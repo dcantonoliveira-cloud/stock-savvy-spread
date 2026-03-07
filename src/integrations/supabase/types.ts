@@ -14,16 +14,280 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      employee_permissions: {
+        Row: {
+          can_entry: boolean
+          can_output: boolean
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_entry?: boolean
+          can_output?: boolean
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_entry?: boolean
+          can_output?: boolean
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stock_entries: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          invoice_number: string | null
+          item_id: string
+          notes: string | null
+          quantity: number
+          registered_by: string
+          supplier: string | null
+          unit_cost: number | null
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          invoice_number?: string | null
+          item_id: string
+          notes?: string | null
+          quantity: number
+          registered_by: string
+          supplier?: string | null
+          unit_cost?: number | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          invoice_number?: string | null
+          item_id?: string
+          notes?: string | null
+          quantity?: number
+          registered_by?: string
+          supplier?: string | null
+          unit_cost?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_entries_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_items: {
+        Row: {
+          category: string
+          created_at: string
+          current_stock: number
+          id: string
+          min_stock: number
+          name: string
+          unit: string
+          unit_cost: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          current_stock?: number
+          id?: string
+          min_stock?: number
+          name: string
+          unit: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          current_stock?: number
+          id?: string
+          min_stock?: number
+          name?: string
+          unit?: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stock_outputs: {
+        Row: {
+          created_at: string
+          date: string
+          employee_name: string
+          event_name: string | null
+          id: string
+          item_id: string
+          notes: string | null
+          quantity: number
+          registered_by: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          employee_name: string
+          event_name?: string | null
+          id?: string
+          item_id: string
+          notes?: string | null
+          quantity: number
+          registered_by: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          employee_name?: string
+          event_name?: string | null
+          id?: string
+          item_id?: string
+          notes?: string | null
+          quantity?: number
+          registered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_outputs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_sheet_items: {
+        Row: {
+          id: string
+          item_id: string
+          quantity: number
+          sheet_id: string
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          quantity: number
+          sheet_id: string
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          quantity?: number
+          sheet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_sheet_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_sheet_items_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "technical_sheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_sheets: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          servings: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          servings?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          servings?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "supervisor" | "employee"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +414,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["supervisor", "employee"],
+    },
   },
 } as const
