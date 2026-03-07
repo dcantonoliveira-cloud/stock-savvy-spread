@@ -1,22 +1,54 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { LogIn } from 'lucide-react';
+import { LogIn, UserPlus } from 'lucide-react';
 
 export default function LoginPage() {
   const { signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { toast.error('Preencha email e senha'); return; }
     setLoading(true);
     const { error } = await signIn(email, password);
     if (error) toast.error('Email ou senha incorretos');
+    setLoading(false);
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password || !name.trim()) { toast.error('Preencha todos os campos'); return; }
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: name.trim() },
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+      return;
+    }
+
+    if (data.user) {
+      // Try to self-assign as supervisor (works only if no supervisors exist)
+      await supabase.from('user_roles').insert({ user_id: data.user.id, role: 'supervisor' as const });
+      toast.success('Conta criada! Faça login.');
+      setIsSignUp(false);
+    }
     setLoading(false);
   };
 
@@ -28,7 +60,13 @@ export default function LoginPage() {
           <p className="text-xs text-muted-foreground mt-1 tracking-widest uppercase">Controle de Estoque</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 space-y-4">
+        <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="glass-card rounded-2xl p-6 space-y-4">
+          {isSignUp && (
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Nome</label>
+              <Input value={name} onChange={e => setName(e.target.value)} placeholder="Seu nome" />
+            </div>
+          )}
           <div>
             <label className="text-sm text-muted-foreground mb-1 block">Email</label>
             <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" />
@@ -38,9 +76,16 @@ export default function LoginPage() {
             <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            <LogIn className="w-4 h-4 mr-2" />
-            {loading ? 'Entrando...' : 'Entrar'}
+            {isSignUp ? <UserPlus className="w-4 h-4 mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
+            {loading ? 'Aguarde...' : isSignUp ? 'Criar Conta' : 'Entrar'}
           </Button>
+          <button
+            type="button"
+            className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setIsSignUp(!isSignUp)}
+          >
+            {isSignUp ? 'Já tem conta? Entrar' : 'Primeiro acesso? Criar conta'}
+          </button>
         </form>
 
         <div className="text-center">
