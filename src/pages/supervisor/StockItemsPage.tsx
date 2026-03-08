@@ -373,6 +373,9 @@ export default function StockItemsPage() {
                       <Sparkles className="w-4 h-4 text-primary" />
                     </Button>
                   )}
+                  <Button variant="ghost" size="icon" title="Histórico" onClick={() => setHistoryItem(item)}>
+                    <History className="w-4 h-4 text-muted-foreground" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => { setEditingItem(item); setDialogOpen(true); }}>
                     <Pencil className="w-4 h-4" />
                   </Button>
