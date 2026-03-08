@@ -128,6 +128,7 @@ export default function StockItemsPage() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
+  const [historyItem, setHistoryItem] = useState<Item | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
