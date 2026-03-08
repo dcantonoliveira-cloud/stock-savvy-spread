@@ -12,6 +12,7 @@ const navItems = [
   { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
   { path: '/comparison', label: 'Comparativo', icon: BarChart3 },
   { path: '/inventory', label: 'Inventário', icon: ClipboardCheck },
+  { path: '/kitchens', label: 'Cozinhas', icon: Building2 },
   { path: '/notifications', label: 'Notificações', icon: Bell },
   { path: '/analysis', label: 'Análise IA', icon: Brain },
   { path: '/users', label: 'Funcionários', icon: Users },

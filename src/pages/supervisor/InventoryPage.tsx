@@ -386,6 +386,62 @@ export default function InventoryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Link generation dialog */}
+      <Dialog open={linkDialog} onOpenChange={setLinkDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gerar Link de Inventário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Gere um link compartilhável para que qualquer pessoa da cozinha faça a contagem sem precisar logar.
+            </p>
+            {kitchens.length > 0 && (
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Cozinha (opcional)</label>
+                <Select value={linkKitchen} onValueChange={setLinkKitchen}>
+                  <SelectTrigger><SelectValue placeholder="Todas as cozinhas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {kitchens.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Validade (horas)</label>
+              <Select value={linkHours} onValueChange={setLinkHours}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6">6 horas</SelectItem>
+                  <SelectItem value="12">12 horas</SelectItem>
+                  <SelectItem value="24">24 horas</SelectItem>
+                  <SelectItem value="48">48 horas</SelectItem>
+                  <SelectItem value="72">72 horas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!generatedLink ? (
+              <Button className="w-full" onClick={generateLink} disabled={generatingLink}>
+                {generatingLink ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+                Gerar Link
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-accent rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Link gerado:</p>
+                  <p className="text-sm font-mono text-foreground break-all">{generatedLink}</p>
+                </div>
+                <Button className="w-full" onClick={copyLink}>
+                  <Copy className="w-4 h-4 mr-2" />Copiar Link
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
