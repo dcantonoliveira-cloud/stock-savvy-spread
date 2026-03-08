@@ -83,7 +83,7 @@ export default function InventoryPage() {
       const expiresAt = new Date(Date.now() + parseInt(linkHours) * 60 * 60 * 1000).toISOString();
       const { data: tokenData, error: tokenErr } = await supabase.from('inventory_tokens').insert({
         count_id: cId,
-        kitchen_id: linkKitchen || null,
+        kitchen_id: (linkKitchen && linkKitchen !== 'all') ? linkKitchen : null,
         expires_at: expiresAt,
       } as any).select('token').single();
       if (tokenErr || !tokenData) throw tokenErr;
