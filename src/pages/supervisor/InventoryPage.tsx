@@ -5,8 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ClipboardCheck, Plus, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ClipboardCheck, Plus, CheckCircle, AlertTriangle, Loader2, Link2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+
+type Kitchen = { id: string; name: string };
 
 type StockItem = {
   id: string; name: string; category: string; unit: string; current_stock: number;
