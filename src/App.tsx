@@ -20,10 +20,12 @@ import NotificationsPage from "./pages/supervisor/NotificationsPage";
 import AIAnalysisPage from "./pages/supervisor/AIAnalysisPage";
 import CategoriesPage from "./pages/supervisor/CategoriesPage";
 import InventoryPage from "./pages/supervisor/InventoryPage";
+import KitchensPage from "./pages/supervisor/KitchensPage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 
+import PublicInventoryPage from "./pages/public/PublicInventoryPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +59,7 @@ function AppRoutes() {
           <Route path="/sheets" element={<SupervisorSheetsPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
+          <Route path="/kitchens" element={<KitchensPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/analysis" element={<AIAnalysisPage />} />
           <Route path="/users" element={<UsersPage />} />
@@ -83,9 +86,14 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
+        <Routes>
+          <Route path="/inventario" element={<PublicInventoryPage />} />
+          <Route path="/*" element={
+            <AuthProvider>
+              <AppRoutes />
+            </AuthProvider>
+          } />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
