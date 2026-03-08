@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, Search, Upload, Download, Image, Sparkles, Loader
 import { toast } from 'sonner';
 import { CATEGORIES, UNITS } from '@/types/inventory';
 import * as XLSX from 'xlsx';
+import ItemHistoryDialog from '@/components/ItemHistoryDialog';
 
 type Item = {
   id: string; name: string; category: string; unit: string;
