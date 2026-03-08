@@ -65,7 +65,7 @@ export default function InventoryPage() {
       // Create count
       const { data: countData, error: countErr } = await supabase.from('inventory_counts' as any).insert({
         status: 'in_progress',
-        kitchen_id: linkKitchen || null,
+        kitchen_id: (linkKitchen && linkKitchen !== 'all') ? linkKitchen : null,
       }).select('id').single();
       if (countErr || !countData) throw countErr;
 
