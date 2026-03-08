@@ -5,11 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const CHART_COLORS = [
-  'hsl(200, 98%, 39%)',
-  'hsl(142, 52%, 40%)',
   'hsl(38, 92%, 50%)',
-  'hsl(0, 72%, 50%)',
-  'hsl(280, 60%, 50%)',
+  'hsl(152, 60%, 42%)',
+  'hsl(220, 70%, 55%)',
+  'hsl(0, 72%, 55%)',
+  'hsl(280, 60%, 55%)',
   'hsl(180, 60%, 40%)',
   'hsl(320, 60%, 50%)',
   'hsl(60, 70%, 45%)',
@@ -50,14 +50,12 @@ export default function SupervisorDashboard() {
   const todayOutputs = outputs.filter(o => o.date === today);
   const todayEntries = entries.filter(e => e.date === today);
 
-  // Category breakdown for pie chart
   const categoryMap: Record<string, number> = {};
   items.forEach(i => {
     categoryMap[i.category] = (categoryMap[i.category] || 0) + i.current_stock * i.unit_cost;
   });
   const categoryData = Object.entries(categoryMap).map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 })).sort((a, b) => b.value - a.value);
 
-  // Last 7 days movements
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -69,7 +67,6 @@ export default function SupervisorDashboard() {
     saidas: outputs.filter(o => o.date === date).reduce((s, o) => s + o.quantity, 0),
   }));
 
-  // Recent activity
   const recentActivity = [
     ...outputs.slice(0, 5).map(o => ({
       type: 'output' as const,
@@ -88,18 +85,19 @@ export default function SupervisorDashboard() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-display font-bold gold-text">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Visão geral do estoque</p>
+        <h1 className="text-3xl font-extrabold gold-text">Dashboard</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Visão geral do estoque</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard icon={DollarSign} label="Valor em Estoque" value={`R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} accent />
         <StatCard icon={Package} label="Itens Cadastrados" value={items.length} />
         <StatCard icon={AlertTriangle} label="Estoque Baixo" value={lowStock.length} warn={lowStock.length > 0} />
         <StatCard icon={Users} label="Funcionários" value={employeeCount} />
       </div>
 
+      {/* Stats Row 2 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard icon={ArrowUpCircle} label="Entradas Hoje" value={todayEntries.length} />
         <StatCard icon={ArrowDownCircle} label="Saídas Hoje" value={todayOutputs.length} />
@@ -109,35 +107,43 @@ export default function SupervisorDashboard() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <Card className="glass-card border-0">
-          <CardHeader>
-            <CardTitle className="text-base font-display">Movimentações (7 dias)</CardTitle>
+        <Card className="glass-card border-0 rounded-2xl overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-foreground">Movimentações (7 dias)</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={movementData}>
-                <XAxis dataKey="date" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
-                <Bar dataKey="entradas" fill="hsl(142, 52%, 40%)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="saidas" fill="hsl(0, 72%, 50%)" radius={[4, 4, 0, 0]} />
+              <BarChart data={movementData} barGap={2}>
+                <XAxis dataKey="date" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: 12,
+                    boxShadow: 'var(--shadow-lg)',
+                    fontSize: 12,
+                  }}
+                />
+                <Bar dataKey="entradas" fill="hsl(152, 60%, 42%)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="saidas" fill="hsl(0, 72%, 55%)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-0">
-          <CardHeader>
-            <CardTitle className="text-base font-display">Valor por Categoria</CardTitle>
+        <Card className="glass-card border-0 rounded-2xl overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-foreground">Valor por Categoria</CardTitle>
           </CardHeader>
           <CardContent>
             {categoryData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
-                  <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                  <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={40} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} strokeWidth={2} stroke="hsl(var(--background))">
                     {categoryData.map((_, idx) => <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                  <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -150,23 +156,25 @@ export default function SupervisorDashboard() {
       {/* Low stock + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {lowStock.length > 0 && (
-          <Card className="glass-card border-0">
-            <CardHeader>
-              <CardTitle className="text-base font-display flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-warning" />
+          <Card className="glass-card border-0 rounded-2xl overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-warning/15 flex items-center justify-center">
+                  <AlertTriangle className="w-3.5 h-3.5 text-warning" />
+                </div>
                 Estoque Baixo
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {lowStock.map(item => (
-                <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
+                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50 hover:bg-muted transition-colors">
                   <div>
                     <p className="text-sm font-medium text-foreground">{item.name}</p>
                     <p className="text-xs text-muted-foreground">{item.category}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-warning">{item.current_stock} {item.unit}</p>
-                    <p className="text-xs text-muted-foreground">Mín: {item.min_stock}</p>
+                    <p className="text-sm font-bold text-warning">{item.current_stock} {item.unit}</p>
+                    <p className="text-[11px] text-muted-foreground">Mín: {item.min_stock}</p>
                   </div>
                 </div>
               ))}
@@ -174,22 +182,22 @@ export default function SupervisorDashboard() {
           </Card>
         )}
 
-        <Card className="glass-card border-0">
-          <CardHeader>
-            <CardTitle className="text-base font-display">Atividade Recente</CardTitle>
+        <Card className="glass-card border-0 rounded-2xl overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-foreground">Atividade Recente</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-1">
             {recentActivity.length > 0 ? recentActivity.map((a, i) => (
-              <div key={i} className="flex items-start gap-3 p-2 rounded-lg">
-                <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${a.type === 'entry' ? 'bg-success' : 'bg-destructive'}`} />
+              <div key={i} className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-muted/50 transition-colors">
+                <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${a.type === 'entry' ? 'bg-success' : 'bg-destructive'}`} />
                 <div className="min-w-0">
-                  <p className="text-sm text-foreground">{a.text}</p>
+                  <p className="text-sm text-foreground leading-snug">{a.text}</p>
                   {a.event && <p className="text-xs text-muted-foreground">{a.event}</p>}
-                  <p className="text-xs text-muted-foreground">{new Date(a.time).toLocaleString('pt-BR')}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{new Date(a.time).toLocaleString('pt-BR')}</p>
                 </div>
               </div>
             )) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma atividade recente</p>
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhuma atividade recente</p>
             )}
           </CardContent>
         </Card>
@@ -200,14 +208,16 @@ export default function SupervisorDashboard() {
 
 function StatCard({ icon: Icon, label, value, accent, warn }: { icon: any; label: string; value: string | number; accent?: boolean; warn?: boolean }) {
   return (
-    <div className="glass-card rounded-xl p-5 animate-fade-in">
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`p-2 rounded-lg ${warn ? 'bg-warning/20 text-warning' : accent ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+    <div className="stat-card">
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+          warn ? 'bg-warning/12 text-warning' : accent ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground'
+        }`}>
           <Icon className="w-4 h-4" />
         </div>
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
-      <p className={`text-2xl font-display font-bold ${warn ? 'text-warning' : 'text-foreground'}`}>{value}</p>
+      <p className={`text-2xl font-extrabold tracking-tight ${warn ? 'text-warning' : 'text-foreground'}`}>{value}</p>
     </div>
   );
 }
