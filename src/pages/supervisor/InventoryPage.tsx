@@ -192,8 +192,11 @@ export default function InventoryPage() {
           <h1 className="text-3xl font-display font-bold gold-text">Inventário</h1>
           <p className="text-muted-foreground mt-1">Contagem física do estoque</p>
         </div>
-        {!activeCount && (
+      {!activeCount && (
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => { setLinkDialog(true); setGeneratedLink(''); }}>
+              <Link2 className="w-4 h-4 mr-2" />Gerar Link
+            </Button>
             <Button variant="outline" onClick={() => setShowHistory(!showHistory)}>
               {showHistory ? 'Fechar Histórico' : 'Histórico'}
             </Button>
