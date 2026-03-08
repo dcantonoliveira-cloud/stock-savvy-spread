@@ -4,9 +4,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowUpCircle, ArrowDownCircle, Check, ArrowLeft, Search } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Check, ArrowLeft, Search, ScanBarcode } from 'lucide-react';
 import { toast } from 'sonner';
 import { CATEGORIES } from '@/types/inventory';
+import BarcodeScanner from '@/components/BarcodeScanner';
 
 type StockItem = {
   id: string;
@@ -15,6 +16,7 @@ type StockItem = {
   unit: string;
   current_stock: number;
   image_url: string | null;
+  barcode: string | null;
 };
 
 const CATEGORY_EMOJIS: Record<string, string> = {
@@ -33,13 +35,59 @@ export default function EmployeeDashboard() {
   const [eventName, setEventName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [barcodeBuffer, setBarcodeBuffer] = useState('');
+  const [barcodeTimeout, setBarcodeTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const loadItems = async () => {
-    const { data } = await supabase.from('stock_items').select('id, name, category, unit, current_stock, image_url' as any).order('name');
+    const { data } = await supabase.from('stock_items').select('id, name, category, unit, current_stock, image_url, barcode' as any).order('name');
     if (data) setItems(data as unknown as StockItem[]);
   };
 
   useEffect(() => { loadItems(); }, []);
+
+  // Physical barcode reader support (keyboard input)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if (e.key === 'Enter' && barcodeBuffer.length >= 8) {
+        handleBarcodeScan(barcodeBuffer);
+        setBarcodeBuffer('');
+        return;
+      }
+
+      if (/^[0-9]$/.test(e.key)) {
+        setBarcodeBuffer(prev => prev + e.key);
+        if (barcodeTimeout) clearTimeout(barcodeTimeout);
+        const timeout = setTimeout(() => setBarcodeBuffer(''), 300);
+        setBarcodeTimeout(timeout);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [barcodeBuffer, barcodeTimeout]);
+
+  const handleBarcodeScan = (barcode: string) => {
+    const found = items.find(i => i.barcode === barcode);
+    if (found) {
+      setSearch('');
+      setSelectedCategory(null);
+      if (permissions.can_output && permissions.can_entry) {
+        setSelectedItem(found);
+      } else if (permissions.can_output) {
+        handleAction(found, 'output');
+      } else if (permissions.can_entry) {
+        handleAction(found, 'entry');
+      }
+      toast.success(`📦 ${found.name}`);
+    } else {
+      toast.error(`Código ${barcode} não encontrado`);
+    }
+  };
 
   const categories = CATEGORIES.filter(cat => items.some(i => i.category === cat));
   const categoryItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : [];
@@ -90,10 +138,9 @@ export default function EmployeeDashboard() {
 
   const ItemCard = ({ item }: { item: StockItem }) => (
     <div
-      className="flex flex-col items-center rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      className="flex flex-col items-center rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer active:scale-95"
       onClick={() => {
         if (permissions.can_output && permissions.can_entry) {
-          // Show both options
           setSelectedItem(item);
         } else if (permissions.can_output) {
           handleAction(item, 'output');
@@ -114,27 +161,35 @@ export default function EmployeeDashboard() {
     </div>
   );
 
-  // Choose action dialog (when both entry and output are allowed)
   const showChooseAction = selectedItem && mode === null;
 
   return (
     <div className="pb-8">
-      {/* Header */}
       <div className="text-center py-3">
         <h2 className="text-lg font-display font-bold text-foreground">
           Olá, {profile?.display_name?.split(' ')[0]} 👋
         </h2>
       </div>
 
-      {/* Search bar */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          className="pl-10 h-11 text-sm rounded-xl"
-          placeholder="Buscar item..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); if (e.target.value) setSelectedCategory(null); }}
-        />
+      {/* Search + Scanner */}
+      <div className="flex gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            className="pl-10 h-11 text-sm rounded-xl"
+            placeholder="Buscar item..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); if (e.target.value) setSelectedCategory(null); }}
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="lg"
+          className="h-11 px-4 rounded-xl border-primary/30 text-primary hover:bg-primary/10"
+          onClick={() => setScannerOpen(true)}
+        >
+          <ScanBarcode className="w-5 h-5" />
+        </Button>
       </div>
 
       {/* Search results */}
@@ -161,7 +216,7 @@ export default function EmployeeDashboard() {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className="flex flex-col items-center justify-center rounded-2xl bg-card border border-border p-6 shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
+                  className="flex flex-col items-center justify-center rounded-2xl bg-card border border-border p-6 shadow-sm hover:shadow-md hover:border-primary/30 transition-all active:scale-95"
                 >
                   <span className="text-4xl mb-2">{CATEGORY_EMOJIS[cat] || '📦'}</span>
                   <p className="font-medium text-foreground text-sm">{cat}</p>
@@ -193,6 +248,13 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       )}
+
+      {/* Camera barcode scanner */}
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleBarcodeScan}
+      />
 
       {/* Choose action dialog */}
       <Dialog open={!!showChooseAction} onOpenChange={open => { if (!open) setSelectedItem(null); }}>
@@ -252,9 +314,7 @@ export default function EmployeeDashboard() {
               </div>
 
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">
-                  Quantidade ({selectedItem.unit}) *
-                </label>
+                <label className="text-sm text-muted-foreground mb-1 block">Quantidade ({selectedItem.unit}) *</label>
                 <Input
                   type="number"
                   inputMode="decimal"
@@ -269,30 +329,16 @@ export default function EmployeeDashboard() {
               {mode === 'output' && (
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Evento (opcional)</label>
-                  <Input
-                    className="h-11 rounded-xl"
-                    value={eventName}
-                    onChange={e => setEventName(e.target.value)}
-                    placeholder="Ex: Casamento Silva"
-                  />
+                  <Input className="h-11 rounded-xl" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="Ex: Casamento Silva" />
                 </div>
               )}
 
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Obs (opcional)</label>
-                <Input
-                  className="h-11 rounded-xl"
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  placeholder="Observações"
-                />
+                <Input className="h-11 rounded-xl" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Observações" />
               </div>
 
-              <Button
-                className="w-full h-14 text-lg rounded-xl"
-                onClick={handleSubmit}
-                disabled={submitting || !quantity}
-              >
+              <Button className="w-full h-14 text-lg rounded-xl" onClick={handleSubmit} disabled={submitting || !quantity}>
                 <Check className="w-5 h-5 mr-2" />
                 {submitting ? 'Registrando...' : 'Confirmar'}
               </Button>

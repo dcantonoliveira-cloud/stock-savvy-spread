@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.generate-item-image]
 verify_jwt = false
+
+[functions.analyze-stock]
+verify_jwt = false
