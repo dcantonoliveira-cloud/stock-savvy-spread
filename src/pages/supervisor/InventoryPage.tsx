@@ -5,8 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ClipboardCheck, Plus, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ClipboardCheck, Plus, CheckCircle, AlertTriangle, Loader2, Link2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+
+type Kitchen = { id: string; name: string };
 
 type StockItem = {
   id: string; name: string; category: string; unit: string; current_stock: number;
@@ -38,13 +41,65 @@ export default function InventoryPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyDetails, setHistoryDetails] = useState<any[]>([]);
   const [detailCountId, setDetailCountId] = useState<string | null>(null);
+  const [kitchens, setKitchens] = useState<Kitchen[]>([]);
+  const [linkDialog, setLinkDialog] = useState(false);
+  const [linkKitchen, setLinkKitchen] = useState('');
+  const [linkHours, setLinkHours] = useState('24');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [generatingLink, setGeneratingLink] = useState(false);
 
   const load = async () => {
-    const { data: itemsData } = await supabase.from('stock_items').select('id, name, category, unit, current_stock').order('category').order('name');
-    if (itemsData) setItems(itemsData);
+    const [itemsRes, historyRes, kitchensRes] = await Promise.all([
+      supabase.from('stock_items').select('id, name, category, unit, current_stock').order('category').order('name'),
+      supabase.from('inventory_counts' as any).select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('kitchens').select('id, name').order('name'),
+    ]);
+    if (itemsRes.data) setItems(itemsRes.data);
+    if (historyRes.data) setHistory(historyRes.data as unknown as InventoryCount[]);
+    if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
+  };
 
-    const { data: historyData } = await supabase.from('inventory_counts' as any).select('*').order('created_at', { ascending: false }).limit(20);
-    if (historyData) setHistory(historyData as unknown as InventoryCount[]);
+  const generateLink = async () => {
+    setGeneratingLink(true);
+    try {
+      // Create count
+      const { data: countData, error: countErr } = await supabase.from('inventory_counts' as any).insert({
+        status: 'in_progress',
+        kitchen_id: (linkKitchen && linkKitchen !== 'all') ? linkKitchen : null,
+      }).select('id').single();
+      if (countErr || !countData) throw countErr;
+
+      const cId = (countData as any).id;
+
+      // Create count items
+      const countItemsData = items.map(item => ({
+        count_id: cId,
+        item_id: item.id,
+        system_stock: item.current_stock,
+      }));
+      await supabase.from('inventory_count_items' as any).insert(countItemsData);
+
+      // Create token
+      const expiresAt = new Date(Date.now() + parseInt(linkHours) * 60 * 60 * 1000).toISOString();
+      const { data: tokenData, error: tokenErr } = await supabase.from('inventory_tokens').insert({
+        count_id: cId,
+        kitchen_id: (linkKitchen && linkKitchen !== 'all') ? linkKitchen : null,
+        expires_at: expiresAt,
+      } as any).select('token').single();
+      if (tokenErr || !tokenData) throw tokenErr;
+
+      const url = `${window.location.origin}/inventario?token=${(tokenData as any).token}`;
+      setGeneratedLink(url);
+      toast.success('Link gerado com sucesso!');
+    } catch (e) {
+      toast.error('Erro ao gerar link');
+    }
+    setGeneratingLink(false);
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(generatedLink);
+    toast.success('Link copiado!');
   };
 
   useEffect(() => { load(); }, []);
@@ -137,8 +192,11 @@ export default function InventoryPage() {
           <h1 className="text-3xl font-display font-bold gold-text">Inventário</h1>
           <p className="text-muted-foreground mt-1">Contagem física do estoque</p>
         </div>
-        {!activeCount && (
+      {!activeCount && (
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => { setLinkDialog(true); setGeneratedLink(''); }}>
+              <Link2 className="w-4 h-4 mr-2" />Gerar Link
+            </Button>
             <Button variant="outline" onClick={() => setShowHistory(!showHistory)}>
               {showHistory ? 'Fechar Histórico' : 'Histórico'}
             </Button>
@@ -325,6 +383,62 @@ export default function InventoryPage() {
                 </div>
               );
             })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Link generation dialog */}
+      <Dialog open={linkDialog} onOpenChange={setLinkDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gerar Link de Inventário</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Gere um link compartilhável para que qualquer pessoa da cozinha faça a contagem sem precisar logar.
+            </p>
+            {kitchens.length > 0 && (
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Cozinha (opcional)</label>
+                <Select value={linkKitchen} onValueChange={setLinkKitchen}>
+                  <SelectTrigger><SelectValue placeholder="Todas as cozinhas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {kitchens.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Validade (horas)</label>
+              <Select value={linkHours} onValueChange={setLinkHours}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6">6 horas</SelectItem>
+                  <SelectItem value="12">12 horas</SelectItem>
+                  <SelectItem value="24">24 horas</SelectItem>
+                  <SelectItem value="48">48 horas</SelectItem>
+                  <SelectItem value="72">72 horas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!generatedLink ? (
+              <Button className="w-full" onClick={generateLink} disabled={generatingLink}>
+                {generatingLink ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+                Gerar Link
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-accent rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Link gerado:</p>
+                  <p className="text-sm font-mono text-foreground break-all">{generatedLink}</p>
+                </div>
+                <Button className="w-full" onClick={copyLink}>
+                  <Copy className="w-4 h-4 mr-2" />Copiar Link
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
