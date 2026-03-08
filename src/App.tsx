@@ -16,6 +16,8 @@ import SupervisorOutputsPage from "./pages/supervisor/OutputsPage";
 import SupervisorSheetsPage from "./pages/supervisor/SheetsPage";
 import SupervisorComparisonPage from "./pages/supervisor/ComparisonPage";
 import UsersPage from "./pages/supervisor/UsersPage";
+import NotificationsPage from "./pages/supervisor/NotificationsPage";
+import AIAnalysisPage from "./pages/supervisor/AIAnalysisPage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
