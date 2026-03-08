@@ -50,6 +50,7 @@ function AppRoutes() {
       <SupervisorLayout>
         <Routes>
           <Route path="/" element={<SupervisorDashboard />} />
+          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/items" element={<StockItemsPage />} />
           <Route path="/entries" element={<EntriesPage />} />
           <Route path="/outputs" element={<SupervisorOutputsPage />} />
