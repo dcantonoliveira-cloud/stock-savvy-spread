@@ -293,6 +293,9 @@ export default function StockItemsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={exportStock}>
+            <FileSpreadsheet className="w-4 h-4 mr-2" />Exportar
+          </Button>
           <Button variant="outline" onClick={downloadTemplate}>
             <Download className="w-4 h-4 mr-2" />Modelo
           </Button>
