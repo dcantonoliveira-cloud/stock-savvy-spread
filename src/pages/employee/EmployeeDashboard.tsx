@@ -4,7 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowUpCircle, ArrowDownCircle, Check, ArrowLeft, Search, ScanBarcode } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowUpCircle, ArrowDownCircle, ArrowRightLeft, Check, ArrowLeft, Search, ScanBarcode } from 'lucide-react';
 import { toast } from 'sonner';
 import { CATEGORIES } from '@/types/inventory';
 import BarcodeScanner from '@/components/BarcodeScanner';
@@ -19,6 +20,9 @@ type StockItem = {
   barcode: string | null;
 };
 
+type Kitchen = { id: string; name: string };
+type Location = { id: string; item_id: string; kitchen_id: string; current_stock: number };
+
 const CATEGORY_EMOJIS: Record<string, string> = {
   'Carnes': '🥩', 'Bebidas': '🥤', 'Frios': '🧀', 'Hortifruti': '🥬',
   'Secos': '🌾', 'Descartáveis': '🥤', 'Limpeza': '🧹', 'Outros': '📦',
@@ -27,9 +31,11 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 export default function EmployeeDashboard() {
   const { user, permissions, profile } = useAuth();
   const [items, setItems] = useState<StockItem[]>([]);
+  const [kitchens, setKitchens] = useState<Kitchen[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
-  const [mode, setMode] = useState<'entry' | 'output' | null>(null);
+  const [mode, setMode] = useState<'entry' | 'output' | 'transfer' | null>(null);
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
   const [eventName, setEventName] = useState('');
@@ -39,17 +45,26 @@ export default function EmployeeDashboard() {
   const [barcodeBuffer, setBarcodeBuffer] = useState('');
   const [barcodeTimeout, setBarcodeTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  const loadItems = async () => {
-    const { data } = await supabase.from('stock_items').select('id, name, category, unit, current_stock, image_url, barcode' as any).order('name');
-    if (data) setItems(data as unknown as StockItem[]);
+  // Transfer state
+  const [tfFromKitchen, setTfFromKitchen] = useState('');
+  const [tfToKitchen, setTfToKitchen] = useState('');
+
+  const loadData = async () => {
+    const [itemsRes, kitchensRes, locsRes] = await Promise.all([
+      supabase.from('stock_items').select('id, name, category, unit, current_stock, image_url, barcode' as any).order('name'),
+      supabase.from('kitchens').select('id, name').order('name'),
+      supabase.from('stock_item_locations').select('id, item_id, kitchen_id, current_stock'),
+    ]);
+    if (itemsRes.data) setItems(itemsRes.data as unknown as StockItem[]);
+    if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
+    if (locsRes.data) setLocations(locsRes.data as Location[]);
   };
 
-  useEffect(() => { loadItems(); }, []);
+  useEffect(() => { loadData(); }, []);
 
   // Physical barcode reader support (keyboard input)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
@@ -76,13 +91,7 @@ export default function EmployeeDashboard() {
     if (found) {
       setSearch('');
       setSelectedCategory(null);
-      if (permissions.can_output && permissions.can_entry) {
-        setSelectedItem(found);
-      } else if (permissions.can_output) {
-        handleAction(found, 'output');
-      } else if (permissions.can_entry) {
-        handleAction(found, 'entry');
-      }
+      setSelectedItem(found);
       toast.success(`📦 ${found.name}`);
     } else {
       toast.error(`Código ${barcode} não encontrado`);
@@ -93,12 +102,18 @@ export default function EmployeeDashboard() {
   const categoryItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : [];
   const searchResults = search ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())) : [];
 
-  const handleAction = (item: StockItem, action: 'entry' | 'output') => {
+  const handleAction = (item: StockItem, action: 'entry' | 'output' | 'transfer') => {
     setSelectedItem(item);
     setMode(action);
     setQuantity('');
     setNotes('');
     setEventName('');
+    setTfFromKitchen('');
+    setTfToKitchen('');
+  };
+
+  const getLocationStock = (itemId: string, kitchenId: string) => {
+    return locations.find(l => l.item_id === itemId && l.kitchen_id === kitchenId)?.current_stock ?? 0;
   };
 
   const handleSubmit = async () => {
@@ -117,7 +132,7 @@ export default function EmployeeDashboard() {
       });
       if (error) toast.error('Erro ao registrar entrada');
       else toast.success(`✅ Entrada de ${quantity} ${selectedItem.unit} de ${selectedItem.name}`);
-    } else {
+    } else if (mode === 'output') {
       const { error } = await supabase.from('stock_outputs').insert({
         item_id: selectedItem.id,
         quantity: parseFloat(quantity),
@@ -128,26 +143,73 @@ export default function EmployeeDashboard() {
       });
       if (error) toast.error('Erro ao registrar saída');
       else toast.success(`✅ Saída de ${quantity} ${selectedItem.unit} de ${selectedItem.name}`);
+    } else if (mode === 'transfer') {
+      if (!tfFromKitchen || !tfToKitchen) {
+        toast.error('Selecione origem e destino');
+        setSubmitting(false);
+        return;
+      }
+      if (tfFromKitchen === tfToKitchen) {
+        toast.error('Origem e destino devem ser diferentes');
+        setSubmitting(false);
+        return;
+      }
+      const qty = parseFloat(quantity);
+      const fromStock = getLocationStock(selectedItem.id, tfFromKitchen);
+      if (qty > fromStock) {
+        toast.error(`Estoque insuficiente na origem (disponível: ${fromStock})`);
+        setSubmitting(false);
+        return;
+      }
+
+      // Record transfer
+      const { error: tfError } = await supabase.from('stock_transfers').insert({
+        item_id: selectedItem.id,
+        from_kitchen_id: tfFromKitchen,
+        to_kitchen_id: tfToKitchen,
+        quantity: qty,
+        transferred_by: profile?.display_name || user.email || '',
+        notes: notes.trim() || null,
+      } as any);
+      if (tfError) { toast.error('Erro ao registrar transferência'); setSubmitting(false); return; }
+
+      // Update origin
+      const fromLoc = locations.find(l => l.item_id === selectedItem.id && l.kitchen_id === tfFromKitchen);
+      if (fromLoc) {
+        await supabase.from('stock_item_locations')
+          .update({ current_stock: fromLoc.current_stock - qty } as any)
+          .eq('id', fromLoc.id);
+      }
+
+      // Update destination
+      const toLoc = locations.find(l => l.item_id === selectedItem.id && l.kitchen_id === tfToKitchen);
+      if (toLoc) {
+        await supabase.from('stock_item_locations')
+          .update({ current_stock: toLoc.current_stock + qty } as any)
+          .eq('id', toLoc.id);
+      } else {
+        await supabase.from('stock_item_locations').insert({
+          item_id: selectedItem.id,
+          kitchen_id: tfToKitchen,
+          current_stock: qty,
+        } as any);
+      }
+
+      const fromName = kitchens.find(k => k.id === tfFromKitchen)?.name;
+      const toName = kitchens.find(k => k.id === tfToKitchen)?.name;
+      toast.success(`✅ ${qty} ${selectedItem.unit} de ${selectedItem.name} transferidos de ${fromName} → ${toName}`);
     }
 
     setSubmitting(false);
     setMode(null);
     setSelectedItem(null);
-    loadItems();
+    loadData();
   };
 
   const ItemCard = ({ item }: { item: StockItem }) => (
     <div
       className="flex flex-col items-center rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer active:scale-95"
-      onClick={() => {
-        if (permissions.can_output && permissions.can_entry) {
-          setSelectedItem(item);
-        } else if (permissions.can_output) {
-          handleAction(item, 'output');
-        } else if (permissions.can_entry) {
-          handleAction(item, 'entry');
-        }
-      }}
+      onClick={() => setSelectedItem(item)}
     >
       <div className="w-16 h-16 rounded-xl overflow-hidden bg-accent flex items-center justify-center mb-2">
         {item.image_url ? (
@@ -162,6 +224,7 @@ export default function EmployeeDashboard() {
   );
 
   const showChooseAction = selectedItem && mode === null;
+  const hasKitchens = kitchens.length >= 2;
 
   return (
     <div className="pb-8">
@@ -262,31 +325,44 @@ export default function EmployeeDashboard() {
           <DialogHeader>
             <DialogTitle className="text-center">{selectedItem?.name}</DialogTitle>
           </DialogHeader>
+          <p className="text-center text-sm text-muted-foreground -mt-2">
+            Estoque: {selectedItem?.current_stock} {selectedItem?.unit}
+          </p>
           <div className="flex flex-col gap-3 pt-2">
             {permissions.can_entry && (
               <Button
                 size="lg"
-                className="h-16 text-lg rounded-xl bg-success text-success-foreground hover:bg-success/90"
+                className="h-14 text-base rounded-xl bg-success text-success-foreground hover:bg-success/90"
                 onClick={() => setMode('entry')}
               >
-                <ArrowUpCircle className="w-6 h-6 mr-3" /> Entrada
+                <ArrowUpCircle className="w-5 h-5 mr-3" /> Entrada
               </Button>
             )}
             {permissions.can_output && (
               <Button
                 size="lg"
-                className="h-16 text-lg rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="h-14 text-base rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => setMode('output')}
               >
-                <ArrowDownCircle className="w-6 h-6 mr-3" /> Saída
+                <ArrowDownCircle className="w-5 h-5 mr-3" /> Saída
+              </Button>
+            )}
+            {hasKitchens && (
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-14 text-base rounded-xl border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => setMode('transfer')}
+              >
+                <ArrowRightLeft className="w-5 h-5 mr-3" /> Transferir entre Cozinhas
               </Button>
             )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Quantity dialog */}
-      <Dialog open={mode !== null} onOpenChange={open => { if (!open) { setMode(null); setSelectedItem(null); } }}>
+      {/* Entry/Output quantity dialog */}
+      <Dialog open={mode === 'entry' || mode === 'output'} onOpenChange={open => { if (!open) { setMode(null); setSelectedItem(null); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -341,6 +417,99 @@ export default function EmployeeDashboard() {
               <Button className="w-full h-14 text-lg rounded-xl" onClick={handleSubmit} disabled={submitting || !quantity}>
                 <Check className="w-5 h-5 mr-2" />
                 {submitting ? 'Registrando...' : 'Confirmar'}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer dialog */}
+      <Dialog open={mode === 'transfer'} onOpenChange={open => { if (!open) { setMode(null); setSelectedItem(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5 text-primary" /> Transferir
+            </DialogTitle>
+          </DialogHeader>
+          {selectedItem && (
+            <div className="space-y-4">
+              <div className="bg-accent rounded-lg p-3 flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg overflow-hidden bg-card flex items-center justify-center">
+                  {selectedItem.image_url ? (
+                    <img src={selectedItem.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl">{CATEGORY_EMOJIS[selectedItem.category] || '📦'}</span>
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">{selectedItem.name}</p>
+                  <p className="text-xs text-muted-foreground">Estoque geral: {selectedItem.current_stock} {selectedItem.unit}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">De (Origem) *</label>
+                <Select value={tfFromKitchen} onValueChange={setTfFromKitchen}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Selecione a cozinha de origem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kitchens.map(k => {
+                      const stock = getLocationStock(selectedItem.id, k.id);
+                      return (
+                        <SelectItem key={k.id} value={k.id}>
+                          {k.name} ({stock} {selectedItem.unit})
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Para (Destino) *</label>
+                <Select value={tfToKitchen} onValueChange={setTfToKitchen}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Selecione a cozinha de destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kitchens.filter(k => k.id !== tfFromKitchen).map(k => (
+                      <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Quantidade ({selectedItem.unit}) *</label>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  className="h-14 text-2xl text-center font-bold rounded-xl"
+                  value={quantity}
+                  onChange={e => setQuantity(e.target.value)}
+                  placeholder="0"
+                  autoFocus
+                />
+                {tfFromKitchen && (
+                  <p className="text-xs text-muted-foreground mt-1 text-center">
+                    Disponível na origem: {getLocationStock(selectedItem.id, tfFromKitchen)} {selectedItem.unit}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Obs (opcional)</label>
+                <Input className="h-11 rounded-xl" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Ex: Urgente para evento" />
+              </div>
+
+              <Button
+                className="w-full h-14 text-lg rounded-xl"
+                onClick={handleSubmit}
+                disabled={submitting || !quantity || !tfFromKitchen || !tfToKitchen}
+              >
+                <ArrowRightLeft className="w-5 h-5 mr-2" />
+                {submitting ? 'Transferindo...' : 'Confirmar Transferência'}
               </Button>
             </div>
           )}
