@@ -41,6 +41,12 @@ export default function InventoryPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyDetails, setHistoryDetails] = useState<any[]>([]);
   const [detailCountId, setDetailCountId] = useState<string | null>(null);
+  const [kitchens, setKitchens] = useState<Kitchen[]>([]);
+  const [linkDialog, setLinkDialog] = useState(false);
+  const [linkKitchen, setLinkKitchen] = useState('');
+  const [linkHours, setLinkHours] = useState('24');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [generatingLink, setGeneratingLink] = useState(false);
 
   const load = async () => {
     const { data: itemsData } = await supabase.from('stock_items').select('id, name, category, unit, current_stock').order('category').order('name');
