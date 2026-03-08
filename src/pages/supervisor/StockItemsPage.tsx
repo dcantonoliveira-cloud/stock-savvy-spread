@@ -222,6 +222,25 @@ export default function StockItemsPage() {
     toast.success('Planilha modelo baixada!');
   };
 
+  const exportStock = () => {
+    const rows = items.map(i => ({
+      'Nome': i.name,
+      'Categoria': i.category,
+      'Unidade': i.unit,
+      'Estoque Atual': i.current_stock,
+      'Estoque Mínimo': i.min_stock,
+      'Custo Unitário': i.unit_cost,
+      'Valor em Estoque': Math.round(i.current_stock * i.unit_cost * 100) / 100,
+      'Código de Barras': i.barcode || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Estoque');
+    XLSX.writeFile(wb, `estoque_rondello_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Estoque exportado!');
+  };
+
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
