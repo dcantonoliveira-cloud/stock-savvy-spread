@@ -417,6 +417,15 @@ export default function StockItemsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Item history dialog */}
+      <ItemHistoryDialog
+        itemId={historyItem?.id || null}
+        itemName={historyItem?.name || ''}
+        itemUnit={historyItem?.unit || ''}
+        open={historyItem !== null}
+        onClose={() => setHistoryItem(null)}
+      />
     </div>
   );
 }
