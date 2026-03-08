@@ -53,6 +53,8 @@ function AppRoutes() {
           <Route path="/outputs" element={<SupervisorOutputsPage />} />
           <Route path="/sheets" element={<SupervisorSheetsPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/analysis" element={<AIAnalysisPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
