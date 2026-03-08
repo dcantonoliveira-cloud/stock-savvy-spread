@@ -4,8 +4,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowUpCircle, ArrowDownCircle, Search, Check } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Check, ArrowLeft, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { CATEGORIES } from '@/types/inventory';
 
 type StockItem = {
   id: string;
@@ -13,27 +14,36 @@ type StockItem = {
   category: string;
   unit: string;
   current_stock: number;
+  image_url: string | null;
+};
+
+const CATEGORY_EMOJIS: Record<string, string> = {
+  'Carnes': '🥩', 'Bebidas': '🥤', 'Frios': '🧀', 'Hortifruti': '🥬',
+  'Secos': '🌾', 'Descartáveis': '🥤', 'Limpeza': '🧹', 'Outros': '📦',
 };
 
 export default function EmployeeDashboard() {
   const { user, permissions, profile } = useAuth();
   const [items, setItems] = useState<StockItem[]>([]);
-  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [mode, setMode] = useState<'entry' | 'output' | null>(null);
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
   const [eventName, setEventName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
 
   const loadItems = async () => {
-    const { data } = await supabase.from('stock_items').select('id, name, category, unit, current_stock').order('name');
-    if (data) setItems(data);
+    const { data } = await supabase.from('stock_items').select('id, name, category, unit, current_stock, image_url' as any).order('name');
+    if (data) setItems(data as unknown as StockItem[]);
   };
 
   useEffect(() => { loadItems(); }, []);
 
-  const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
+  const categories = CATEGORIES.filter(cat => items.some(i => i.category === cat));
+  const categoryItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : [];
+  const searchResults = search ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())) : [];
 
   const handleAction = (item: StockItem, action: 'entry' | 'output') => {
     setSelectedItem(item);
@@ -78,69 +88,143 @@ export default function EmployeeDashboard() {
     loadItems();
   };
 
+  const ItemCard = ({ item }: { item: StockItem }) => (
+    <div
+      className="flex flex-col items-center rounded-2xl bg-card border border-border p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      onClick={() => {
+        if (permissions.can_output && permissions.can_entry) {
+          // Show both options
+          setSelectedItem(item);
+        } else if (permissions.can_output) {
+          handleAction(item, 'output');
+        } else if (permissions.can_entry) {
+          handleAction(item, 'entry');
+        }
+      }}
+    >
+      <div className="w-16 h-16 rounded-xl overflow-hidden bg-accent flex items-center justify-center mb-2">
+        {item.image_url ? (
+          <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-3xl">{CATEGORY_EMOJIS[item.category] || '📦'}</span>
+        )}
+      </div>
+      <p className="text-xs font-medium text-foreground text-center leading-tight line-clamp-2">{item.name}</p>
+      <p className="text-[10px] text-muted-foreground mt-1">{item.current_stock} {item.unit}</p>
+    </div>
+  );
+
+  // Choose action dialog (when both entry and output are allowed)
+  const showChooseAction = selectedItem && mode === null;
+
   return (
-    <div className="space-y-4 pb-8">
-      <div className="text-center py-4">
-        <h2 className="text-xl font-display font-bold text-foreground">
+    <div className="pb-8">
+      {/* Header */}
+      <div className="text-center py-3">
+        <h2 className="text-lg font-display font-bold text-foreground">
           Olá, {profile?.display_name?.split(' ')[0]} 👋
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">Selecione um item para lançar</p>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+      {/* Search bar */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          className="pl-11 h-12 text-base rounded-xl"
+          className="pl-10 h-11 text-sm rounded-xl"
           placeholder="Buscar item..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => { setSearch(e.target.value); if (e.target.value) setSelectedCategory(null); }}
         />
       </div>
 
-      {/* Items list */}
-      <div className="space-y-2">
-        {filtered.map(item => (
-          <div key={item.id} className="glass-card rounded-xl p-4 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{item.name}</p>
-                <p className="text-xs text-muted-foreground">{item.category} · {item.current_stock} {item.unit}</p>
-              </div>
-              <div className="flex gap-2 ml-3">
-                {permissions.can_entry && (
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 w-12 rounded-xl border-success/30 text-success hover:bg-success/10"
-                    onClick={() => handleAction(item, 'entry')}
-                  >
-                    <ArrowUpCircle className="w-5 h-5" />
-                  </Button>
-                )}
-                {permissions.can_output && (
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 w-12 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10"
-                    onClick={() => handleAction(item, 'output')}
-                  >
-                    <ArrowDownCircle className="w-5 h-5" />
-                  </Button>
-                )}
-              </div>
-            </div>
+      {/* Search results */}
+      {search && (
+        <div>
+          <p className="text-sm text-muted-foreground mb-3">{searchResults.length} resultado(s)</p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            {searchResults.map(item => <ItemCard key={item.id} item={item} />)}
           </div>
-        ))}
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            {items.length === 0 ? 'Nenhum item cadastrado.' : 'Nenhum item encontrado.'}
-          </div>
-        )}
-      </div>
+          {searchResults.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">Nenhum item encontrado.</p>
+          )}
+        </div>
+      )}
 
-      {/* Action Dialog */}
-      <Dialog open={mode !== null} onOpenChange={open => { if (!open) setMode(null); }}>
+      {/* Category grid */}
+      {!search && !selectedCategory && (
+        <div>
+          <p className="text-sm text-muted-foreground mb-3">Selecione uma categoria</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {categories.map(cat => {
+              const count = items.filter(i => i.category === cat).length;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className="flex flex-col items-center justify-center rounded-2xl bg-card border border-border p-6 shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
+                >
+                  <span className="text-4xl mb-2">{CATEGORY_EMOJIS[cat] || '📦'}</span>
+                  <p className="font-medium text-foreground text-sm">{cat}</p>
+                  <p className="text-xs text-muted-foreground">{count} {count === 1 ? 'item' : 'itens'}</p>
+                </button>
+              );
+            })}
+          </div>
+          {categories.length === 0 && (
+            <p className="text-center text-muted-foreground py-12">Nenhum item cadastrado.</p>
+          )}
+        </div>
+      )}
+
+      {/* Items in category */}
+      {!search && selectedCategory && (
+        <div>
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className="flex items-center gap-2 text-sm text-primary mb-4 hover:underline"
+          >
+            <ArrowLeft className="w-4 h-4" /> Voltar às categorias
+          </button>
+          <p className="text-sm text-muted-foreground mb-3">
+            {CATEGORY_EMOJIS[selectedCategory]} {selectedCategory} · {categoryItems.length} {categoryItems.length === 1 ? 'item' : 'itens'}
+          </p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+            {categoryItems.map(item => <ItemCard key={item.id} item={item} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Choose action dialog */}
+      <Dialog open={!!showChooseAction} onOpenChange={open => { if (!open) setSelectedItem(null); }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-center">{selectedItem?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            {permissions.can_entry && (
+              <Button
+                size="lg"
+                className="h-16 text-lg rounded-xl bg-success text-success-foreground hover:bg-success/90"
+                onClick={() => setMode('entry')}
+              >
+                <ArrowUpCircle className="w-6 h-6 mr-3" /> Entrada
+              </Button>
+            )}
+            {permissions.can_output && (
+              <Button
+                size="lg"
+                className="h-16 text-lg rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => setMode('output')}
+              >
+                <ArrowDownCircle className="w-6 h-6 mr-3" /> Saída
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quantity dialog */}
+      <Dialog open={mode !== null} onOpenChange={open => { if (!open) { setMode(null); setSelectedItem(null); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -153,9 +237,18 @@ export default function EmployeeDashboard() {
           </DialogHeader>
           {selectedItem && (
             <div className="space-y-4">
-              <div className="bg-secondary/50 rounded-lg p-3">
-                <p className="font-medium text-foreground">{selectedItem.name}</p>
-                <p className="text-xs text-muted-foreground">Estoque: {selectedItem.current_stock} {selectedItem.unit}</p>
+              <div className="bg-accent rounded-lg p-3 flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg overflow-hidden bg-card flex items-center justify-center">
+                  {selectedItem.image_url ? (
+                    <img src={selectedItem.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl">{CATEGORY_EMOJIS[selectedItem.category] || '📦'}</span>
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">{selectedItem.name}</p>
+                  <p className="text-xs text-muted-foreground">Estoque: {selectedItem.current_stock} {selectedItem.unit}</p>
+                </div>
               </div>
 
               <div>
