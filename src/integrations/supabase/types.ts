@@ -93,6 +93,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          kitchen_id: string | null
           notes: string | null
           status: string
         }
@@ -102,6 +103,7 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          kitchen_id?: string | null
           notes?: string | null
           status?: string
         }
@@ -111,8 +113,77 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          kitchen_id?: string | null
           notes?: string | null
           status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_counts_kitchen_id_fkey"
+            columns: ["kitchen_id"]
+            isOneToOne: false
+            referencedRelation: "kitchens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_tokens: {
+        Row: {
+          count_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          kitchen_id: string | null
+          token: string
+        }
+        Insert: {
+          count_id?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          kitchen_id?: string | null
+          token?: string
+        }
+        Update: {
+          count_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          kitchen_id?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_tokens_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_tokens_kitchen_id_fkey"
+            columns: ["kitchen_id"]
+            isOneToOne: false
+            referencedRelation: "kitchens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kitchens: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
       }
@@ -150,6 +221,7 @@ export type Database = {
           id: string
           invoice_number: string | null
           item_id: string
+          kitchen_id: string | null
           notes: string | null
           quantity: number
           registered_by: string
@@ -162,6 +234,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           item_id: string
+          kitchen_id?: string | null
           notes?: string | null
           quantity: number
           registered_by: string
@@ -174,6 +247,7 @@ export type Database = {
           id?: string
           invoice_number?: string | null
           item_id?: string
+          kitchen_id?: string | null
           notes?: string | null
           quantity?: number
           registered_by?: string
@@ -186,6 +260,55 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_entries_kitchen_id_fkey"
+            columns: ["kitchen_id"]
+            isOneToOne: false
+            referencedRelation: "kitchens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_item_locations: {
+        Row: {
+          created_at: string
+          current_stock: number
+          id: string
+          item_id: string
+          kitchen_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_stock?: number
+          id?: string
+          item_id: string
+          kitchen_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_stock?: number
+          id?: string
+          item_id?: string
+          kitchen_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_item_locations_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_item_locations_kitchen_id_fkey"
+            columns: ["kitchen_id"]
+            isOneToOne: false
+            referencedRelation: "kitchens"
             referencedColumns: ["id"]
           },
         ]
@@ -240,6 +363,7 @@ export type Database = {
           event_name: string | null
           id: string
           item_id: string
+          kitchen_id: string | null
           notes: string | null
           quantity: number
           registered_by: string
@@ -251,6 +375,7 @@ export type Database = {
           event_name?: string | null
           id?: string
           item_id: string
+          kitchen_id?: string | null
           notes?: string | null
           quantity: number
           registered_by: string
@@ -262,6 +387,7 @@ export type Database = {
           event_name?: string | null
           id?: string
           item_id?: string
+          kitchen_id?: string | null
           notes?: string | null
           quantity?: number
           registered_by?: string
@@ -272,6 +398,71 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_outputs_kitchen_id_fkey"
+            columns: ["kitchen_id"]
+            isOneToOne: false
+            referencedRelation: "kitchens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_transfers: {
+        Row: {
+          created_at: string
+          date: string
+          from_kitchen_id: string
+          id: string
+          item_id: string
+          notes: string | null
+          quantity: number
+          to_kitchen_id: string
+          transferred_by: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          from_kitchen_id: string
+          id?: string
+          item_id: string
+          notes?: string | null
+          quantity: number
+          to_kitchen_id: string
+          transferred_by: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          from_kitchen_id?: string
+          id?: string
+          item_id?: string
+          notes?: string | null
+          quantity?: number
+          to_kitchen_id?: string
+          transferred_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfers_from_kitchen_id_fkey"
+            columns: ["from_kitchen_id"]
+            isOneToOne: false
+            referencedRelation: "kitchens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfers_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfers_to_kitchen_id_fkey"
+            columns: ["to_kitchen_id"]
+            isOneToOne: false
+            referencedRelation: "kitchens"
             referencedColumns: ["id"]
           },
         ]
