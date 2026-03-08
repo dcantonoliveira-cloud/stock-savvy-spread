@@ -49,11 +49,57 @@ export default function InventoryPage() {
   const [generatingLink, setGeneratingLink] = useState(false);
 
   const load = async () => {
-    const { data: itemsData } = await supabase.from('stock_items').select('id, name, category, unit, current_stock').order('category').order('name');
-    if (itemsData) setItems(itemsData);
+    const [itemsRes, historyRes, kitchensRes] = await Promise.all([
+      supabase.from('stock_items').select('id, name, category, unit, current_stock').order('category').order('name'),
+      supabase.from('inventory_counts' as any).select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('kitchens').select('id, name').order('name'),
+    ]);
+    if (itemsRes.data) setItems(itemsRes.data);
+    if (historyRes.data) setHistory(historyRes.data as unknown as InventoryCount[]);
+    if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
+  };
 
-    const { data: historyData } = await supabase.from('inventory_counts' as any).select('*').order('created_at', { ascending: false }).limit(20);
-    if (historyData) setHistory(historyData as unknown as InventoryCount[]);
+  const generateLink = async () => {
+    setGeneratingLink(true);
+    try {
+      // Create count
+      const { data: countData, error: countErr } = await supabase.from('inventory_counts' as any).insert({
+        status: 'in_progress',
+        kitchen_id: linkKitchen || null,
+      }).select('id').single();
+      if (countErr || !countData) throw countErr;
+
+      const cId = (countData as any).id;
+
+      // Create count items
+      const countItemsData = items.map(item => ({
+        count_id: cId,
+        item_id: item.id,
+        system_stock: item.current_stock,
+      }));
+      await supabase.from('inventory_count_items' as any).insert(countItemsData);
+
+      // Create token
+      const expiresAt = new Date(Date.now() + parseInt(linkHours) * 60 * 60 * 1000).toISOString();
+      const { data: tokenData, error: tokenErr } = await supabase.from('inventory_tokens').insert({
+        count_id: cId,
+        kitchen_id: linkKitchen || null,
+        expires_at: expiresAt,
+      } as any).select('token').single();
+      if (tokenErr || !tokenData) throw tokenErr;
+
+      const url = `${window.location.origin}/inventario?token=${(tokenData as any).token}`;
+      setGeneratedLink(url);
+      toast.success('Link gerado com sucesso!');
+    } catch (e) {
+      toast.error('Erro ao gerar link');
+    }
+    setGeneratingLink(false);
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(generatedLink);
+    toast.success('Link copiado!');
   };
 
   useEffect(() => { load(); }, []);
