@@ -409,6 +409,44 @@ export type Database = {
           },
         ]
       }
+      stock_price_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          id: string
+          item_id: string
+          new_price: number
+          old_price: number
+          source: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          new_price?: number
+          old_price?: number
+          source?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          new_price?: number
+          old_price?: number
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_price_history_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_transfers: {
         Row: {
           created_at: string
