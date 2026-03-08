@@ -100,6 +100,17 @@ export default function UsersPage() {
     load();
   };
 
+  const promoteToSupervisor = async (userId: string, name: string) => {
+    if (!confirm(`Tem certeza que deseja promover ${name} a Supervisor? Esta ação dará acesso total ao sistema.`)) return;
+    // Remove employee role and add supervisor
+    await supabase.from('user_roles').delete().eq('user_id', userId);
+    await supabase.from('employee_permissions').delete().eq('user_id', userId);
+    const { error } = await supabase.from('user_roles').insert({ user_id: userId, role: 'supervisor' });
+    if (error) { toast.error('Erro ao promover'); return; }
+    toast.success(`${name} agora é Supervisor!`);
+    load();
+  };
+
   const employeeList = employees.filter(e => e.role === 'employee');
   const supervisorList = employees.filter(e => e.role === 'supervisor');
   const noAccess = employees.filter(e => e.role === 'sem acesso');
