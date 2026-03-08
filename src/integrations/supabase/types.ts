@@ -117,10 +117,12 @@ export type Database = {
       }
       stock_items: {
         Row: {
+          barcode: string | null
           category: string
           created_at: string
           current_stock: number
           id: string
+          image_url: string | null
           min_stock: number
           name: string
           unit: string
@@ -128,10 +130,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          barcode?: string | null
           category: string
           created_at?: string
           current_stock?: number
           id?: string
+          image_url?: string | null
           min_stock?: number
           name: string
           unit: string
@@ -139,10 +143,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          barcode?: string | null
           category?: string
           created_at?: string
           current_stock?: number
           id?: string
+          image_url?: string | null
           min_stock?: number
           name?: string
           unit?: string
