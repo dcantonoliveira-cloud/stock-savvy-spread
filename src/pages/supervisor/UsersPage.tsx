@@ -182,9 +182,14 @@ export default function UsersPage() {
                   <p className="font-medium text-foreground">{emp.display_name}</p>
                   <p className="text-xs text-muted-foreground">{emp.email}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => removeRole(emp.user_id)}>
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" onClick={() => promoteToSupervisor(emp.user_id, emp.display_name)} title="Promover a Supervisor">
+                    <ArrowUpCircle className="w-4 h-4 text-primary" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => removeRole(emp.user_id)} title="Remover acesso">
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
               </div>
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-sm">
