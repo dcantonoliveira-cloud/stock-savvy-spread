@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3, Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3, Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
   { path: '/comparison', label: 'Comparativo', icon: BarChart3 },
   { path: '/inventory', label: 'Inventário', icon: ClipboardCheck },
+  { path: '/kitchens', label: 'Cozinhas', icon: Building2 },
   { path: '/notifications', label: 'Notificações', icon: Bell },
   { path: '/analysis', label: 'Análise IA', icon: Brain },
   { path: '/users', label: 'Funcionários', icon: Users },
