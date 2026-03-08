@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Pencil, Trash2, Package, DollarSign } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { CATEGORIES as DEFAULT_CATEGORIES } from '@/types/inventory';
 import * as XLSX from 'xlsx';
@@ -22,6 +23,7 @@ type CategorySummary = {
 };
 
 export default function CategoriesPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -32,7 +34,6 @@ export default function CategoriesPage() {
     const { data } = await supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost').order('name');
     if (data) {
       setItems(data);
-      // Get unique categories from items + defaults
       const usedCats = [...new Set(data.map(i => i.category))];
       const allCats = [...new Set([...DEFAULT_CATEGORIES, ...usedCats])];
       setCategories(allCats);
@@ -67,11 +68,8 @@ export default function CategoriesPage() {
     const name = newCategoryName.trim();
     if (!name || !editingCategory) return;
     if (categories.includes(name)) { toast.error('Categoria já existe'); return; }
-
-    // Update all items with this category
     const { error } = await supabase.from('stock_items').update({ category: name } as any).eq('category', editingCategory);
     if (error) { toast.error('Erro ao renomear'); return; }
-
     toast.success(`Categoria renomeada para "${name}"`);
     setNewCategoryName('');
     setEditingCategory(null);
@@ -91,11 +89,8 @@ export default function CategoriesPage() {
 
   const exportExcel = () => {
     const rows = items.map(i => ({
-      'Nome': i.name,
-      'Categoria': i.category,
-      'Unidade': i.unit,
-      'Estoque Atual': i.current_stock,
-      'Estoque Mínimo': i.min_stock,
+      'Nome': i.name, 'Categoria': i.category, 'Unidade': i.unit,
+      'Estoque Atual': i.current_stock, 'Estoque Mínimo': i.min_stock,
       'Custo Unitário': i.unit_cost,
       'Valor em Estoque': Math.round(i.current_stock * i.unit_cost * 100) / 100,
     }));
@@ -103,14 +98,17 @@ export default function CategoriesPage() {
     ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Estoque');
-    const date = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `estoque_rondello_${date}.xlsx`);
+    XLSX.writeFile(wb, `estoque_rondello_${new Date().toISOString().split('T')[0]}.xlsx`);
     toast.success('Planilha de estoque exportada!');
   };
 
   const CATEGORY_EMOJIS: Record<string, string> = {
     'Carnes': '🥩', 'Bebidas': '🥤', 'Frios': '🧀', 'Hortifruti': '🥬',
     'Secos': '🌾', 'Descartáveis': '🥤', 'Limpeza': '🧹', 'Outros': '📦',
+  };
+
+  const navigateToCategory = (catName: string) => {
+    navigate(`/items?category=${encodeURIComponent(catName)}`);
   };
 
   return (
@@ -135,12 +133,7 @@ export default function CategoriesPage() {
                 <DialogTitle>{editingCategory ? 'Renomear Categoria' : 'Nova Categoria'}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <Input
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  placeholder="Nome da categoria"
-                  autoFocus
-                />
+                <Input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Nome da categoria" autoFocus />
                 <div className="flex gap-3">
                   <Button className="flex-1" onClick={editingCategory ? handleRenameCategory : handleAddCategory}>
                     {editingCategory ? 'Renomear' : 'Criar'}
@@ -155,7 +148,11 @@ export default function CategoriesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {summaries.map(cat => (
-          <Card key={cat.name} className="glass-card border-0 animate-fade-in">
+          <Card
+            key={cat.name}
+            className="glass-card border-0 animate-fade-in cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all group"
+            onClick={() => navigateToCategory(cat.name)}
+          >
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -165,13 +162,16 @@ export default function CategoriesPage() {
                     <p className="text-xs text-muted-foreground">{cat.itemCount} {cat.itemCount === 1 ? 'item' : 'itens'}</p>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingCategory(cat.name); setNewCategoryName(cat.name); setDialogOpen(true); }}>
-                    <Pencil className="w-3 h-3" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteCategory(cat.name)}>
-                    <Trash2 className="w-3 h-3 text-destructive" />
-                  </Button>
+                <div className="flex items-center gap-1">
+                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingCategory(cat.name); setNewCategoryName(cat.name); setDialogOpen(true); }}>
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteCategory(cat.name)}>
+                      <Trash2 className="w-3 h-3 text-destructive" />
+                    </Button>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
