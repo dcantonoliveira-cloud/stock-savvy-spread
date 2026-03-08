@@ -41,6 +41,81 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_count_items: {
+        Row: {
+          count_id: string
+          counted_stock: number | null
+          created_at: string
+          difference: number | null
+          id: string
+          item_id: string
+          system_stock: number
+        }
+        Insert: {
+          count_id: string
+          counted_stock?: number | null
+          created_at?: string
+          difference?: number | null
+          id?: string
+          item_id: string
+          system_stock?: number
+        }
+        Update: {
+          count_id?: string
+          counted_stock?: number | null
+          created_at?: string
+          difference?: number | null
+          id?: string
+          item_id?: string
+          system_stock?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_count_items_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_count_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_counts: {
+        Row: {
+          completed_at: string | null
+          counted_by: string | null
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          counted_by?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          counted_by?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
