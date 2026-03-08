@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3, Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3, Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
