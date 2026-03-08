@@ -18,6 +18,8 @@ import SupervisorComparisonPage from "./pages/supervisor/ComparisonPage";
 import UsersPage from "./pages/supervisor/UsersPage";
 import NotificationsPage from "./pages/supervisor/NotificationsPage";
 import AIAnalysisPage from "./pages/supervisor/AIAnalysisPage";
+import CategoriesPage from "./pages/supervisor/CategoriesPage";
+import InventoryPage from "./pages/supervisor/InventoryPage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
@@ -48,11 +50,13 @@ function AppRoutes() {
       <SupervisorLayout>
         <Routes>
           <Route path="/" element={<SupervisorDashboard />} />
+          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/items" element={<StockItemsPage />} />
           <Route path="/entries" element={<EntriesPage />} />
           <Route path="/outputs" element={<SupervisorOutputsPage />} />
           <Route path="/sheets" element={<SupervisorSheetsPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/analysis" element={<AIAnalysisPage />} />
           <Route path="/users" element={<UsersPage />} />

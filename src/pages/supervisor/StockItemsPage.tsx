@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Search, Upload, Download, Image, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Upload, Download, Image, Sparkles, Loader2, History, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { CATEGORIES, UNITS } from '@/types/inventory';
 import * as XLSX from 'xlsx';
+import ItemHistoryDialog from '@/components/ItemHistoryDialog';
 
 type Item = {
   id: string; name: string; category: string; unit: string;
@@ -127,6 +128,7 @@ export default function StockItemsPage() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
+  const [historyItem, setHistoryItem] = useState<Item | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
@@ -220,6 +222,25 @@ export default function StockItemsPage() {
     toast.success('Planilha modelo baixada!');
   };
 
+  const exportStock = () => {
+    const rows = items.map(i => ({
+      'Nome': i.name,
+      'Categoria': i.category,
+      'Unidade': i.unit,
+      'Estoque Atual': i.current_stock,
+      'Estoque Mínimo': i.min_stock,
+      'Custo Unitário': i.unit_cost,
+      'Valor em Estoque': Math.round(i.current_stock * i.unit_cost * 100) / 100,
+      'Código de Barras': i.barcode || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Estoque');
+    XLSX.writeFile(wb, `estoque_rondello_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Estoque exportado!');
+  };
+
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -272,6 +293,9 @@ export default function StockItemsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={exportStock}>
+            <FileSpreadsheet className="w-4 h-4 mr-2" />Exportar
+          </Button>
           <Button variant="outline" onClick={downloadTemplate}>
             <Download className="w-4 h-4 mr-2" />Modelo
           </Button>
@@ -349,6 +373,9 @@ export default function StockItemsPage() {
                       <Sparkles className="w-4 h-4 text-primary" />
                     </Button>
                   )}
+                  <Button variant="ghost" size="icon" title="Histórico" onClick={() => setHistoryItem(item)}>
+                    <History className="w-4 h-4 text-muted-foreground" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => { setEditingItem(item); setDialogOpen(true); }}>
                     <Pencil className="w-4 h-4" />
                   </Button>
@@ -390,6 +417,15 @@ export default function StockItemsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Item history dialog */}
+      <ItemHistoryDialog
+        itemId={historyItem?.id || null}
+        itemName={historyItem?.name || ''}
+        itemUnit={historyItem?.unit || ''}
+        open={historyItem !== null}
+        onClose={() => setHistoryItem(null)}
+      />
     </div>
   );
 }
