@@ -27,9 +27,9 @@ export default function SupervisorSidebar() {
   return (
     <aside className="fixed left-0 top-0 h-screen w-[260px] glass-sidebar flex flex-col z-50">
       {/* Logo */}
-      <div className="p-6 pb-4">
-        <h1 className="text-xl font-extrabold gold-text tracking-wide">RONDELLO</h1>
-        <p className="text-[10px] text-muted-foreground mt-0.5 tracking-[0.2em] uppercase font-medium">
+      <div className="p-5 pb-3">
+        <img src={logoRondello} alt="Rondello Buffet" className="h-10 object-contain" />
+        <p className="text-[10px] text-muted-foreground mt-1 tracking-[0.2em] uppercase font-medium">
           Painel do Supervisor
         </p>
       </div>
