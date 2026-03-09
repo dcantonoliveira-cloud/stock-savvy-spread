@@ -2,40 +2,84 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Trash2, Eye, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
-type Item = { id: string; name: string; unit: string };
-type SheetItem = { item_id: string; item_name: string; quantity: number; unit: string };
-type Sheet = { id: string; name: string; servings: number; items: SheetItem[] };
+type StockItem = { id: string; name: string; unit: string; unit_cost: number };
+type SheetItem = {
+  id?: string;
+  item_id: string;
+  item_name: string;
+  quantity: number;
+  gross_quantity: number;
+  correction_factor: number;
+  unit: string;
+  unit_cost: number;
+};
+type Sheet = {
+  id: string;
+  name: string;
+  servings: number;
+  description: string | null;
+  category: string | null;
+  prep_time: number;
+  yield_quantity: number;
+  yield_unit: string;
+  instructions: string | null;
+  items: SheetItem[];
+  created_at: string;
+};
+
+const RECIPE_CATEGORIES = ['Prato Principal', 'Entrada', 'Acompanhamento', 'Sobremesa', 'Molho', 'Guarnição', 'Bebida', 'Outros'];
 
 export default function SupervisorSheetsPage() {
-  const [stockItems, setStockItems] = useState<Item[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewingSheet, setViewingSheet] = useState<Sheet | null>(null);
+  const [editingSheet, setEditingSheet] = useState<Sheet | null>(null);
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [search, setSearch] = useState('');
 
+  // Form state
   const [name, setName] = useState('');
-  const [servings, setServings] = useState('100');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('Prato Principal');
+  const [servings, setServings] = useState('1');
+  const [yieldQty, setYieldQty] = useState('1');
+  const [yieldUnit, setYieldUnit] = useState('kg');
+  const [prepTime, setPrepTime] = useState('0');
+  const [instructions, setInstructions] = useState('');
   const [formItems, setFormItems] = useState<SheetItem[]>([]);
 
   const load = async () => {
     const [itemsRes, sheetsRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, unit').order('name'),
+      supabase.from('stock_items').select('id, name, unit, unit_cost').order('name'),
       supabase.from('technical_sheets').select('*').order('name'),
     ]);
-    if (itemsRes.data) setStockItems(itemsRes.data);
+    if (itemsRes.data) setStockItems(itemsRes.data as unknown as StockItem[]);
     if (sheetsRes.data) {
       const sheetsWithItems = await Promise.all(
-        sheetsRes.data.map(async s => {
-          const { data: si } = await supabase.from('technical_sheet_items').select('item_id, quantity').eq('sheet_id', s.id);
-          const sheetItems: SheetItem[] = (si || []).map(i => {
-            const item = itemsRes.data?.find(x => x.id === i.item_id);
-            return { item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: item?.unit || '' };
+        (sheetsRes.data as any[]).map(async s => {
+          const { data: si } = await supabase.from('technical_sheet_items').select('*').eq('sheet_id', s.id);
+          const sheetItems: SheetItem[] = (si || []).map((i: any) => {
+            const item = itemsRes.data?.find((x: any) => x.id === i.item_id);
+            return {
+              id: i.id,
+              item_id: i.item_id,
+              item_name: (item as any)?.name || '?',
+              quantity: i.quantity,
+              gross_quantity: i.gross_quantity || i.quantity,
+              correction_factor: i.correction_factor || 1,
+              unit: (item as any)?.unit || '',
+              unit_cost: i.unit_cost || (item as any)?.unit_cost || 0,
+            };
           });
-          return { ...s, items: sheetItems };
+          return { ...s, items: sheetItems } as Sheet;
         })
       );
       setSheets(sheetsWithItems);
@@ -43,15 +87,63 @@ export default function SupervisorSheetsPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const resetForm = () => { setName(''); setServings('100'); setFormItems([]); };
+  const resetForm = () => {
+    setName(''); setDescription(''); setCategory('Prato Principal');
+    setServings('1'); setYieldQty('1'); setYieldUnit('kg');
+    setPrepTime('0'); setInstructions(''); setFormItems([]);
+    setEditingSheet(null);
+  };
 
-  const addItem = () => setFormItems([...formItems, { item_id: '', item_name: '', quantity: 0, unit: '' }]);
+  const openEditDialog = (sheet: Sheet) => {
+    setEditingSheet(sheet);
+    setName(sheet.name);
+    setDescription(sheet.description || '');
+    setCategory(sheet.category || 'Prato Principal');
+    setServings(sheet.servings.toString());
+    setYieldQty(sheet.yield_quantity?.toString() || '1');
+    setYieldUnit(sheet.yield_unit || 'kg');
+    setPrepTime(sheet.prep_time?.toString() || '0');
+    setInstructions(sheet.instructions || '');
+    setFormItems([...sheet.items]);
+    setDialogOpen(true);
+  };
+
+  const openDuplicateDialog = (sheet: Sheet) => {
+    setEditingSheet(null);
+    setName(`${sheet.name} (cópia)`);
+    setDescription(sheet.description || '');
+    setCategory(sheet.category || 'Prato Principal');
+    setServings(sheet.servings.toString());
+    setYieldQty(sheet.yield_quantity?.toString() || '1');
+    setYieldUnit(sheet.yield_unit || 'kg');
+    setPrepTime(sheet.prep_time?.toString() || '0');
+    setInstructions(sheet.instructions || '');
+    setFormItems(sheet.items.map(i => ({ ...i, id: undefined })));
+    setDialogOpen(true);
+  };
+
+  const addItem = () => setFormItems([...formItems, {
+    item_id: '', item_name: '', quantity: 0, gross_quantity: 0,
+    correction_factor: 1, unit: '', unit_cost: 0,
+  }]);
 
   const updateItem = (idx: number, field: string, value: any) => {
     const updated = [...formItems];
     if (field === 'item_id') {
       const si = stockItems.find(s => s.id === value);
-      updated[idx] = { ...updated[idx], item_id: value, item_name: si?.name || '', unit: si?.unit || '' };
+      updated[idx] = {
+        ...updated[idx], item_id: value,
+        item_name: si?.name || '', unit: si?.unit || '',
+        unit_cost: si?.unit_cost || 0,
+      };
+    } else if (field === 'gross_quantity') {
+      const gross = parseFloat(value) || 0;
+      const cf = updated[idx].correction_factor || 1;
+      updated[idx] = { ...updated[idx], gross_quantity: gross, quantity: parseFloat((gross / cf).toFixed(4)) };
+    } else if (field === 'correction_factor') {
+      const cf = parseFloat(value) || 1;
+      const gross = updated[idx].gross_quantity || 0;
+      updated[idx] = { ...updated[idx], correction_factor: cf, quantity: parseFloat((gross / cf).toFixed(4)) };
     } else {
       (updated[idx] as any)[field] = value;
     }
@@ -63,20 +155,48 @@ export default function SupervisorSheetsPage() {
   const handleSave = async () => {
     if (!name.trim()) { toast.error('Nome é obrigatório'); return; }
     const validItems = formItems.filter(i => i.item_id);
-    if (validItems.length === 0) { toast.error('Adicione pelo menos um item'); return; }
+    if (validItems.length === 0) { toast.error('Adicione pelo menos um insumo'); return; }
 
-    const { data: sheet, error } = await supabase.from('technical_sheets').insert({
+    const sheetData = {
       name: name.trim(),
-      servings: parseInt(servings) || 100,
-    }).select().single();
+      description: description.trim() || null,
+      category,
+      servings: parseInt(servings) || 1,
+      yield_quantity: parseFloat(yieldQty) || 1,
+      yield_unit: yieldUnit,
+      prep_time: parseInt(prepTime) || 0,
+      instructions: instructions.trim() || null,
+    };
 
-    if (error || !sheet) { toast.error('Erro ao criar ficha'); return; }
+    if (editingSheet) {
+      // Update
+      const { error } = await supabase.from('technical_sheets').update(sheetData as any).eq('id', editingSheet.id);
+      if (error) { toast.error('Erro ao atualizar ficha'); return; }
+      // Delete old items and re-insert
+      await supabase.from('technical_sheet_items').delete().eq('sheet_id', editingSheet.id);
+      await supabase.from('technical_sheet_items').insert(
+        validItems.map(i => ({
+          sheet_id: editingSheet.id, item_id: i.item_id, quantity: i.quantity,
+          gross_quantity: i.gross_quantity, correction_factor: i.correction_factor,
+          unit_cost: i.unit_cost,
+        })) as any
+      );
+      toast.success('Ficha técnica atualizada!');
+    } else {
+      // Create
+      const { data: sheet, error } = await supabase.from('technical_sheets')
+        .insert(sheetData as any).select().single();
+      if (error || !sheet) { toast.error('Erro ao criar ficha'); return; }
+      await supabase.from('technical_sheet_items').insert(
+        validItems.map(i => ({
+          sheet_id: (sheet as any).id, item_id: i.item_id, quantity: i.quantity,
+          gross_quantity: i.gross_quantity, correction_factor: i.correction_factor,
+          unit_cost: i.unit_cost,
+        })) as any
+      );
+      toast.success('Ficha técnica criada!');
+    }
 
-    await supabase.from('technical_sheet_items').insert(
-      validItems.map(i => ({ sheet_id: sheet.id, item_id: i.item_id, quantity: i.quantity }))
-    );
-
-    toast.success('Ficha técnica criada!');
     resetForm();
     setDialogOpen(false);
     load();
@@ -88,85 +208,228 @@ export default function SupervisorSheetsPage() {
     load();
   };
 
+  const getSheetTotalCost = (sheet: Sheet) => {
+    return sheet.items.reduce((sum, i) => sum + (i.quantity * i.unit_cost), 0);
+  };
+
+  const filteredSheets = sheets.filter(s => {
+    const matchSearch = s.name.toLowerCase().includes(search.toLowerCase());
+    const matchCat = filterCategory === 'all' || s.category === filterCategory;
+    return matchSearch && matchCat;
+  });
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-display font-bold gold-text">Fichas Técnicas</h1>
-          <p className="text-muted-foreground mt-1">Defina o consumo esperado por evento</p>
+          <p className="text-muted-foreground mt-1">Receitas detalhadas com insumos e custos</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" />Nova Ficha</Button>
+            <Button><Plus className="w-4 h-4 mr-2" />Nova Receita</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Nova Ficha Técnica</DialogTitle></DialogHeader>
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Nome da Ficha</label>
-                <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Cardápio Casamento Premium" />
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>{editingSheet ? 'Editar Receita' : 'Nova Ficha Técnica'}</DialogTitle>
+              <DialogDescription>Defina os insumos e o modo de preparo da receita</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-sm text-muted-foreground mb-1 block">Nome da Receita *</label>
+                  <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Espeto Baiano" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RECIPE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Tempo de Preparo (min)</label>
+                  <Input type="number" value={prepTime} onChange={e => setPrepTime(e.target.value)} />
+                </div>
               </div>
+
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Quantidade de Pessoas</label>
-                <Input type="number" value={servings} onChange={e => setServings(e.target.value)} />
+                <label className="text-sm text-muted-foreground mb-1 block">Descrição (opcional)</label>
+                <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Breve descrição do prato" />
               </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Rendimento</label>
+                  <Input type="number" value={yieldQty} onChange={e => setYieldQty(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Unidade Rendimento</label>
+                  <Select value={yieldUnit} onValueChange={setYieldUnit}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['kg', 'g', 'L', 'ml', 'un', 'porções'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Porções</label>
+                  <Input type="number" value={servings} onChange={e => setServings(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Insumos */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm text-muted-foreground">Itens</label>
+                  <label className="text-sm font-medium text-foreground">Insumos da Receita</label>
                   <Button variant="outline" size="sm" onClick={addItem}><Plus className="w-3 h-3 mr-1" />Adicionar</Button>
                 </div>
+
+                {formItems.length > 0 && (
+                  <div className="grid grid-cols-[1fr_80px_80px_60px_80px_80px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
+                    <span>Item</span><span>Qtd Bruta</span><span>Fator Cor.</span>
+                    <span>Qtd Líq.</span><span>Custo Unit.</span><span>Custo Total</span><span></span>
+                  </div>
+                )}
+
                 {formItems.map((item, idx) => (
-                  <div key={idx} className="flex gap-2 items-center mb-2">
+                  <div key={idx} className="grid grid-cols-[1fr_80px_80px_60px_80px_80px_32px] gap-1 items-center mb-1">
                     <Select value={item.item_id} onValueChange={v => updateItem(idx, 'item_id', v)}>
-                      <SelectTrigger className="flex-1"><SelectValue placeholder="Item" /></SelectTrigger>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Item" /></SelectTrigger>
                       <SelectContent>
                         {stockItems.map(si => <SelectItem key={si.id} value={si.id}>{si.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Input type="number" className="w-24" placeholder="Qtd" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)} />
-                    <span className="text-xs text-muted-foreground w-10">{item.unit}</span>
-                    <Button variant="ghost" size="icon" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
+                    <Input type="number" className="h-8 text-xs" placeholder="Bruta" value={item.gross_quantity || ''} onChange={e => updateItem(idx, 'gross_quantity', e.target.value)} />
+                    <Input type="number" className="h-8 text-xs" placeholder="FC" value={item.correction_factor || ''} onChange={e => updateItem(idx, 'correction_factor', e.target.value)} />
+                    <span className="text-xs text-muted-foreground text-center">{item.quantity.toFixed(3)}</span>
+                    <Input type="number" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
+                    <span className="text-xs font-medium text-foreground text-center">R$ {(item.quantity * item.unit_cost).toFixed(2)}</span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
                   </div>
                 ))}
+
+                {formItems.length > 0 && (
+                  <div className="flex justify-end mt-2 pr-10">
+                    <span className="text-sm font-semibold text-primary">
+                      Total: R$ {formItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0).toFixed(2)}
+                    </span>
+                  </div>
+                )}
               </div>
-              <Button onClick={handleSave} className="w-full">Salvar</Button>
+
+              {/* Instructions */}
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Modo de Preparo</label>
+                <Textarea value={instructions} onChange={e => setInstructions(e.target.value)} placeholder="Descreva o passo a passo do preparo..." rows={4} />
+              </div>
+
+              <Button onClick={handleSave} className="w-full">{editingSheet ? 'Salvar Alterações' : 'Criar Ficha Técnica'}</Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <div className="flex gap-4 mb-6">
+        <div className="relative flex-1">
+          <Input placeholder="Buscar receita..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <Select value={filterCategory} onValueChange={setFilterCategory}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="Categoria" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas</SelectItem>
+            {RECIPE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Viewing sheet detail */}
       {viewingSheet && (
         <div className="glass-card rounded-xl p-6 mb-6 animate-fade-in">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold text-foreground">{viewingSheet.name}</h3>
+            <div>
+              <h3 className="font-display font-semibold text-foreground text-lg">{viewingSheet.name}</h3>
+              {viewingSheet.description && <p className="text-sm text-muted-foreground">{viewingSheet.description}</p>}
+            </div>
             <Button variant="ghost" size="icon" onClick={() => setViewingSheet(null)}><X className="w-4 h-4" /></Button>
           </div>
-          <p className="text-sm text-muted-foreground mb-4">Para {viewingSheet.servings} pessoas</p>
-          <div className="space-y-2">
-            {viewingSheet.items.map((item, idx) => (
-              <div key={idx} className="flex justify-between text-sm p-2 rounded bg-secondary/50">
-                <span className="text-foreground">{item.item_name}</span>
-                <span className="text-muted-foreground">{item.quantity} {item.unit}</span>
-              </div>
-            ))}
+          <div className="flex flex-wrap gap-3 mb-4">
+            <Badge variant="secondary"><ChefHat className="w-3 h-3 mr-1" />{viewingSheet.category}</Badge>
+            {viewingSheet.prep_time > 0 && <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />{viewingSheet.prep_time} min</Badge>}
+            <Badge variant="outline"><Users className="w-3 h-3 mr-1" />{viewingSheet.servings} porções</Badge>
+            <Badge variant="outline">Rende: {viewingSheet.yield_quantity} {viewingSheet.yield_unit}</Badge>
+            <Badge className="bg-primary/20 text-primary">Custo: R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</Badge>
           </div>
+
+          {/* Ingredients table */}
+          <div className="overflow-x-auto mb-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left">
+                  <th className="py-2 text-muted-foreground font-medium">Insumo</th>
+                  <th className="py-2 text-muted-foreground font-medium text-center">Unidade</th>
+                  <th className="py-2 text-muted-foreground font-medium text-center">Qtd Bruta</th>
+                  <th className="py-2 text-muted-foreground font-medium text-center">Qtd Líquida</th>
+                  <th className="py-2 text-muted-foreground font-medium text-center">FC</th>
+                  <th className="py-2 text-muted-foreground font-medium text-right">Custo Unit.</th>
+                  <th className="py-2 text-muted-foreground font-medium text-right">Custo Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {viewingSheet.items.map((item, idx) => (
+                  <tr key={idx} className="border-b border-border/50">
+                    <td className="py-2 text-foreground">{item.item_name}</td>
+                    <td className="py-2 text-center text-muted-foreground">{item.unit}</td>
+                    <td className="py-2 text-center text-foreground">{item.gross_quantity}</td>
+                    <td className="py-2 text-center text-foreground">{item.quantity}</td>
+                    <td className="py-2 text-center text-muted-foreground">{item.correction_factor}</td>
+                    <td className="py-2 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
+                    <td className="py-2 text-right font-medium text-foreground">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
+                  </tr>
+                ))}
+                <tr className="font-semibold">
+                  <td colSpan={6} className="py-2 text-right text-foreground">Total:</td>
+                  <td className="py-2 text-right text-primary">R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {viewingSheet.instructions && (
+            <div className="bg-accent rounded-lg p-4">
+              <p className="text-sm font-medium text-foreground mb-2">Modo de Preparo</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-line">{viewingSheet.instructions}</p>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Sheets list */}
       <div className="space-y-3">
-        {sheets.map(sheet => (
+        {filteredSheets.map(sheet => (
           <div key={sheet.id} className="glass-card rounded-xl p-4 flex items-center justify-between animate-fade-in">
-            <div>
-              <p className="font-medium text-foreground">{sheet.name}</p>
-              <p className="text-xs text-muted-foreground">{sheet.servings} pessoas · {sheet.items.length} itens</p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-foreground">{sheet.name}</p>
+                <Badge variant="secondary" className="text-[10px]">{sheet.category}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {sheet.items.length} insumos · {sheet.yield_quantity} {sheet.yield_unit} · {sheet.servings} porções
+                · <span className="text-primary font-medium">R$ {getSheetTotalCost(sheet).toFixed(2)}</span>
+              </p>
             </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setViewingSheet(sheet)}><Eye className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => handleDelete(sheet.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" title="Visualizar" onClick={() => setViewingSheet(sheet)}><Eye className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" title="Editar" onClick={() => openEditDialog(sheet)}><Pencil className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" title="Duplicar" onClick={() => openDuplicateDialog(sheet)}><Copy className="w-4 h-4 text-primary" /></Button>
+              <Button variant="ghost" size="icon" title="Excluir" onClick={() => handleDelete(sheet.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
             </div>
           </div>
         ))}
-        {sheets.length === 0 && (
+        {filteredSheets.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">Nenhuma ficha técnica cadastrada.</div>
         )}
       </div>
