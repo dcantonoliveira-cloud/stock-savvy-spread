@@ -21,6 +21,7 @@ import AIAnalysisPage from "./pages/supervisor/AIAnalysisPage";
 import CategoriesPage from "./pages/supervisor/CategoriesPage";
 import InventoryPage from "./pages/supervisor/InventoryPage";
 import KitchensPage from "./pages/supervisor/KitchensPage";
+import EventMenusPage from "./pages/supervisor/EventMenusPage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
@@ -57,6 +58,7 @@ function AppRoutes() {
           <Route path="/entries" element={<EntriesPage />} />
           <Route path="/outputs" element={<SupervisorOutputsPage />} />
           <Route path="/sheets" element={<SupervisorSheetsPage />} />
+          <Route path="/event-menus" element={<EventMenusPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/kitchens" element={<KitchensPage />} />

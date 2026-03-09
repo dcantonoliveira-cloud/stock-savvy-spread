@@ -321,40 +321,40 @@ export default function EmployeeDashboard() {
 
       {/* Choose action dialog */}
       <Dialog open={!!showChooseAction} onOpenChange={open => { if (!open) setSelectedItem(null); }}>
-        <DialogContent className="max-w-xs">
+        <DialogContent className="max-w-[320px] mx-auto">
           <DialogHeader>
             <DialogTitle className="text-center">{selectedItem?.name}</DialogTitle>
           </DialogHeader>
           <p className="text-center text-sm text-muted-foreground -mt-2">
             Estoque: {selectedItem?.current_stock} {selectedItem?.unit}
           </p>
-          <div className="flex flex-col gap-3 pt-2">
+          <div className="flex flex-col gap-3 pt-2 w-full">
             {permissions.can_entry && (
               <Button
                 size="lg"
-                className="h-14 text-base rounded-xl bg-success text-success-foreground hover:bg-success/90"
+                className="h-14 text-base rounded-xl bg-success text-success-foreground hover:bg-success/90 w-full justify-center"
                 onClick={() => setMode('entry')}
               >
-                <ArrowUpCircle className="w-5 h-5 mr-3" /> Entrada
+                <ArrowUpCircle className="w-5 h-5 mr-3 flex-shrink-0" /> Entrada
               </Button>
             )}
             {permissions.can_output && (
               <Button
                 size="lg"
-                className="h-14 text-base rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="h-14 text-base rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full justify-center"
                 onClick={() => setMode('output')}
               >
-                <ArrowDownCircle className="w-5 h-5 mr-3" /> Saída
+                <ArrowDownCircle className="w-5 h-5 mr-3 flex-shrink-0" /> Saída
               </Button>
             )}
             {hasKitchens && (
               <Button
                 size="lg"
                 variant="outline"
-                className="h-14 text-base rounded-xl border-primary/30 text-primary hover:bg-primary/10"
+                className="h-14 text-base rounded-xl border-primary/30 text-primary hover:bg-primary/10 w-full justify-center"
                 onClick={() => setMode('transfer')}
               >
-                <ArrowRightLeft className="w-5 h-5 mr-3" /> Transferir entre Cozinhas
+                <ArrowRightLeft className="w-5 h-5 mr-3 flex-shrink-0" /> Transferir
               </Button>
             )}
           </div>
