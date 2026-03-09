@@ -41,6 +41,138 @@ export type Database = {
         }
         Relationships: []
       }
+      event_menu_dish_items: {
+        Row: {
+          calculated_quantity: number
+          created_at: string
+          id: string
+          item_id: string
+          menu_dish_id: string
+          override_quantity: number | null
+          unit: string | null
+        }
+        Insert: {
+          calculated_quantity?: number
+          created_at?: string
+          id?: string
+          item_id: string
+          menu_dish_id: string
+          override_quantity?: number | null
+          unit?: string | null
+        }
+        Update: {
+          calculated_quantity?: number
+          created_at?: string
+          id?: string
+          item_id?: string
+          menu_dish_id?: string
+          override_quantity?: number | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_menu_dish_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_menu_dish_items_menu_dish_id_fkey"
+            columns: ["menu_dish_id"]
+            isOneToOne: false
+            referencedRelation: "event_menu_dishes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_menu_dishes: {
+        Row: {
+          created_at: string
+          id: string
+          menu_id: string
+          notes: string | null
+          planned_quantity: number
+          planned_unit: string | null
+          sheet_id: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          menu_id: string
+          notes?: string | null
+          planned_quantity?: number
+          planned_unit?: string | null
+          sheet_id: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          menu_id?: string
+          notes?: string | null
+          planned_quantity?: number
+          planned_unit?: string | null
+          sheet_id?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_menu_dishes_menu_id_fkey"
+            columns: ["menu_id"]
+            isOneToOne: false
+            referencedRelation: "event_menus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_menu_dishes_sheet_id_fkey"
+            columns: ["sheet_id"]
+            isOneToOne: false
+            referencedRelation: "technical_sheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_menus: {
+        Row: {
+          created_at: string
+          event_date: string | null
+          guest_count: number
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          staff_count: number | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_date?: string | null
+          guest_count?: number
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          staff_count?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_date?: string | null
+          guest_count?: number
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          staff_count?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory_count_items: {
         Row: {
           count_id: string
@@ -507,22 +639,31 @@ export type Database = {
       }
       technical_sheet_items: {
         Row: {
+          correction_factor: number | null
+          gross_quantity: number | null
           id: string
           item_id: string
           quantity: number
           sheet_id: string
+          unit_cost: number | null
         }
         Insert: {
+          correction_factor?: number | null
+          gross_quantity?: number | null
           id?: string
           item_id: string
           quantity: number
           sheet_id: string
+          unit_cost?: number | null
         }
         Update: {
+          correction_factor?: number | null
+          gross_quantity?: number | null
           id?: string
           item_id?: string
           quantity?: number
           sheet_id?: string
+          unit_cost?: number | null
         }
         Relationships: [
           {
@@ -543,25 +684,43 @@ export type Database = {
       }
       technical_sheets: {
         Row: {
+          category: string | null
           created_at: string
+          description: string | null
           id: string
+          instructions: string | null
           name: string
+          prep_time: number | null
           servings: number
           updated_at: string
+          yield_quantity: number | null
+          yield_unit: string | null
         }
         Insert: {
+          category?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          instructions?: string | null
           name: string
+          prep_time?: number | null
           servings?: number
           updated_at?: string
+          yield_quantity?: number | null
+          yield_unit?: string | null
         }
         Update: {
+          category?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          instructions?: string | null
           name?: string
+          prep_time?: number | null
           servings?: number
           updated_at?: string
+          yield_quantity?: number | null
+          yield_unit?: string | null
         }
         Relationships: []
       }
