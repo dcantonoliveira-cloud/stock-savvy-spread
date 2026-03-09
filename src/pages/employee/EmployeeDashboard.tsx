@@ -321,7 +321,7 @@ export default function EmployeeDashboard() {
 
       {/* Choose action dialog */}
       <Dialog open={!!showChooseAction} onOpenChange={open => { if (!open) setSelectedItem(null); }}>
-        <DialogContent className="max-w-xs">
+        <DialogContent className="max-w-[320px] mx-auto">
           <DialogHeader>
             <DialogTitle className="text-center">{selectedItem?.name}</DialogTitle>
           </DialogHeader>
