@@ -21,6 +21,7 @@ import AIAnalysisPage from "./pages/supervisor/AIAnalysisPage";
 import CategoriesPage from "./pages/supervisor/CategoriesPage";
 import InventoryPage from "./pages/supervisor/InventoryPage";
 import KitchensPage from "./pages/supervisor/KitchensPage";
+import EventMenusPage from "./pages/supervisor/EventMenusPage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
