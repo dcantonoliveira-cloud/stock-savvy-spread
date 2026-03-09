@@ -58,6 +58,7 @@ function AppRoutes() {
           <Route path="/entries" element={<EntriesPage />} />
           <Route path="/outputs" element={<SupervisorOutputsPage />} />
           <Route path="/sheets" element={<SupervisorSheetsPage />} />
+          <Route path="/event-menus" element={<EventMenusPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/kitchens" element={<KitchensPage />} />
