@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3, Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck, Building2 } from 'lucide-react';
+import { LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3, Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import logoRondello from '@/assets/logo-rondello.png';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -10,6 +11,7 @@ const navItems = [
   { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
   { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
   { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
+  { path: '/event-menus', label: 'Cardápios', icon: UtensilsCrossed },
   { path: '/comparison', label: 'Comparativo', icon: BarChart3 },
   { path: '/inventory', label: 'Inventário', icon: ClipboardCheck },
   { path: '/kitchens', label: 'Cozinhas', icon: Building2 },
