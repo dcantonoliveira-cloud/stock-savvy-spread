@@ -6,10 +6,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, ArrowRightLeft, Building2, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowRightLeft, Building2, Package, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
-type Kitchen = { id: string; name: string; created_at: string };
+type Kitchen = { id: string; name: string; created_at: string; is_default: boolean };
 type StockItem = { id: string; name: string; unit: string; category: string; current_stock: number };
 type Location = { id: string; item_id: string; kitchen_id: string; current_stock: number };
 type Transfer = {
@@ -73,13 +73,17 @@ export default function KitchensPage() {
     load();
   };
 
-  const handleDeleteKitchen = async (id: string) => {
-    const kitchenLocations = locations.filter(l => l.kitchen_id === id && l.current_stock > 0);
+  const handleDeleteKitchen = async (kitchen: Kitchen) => {
+    if (kitchen.is_default) {
+      toast.error('O Estoque Geral não pode ser removido');
+      return;
+    }
+    const kitchenLocations = locations.filter(l => l.kitchen_id === kitchen.id && l.current_stock > 0);
     if (kitchenLocations.length > 0) {
       toast.error('Transfira todo o estoque antes de remover esta cozinha');
       return;
     }
-    const { error } = await supabase.from('kitchens').delete().eq('id', id);
+    const { error } = await supabase.from('kitchens').delete().eq('id', kitchen.id);
     if (error) { toast.error('Erro ao remover'); return; }
     toast.success('Cozinha removida!');
     load();
@@ -103,7 +107,6 @@ export default function KitchensPage() {
       return;
     }
 
-    // Record the transfer
     const { error: tfError } = await supabase.from('stock_transfers').insert({
       item_id: tfItem,
       from_kitchen_id: tfFromKitchen,
@@ -114,7 +117,6 @@ export default function KitchensPage() {
     } as any);
     if (tfError) { toast.error('Erro ao registrar transferência'); return; }
 
-    // Update origin: subtract
     const fromLoc = locations.find(l => l.item_id === tfItem && l.kitchen_id === tfFromKitchen);
     if (fromLoc) {
       await supabase.from('stock_item_locations')
@@ -122,7 +124,6 @@ export default function KitchensPage() {
         .eq('id', fromLoc.id);
     }
 
-    // Update destination: add or create
     const toLoc = locations.find(l => l.item_id === tfItem && l.kitchen_id === tfToKitchen);
     if (toLoc) {
       await supabase.from('stock_item_locations')
@@ -258,22 +259,27 @@ export default function KitchensPage() {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-primary" />
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${kitchen.is_default ? 'bg-primary/20' : 'bg-primary/10'}`}>
+                      {kitchen.is_default ? <Package className="w-5 h-5 text-primary" /> : <Building2 className="w-5 h-5 text-primary" />}
                     </div>
                     <div>
-                      <h3 className="font-display font-semibold text-foreground">{kitchen.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-display font-semibold text-foreground">{kitchen.name}</h3>
+                        {kitchen.is_default && <Lock className="w-3 h-3 text-muted-foreground" />}
+                      </div>
                       <p className="text-xs text-muted-foreground">{totalItems} itens em estoque</p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingKitchen(kitchen); setKitchenName(kitchen.name); setKitchenDialog(true); }}>
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteKitchen(kitchen.id)}>
-                      <Trash2 className="w-3 h-3 text-destructive" />
-                    </Button>
-                  </div>
+                  {!kitchen.is_default && (
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingKitchen(kitchen); setKitchenName(kitchen.name); setKitchenDialog(true); }}>
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteKitchen(kitchen)}>
+                        <Trash2 className="w-3 h-3 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div className="bg-accent rounded-lg p-3 text-center">
                   <p className="text-xs text-muted-foreground mb-1">Total em Estoque</p>

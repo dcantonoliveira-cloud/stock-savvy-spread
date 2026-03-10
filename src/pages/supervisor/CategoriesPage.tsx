@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Pencil, Trash2, DollarSign, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { CATEGORIES as DEFAULT_CATEGORIES } from '@/types/inventory';
 import * as XLSX from 'xlsx';
 
 type Item = {
@@ -22,6 +21,11 @@ type CategorySummary = {
   totalValue: number;
 };
 
+const CATEGORY_EMOJIS: Record<string, string> = {
+  'Carnes': '🥩', 'Bebidas': '🥤', 'Frios': '🧀', 'Hortifruti': '🥬',
+  'Secos': '🌾', 'Descartáveis': '🥤', 'Limpeza': '🧹', 'Outros': '📦',
+};
+
 export default function CategoriesPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
@@ -31,13 +35,17 @@ export default function CategoriesPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
 
   const load = async () => {
-    const { data } = await supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost').order('name');
-    if (data) {
-      setItems(data);
-      const usedCats = [...new Set(data.map(i => i.category))];
-      const allCats = [...new Set([...DEFAULT_CATEGORIES, ...usedCats])];
-      setCategories(allCats);
-    }
+    const [itemsRes, catsRes] = await Promise.all([
+      supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost').order('name'),
+      supabase.from('categories').select('name').order('name'),
+    ]);
+    
+    const dbCats = (catsRes.data || []).map((c: any) => c.name);
+    const usedCats = itemsRes.data ? [...new Set((itemsRes.data as any[]).map(i => i.category))] : [];
+    const allCats = [...new Set([...dbCats, ...usedCats])];
+    
+    if (itemsRes.data) setItems(itemsRes.data);
+    setCategories(allCats);
   };
 
   useEffect(() => { load(); }, []);
@@ -54,22 +62,30 @@ export default function CategoriesPage() {
 
   const totalValue = summaries.reduce((s, c) => s + c.totalValue, 0);
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     const name = newCategoryName.trim();
     if (!name) { toast.error('Nome é obrigatório'); return; }
     if (categories.includes(name)) { toast.error('Categoria já existe'); return; }
-    setCategories(prev => [...prev, name]);
+    
+    // Persist to categories table
+    const { error } = await supabase.from('categories').insert({ name } as any);
+    if (error) { toast.error('Erro ao criar categoria'); return; }
+    
     toast.success(`Categoria "${name}" criada!`);
     setNewCategoryName('');
     setDialogOpen(false);
+    load();
   };
 
   const handleRenameCategory = async () => {
     const name = newCategoryName.trim();
     if (!name || !editingCategory) return;
     if (categories.includes(name)) { toast.error('Categoria já existe'); return; }
-    const { error } = await supabase.from('stock_items').update({ category: name } as any).eq('category', editingCategory);
-    if (error) { toast.error('Erro ao renomear'); return; }
+    
+    // Update items and category record
+    await supabase.from('stock_items').update({ category: name } as any).eq('category', editingCategory);
+    await supabase.from('categories').update({ name } as any).eq('name', editingCategory);
+    
     toast.success(`Categoria renomeada para "${name}"`);
     setNewCategoryName('');
     setEditingCategory(null);
@@ -83,8 +99,9 @@ export default function CategoriesPage() {
       toast.error(`Não é possível excluir: ${catItems.length} itens nessa categoria`);
       return;
     }
-    setCategories(prev => prev.filter(c => c !== cat));
+    await supabase.from('categories').delete().eq('name', cat);
     toast.success(`Categoria "${cat}" removida`);
+    load();
   };
 
   const exportExcel = () => {
@@ -100,11 +117,6 @@ export default function CategoriesPage() {
     XLSX.utils.book_append_sheet(wb, ws, 'Estoque');
     XLSX.writeFile(wb, `estoque_rondello_${new Date().toISOString().split('T')[0]}.xlsx`);
     toast.success('Planilha de estoque exportada!');
-  };
-
-  const CATEGORY_EMOJIS: Record<string, string> = {
-    'Carnes': '🥩', 'Bebidas': '🥤', 'Frios': '🧀', 'Hortifruti': '🥬',
-    'Secos': '🌾', 'Descartáveis': '🥤', 'Limpeza': '🧹', 'Outros': '📦',
   };
 
   const navigateToCategory = (catName: string) => {

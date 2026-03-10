@@ -224,6 +224,7 @@ export default function EmployeeDashboard() {
   );
 
   const showChooseAction = selectedItem && mode === null;
+  // Always show transfer if there are kitchens (Estoque Geral counts as one)
   const hasKitchens = kitchens.length >= 2;
 
   return (
