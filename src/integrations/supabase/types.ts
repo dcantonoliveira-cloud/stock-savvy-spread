@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          emoji: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       employee_permissions: {
         Row: {
           can_entry: boolean
@@ -305,16 +326,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_default: boolean
           name: string
         }
         Insert: {
           created_at?: string
           id?: string
+          is_default?: boolean
           name: string
         }
         Update: {
           created_at?: string
           id?: string
+          is_default?: boolean
           name?: string
         }
         Relationships: []
