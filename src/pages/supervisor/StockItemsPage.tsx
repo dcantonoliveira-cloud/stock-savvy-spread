@@ -14,7 +14,7 @@ import {
   ArrowUpCircle, ArrowDownCircle, X
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { CATEGORIES, UNITS } from '@/types/inventory';
+import { UNITS } from '@/types/inventory';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -29,14 +29,15 @@ type LocationStock = { kitchen_id: string; kitchen_name: string; current_stock: 
 type PriceHistoryEntry = { id: string; old_price: number; new_price: number; source: string; created_at: string };
 
 // ─── Item Form ───
-function ItemForm({ item, kitchens, onSave, onCancel }: {
+function ItemForm({ item, kitchens, allCategories, onSave, onCancel }: {
   item?: Item;
   kitchens: Kitchen[];
+  allCategories: string[];
   onSave: (i: Partial<Item> & { name: string; category: string; unit: string }, imageFile?: File, initialKitchenId?: string) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(item?.name || '');
-  const [category, setCategory] = useState(item?.category || CATEGORIES[0]);
+  const [category, setCategory] = useState(item?.category || (allCategories[0] || 'Outros'));
   const [unit, setUnit] = useState(item?.unit || UNITS[0]);
   const [currentStock, setCurrentStock] = useState(item?.current_stock?.toString() || '0');
   const [minStock, setMinStock] = useState(item?.min_stock?.toString() || '0');
@@ -88,7 +89,9 @@ function ItemForm({ item, kitchens, onSave, onCancel }: {
           <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+            <SelectContent>
+              {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
           </Select>
         </div>
         <div>
@@ -373,13 +376,11 @@ function TransferDialog({ item, kitchens, open, onClose, onDone }: {
 
     setSaving(true);
     try {
-      // Debit origin
       const { error: e1 } = await supabase.from('stock_item_locations')
         .update({ current_stock: fromStock - qty } as any)
         .eq('item_id', item.id).eq('kitchen_id', fromKitchen);
       if (e1) throw e1;
 
-      // Credit destination (upsert)
       const destStock = locations.find(l => l.kitchen_id === toKitchen)?.current_stock || 0;
       const existing = locations.find(l => l.kitchen_id === toKitchen);
       if (existing) {
@@ -391,7 +392,6 @@ function TransferDialog({ item, kitchens, open, onClose, onDone }: {
           .insert({ item_id: item.id, kitchen_id: toKitchen, current_stock: qty } as any);
       }
 
-      // Log transfer
       await supabase.from('stock_transfers').insert({
         item_id: item.id,
         from_kitchen_id: fromKitchen,
@@ -476,6 +476,7 @@ export default function StockItemsPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
+  const [allCategories, setAllCategories] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | undefined>();
@@ -488,19 +489,25 @@ export default function StockItemsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const priceFileRef = useRef<HTMLInputElement>(null);
 
-  // Sync category filter from URL params
   useEffect(() => {
     const cat = searchParams.get('category');
-    if (cat && CATEGORIES.includes(cat as any)) setFilterCategory(cat);
+    if (cat) setFilterCategory(cat);
   }, [searchParams]);
 
   const load = async () => {
-    const [itemsRes, kitchensRes] = await Promise.all([
+    const [itemsRes, kitchensRes, catsRes] = await Promise.all([
       supabase.from('stock_items').select('*' as any).order('name'),
       supabase.from('kitchens').select('id, name').order('name'),
+      supabase.from('categories').select('name').order('name'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data as unknown as Item[]);
     if (kitchensRes.data) setKitchens(kitchensRes.data);
+    
+    // Build categories from DB + any used in items
+    const dbCats = (catsRes.data || []).map((c: any) => c.name);
+    const usedCats = itemsRes.data ? [...new Set((itemsRes.data as any[]).map(i => i.category))] : [];
+    const merged = [...new Set([...dbCats, ...usedCats])].sort();
+    setAllCategories(merged);
   };
   useEffect(() => { load(); }, []);
 
@@ -510,15 +517,18 @@ export default function StockItemsPage() {
     return matchSearch && matchCat;
   });
 
-  const groupedByCategory = CATEGORIES.reduce<Record<string, Item[]>>((acc, cat) => {
+  // Group by category dynamically
+  const groupedByCategory = allCategories.reduce<Record<string, Item[]>>((acc, cat) => {
     const catItems = filtered.filter(i => i.category === cat);
     if (catItems.length > 0) acc[cat] = catItems;
     return acc;
   }, {});
 
-  // Also include items from non-default categories
-  const otherItems = filtered.filter(i => !CATEGORIES.includes(i.category as any));
-  if (otherItems.length > 0) groupedByCategory['Outros'] = [...(groupedByCategory['Outros'] || []), ...otherItems];
+  // Include items with categories not in allCategories
+  const uncategorized = filtered.filter(i => !allCategories.includes(i.category));
+  if (uncategorized.length > 0) {
+    groupedByCategory['Outros'] = [...(groupedByCategory['Outros'] || []), ...uncategorized];
+  }
 
   const totalValue = filtered.reduce((s, i) => s + i.current_stock * i.unit_cost, 0);
 
@@ -548,7 +558,6 @@ export default function StockItemsPage() {
       } else {
         generateAIImage(data.id, item.name);
       }
-      // Assign to initial kitchen if selected
       if (initialKitchenId && initialKitchenId !== 'none') {
         await supabase.from('stock_item_locations').insert({
           item_id: data.id,
@@ -603,94 +612,84 @@ export default function StockItemsPage() {
       'Estoque Atual': i.current_stock, 'Estoque Mínimo': i.min_stock,
       'Custo Unitário': i.unit_cost,
       'Valor em Estoque': Math.round(i.current_stock * i.unit_cost * 100) / 100,
-      'Código de Barras': i.barcode || '',
+      'EAN': i.barcode || '',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 18 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Estoque');
     XLSX.writeFile(wb, `estoque_rondello_${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast.success('Estoque exportado!');
+    toast.success('Planilha de estoque exportada!');
   };
 
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(ws);
-      let success = 0, errors = 0;
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows: any[] = XLSX.utils.sheet_to_json(ws);
 
-      for (const row of rows) {
-        const name = row['Nome'] || row['name'];
-        const category = row['Categoria'] || row['category'] || 'Outros';
-        const unit = row['Unidade'] || row['unit'] || 'un';
-        if (!name) { errors++; continue; }
-        const { error } = await supabase.from('stock_items').insert({
-          name, category: CATEGORIES.includes(category) ? category : 'Outros',
-          unit: UNITS.includes(unit) ? unit : 'un',
-          current_stock: parseFloat(row['Estoque Atual'] || row['current_stock'] || '0') || 0,
-          min_stock: parseFloat(row['Estoque Mínimo'] || row['min_stock'] || '0') || 0,
-          unit_cost: parseFloat(row['Custo Unitário'] || row['unit_cost'] || '0') || 0,
-          barcode: row['Código de Barras'] || row['barcode'] || null,
-        } as any);
-        if (error) errors++; else success++;
-      }
-
-      toast.success(`✅ ${success} itens importados${errors > 0 ? `, ${errors} erros` : ''}`);
-      load();
-      setImportDialogOpen(false);
-    } catch { toast.error('Erro ao ler a planilha'); }
+    let count = 0;
+    for (const row of rows) {
+      const name = row['Nome']?.toString().trim();
+      if (!name) continue;
+      const { error } = await supabase.from('stock_items').insert({
+        name,
+        category: row['Categoria'] || 'Outros',
+        unit: row['Unidade'] || 'un',
+        current_stock: parseFloat(row['Estoque Atual']) || 0,
+        min_stock: parseFloat(row['Estoque Mínimo']) || 0,
+        unit_cost: parseFloat(row['Custo Unitário']) || 0,
+        barcode: row['Código de Barras']?.toString() || null,
+      } as any);
+      if (!error) count++;
+    }
+    toast.success(`${count} itens importados com sucesso!`);
+    setImportDialogOpen(false);
+    load();
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // ─── Price import ───
   const downloadPriceTemplate = () => {
-    const rows = items.map(i => ['', i.name, i.unit_cost, '']);
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['ID (não altere)', 'Nome do Item', 'Preço Atual (R$)', 'Novo Preço (R$)'],
-      ...items.map(i => [i.id, i.name, i.unit_cost, '']),
-    ]);
-    ws['!cols'] = [{ wch: 40 }, { wch: 30 }, { wch: 18 }, { wch: 18 }];
+    const rows = items.map(i => ({
+      'ID': i.id,
+      'Nome': i.name,
+      'Categoria': i.category,
+      'Unidade': i.unit,
+      'Preço Atual (R$)': i.unit_cost,
+      'Novo Preço (R$)': '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 36 }, { wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 18 }, { wch: 18 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Preços');
-    XLSX.writeFile(wb, 'modelo_precos_rondello.xlsx');
-    toast.success('Planilha modelo de preços baixada!');
+    XLSX.utils.book_append_sheet(wb, ws, 'Precos');
+    XLSX.writeFile(wb, `precos_rondello_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Planilha de preços baixada!');
   };
 
   const handlePriceImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(ws);
-      let success = 0, errors = 0;
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows: any[] = XLSX.utils.sheet_to_json(ws);
 
-      for (const row of rows) {
-        const itemId = row['ID (não altere)'] || row['id'];
-        const newPrice = parseFloat(row['Novo Preço (R$)'] || row['new_price'] || '');
-        if (!itemId || isNaN(newPrice) || newPrice < 0) continue;
+    let count = 0;
+    for (const row of rows) {
+      const id = row['ID']?.toString().trim();
+      const newPrice = parseFloat(row['Novo Preço (R$)']);
+      if (!id || isNaN(newPrice) || newPrice < 0) continue;
 
-        // The trigger will auto-log the price change
-        const { error } = await supabase.from('stock_items').update({ unit_cost: newPrice } as any).eq('id', itemId);
-        if (error) errors++; else success++;
-      }
-
-      // Mark source as bulk_import for the recent changes
-      if (success > 0) {
-        await supabase.from('stock_price_history')
-          .update({ source: 'bulk_import' } as any)
-          .gte('created_at', new Date(Date.now() - 10000).toISOString());
-      }
-
-      toast.success(`✅ ${success} preços atualizados${errors > 0 ? `, ${errors} erros` : ''}`);
-      load();
-      setPriceImportOpen(false);
-    } catch { toast.error('Erro ao ler a planilha'); }
+      const { error } = await supabase.from('stock_items')
+        .update({ unit_cost: newPrice } as any)
+        .eq('id', id);
+      if (!error) count++;
+    }
+    toast.success(`${count} preços atualizados!`);
+    setPriceImportOpen(false);
+    load();
     if (priceFileRef.current) priceFileRef.current.value = '';
   };
 
@@ -731,7 +730,7 @@ export default function StockItemsPage() {
               <DialogHeader>
                 <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
               </DialogHeader>
-              <ItemForm item={editingItem} kitchens={kitchens} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
+              <ItemForm item={editingItem} kitchens={kitchens} allCategories={allCategories} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
             </DialogContent>
           </Dialog>
         </div>
@@ -747,7 +746,7 @@ export default function StockItemsPage() {
           <SelectTrigger className="w-48"><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
-            {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -759,7 +758,6 @@ export default function StockItemsPage() {
           <div className="space-y-2">
             {catItems.map(item => (
               <div key={item.id} className="glass-card rounded-xl p-4 flex items-center gap-4 animate-fade-in cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => setDetailItem(item)}>
-                {/* Image */}
                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-accent flex items-center justify-center flex-shrink-0">
                   {generatingImages.has(item.id) ? (
                     <Loader2 className="w-5 h-5 animate-spin text-primary" />
@@ -770,7 +768,6 @@ export default function StockItemsPage() {
                   )}
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.current_stock <= item.min_stock ? 'bg-warning' : 'bg-success'}`} />
@@ -782,13 +779,11 @@ export default function StockItemsPage() {
                   </p>
                 </div>
 
-                {/* Stock info */}
                 <div className="text-right flex-shrink-0">
                   <p className="text-lg font-semibold text-foreground">{item.current_stock} <span className="text-xs text-muted-foreground">{item.unit}</span></p>
                   <p className="text-xs text-muted-foreground">R$ {(item.current_stock * item.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                   <Button variant="ghost" size="icon" title="Regenerar imagem IA" onClick={() => generateAIImage(item.id, item.name)} disabled={generatingImages.has(item.id)}>
                     <Sparkles className="w-4 h-4 text-primary" />

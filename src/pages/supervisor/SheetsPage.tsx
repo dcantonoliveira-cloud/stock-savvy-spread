@@ -5,9 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
-import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
+import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDown, Check, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number };
 type SheetItem = {
@@ -36,6 +39,161 @@ type Sheet = {
 
 const RECIPE_CATEGORIES = ['Prato Principal', 'Entrada', 'Acompanhamento', 'Sobremesa', 'Molho', 'Guarnição', 'Bebida', 'Outros'];
 
+// ─── Searchable Item Combobox ───
+function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: {
+  stockItems: StockItem[];
+  value: string;
+  onSelect: (id: string) => void;
+  onCreateNew: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = stockItems.find(s => s.id === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-8 text-xs justify-between w-full font-normal"
+        >
+          <span className="truncate">{selected ? selected.name : 'Selecionar item...'}</span>
+          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar insumo..." className="h-9" />
+          <CommandList>
+            <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
+            <CommandGroup>
+              {stockItems.map(si => (
+                <CommandItem
+                  key={si.id}
+                  value={si.name}
+                  onSelect={() => {
+                    onSelect(si.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-3 w-3", value === si.id ? "opacity-100" : "opacity-0")} />
+                  <span className="truncate">{si.name}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">{si.unit}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandGroup>
+              <CommandItem
+                onSelect={() => {
+                  setOpen(false);
+                  onCreateNew();
+                }}
+                className="text-primary"
+              >
+                <PackagePlus className="mr-2 h-3 w-3" />
+                Criar novo insumo...
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ─── Quick Create Item Dialog ───
+function QuickCreateItemDialog({ open, onClose, onCreated }: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (item: StockItem) => void;
+}) {
+  const [name, setName] = useState('');
+  const [unit, setUnit] = useState('kg');
+  const [unitCost, setUnitCost] = useState('0');
+  const [category, setCategory] = useState('Outros');
+  const [saving, setSaving] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      supabase.from('categories').select('name').order('name')
+        .then(({ data }) => {
+          if (data) setCategories(data.map((c: any) => c.name));
+        });
+    }
+  }, [open]);
+
+  const UNITS = ['kg', 'g', 'L', 'ml', 'un', 'cx', 'pct', 'lata', 'garrafa'];
+
+  const handleSave = async () => {
+    if (!name.trim()) { toast.error('Nome é obrigatório'); return; }
+    setSaving(true);
+    const { data, error } = await supabase.from('stock_items').insert({
+      name: name.trim(),
+      unit,
+      unit_cost: parseFloat(unitCost) || 0,
+      category,
+      current_stock: 0,
+      min_stock: 0,
+    } as any).select('id, name, unit, unit_cost').single();
+
+    if (error || !data) {
+      toast.error('Erro ao criar insumo');
+      setSaving(false);
+      return;
+    }
+    toast.success(`Insumo "${name}" criado!`);
+    onCreated(data as unknown as StockItem);
+    setName(''); setUnit('kg'); setUnitCost('0'); setCategory('Outros');
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Criar Novo Insumo</DialogTitle>
+          <DialogDescription>Cadastre rapidamente um novo item de estoque</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm text-muted-foreground mb-1 block">Nome *</label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Farinha de Trigo" autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Unidade</label>
+              <Select value={unit} onValueChange={setUnit}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Custo (R$)</label>
+              <Input type="number" step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button className="w-full" onClick={handleSave} disabled={saving}>
+            {saving ? 'Criando...' : 'Criar Insumo'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function SupervisorSheetsPage() {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
@@ -44,6 +202,7 @@ export default function SupervisorSheetsPage() {
   const [editingSheet, setEditingSheet] = useState<Sheet | null>(null);
   const [filterCategory, setFilterCategory] = useState('all');
   const [search, setSearch] = useState('');
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
@@ -169,10 +328,8 @@ export default function SupervisorSheetsPage() {
     };
 
     if (editingSheet) {
-      // Update
       const { error } = await supabase.from('technical_sheets').update(sheetData as any).eq('id', editingSheet.id);
       if (error) { toast.error('Erro ao atualizar ficha'); return; }
-      // Delete old items and re-insert
       await supabase.from('technical_sheet_items').delete().eq('sheet_id', editingSheet.id);
       await supabase.from('technical_sheet_items').insert(
         validItems.map(i => ({
@@ -183,7 +340,6 @@ export default function SupervisorSheetsPage() {
       );
       toast.success('Ficha técnica atualizada!');
     } else {
-      // Create
       const { data: sheet, error } = await supabase.from('technical_sheets')
         .insert(sheetData as any).select().single();
       if (error || !sheet) { toast.error('Erro ao criar ficha'); return; }
@@ -217,6 +373,10 @@ export default function SupervisorSheetsPage() {
     const matchCat = filterCategory === 'all' || s.category === filterCategory;
     return matchSearch && matchCat;
   });
+
+  const handleQuickItemCreated = (newItem: StockItem) => {
+    setStockItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+  };
 
   return (
     <div>
@@ -296,12 +456,12 @@ export default function SupervisorSheetsPage() {
 
                 {formItems.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-[1fr_80px_80px_60px_80px_80px_32px] gap-1 items-center mb-1">
-                    <Select value={item.item_id} onValueChange={v => updateItem(idx, 'item_id', v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Item" /></SelectTrigger>
-                      <SelectContent>
-                        {stockItems.map(si => <SelectItem key={si.id} value={si.id}>{si.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <ItemCombobox
+                      stockItems={stockItems}
+                      value={item.item_id}
+                      onSelect={v => updateItem(idx, 'item_id', v)}
+                      onCreateNew={() => setQuickCreateOpen(true)}
+                    />
                     <Input type="number" className="h-8 text-xs" placeholder="Bruta" value={item.gross_quantity || ''} onChange={e => updateItem(idx, 'gross_quantity', e.target.value)} />
                     <Input type="number" className="h-8 text-xs" placeholder="FC" value={item.correction_factor || ''} onChange={e => updateItem(idx, 'correction_factor', e.target.value)} />
                     <span className="text-xs text-muted-foreground text-center">{item.quantity.toFixed(3)}</span>
@@ -384,55 +544,77 @@ export default function SupervisorSheetsPage() {
                     <td className="py-2 text-foreground">{item.item_name}</td>
                     <td className="py-2 text-center text-muted-foreground">{item.unit}</td>
                     <td className="py-2 text-center text-foreground">{item.gross_quantity}</td>
-                    <td className="py-2 text-center text-foreground">{item.quantity}</td>
+                    <td className="py-2 text-center text-foreground font-medium">{item.quantity}</td>
                     <td className="py-2 text-center text-muted-foreground">{item.correction_factor}</td>
                     <td className="py-2 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
-                    <td className="py-2 text-right font-medium text-foreground">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
+                    <td className="py-2 text-right text-foreground font-medium">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
                   </tr>
                 ))}
-                <tr className="font-semibold">
-                  <td colSpan={6} className="py-2 text-right text-foreground">Total:</td>
-                  <td className="py-2 text-right text-primary">R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</td>
-                </tr>
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border">
+                  <td colSpan={6} className="py-2 text-right font-semibold text-foreground">Total:</td>
+                  <td className="py-2 text-right font-bold text-primary">R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 
+          {/* Instructions */}
           {viewingSheet.instructions && (
-            <div className="bg-accent rounded-lg p-4">
-              <p className="text-sm font-medium text-foreground mb-2">Modo de Preparo</p>
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-foreground mb-2">Modo de Preparo</h4>
               <p className="text-sm text-muted-foreground whitespace-pre-line">{viewingSheet.instructions}</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Sheets list */}
+      {/* Sheet list */}
       <div className="space-y-3">
         {filteredSheets.map(sheet => (
           <div key={sheet.id} className="glass-card rounded-xl p-4 flex items-center justify-between animate-fade-in">
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="font-medium text-foreground">{sheet.name}</p>
-                <Badge variant="secondary" className="text-[10px]">{sheet.category}</Badge>
+                <p className="font-medium text-foreground truncate">{sheet.name}</p>
+                {sheet.category && <Badge variant="secondary" className="text-[10px]">{sheet.category}</Badge>}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {sheet.items.length} insumos · {sheet.yield_quantity} {sheet.yield_unit} · {sheet.servings} porções
-                · <span className="text-primary font-medium">R$ {getSheetTotalCost(sheet).toFixed(2)}</span>
-              </p>
+              <div className="flex gap-3 mt-1">
+                <span className="text-xs text-muted-foreground">{sheet.items.length} insumos</span>
+                {sheet.prep_time > 0 && <span className="text-xs text-muted-foreground">{sheet.prep_time} min</span>}
+                <span className="text-xs text-muted-foreground">Rende: {sheet.yield_quantity} {sheet.yield_unit}</span>
+                <span className="text-xs text-primary font-medium">R$ {getSheetTotalCost(sheet).toFixed(2)}</span>
+              </div>
             </div>
-            <div className="flex gap-1">
-              <Button variant="ghost" size="icon" title="Visualizar" onClick={() => setViewingSheet(sheet)}><Eye className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" title="Editar" onClick={() => openEditDialog(sheet)}><Pencil className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" title="Duplicar" onClick={() => openDuplicateDialog(sheet)}><Copy className="w-4 h-4 text-primary" /></Button>
-              <Button variant="ghost" size="icon" title="Excluir" onClick={() => handleDelete(sheet.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+            <div className="flex gap-1 flex-shrink-0">
+              <Button variant="ghost" size="icon" title="Visualizar" onClick={() => setViewingSheet(sheet)}>
+                <Eye className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Editar" onClick={() => openEditDialog(sheet)}>
+                <Pencil className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Duplicar" onClick={() => openDuplicateDialog(sheet)}>
+                <Copy className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Remover" onClick={() => handleDelete(sheet.id)}>
+                <Trash2 className="w-4 h-4 text-destructive" />
+              </Button>
             </div>
           </div>
         ))}
         {filteredSheets.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">Nenhuma ficha técnica cadastrada.</div>
+          <div className="text-center py-12 text-muted-foreground">
+            {sheets.length === 0 ? 'Nenhuma ficha técnica cadastrada.' : 'Nenhuma receita encontrada.'}
+          </div>
         )}
       </div>
+
+      {/* Quick create item dialog */}
+      <QuickCreateItemDialog
+        open={quickCreateOpen}
+        onClose={() => setQuickCreateOpen(false)}
+        onCreated={handleQuickItemCreated}
+      />
     </div>
   );
 }
