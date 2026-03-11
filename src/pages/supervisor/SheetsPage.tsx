@@ -402,12 +402,35 @@ export default function SupervisorSheetsPage() {
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {RECIPE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {sheetCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {!addingCat ? (
+                      <Button variant="outline" size="icon" className="shrink-0" onClick={() => setAddingCat(true)} title="Nova categoria">
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <div className="flex gap-1">
+                        <Input className="w-36" placeholder="Nova categoria" value={newCatName} onChange={e => setNewCatName(e.target.value)} autoFocus />
+                        <Button size="icon" className="shrink-0" onClick={async () => {
+                          const n = newCatName.trim();
+                          if (!n) return;
+                          if (sheetCategories.includes(n)) { toast.error('Categoria já existe'); return; }
+                          await supabase.from('sheet_categories').insert({ name: n, sort_order: sheetCategories.length + 1 } as any);
+                          setSheetCategories(prev => [...prev, n]);
+                          setCategory(n);
+                          setNewCatName('');
+                          setAddingCat(false);
+                          toast.success(`Categoria "${n}" criada!`);
+                        }}><Check className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" className="shrink-0" onClick={() => { setAddingCat(false); setNewCatName(''); }}><X className="w-4 h-4" /></Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Tempo de Preparo (min)</label>
