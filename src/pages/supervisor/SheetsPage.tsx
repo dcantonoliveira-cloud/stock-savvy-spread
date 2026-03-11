@@ -252,7 +252,7 @@ export default function SupervisorSheetsPage() {
   useEffect(() => { load(); }, []);
 
   const resetForm = () => {
-    setName(''); setDescription(''); setCategory('Prato Principal');
+    setName(''); setDescription(''); setCategory(sheetCategories[0] || '');
     setServings('1'); setYieldQty('1'); setYieldUnit('kg');
     setPrepTime('0'); setInstructions(''); setFormItems([]);
     setEditingSheet(null);
