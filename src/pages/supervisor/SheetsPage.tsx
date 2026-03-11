@@ -295,14 +295,9 @@ export default function SupervisorSheetsPage() {
         item_name: si?.name || '', unit: si?.unit || '',
         unit_cost: si?.unit_cost || 0,
       };
-    } else if (field === 'gross_quantity') {
-      const gross = parseFloat(value) || 0;
-      const cf = updated[idx].correction_factor || 1;
-      updated[idx] = { ...updated[idx], gross_quantity: gross, quantity: parseFloat((gross / cf).toFixed(4)) };
-    } else if (field === 'correction_factor') {
-      const cf = parseFloat(value) || 1;
-      const gross = updated[idx].gross_quantity || 0;
-      updated[idx] = { ...updated[idx], correction_factor: cf, quantity: parseFloat((gross / cf).toFixed(4)) };
+    } else if (field === 'quantity') {
+      const qty = parseFloat(value) || 0;
+      updated[idx] = { ...updated[idx], quantity: qty, gross_quantity: qty };
     } else {
       (updated[idx] as any)[field] = value;
     }
@@ -448,24 +443,23 @@ export default function SupervisorSheetsPage() {
                 </div>
 
                 {formItems.length > 0 && (
-                  <div className="grid grid-cols-[1fr_80px_80px_60px_80px_80px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
-                    <span>Item</span><span>Qtd Bruta</span><span>Fator Cor.</span>
-                    <span>Qtd Líq.</span><span>Custo Unit.</span><span>Custo Total</span><span></span>
+                  <div className="grid grid-cols-[1fr_90px_50px_80px_80px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
+                    <span>Item</span><span>Quantidade</span><span>Un.</span>
+                    <span>Custo Unit.</span><span>Custo Total</span><span></span>
                   </div>
                 )}
 
                 {formItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_80px_80px_60px_80px_80px_32px] gap-1 items-center mb-1">
+                  <div key={idx} className="grid grid-cols-[1fr_90px_50px_80px_80px_32px] gap-1 items-center mb-1">
                     <ItemCombobox
                       stockItems={stockItems}
                       value={item.item_id}
                       onSelect={v => updateItem(idx, 'item_id', v)}
                       onCreateNew={() => setQuickCreateOpen(true)}
                     />
-                    <Input type="number" className="h-8 text-xs" placeholder="Bruta" value={item.gross_quantity || ''} onChange={e => updateItem(idx, 'gross_quantity', e.target.value)} />
-                    <Input type="number" className="h-8 text-xs" placeholder="FC" value={item.correction_factor || ''} onChange={e => updateItem(idx, 'correction_factor', e.target.value)} />
-                    <span className="text-xs text-muted-foreground text-center">{item.quantity.toFixed(3)}</span>
-                    <Input type="number" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
+                    <Input type="number" step="any" className="h-8 text-xs" placeholder="Ex: 0.1" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} />
+                    <span className="text-xs text-muted-foreground text-center">{item.unit}</span>
+                    <Input type="number" step="0.01" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
                     <span className="text-xs font-medium text-foreground text-center">R$ {(item.quantity * item.unit_cost).toFixed(2)}</span>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
                   </div>
@@ -530,10 +524,8 @@ export default function SupervisorSheetsPage() {
               <thead>
                 <tr className="border-b border-border text-left">
                   <th className="py-2 text-muted-foreground font-medium">Insumo</th>
+                  <th className="py-2 text-muted-foreground font-medium text-center">Quantidade</th>
                   <th className="py-2 text-muted-foreground font-medium text-center">Unidade</th>
-                  <th className="py-2 text-muted-foreground font-medium text-center">Qtd Bruta</th>
-                  <th className="py-2 text-muted-foreground font-medium text-center">Qtd Líquida</th>
-                  <th className="py-2 text-muted-foreground font-medium text-center">FC</th>
                   <th className="py-2 text-muted-foreground font-medium text-right">Custo Unit.</th>
                   <th className="py-2 text-muted-foreground font-medium text-right">Custo Total</th>
                 </tr>
@@ -542,10 +534,8 @@ export default function SupervisorSheetsPage() {
                 {viewingSheet.items.map((item, idx) => (
                   <tr key={idx} className="border-b border-border/50">
                     <td className="py-2 text-foreground">{item.item_name}</td>
-                    <td className="py-2 text-center text-muted-foreground">{item.unit}</td>
-                    <td className="py-2 text-center text-foreground">{item.gross_quantity}</td>
                     <td className="py-2 text-center text-foreground font-medium">{item.quantity}</td>
-                    <td className="py-2 text-center text-muted-foreground">{item.correction_factor}</td>
+                    <td className="py-2 text-center text-muted-foreground">{item.unit}</td>
                     <td className="py-2 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
                     <td className="py-2 text-right text-foreground font-medium">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
                   </tr>
@@ -553,7 +543,7 @@ export default function SupervisorSheetsPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-border">
-                  <td colSpan={6} className="py-2 text-right font-semibold text-foreground">Total:</td>
+                  <td colSpan={4} className="py-2 text-right font-semibold text-foreground">Total:</td>
                   <td className="py-2 text-right font-bold text-primary">R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</td>
                 </tr>
               </tfoot>
