@@ -24,7 +24,7 @@ type Item = {
   image_url: string | null; barcode: string | null;
 };
 
-type Kitchen = { id: string; name: string };
+type Kitchen = { id: string; name: string; is_default?: boolean };
 type LocationStock = { kitchen_id: string; kitchen_name: string; current_stock: number };
 type PriceHistoryEntry = { id: string; old_price: number; new_price: number; source: string; created_at: string };
 
@@ -497,7 +497,7 @@ export default function StockItemsPage() {
   const load = async () => {
     const [itemsRes, kitchensRes, catsRes] = await Promise.all([
       supabase.from('stock_items').select('*' as any).order('name'),
-      supabase.from('kitchens').select('id, name').order('name'),
+      supabase.from('kitchens').select('id, name, is_default').order('name'),
       supabase.from('categories').select('name').order('name'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data as unknown as Item[]);
@@ -558,10 +558,16 @@ export default function StockItemsPage() {
       } else {
         generateAIImage(data.id, item.name);
       }
-      if (initialKitchenId && initialKitchenId !== 'none') {
+      // Always link to a kitchen - use selected or default to Estoque Geral
+      let targetKitchenId = initialKitchenId && initialKitchenId !== 'none' ? initialKitchenId : null;
+      if (!targetKitchenId) {
+        const defaultKitchen = kitchens.find(k => (k as any).is_default || k.name === 'Estoque Geral');
+        if (defaultKitchen) targetKitchenId = defaultKitchen.id;
+      }
+      if (targetKitchenId) {
         await supabase.from('stock_item_locations').insert({
           item_id: data.id,
-          kitchen_id: initialKitchenId,
+          kitchen_id: targetKitchenId,
           current_stock: item.current_stock || 0,
         } as any);
       }
