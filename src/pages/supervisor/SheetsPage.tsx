@@ -295,14 +295,9 @@ export default function SupervisorSheetsPage() {
         item_name: si?.name || '', unit: si?.unit || '',
         unit_cost: si?.unit_cost || 0,
       };
-    } else if (field === 'gross_quantity') {
-      const gross = parseFloat(value) || 0;
-      const cf = updated[idx].correction_factor || 1;
-      updated[idx] = { ...updated[idx], gross_quantity: gross, quantity: parseFloat((gross / cf).toFixed(4)) };
-    } else if (field === 'correction_factor') {
-      const cf = parseFloat(value) || 1;
-      const gross = updated[idx].gross_quantity || 0;
-      updated[idx] = { ...updated[idx], correction_factor: cf, quantity: parseFloat((gross / cf).toFixed(4)) };
+    } else if (field === 'quantity') {
+      const qty = parseFloat(value) || 0;
+      updated[idx] = { ...updated[idx], quantity: qty, gross_quantity: qty };
     } else {
       (updated[idx] as any)[field] = value;
     }
