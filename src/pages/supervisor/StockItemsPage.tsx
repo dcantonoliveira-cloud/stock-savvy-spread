@@ -558,10 +558,16 @@ export default function StockItemsPage() {
       } else {
         generateAIImage(data.id, item.name);
       }
-      if (initialKitchenId && initialKitchenId !== 'none') {
+      // Always link to a kitchen - use selected or default to Estoque Geral
+      let targetKitchenId = initialKitchenId && initialKitchenId !== 'none' ? initialKitchenId : null;
+      if (!targetKitchenId) {
+        const defaultKitchen = kitchens.find(k => (k as any).is_default || k.name === 'Estoque Geral');
+        if (defaultKitchen) targetKitchenId = defaultKitchen.id;
+      }
+      if (targetKitchenId) {
         await supabase.from('stock_item_locations').insert({
           item_id: data.id,
-          kitchen_id: initialKitchenId,
+          kitchen_id: targetKitchenId,
           current_stock: item.current_stock || 0,
         } as any);
       }

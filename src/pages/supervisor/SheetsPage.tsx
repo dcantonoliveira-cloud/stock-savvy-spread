@@ -543,7 +543,7 @@ export default function SupervisorSheetsPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-border">
-                  <td colSpan={6} className="py-2 text-right font-semibold text-foreground">Total:</td>
+                  <td colSpan={4} className="py-2 text-right font-semibold text-foreground">Total:</td>
                   <td className="py-2 text-right font-bold text-primary">R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</td>
                 </tr>
               </tfoot>
