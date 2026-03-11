@@ -210,7 +210,7 @@ export default function SupervisorSheetsPage() {
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Prato Principal');
+  const [category, setCategory] = useState('');
   const [servings, setServings] = useState('1');
   const [yieldQty, setYieldQty] = useState('1');
   const [yieldUnit, setYieldUnit] = useState('kg');
