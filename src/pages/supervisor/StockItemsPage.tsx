@@ -497,7 +497,7 @@ export default function StockItemsPage() {
   const load = async () => {
     const [itemsRes, kitchensRes, catsRes] = await Promise.all([
       supabase.from('stock_items').select('*' as any).order('name'),
-      supabase.from('kitchens').select('id, name').order('name'),
+      supabase.from('kitchens').select('id, name, is_default').order('name'),
       supabase.from('categories').select('name').order('name'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data as unknown as Item[]);
