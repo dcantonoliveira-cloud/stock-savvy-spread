@@ -443,24 +443,23 @@ export default function SupervisorSheetsPage() {
                 </div>
 
                 {formItems.length > 0 && (
-                  <div className="grid grid-cols-[1fr_80px_80px_60px_80px_80px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
-                    <span>Item</span><span>Qtd Bruta</span><span>Fator Cor.</span>
-                    <span>Qtd Líq.</span><span>Custo Unit.</span><span>Custo Total</span><span></span>
+                  <div className="grid grid-cols-[1fr_90px_50px_80px_80px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
+                    <span>Item</span><span>Quantidade</span><span>Un.</span>
+                    <span>Custo Unit.</span><span>Custo Total</span><span></span>
                   </div>
                 )}
 
                 {formItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_80px_80px_60px_80px_80px_32px] gap-1 items-center mb-1">
+                  <div key={idx} className="grid grid-cols-[1fr_90px_50px_80px_80px_32px] gap-1 items-center mb-1">
                     <ItemCombobox
                       stockItems={stockItems}
                       value={item.item_id}
                       onSelect={v => updateItem(idx, 'item_id', v)}
                       onCreateNew={() => setQuickCreateOpen(true)}
                     />
-                    <Input type="number" className="h-8 text-xs" placeholder="Bruta" value={item.gross_quantity || ''} onChange={e => updateItem(idx, 'gross_quantity', e.target.value)} />
-                    <Input type="number" className="h-8 text-xs" placeholder="FC" value={item.correction_factor || ''} onChange={e => updateItem(idx, 'correction_factor', e.target.value)} />
-                    <span className="text-xs text-muted-foreground text-center">{item.quantity.toFixed(3)}</span>
-                    <Input type="number" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
+                    <Input type="number" step="any" className="h-8 text-xs" placeholder="Ex: 0.1" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} />
+                    <span className="text-xs text-muted-foreground text-center">{item.unit}</span>
+                    <Input type="number" step="0.01" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
                     <span className="text-xs font-medium text-foreground text-center">R$ {(item.quantity * item.unit_cost).toFixed(2)}</span>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
                   </div>
