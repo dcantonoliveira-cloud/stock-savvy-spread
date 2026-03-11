@@ -37,7 +37,7 @@ type Sheet = {
   created_at: string;
 };
 
-const RECIPE_CATEGORIES = ['Prato Principal', 'Entrada', 'Acompanhamento', 'Sobremesa', 'Molho', 'Guarnição', 'Bebida', 'Outros'];
+// Categories loaded dynamically from DB
 
 // ─── Searchable Item Combobox ───
 function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: {
