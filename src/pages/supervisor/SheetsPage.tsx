@@ -219,10 +219,12 @@ export default function SupervisorSheetsPage() {
   const [formItems, setFormItems] = useState<SheetItem[]>([]);
 
   const load = async () => {
-    const [itemsRes, sheetsRes] = await Promise.all([
+    const [itemsRes, sheetsRes, catsRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, unit_cost').order('name'),
       supabase.from('technical_sheets').select('*').order('name'),
+      supabase.from('sheet_categories').select('name, sort_order').order('sort_order'),
     ]);
+    if (catsRes.data) setSheetCategories((catsRes.data as any[]).map(c => c.name));
     if (itemsRes.data) setStockItems(itemsRes.data as unknown as StockItem[]);
     if (sheetsRes.data) {
       const sheetsWithItems = await Promise.all(
