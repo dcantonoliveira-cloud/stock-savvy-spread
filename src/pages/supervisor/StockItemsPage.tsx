@@ -24,7 +24,7 @@ type Item = {
   image_url: string | null; barcode: string | null;
 };
 
-type Kitchen = { id: string; name: string };
+type Kitchen = { id: string; name: string; is_default?: boolean };
 type LocationStock = { kitchen_id: string; kitchen_name: string; current_stock: number };
 type PriceHistoryEntry = { id: string; old_price: number; new_price: number; source: string; created_at: string };
 
