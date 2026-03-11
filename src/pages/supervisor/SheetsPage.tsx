@@ -524,10 +524,8 @@ export default function SupervisorSheetsPage() {
               <thead>
                 <tr className="border-b border-border text-left">
                   <th className="py-2 text-muted-foreground font-medium">Insumo</th>
+                  <th className="py-2 text-muted-foreground font-medium text-center">Quantidade</th>
                   <th className="py-2 text-muted-foreground font-medium text-center">Unidade</th>
-                  <th className="py-2 text-muted-foreground font-medium text-center">Qtd Bruta</th>
-                  <th className="py-2 text-muted-foreground font-medium text-center">Qtd Líquida</th>
-                  <th className="py-2 text-muted-foreground font-medium text-center">FC</th>
                   <th className="py-2 text-muted-foreground font-medium text-right">Custo Unit.</th>
                   <th className="py-2 text-muted-foreground font-medium text-right">Custo Total</th>
                 </tr>
@@ -536,10 +534,8 @@ export default function SupervisorSheetsPage() {
                 {viewingSheet.items.map((item, idx) => (
                   <tr key={idx} className="border-b border-border/50">
                     <td className="py-2 text-foreground">{item.item_name}</td>
-                    <td className="py-2 text-center text-muted-foreground">{item.unit}</td>
-                    <td className="py-2 text-center text-foreground">{item.gross_quantity}</td>
                     <td className="py-2 text-center text-foreground font-medium">{item.quantity}</td>
-                    <td className="py-2 text-center text-muted-foreground">{item.correction_factor}</td>
+                    <td className="py-2 text-center text-muted-foreground">{item.unit}</td>
                     <td className="py-2 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
                     <td className="py-2 text-right text-foreground font-medium">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
                   </tr>
