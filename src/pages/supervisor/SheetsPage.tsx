@@ -203,6 +203,9 @@ export default function SupervisorSheetsPage() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [sheetCategories, setSheetCategories] = useState<string[]>([]);
+  const [newCatName, setNewCatName] = useState('');
+  const [addingCat, setAddingCat] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
