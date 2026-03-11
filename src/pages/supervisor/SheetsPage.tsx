@@ -37,7 +37,7 @@ type Sheet = {
   created_at: string;
 };
 
-const RECIPE_CATEGORIES = ['Prato Principal', 'Entrada', 'Acompanhamento', 'Sobremesa', 'Molho', 'Guarnição', 'Bebida', 'Outros'];
+// Categories loaded dynamically from DB
 
 // ─── Searchable Item Combobox ───
 function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: {
@@ -203,11 +203,14 @@ export default function SupervisorSheetsPage() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [sheetCategories, setSheetCategories] = useState<string[]>([]);
+  const [newCatName, setNewCatName] = useState('');
+  const [addingCat, setAddingCat] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Prato Principal');
+  const [category, setCategory] = useState('');
   const [servings, setServings] = useState('1');
   const [yieldQty, setYieldQty] = useState('1');
   const [yieldUnit, setYieldUnit] = useState('kg');
@@ -216,10 +219,12 @@ export default function SupervisorSheetsPage() {
   const [formItems, setFormItems] = useState<SheetItem[]>([]);
 
   const load = async () => {
-    const [itemsRes, sheetsRes] = await Promise.all([
+    const [itemsRes, sheetsRes, catsRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, unit_cost').order('name'),
       supabase.from('technical_sheets').select('*').order('name'),
+      supabase.from('sheet_categories').select('name, sort_order').order('sort_order'),
     ]);
+    if (catsRes.data) setSheetCategories((catsRes.data as any[]).map(c => c.name));
     if (itemsRes.data) setStockItems(itemsRes.data as unknown as StockItem[]);
     if (sheetsRes.data) {
       const sheetsWithItems = await Promise.all(
@@ -247,7 +252,7 @@ export default function SupervisorSheetsPage() {
   useEffect(() => { load(); }, []);
 
   const resetForm = () => {
-    setName(''); setDescription(''); setCategory('Prato Principal');
+    setName(''); setDescription(''); setCategory(sheetCategories[0] || '');
     setServings('1'); setYieldQty('1'); setYieldUnit('kg');
     setPrepTime('0'); setInstructions(''); setFormItems([]);
     setEditingSheet(null);
@@ -397,12 +402,35 @@ export default function SupervisorSheetsPage() {
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {RECIPE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {sheetCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {!addingCat ? (
+                      <Button variant="outline" size="icon" className="shrink-0" onClick={() => setAddingCat(true)} title="Nova categoria">
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <div className="flex gap-1">
+                        <Input className="w-36" placeholder="Nova categoria" value={newCatName} onChange={e => setNewCatName(e.target.value)} autoFocus />
+                        <Button size="icon" className="shrink-0" onClick={async () => {
+                          const n = newCatName.trim();
+                          if (!n) return;
+                          if (sheetCategories.includes(n)) { toast.error('Categoria já existe'); return; }
+                          await supabase.from('sheet_categories').insert({ name: n, sort_order: sheetCategories.length + 1 } as any);
+                          setSheetCategories(prev => [...prev, n]);
+                          setCategory(n);
+                          setNewCatName('');
+                          setAddingCat(false);
+                          toast.success(`Categoria "${n}" criada!`);
+                        }}><Check className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" className="shrink-0" onClick={() => { setAddingCat(false); setNewCatName(''); }}><X className="w-4 h-4" /></Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Tempo de Preparo (min)</label>
@@ -495,7 +523,7 @@ export default function SupervisorSheetsPage() {
           <SelectTrigger className="w-48"><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
-            {RECIPE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            {sheetCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
