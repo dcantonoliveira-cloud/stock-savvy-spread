@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3, Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed } from 'lucide-react';
+import { LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3, Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoRondello from '@/assets/logo-rondello.png';
 
@@ -8,6 +8,7 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/categories', label: 'Categorias', icon: FolderOpen },
   { path: '/items', label: 'Estoque', icon: Package },
+  { path: '/invoices', label: 'Notas Fiscais', icon: Receipt },
   { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
   { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
   { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
@@ -26,18 +27,13 @@ export default function SupervisorSidebar() {
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-[260px] glass-sidebar flex flex-col z-50">
-      {/* Logo */}
       <div className="p-5 pb-3">
         <img src={logoRondello} alt="Rondello Buffet" className="h-10 object-contain" />
         <p className="text-[10px] text-muted-foreground mt-1 tracking-[0.2em] uppercase font-medium">
           Painel do Supervisor
         </p>
       </div>
-
-      {/* Divider */}
       <div className="mx-4 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent" />
-
-      {/* Nav */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto mt-2">
         {navItems.map(({ path, label, icon: Icon }) => {
           const active = pathname === path;
@@ -46,9 +42,7 @@ export default function SupervisorSidebar() {
               key={path}
               to={path}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
-                active
-                  ? 'nav-item-active'
-                  : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+                active ? 'nav-item-active' : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
               }`}
             >
               <Icon className="w-[18px] h-[18px]" />
@@ -57,11 +51,7 @@ export default function SupervisorSidebar() {
           );
         })}
       </nav>
-
-      {/* Divider */}
       <div className="mx-4 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent" />
-
-      {/* User */}
       <div className="p-4 space-y-3">
         <div className="flex items-center gap-3 px-1">
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
