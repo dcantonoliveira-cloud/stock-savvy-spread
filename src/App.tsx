@@ -22,6 +22,7 @@ import CategoriesPage from "./pages/supervisor/CategoriesPage";
 import InventoryPage from "./pages/supervisor/InventoryPage";
 import KitchensPage from "./pages/supervisor/KitchensPage";
 import EventMenusPage from "./pages/supervisor/EventMenusPage";
+import InvoicePage from "./pages/InvoicePage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
@@ -65,17 +66,18 @@ function AppRoutes() {
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/analysis" element={<AIAnalysisPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/invoices" element={<InvoicePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </SupervisorLayout>
     );
   }
 
-  // Employee
   return (
     <EmployeeLayout>
       <Routes>
         <Route path="/" element={<EmployeeDashboard />} />
+        <Route path="/invoices" element={<InvoicePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </EmployeeLayout>
