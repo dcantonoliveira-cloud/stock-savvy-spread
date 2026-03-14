@@ -22,6 +22,7 @@ import CategoriesPage from "./pages/supervisor/CategoriesPage";
 import InventoryPage from "./pages/supervisor/InventoryPage";
 import KitchensPage from "./pages/supervisor/KitchensPage";
 import EventMenusPage from "./pages/supervisor/EventMenusPage";
+import EventMenuDetailPage from "./pages/supervisor/EventMenuDetailPage";
 import InvoicePage from "./pages/InvoicePage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
@@ -60,6 +61,7 @@ function AppRoutes() {
           <Route path="/outputs" element={<SupervisorOutputsPage />} />
           <Route path="/sheets" element={<SupervisorSheetsPage />} />
           <Route path="/event-menus" element={<EventMenusPage />} />
+          <Route path="/event-menus/:id" element={<EventMenuDetailPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/kitchens" element={<KitchensPage />} />
