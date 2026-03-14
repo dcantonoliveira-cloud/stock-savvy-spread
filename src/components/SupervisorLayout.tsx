@@ -16,24 +16,23 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
       setUnread(count || 0);
     };
     load();
-
     const channel = supabase
       .channel('notifications')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'app_notifications' }, load)
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
   return (
     <div className="flex min-h-screen bg-background">
       <SupervisorSidebar />
-      <div className="flex-1 ml-[260px] flex flex-col">
-        {/* Top bar with bell */}
-        <div className="flex justify-end items-center px-8 pt-6 pb-0">
+      <div className="flex-1 ml-[256px] flex flex-col min-h-screen">
+
+        {/* Top bar */}
+        <div className="flex justify-end items-center px-8 pt-5 pb-0">
           <Link
             to="/notifications"
-            className="relative p-2 rounded-xl hover:bg-accent transition-colors"
+            className="relative p-2 rounded-xl transition-colors hover:bg-black/5"
             title="Notificações"
           >
             <Bell className="w-5 h-5 text-muted-foreground" />
@@ -44,6 +43,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
             )}
           </Link>
         </div>
+
         <main className="flex-1 p-8 pt-4">
           <div className="max-w-[1400px] mx-auto">
             {children}
