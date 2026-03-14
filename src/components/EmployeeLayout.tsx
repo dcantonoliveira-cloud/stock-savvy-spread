@@ -8,49 +8,73 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
   const { signOut, profile } = useAuth();
   const { pathname } = useLocation();
 
+  const initials = profile?.display_name
+    ?.split(' ')
+    .slice(0, 2)
+    .map((w: string) => w[0])
+    .join('')
+    .toUpperCase() || '?';
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border/50 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center">
-            <ChefHat className="w-4 h-4 text-primary" />
+
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white border-b border-border px-4 py-3 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+               style={{ background: 'hsl(222 35% 10%)' }}>
+            <ChefHat className="w-4 h-4" style={{ color: 'hsl(38 75% 52%)' }} />
           </div>
-          <div>
-            <h1 className="text-base font-bold gold-text tracking-wide">RONDELLO</h1>
-          </div>
+          <span className="text-base font-bold tracking-wide gold-text">RONDELLO</span>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold">
-              {profile?.display_name?.charAt(0)?.toUpperCase() || '?'}
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                 style={{
+                   background: 'hsl(222 35% 10%)',
+                   color: 'hsl(38 75% 52%)',
+                 }}>
+              {initials}
             </div>
-            <span className="text-sm text-muted-foreground hidden sm:block font-medium">{profile?.display_name}</span>
+            <span className="text-sm text-muted-foreground hidden sm:block font-medium">
+              {profile?.display_name}
+            </span>
           </div>
-          <Button variant="ghost" size="icon" onClick={signOut} className="hover:bg-destructive/10 hover:text-destructive rounded-xl">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={signOut}
+            className="hover:bg-destructive/10 hover:text-destructive rounded-xl w-8 h-8"
+          >
             <LogOut className="w-4 h-4" />
           </Button>
         </div>
       </header>
 
+      {/* Content */}
       <main className="p-4 max-w-2xl mx-auto pb-24">
         {children}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-card/90 backdrop-blur-xl border-t border-border/50 flex z-50">
+      {/* Bottom nav */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex z-50">
         <Link
           to="/"
-          className={`flex-1 flex flex-col items-center gap-1 py-3 text-[11px] font-medium transition-colors ${
-            pathname === '/' ? 'text-primary' : 'text-muted-foreground'
+          className={`flex-1 flex flex-col items-center gap-1 py-3 text-[11px] font-semibold transition-colors ${
+            pathname === '/' ? '' : 'text-muted-foreground'
           }`}
+          style={pathname === '/' ? { color: 'hsl(38 75% 45%)' } : {}}
         >
           <Home className="w-5 h-5" />
           Estoque
         </Link>
         <Link
           to="/invoices"
-          className={`flex-1 flex flex-col items-center gap-1 py-3 text-[11px] font-medium transition-colors ${
-            pathname === '/invoices' ? 'text-primary' : 'text-muted-foreground'
+          className={`flex-1 flex flex-col items-center gap-1 py-3 text-[11px] font-semibold transition-colors ${
+            pathname === '/invoices' ? '' : 'text-muted-foreground'
           }`}
+          style={pathname === '/invoices' ? { color: 'hsl(38 75% 45%)' } : {}}
         >
           <Receipt className="w-5 h-5" />
           Nota Fiscal
