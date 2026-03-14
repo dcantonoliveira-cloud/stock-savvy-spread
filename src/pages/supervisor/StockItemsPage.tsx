@@ -506,7 +506,7 @@ export default function StockItemsPage() {
     // Build categories from DB + any used in items
     const dbCats = (catsRes.data || []).map((c: any) => c.name);
     const usedCats = itemsRes.data ? [...new Set((itemsRes.data as any[]).map(i => i.category))] : [];
-    const merged = [...new Set([...dbCats, ...usedCats])].sort();
+    const merged = [...new Set([...dbCats, ...usedCats])].filter(c => c && c.trim() !== '').sort();
     setAllCategories(merged);
   };
   useEffect(() => { load(); }, []);
