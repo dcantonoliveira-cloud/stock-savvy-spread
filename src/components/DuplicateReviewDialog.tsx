@@ -12,9 +12,9 @@ type Item = {
 };
 
 type DuplicateGroup = {
-  canonical: Item;       // item que vai ficar
-  duplicates: Item[];    // itens que serão removidos
-  reason: string;        // por que são duplicatas
+  canonical: Item;
+  duplicates: Item[];
+  reason: string;
   confidence: 'high' | 'medium' | 'low';
 };
 
@@ -37,7 +37,9 @@ export default function DuplicateReviewDialog({ open, onClose, items, onDone }: 
     setProgress('Enviando itens para análise...');
 
     try {
-      const itemList = items.map(i => `${i.id}|${i.name}|${i.unit}`).join('\n');
+      // Limit to 500 items to avoid API limits
+      const itemsToAnalyze = items.slice(0, 500);
+      const itemList = itemsToAnalyze.map(i => `${i.id}|${i.name}|${i.unit}`).join('\n');
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -45,33 +47,19 @@ export default function DuplicateReviewDialog({ open, onClose, items, onDone }: 
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 4000,
-          system: `Você é um assistente especializado em análise de estoque de buffet. 
+          system: `Você é um assistente especializado em análise de estoque de buffet.
 Analise a lista de itens e identifique grupos de duplicatas ou itens muito similares que deveriam ser unificados.
-Responda APENAS com JSON válido, sem texto adicional, sem markdown, sem explicações.`,
+Responda APENAS com JSON válido, sem texto adicional, sem markdown, sem explicações fora do JSON.`,
           messages: [{
             role: 'user',
-            content: `Analise estes itens de estoque de um buffet e identifique duplicatas ou itens muito similares:
+            content: `Analise estes itens de estoque e identifique duplicatas (itens com numeração como "ABOBRINHA 1", "ABOBRINHA 2" que são o mesmo produto, ou nomes quase idênticos):
 
 ${itemList}
 
-Formato: ID|NOME|UNIDADE
+Formato da lista: ID|NOME|UNIDADE
 
-Regras:
-- Agrupe itens que são claramente o mesmo produto (ex: "ABOBRINHA", "ABOBRINHA 1", "ABOBRINHA 2", "ABOBRINHA GRELHADA" são diferentes - só agrupe se forem realmente o mesmo)
-- Prefira como "canonical" o item com nome mais simples/limpo
-- Confidence: "high" = claramente duplicata, "medium" = provavelmente duplicata, "low" = possível duplicata
-
-Responda com JSON:
-{
-  "groups": [
-    {
-      "canonical_id": "uuid-do-item-principal",
-      "duplicate_ids": ["uuid1", "uuid2"],
-      "reason": "explicação curta",
-      "confidence": "high|medium|low"
-    }
-  ]
-}`
+Responda SOMENTE com este JSON (sem markdown):
+{"groups":[{"canonical_id":"uuid","duplicate_ids":["uuid1"],"reason":"motivo curto","confidence":"high"}]}`
           }]
         })
       });
@@ -82,7 +70,8 @@ Responda com JSON:
 
       let parsed: any;
       try {
-        parsed = JSON.parse(text);
+        const clean = text.replace(/```json|```/g, '').trim();
+        parsed = JSON.parse(clean);
       } catch {
         const match = text.match(/\{[\s\S]*\}/);
         parsed = match ? JSON.parse(match[0]) : { groups: [] };
@@ -102,6 +91,7 @@ Responda com JSON:
       setExpanded(new Set([0]));
       setStep('review');
     } catch (err) {
+      console.error(err);
       toast.error('Erro ao analisar duplicatas');
       setStep('idle');
     }
@@ -134,14 +124,12 @@ Responda com JSON:
       const group = groups[idx];
       try {
         for (const dup of group.duplicates) {
-          // 1. Update technical_sheet_items: replace dup.id with canonical.id
           const { data: sheetItems } = await supabase
             .from('technical_sheet_items')
-            .select('id, sheet_id')
+            .select('id, sheet_id, quantity')
             .eq('item_id', dup.id as any);
 
           for (const si of (sheetItems || [])) {
-            // Check if canonical already exists in this sheet
             const { data: existing } = await supabase
               .from('technical_sheet_items')
               .select('id, quantity')
@@ -150,19 +138,12 @@ Responda com JSON:
               .maybeSingle();
 
             if (existing) {
-              // Merge quantities
-              const { data: dupSi } = await supabase
-                .from('technical_sheet_items')
-                .select('quantity')
-                .eq('id', si.id as any)
-                .single();
               await supabase
                 .from('technical_sheet_items')
-                .update({ quantity: (existing.quantity as number) + ((dupSi?.quantity as number) || 0) } as any)
+                .update({ quantity: (existing.quantity as number) + ((si.quantity as number) || 0) } as any)
                 .eq('id', existing.id as any);
               await supabase.from('technical_sheet_items').delete().eq('id', si.id as any);
             } else {
-              // Just reassign
               await supabase
                 .from('technical_sheet_items')
                 .update({ item_id: group.canonical.id } as any)
@@ -170,13 +151,9 @@ Responda com JSON:
             }
           }
 
-          // 2. Update stock_entries
           await supabase.from('stock_entries').update({ item_id: group.canonical.id } as any).eq('item_id', dup.id as any);
-
-          // 3. Update stock_outputs
           await supabase.from('stock_outputs').update({ item_id: group.canonical.id } as any).eq('item_id', dup.id as any);
 
-          // 4. Transfer stock to canonical
           if (dup.current_stock > 0) {
             await supabase
               .from('stock_items')
@@ -184,7 +161,6 @@ Responda com JSON:
               .eq('id', group.canonical.id as any);
           }
 
-          // 5. Delete duplicate
           await supabase.from('stock_items').delete().eq('id', dup.id as any);
           mergedCount++;
         }
@@ -229,13 +205,11 @@ Responda com JSON:
             Revisar Duplicatas com IA
           </DialogTitle>
           <DialogDescription>
-            A IA analisa os {items.length} itens do estoque e identifica possíveis duplicatas para unificação.
+            A IA analisa até 500 itens do estoque e identifica possíveis duplicatas para unificação.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
-
-          {/* IDLE */}
           {step === 'idle' && (
             <div className="py-8 text-center space-y-4">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
@@ -244,7 +218,7 @@ Responda com JSON:
               <div>
                 <p className="text-foreground font-medium">Pronto para analisar</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  A IA vai comparar todos os {items.length} itens e sugerir grupos de duplicatas.<br />
+                  A IA vai comparar os itens e sugerir grupos de duplicatas.<br />
                   Você poderá revisar e confirmar antes de qualquer alteração.
                 </p>
               </div>
@@ -255,7 +229,6 @@ Responda com JSON:
             </div>
           )}
 
-          {/* ANALYZING */}
           {step === 'analyzing' && (
             <div className="py-8 text-center space-y-4">
               <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
@@ -263,7 +236,6 @@ Responda com JSON:
             </div>
           )}
 
-          {/* REVIEW */}
           {step === 'review' && (
             <div className="space-y-3 py-2">
               {groups.length === 0 ? (
@@ -278,7 +250,7 @@ Responda com JSON:
                     <p className="text-sm text-muted-foreground">{groups.length} grupos encontrados · {selected.size} selecionados</p>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => setSelected(new Set(groups.map((_, i) => i)))}>
-                        Selecionar todos
+                        Todos
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>
                         Limpar
@@ -287,11 +259,7 @@ Responda com JSON:
                   </div>
 
                   {groups.map((group, idx) => (
-                    <div
-                      key={idx}
-                      className={`rounded-xl border transition-all ${selected.has(idx) ? 'border-primary/50 bg-primary/5' : 'border-border bg-card'}`}
-                    >
-                      {/* Header */}
+                    <div key={idx} className={`rounded-xl border transition-all ${selected.has(idx) ? 'border-primary/50 bg-primary/5' : 'border-border bg-card'}`}>
                       <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => toggleGroup(idx)}>
                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${selected.has(idx) ? 'bg-primary border-primary' : 'border-border'}`}>
                           {selected.has(idx) && <CheckCircle2 className="w-3 h-3 text-primary-foreground" />}
@@ -311,7 +279,6 @@ Responda com JSON:
                         </Button>
                       </div>
 
-                      {/* Expanded */}
                       {expanded.has(idx) && (
                         <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
                           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Será unificado com:</p>
@@ -333,7 +300,7 @@ Responda com JSON:
                             <Merge className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm text-foreground">{group.canonical.name} <span className="text-xs text-muted-foreground">(fica no estoque)</span></p>
-                              <p className="text-xs text-muted-foreground">{group.canonical.unit} · Fichas técnicas serão atualizadas automaticamente</p>
+                              <p className="text-xs text-muted-foreground">Fichas técnicas serão atualizadas automaticamente</p>
                             </div>
                           </div>
                         </div>
@@ -345,7 +312,6 @@ Responda com JSON:
             </div>
           )}
 
-          {/* MERGING */}
           {step === 'merging' && (
             <div className="py-8 text-center space-y-4">
               <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
@@ -353,22 +319,18 @@ Responda com JSON:
             </div>
           )}
 
-          {/* DONE */}
           {step === 'done' && (
             <div className="py-8 text-center space-y-4">
               <CheckCircle2 className="w-10 h-10 text-success mx-auto" />
               <div>
                 <p className="font-medium text-foreground">Unificação concluída!</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Todos os itens foram unificados e as fichas técnicas foram atualizadas.
-                </p>
+                <p className="text-sm text-muted-foreground mt-1">Fichas técnicas atualizadas com sucesso.</p>
               </div>
               <Button onClick={reset}>Fechar</Button>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         {step === 'review' && groups.length > 0 && (
           <div className="border-t border-border pt-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
