@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { UNITS } from '@/types/inventory';
 import * as XLSX from 'xlsx';
+import { ItemImage } from '@/components/ItemImage';
 
 type Item = {
   id: string; name: string; category: string; unit: string;
@@ -624,6 +625,7 @@ export default function StockItemsPage() {
             <thead>
               <tr className="bg-accent/60 border-b border-border">
                 <th className="text-left px-3 py-3 font-medium text-muted-foreground text-xs w-8">#</th>
+                <th className="text-left px-3 py-3 font-medium text-muted-foreground text-xs w-10"></th>
                 <th className="text-left px-3 py-3 font-medium text-muted-foreground text-xs cursor-pointer select-none min-w-[200px]" onClick={() => toggleSort('name')}>
                   <div className="flex items-center gap-1">PRODUTO <SortIcon field="name" /></div>
                 </th>
@@ -649,6 +651,12 @@ export default function StockItemsPage() {
                 return (
                   <tr key={item.id} className={`hover:bg-accent/20 transition-colors ${isLow ? 'bg-destructive/5' : idx % 2 === 0 ? '' : 'bg-accent/10'}`}>
                     <td className="px-3 py-2 text-muted-foreground text-xs">{idx + 1}</td>
+
+                    {/* Imagem */}
+                    <td className="px-2 py-1.5">
+                      <ItemImage itemId={item.id} itemName={item.name} size="sm" />
+                    </td>
+
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         {isLow && <div className="w-1.5 h-1.5 rounded-full bg-destructive flex-shrink-0" title="Estoque abaixo do mínimo" />}
