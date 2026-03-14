@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { UNITS } from '@/types/inventory';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
+import DuplicateReviewDialog from '@/components/DuplicateReviewDialog';
 
 type Item = {
   id: string; name: string; category: string; unit: string;
@@ -90,7 +91,7 @@ function ItemForm({ item, kitchens, allCategories, onSave, onCancel }: {
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-             {(allCategories.length > 0 ? allCategories : ['Outros']).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {(allCategories.length > 0 ? allCategories : ['Outros']).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -121,7 +122,6 @@ function ItemForm({ item, kitchens, allCategories, onSave, onCancel }: {
         <Input value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="7891234567890" />
       </div>
 
-      {/* Kitchen assignment for new items */}
       {!item?.id && kitchens.length > 0 && (
         <div>
           <label className="text-sm text-muted-foreground mb-1 block">Cozinha inicial (opcional)</label>
@@ -216,7 +216,6 @@ function ItemDetailDialog({ item, kitchens, open, onClose, onGenerateImage, gene
           <DialogDescription className="sr-only">Detalhes do item {item.name}</DialogDescription>
         </DialogHeader>
 
-        {/* Summary cards */}
         <div className="grid grid-cols-3 gap-3 my-2">
           <div className="bg-accent rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">Total Geral</p>
@@ -234,7 +233,6 @@ function ItemDetailDialog({ item, kitchens, open, onClose, onGenerateImage, gene
           </div>
         </div>
 
-        {/* Regen AI image button */}
         <Button
           variant="outline" size="sm" className="w-full"
           disabled={generatingImage}
@@ -486,6 +484,7 @@ export default function StockItemsPage() {
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [detailItem, setDetailItem] = useState<Item | null>(null);
   const [transferItem, setTransferItem] = useState<Item | null>(null);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const priceFileRef = useRef<HTMLInputElement>(null);
 
@@ -502,8 +501,6 @@ export default function StockItemsPage() {
     ]);
     if (itemsRes.data) setItems(itemsRes.data as unknown as Item[]);
     if (kitchensRes.data) setKitchens(kitchensRes.data);
-    
-    // Build categories from DB + any used in items
     const dbCats = (catsRes.data || []).map((c: any) => c.name);
     const usedCats = itemsRes.data ? [...new Set((itemsRes.data as any[]).map(i => i.category))] : [];
     const merged = [...new Set([...dbCats, ...usedCats])].filter(c => c && c.trim() !== '').sort();
@@ -517,14 +514,12 @@ export default function StockItemsPage() {
     return matchSearch && matchCat;
   });
 
-  // Group by category dynamically
   const groupedByCategory = allCategories.reduce<Record<string, Item[]>>((acc, cat) => {
     const catItems = filtered.filter(i => i.category === cat);
     if (catItems.length > 0) acc[cat] = catItems;
     return acc;
   }, {});
 
-  // Include items with categories not in allCategories
   const uncategorized = filtered.filter(i => !allCategories.includes(i.category));
   if (uncategorized.length > 0) {
     groupedByCategory['Outros'] = [...(groupedByCategory['Outros'] || []), ...uncategorized];
@@ -543,7 +538,6 @@ export default function StockItemsPage() {
 
   const handleSave = async (item: Partial<Item> & { name: string; category: string; unit: string }, imageFile?: File, initialKitchenId?: string) => {
     let imageUrl = item.image_url;
-
     if (item.id) {
       if (imageFile) imageUrl = await uploadImage(imageFile, item.id);
       const { error } = await supabase.from('stock_items').update({ ...item, image_url: imageUrl } as any).eq('id', item.id);
@@ -558,7 +552,6 @@ export default function StockItemsPage() {
       } else {
         generateAIImage(data.id, item.name);
       }
-      // Always link to a kitchen - use selected or default to Estoque Geral
       let targetKitchenId = initialKitchenId && initialKitchenId !== 'none' ? initialKitchenId : null;
       if (!targetKitchenId) {
         const defaultKitchen = kitchens.find(k => (k as any).is_default || k.name === 'Estoque Geral');
@@ -566,9 +559,7 @@ export default function StockItemsPage() {
       }
       if (targetKitchenId) {
         await supabase.from('stock_item_locations').insert({
-          item_id: data.id,
-          kitchen_id: targetKitchenId,
-          current_stock: item.current_stock || 0,
+          item_id: data.id, kitchen_id: targetKitchenId, current_stock: item.current_stock || 0,
         } as any);
       }
       toast.success('Item cadastrado!');
@@ -598,7 +589,6 @@ export default function StockItemsPage() {
     else { toast.success('Item removido!'); load(); }
   };
 
-  // ─── Excel functions ───
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
       ['Nome', 'Categoria', 'Unidade', 'Estoque Atual', 'Estoque Mínimo', 'Custo Unitário', 'Código de Barras'],
@@ -635,15 +625,12 @@ export default function StockItemsPage() {
     const wb = XLSX.read(data);
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows: any[] = XLSX.utils.sheet_to_json(ws);
-
     let count = 0;
     for (const row of rows) {
       const name = row['Nome']?.toString().trim();
       if (!name) continue;
       const { error } = await supabase.from('stock_items').insert({
-        name,
-        category: row['Categoria'] || 'Outros',
-        unit: row['Unidade'] || 'un',
+        name, category: row['Categoria'] || 'Outros', unit: row['Unidade'] || 'un',
         current_stock: parseFloat(row['Estoque Atual']) || 0,
         min_stock: parseFloat(row['Estoque Mínimo']) || 0,
         unit_cost: parseFloat(row['Custo Unitário']) || 0,
@@ -659,12 +646,8 @@ export default function StockItemsPage() {
 
   const downloadPriceTemplate = () => {
     const rows = items.map(i => ({
-      'ID': i.id,
-      'Nome': i.name,
-      'Categoria': i.category,
-      'Unidade': i.unit,
-      'Preço Atual (R$)': i.unit_cost,
-      'Novo Preço (R$)': '',
+      'ID': i.id, 'Nome': i.name, 'Categoria': i.category, 'Unidade': i.unit,
+      'Preço Atual (R$)': i.unit_cost, 'Novo Preço (R$)': '',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [{ wch: 36 }, { wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 18 }, { wch: 18 }];
@@ -681,16 +664,12 @@ export default function StockItemsPage() {
     const wb = XLSX.read(data);
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows: any[] = XLSX.utils.sheet_to_json(ws);
-
     let count = 0;
     for (const row of rows) {
       const id = row['ID']?.toString().trim();
       const newPrice = parseFloat(row['Novo Preço (R$)']);
       if (!id || isNaN(newPrice) || newPrice < 0) continue;
-
-      const { error } = await supabase.from('stock_items')
-        .update({ unit_cost: newPrice } as any)
-        .eq('id', id);
+      const { error } = await supabase.from('stock_items').update({ unit_cost: newPrice } as any).eq('id', id);
       if (!error) count++;
     }
     toast.success(`${count} preços atualizados!`);
@@ -701,11 +680,8 @@ export default function StockItemsPage() {
 
   const handleCategoryChange = (value: string) => {
     setFilterCategory(value);
-    if (value === 'all') {
-      searchParams.delete('category');
-    } else {
-      searchParams.set('category', value);
-    }
+    if (value === 'all') { searchParams.delete('category'); }
+    else { searchParams.set('category', value); }
     setSearchParams(searchParams);
   };
 
@@ -727,6 +703,9 @@ export default function StockItemsPage() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setPriceImportOpen(true)}>
             <DollarSign className="w-4 h-4 mr-1" />Importar Preços
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setDuplicateOpen(true)}>
+            <Sparkles className="w-4 h-4 mr-1" />Revisar Duplicatas
           </Button>
           <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) setEditingItem(undefined); }}>
             <DialogTrigger asChild>
@@ -773,7 +752,6 @@ export default function StockItemsPage() {
                     <span className="text-lg">📦</span>
                   )}
                 </div>
-
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${item.current_stock <= item.min_stock ? 'bg-warning' : 'bg-success'}`} />
@@ -784,12 +762,10 @@ export default function StockItemsPage() {
                     {item.barcode ? ` · EAN: ${item.barcode}` : ''}
                   </p>
                 </div>
-
                 <div className="text-right flex-shrink-0">
                   <p className="text-lg font-semibold text-foreground">{item.current_stock} <span className="text-xs text-muted-foreground">{item.unit}</span></p>
                   <p className="text-xs text-muted-foreground">R$ {(item.current_stock * item.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                 </div>
-
                 <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                   <Button variant="ghost" size="icon" title="Regenerar imagem IA" onClick={() => generateAIImage(item.id, item.name)} disabled={generatingImages.has(item.id)}>
                     <Sparkles className="w-4 h-4 text-primary" />
@@ -881,6 +857,14 @@ export default function StockItemsPage() {
         open={transferItem !== null}
         onClose={() => setTransferItem(null)}
         onDone={load}
+      />
+
+      {/* Duplicate review dialog */}
+      <DuplicateReviewDialog
+        open={duplicateOpen}
+        onClose={() => setDuplicateOpen(false)}
+        items={items}
+        onDone={() => { setDuplicateOpen(false); load(); }}
       />
     </div>
   );
