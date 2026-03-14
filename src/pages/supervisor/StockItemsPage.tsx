@@ -37,7 +37,7 @@ function ItemForm({ item, kitchens, allCategories, onSave, onCancel }: {
   onCancel: () => void;
 }) {
   const [name, setName] = useState(item?.name || '');
-  const [category, setCategory] = useState(item?.category || (allCategories[0] || 'Outros'));
+  const [category, setCategory] = useState(item?.category || 'Outros');
   const [unit, setUnit] = useState(item?.unit || UNITS[0]);
   const [currentStock, setCurrentStock] = useState(item?.current_stock?.toString() || '0');
   const [minStock, setMinStock] = useState(item?.min_stock?.toString() || '0');
@@ -90,7 +90,7 @@ function ItemForm({ item, kitchens, allCategories, onSave, onCancel }: {
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+             {(allCategories.length > 0 ? allCategories : ['Outros']).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
