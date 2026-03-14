@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_notifications: {
+        Row: {
+          created_at: string
+          data: Json | null
+          id: string
+          message: string | null
+          read: boolean | null
+          title: string
+          type: string | null
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          message?: string | null
+          read?: boolean | null
+          title: string
+          type?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          message?: string | null
+          read?: boolean | null
+          title?: string
+          type?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -321,6 +351,105 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      invoice_items: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_id: string
+          nf_description: string | null
+          nf_quantity: number | null
+          nf_unit: string | null
+          nf_unit_price: number | null
+          previous_unit_cost: number | null
+          status: string | null
+          stock_item_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_id: string
+          nf_description?: string | null
+          nf_quantity?: number | null
+          nf_unit?: string | null
+          nf_unit_price?: number | null
+          previous_unit_cost?: number | null
+          status?: string | null
+          stock_item_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          nf_description?: string | null
+          nf_quantity?: number | null
+          nf_unit?: string | null
+          nf_unit_price?: number | null
+          previous_unit_cost?: number | null
+          status?: string | null
+          stock_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          created_at: string
+          file_type: string | null
+          file_url: string | null
+          id: string
+          issue_date: string | null
+          number: string | null
+          registered_by: string | null
+          series: string | null
+          status: string | null
+          supplier_cnpj: string | null
+          supplier_name: string | null
+          total_value: number | null
+        }
+        Insert: {
+          created_at?: string
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          issue_date?: string | null
+          number?: string | null
+          registered_by?: string | null
+          series?: string | null
+          status?: string | null
+          supplier_cnpj?: string | null
+          supplier_name?: string | null
+          total_value?: number | null
+        }
+        Update: {
+          created_at?: string
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          issue_date?: string | null
+          number?: string | null
+          registered_by?: string | null
+          series?: string | null
+          status?: string | null
+          supplier_cnpj?: string | null
+          supplier_name?: string | null
+          total_value?: number | null
+        }
+        Relationships: []
       }
       kitchens: {
         Row: {
