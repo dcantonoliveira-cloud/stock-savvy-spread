@@ -271,47 +271,21 @@ export default function EventMenusPage() {
     setExtracting(true);
     setExtractedDishes([]);
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
-          messages: [{
-            role: 'user',
-            content: [
-              {
-                type: mediaType === 'application/pdf' ? 'document' : 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mediaType,
-                  data: base64,
-                },
-              },
-              {
-                type: 'text',
-                text: `Analise este cardápio de buffet e extraia TODOS os pratos com suas quantidades.
-                
-Retorne APENAS um JSON válido, sem markdown, sem explicação, no formato:
-{
-  "dishes": [
-    {
-      "raw_name": "nome exato do prato como aparece no cardápio",
-      "quantity": número (use 0 se não especificado),
-      "unit": "und|kg|g|l|ml|porcao" (use a unidade que aparecer),
-      "section_label": "nome da seção/bloco do cardápio (ex: Mesa Degustação, Coquetel Volante)"
-    }
-  ]
-}
-
-Inclua TODOS os pratos, de TODAS as seções. Não inclua itens decorativos, apenas pratos/alimentos.`,
-              },
-            ],
-          }],
-        }),
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        'https://vfrtvnzptaazhzfirflm.supabase.co/functions/v1/extract-menu',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ base64, mediaType }),
+        }
+      );
 
       const data = await response.json();
+      if (data.error) throw new Error(data.error);
       const text = data.content?.find((c: any) => c.type === 'text')?.text || '';
 
       let parsed: { dishes: any[] };
