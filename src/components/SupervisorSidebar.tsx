@@ -1,8 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText, BarChart3,
-  Users, LogOut, Bell, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
+  LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText,
+  Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
   ArrowRightLeft, Receipt, ChevronDown, ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -71,18 +71,30 @@ export default function SupervisorSidebar() {
     });
   };
 
+  const initials = profile?.display_name
+    ?.split(' ')
+    .slice(0, 2)
+    .map((w: string) => w[0])
+    .join('')
+    .toUpperCase() || '?';
+
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[260px] glass-sidebar flex flex-col z-50">
-      <div className="p-5 pb-3">
-        <img src={logoRondello} alt="Rondello Buffet" className="h-10 object-contain" />
-        <p className="text-[10px] text-muted-foreground mt-1 tracking-[0.2em] uppercase font-medium">
+    <aside className="fixed left-0 top-0 h-screen w-[256px] glass-sidebar flex flex-col z-50">
+
+      {/* Logo */}
+      <div className="px-5 pt-6 pb-4">
+        <img src={logoRondello} alt="Rondello Buffet" className="h-9 object-contain" />
+        <p className="text-[10px] mt-1.5 tracking-[0.2em] uppercase font-semibold"
+           style={{ color: 'hsl(38 75% 52% / 0.7)' }}>
           Painel do Supervisor
         </p>
       </div>
 
-      <div className="mx-4 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent" />
+      {/* Divider */}
+      <div className="mx-5 h-px" style={{ background: 'hsl(222 25% 18%)' }} />
 
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto mt-2">
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {navStructure.map((item) => {
           if (!isGroup(item)) {
             const active = pathname === item.path;
@@ -91,13 +103,14 @@ export default function SupervisorSidebar() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
                   active
                     ? 'nav-item-active'
-                    : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+                    : 'hover:bg-white/5'
                 }`}
+                style={{ color: active ? undefined : 'hsl(210 25% 65%)' }}
               >
-                <Icon className="w-[18px] h-[18px]" />
+                <Icon className="w-[17px] h-[17px] flex-shrink-0" />
                 {item.label}
               </Link>
             );
@@ -111,22 +124,22 @@ export default function SupervisorSidebar() {
             <div key={item.label}>
               <button
                 onClick={() => toggleGroup(item.label)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 ${
-                  isActiveGroup
-                    ? 'text-sidebar-foreground bg-sidebar-accent/50'
-                    : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
+                  isActiveGroup ? 'bg-white/5' : 'hover:bg-white/5'
                 }`}
+                style={{ color: isActiveGroup ? 'hsl(210 30% 85%)' : 'hsl(210 25% 60%)' }}
               >
-                <Icon className="w-[18px] h-[18px]" />
+                <Icon className="w-[17px] h-[17px] flex-shrink-0" />
                 <span className="flex-1 text-left">{item.label}</span>
                 {isOpen
-                  ? <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-                  : <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                  ? <ChevronDown className="w-3.5 h-3.5 opacity-50" />
+                  : <ChevronRight className="w-3.5 h-3.5 opacity-40" />
                 }
               </button>
 
               {isOpen && (
-                <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-3">
+                <div className="ml-5 mt-0.5 space-y-0.5 border-l pl-3"
+                     style={{ borderColor: 'hsl(222 25% 20%)' }}>
                   {item.items.map(sub => {
                     const SubIcon = sub.icon;
                     const active = pathname === sub.path;
@@ -134,13 +147,12 @@ export default function SupervisorSidebar() {
                       <Link
                         key={sub.path}
                         to={sub.path}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-200 ${
-                          active
-                            ? 'nav-item-active'
-                            : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150 ${
+                          active ? 'nav-item-active' : 'hover:bg-white/5'
                         }`}
+                        style={{ color: active ? undefined : 'hsl(210 20% 55%)' }}
                       >
-                        <SubIcon className="w-[15px] h-[15px]" />
+                        <SubIcon className="w-[14px] h-[14px] flex-shrink-0" />
                         {sub.label}
                       </Link>
                     );
@@ -152,22 +164,34 @@ export default function SupervisorSidebar() {
         })}
       </nav>
 
-      <div className="mx-4 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent" />
+      {/* Divider */}
+      <div className="mx-5 h-px" style={{ background: 'hsl(222 25% 18%)' }} />
 
-      <div className="p-4 space-y-3">
+      {/* User */}
+      <div className="p-4 space-y-2">
         <div className="flex items-center gap-3 px-1">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
-            {profile?.display_name?.charAt(0)?.toUpperCase() || '?'}
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+               style={{
+                 background: 'hsl(38 75% 52% / 0.2)',
+                 color: 'hsl(38 80% 62%)',
+                 border: '1px solid hsl(38 75% 52% / 0.3)'
+               }}>
+            {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-sidebar-foreground truncate">{profile?.display_name}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{profile?.email}</p>
+            <p className="text-sm font-semibold truncate" style={{ color: 'hsl(210 30% 88%)' }}>
+              {profile?.display_name}
+            </p>
+            <p className="text-[11px] truncate" style={{ color: 'hsl(210 20% 50%)' }}>
+              {profile?.email}
+            </p>
           </div>
         </div>
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl text-xs"
+          className="w-full justify-start rounded-xl text-xs hover:bg-red-500/10 hover:text-red-400"
+          style={{ color: 'hsl(210 20% 48%)' }}
           onClick={signOut}
         >
           <LogOut className="w-3.5 h-3.5 mr-2" />Sair
