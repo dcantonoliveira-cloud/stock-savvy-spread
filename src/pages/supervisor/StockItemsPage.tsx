@@ -28,7 +28,7 @@ type Supplier = {
 
 type DuplicateGroup = { canonical: Item; duplicates: Item[] };
 
-// ─── Local similarity algorithm ───
+// ─── Similarity ───
 function similarity(a: string, b: string): number {
   const s1 = a.toLowerCase().replace(/\s+/g, ' ').trim();
   const s2 = b.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -38,13 +38,9 @@ function similarity(a: string, b: string): number {
   const dp: number[][] = Array.from({ length: s1.length + 1 }, (_, i) =>
     Array.from({ length: s2.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
   );
-  for (let i = 1; i <= s1.length; i++) {
-    for (let j = 1; j <= s2.length; j++) {
-      dp[i][j] = s1[i - 1] === s2[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-    }
-  }
+  for (let i = 1; i <= s1.length; i++)
+    for (let j = 1; j <= s2.length; j++)
+      dp[i][j] = s1[i-1] === s2[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
   return 1 - dp[s1.length][s2.length] / len;
 }
 
@@ -61,10 +57,7 @@ function findDuplicates(items: Item[]): DuplicateGroup[] {
     const normI = normalize(items[i].name);
     for (let j = i + 1; j < items.length; j++) {
       if (used.has(items[j].id)) continue;
-      if (similarity(normI, normalize(items[j].name)) >= 0.82) {
-        group.push(items[j]);
-        used.add(items[j].id);
-      }
+      if (similarity(normI, normalize(items[j].name)) >= 0.82) { group.push(items[j]); used.add(items[j].id); }
     }
     if (group.length > 0) {
       used.add(items[i].id);
@@ -97,11 +90,7 @@ function SupplierDialog({ item, open, onClose }: { item: Item | null; open: bool
       item_id: item.id, supplier_name: newName.trim(),
       unit_price: parseFloat(newPrice), is_preferred: suppliers.length === 0,
     } as any).select().single();
-    if (!error && data) {
-      setSuppliers(prev => [...prev, data as Supplier]);
-      setNewName(''); setNewPrice(''); setAdding(false);
-      toast.success('Fornecedor adicionado!');
-    }
+    if (!error && data) { setSuppliers(prev => [...prev, data as Supplier]); setNewName(''); setNewPrice(''); setAdding(false); toast.success('Fornecedor adicionado!'); }
     setSaving(false);
   };
 
@@ -122,56 +111,37 @@ function SupplierDialog({ item, open, onClose }: { item: Item | null; open: bool
   };
 
   if (!item) return null;
-
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Store className="w-5 h-5 text-primary" />
-            Fornecedores — {item.name}
-          </DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Store className="w-5 h-5 text-primary" />Fornecedores — {item.name}</DialogTitle>
           <DialogDescription>Gerencie os fornecedores e preços. ⭐ = fornecedor preferido</DialogDescription>
         </DialogHeader>
         <div className="space-y-2 max-h-72 overflow-y-auto">
-          {suppliers.length === 0 && !adding && (
-            <p className="text-sm text-muted-foreground text-center py-4">Nenhum fornecedor cadastrado.</p>
-          )}
+          {suppliers.length === 0 && !adding && <p className="text-sm text-muted-foreground text-center py-4">Nenhum fornecedor cadastrado.</p>}
           {suppliers.map(s => (
             <div key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border ${s.is_preferred ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
               <button onClick={() => setPreferred(s.id)}>
-                {s.is_preferred
-                  ? <Star className="w-4 h-4 text-primary fill-primary" />
-                  : <StarOff className="w-4 h-4 text-muted-foreground hover:text-primary" />}
+                {s.is_preferred ? <Star className="w-4 h-4 text-primary fill-primary" /> : <StarOff className="w-4 h-4 text-muted-foreground hover:text-primary" />}
               </button>
               <span className="flex-1 text-sm font-medium">{s.supplier_name}</span>
               <div className="flex items-center gap-1">
                 <span className="text-xs text-muted-foreground">R$</span>
-                <Input
-                  type="number" step="0.01" defaultValue={s.unit_price}
-                  className="w-20 h-7 text-xs text-right"
-                  onBlur={e => updatePrice(s.id, parseFloat(e.target.value) || 0)}
-                />
+                <Input type="number" step="0.01" defaultValue={s.unit_price} className="w-20 h-7 text-xs text-right"
+                  onBlur={e => updatePrice(s.id, parseFloat(e.target.value) || 0)} />
                 <span className="text-xs text-muted-foreground">/{item.unit}</span>
               </div>
-              <button onClick={() => deleteSupplier(s.id)}>
-                <X className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-              </button>
+              <button onClick={() => deleteSupplier(s.id)}><X className="w-4 h-4 text-muted-foreground hover:text-destructive" /></button>
             </div>
           ))}
           {adding && (
             <div className="flex items-center gap-2 p-3 rounded-xl border border-primary/40 bg-primary/5">
-              <Input placeholder="Nome do fornecedor" value={newName} onChange={e => setNewName(e.target.value)}
-                className="flex-1 h-8 text-sm" autoFocus />
-              <Input type="number" step="0.01" placeholder="Preço" value={newPrice}
-                onChange={e => setNewPrice(e.target.value)} className="w-24 h-8 text-sm"
+              <Input placeholder="Nome do fornecedor" value={newName} onChange={e => setNewName(e.target.value)} className="flex-1 h-8 text-sm" autoFocus />
+              <Input type="number" step="0.01" placeholder="Preço" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-24 h-8 text-sm"
                 onKeyDown={e => e.key === 'Enter' && addSupplier()} />
-              <Button size="sm" onClick={addSupplier} disabled={saving} className="h-8">
-                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'OK'}
-              </Button>
-              <button onClick={() => { setAdding(false); setNewName(''); setNewPrice(''); }}>
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
+              <Button size="sm" onClick={addSupplier} disabled={saving} className="h-8">{saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'OK'}</Button>
+              <button onClick={() => { setAdding(false); setNewName(''); setNewPrice(''); }}><X className="w-4 h-4 text-muted-foreground" /></button>
             </div>
           )}
         </div>
@@ -196,21 +166,10 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
 
   const analyze = () => {
     setStep('analyzing');
-    setTimeout(() => {
-      const result = findDuplicates(items);
-      setGroups(result);
-      setSelected(new Set(result.map((_, i) => i)));
-      setExpanded(new Set([0]));
-      setStep('review');
-    }, 600);
+    setTimeout(() => { const result = findDuplicates(items); setGroups(result); setSelected(new Set(result.map((_, i) => i))); setExpanded(new Set([0])); setStep('review'); }, 600);
   };
-
-  const toggleGroup = (idx: number) => {
-    setSelected(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
-  };
-  const toggleExpand = (idx: number) => {
-    setExpanded(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
-  };
+  const toggleGroup = (idx: number) => { setSelected(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; }); };
+  const toggleExpand = (idx: number) => { setExpanded(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; }); };
 
   const merge = async () => {
     if (selected.size === 0) return;
@@ -220,29 +179,19 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
       const group = groups[idx];
       for (const dup of group.duplicates) {
         try {
-          const { data: sheetItems } = await supabase.from('technical_sheet_items')
-            .select('id, sheet_id, quantity').eq('item_id', dup.id as any);
+          const { data: sheetItems } = await supabase.from('technical_sheet_items').select('id, sheet_id, quantity').eq('item_id', dup.id as any);
           for (const si of (sheetItems || [])) {
-            const { data: existing } = await supabase.from('technical_sheet_items')
-              .select('id, quantity').eq('sheet_id', si.sheet_id as any)
-              .eq('item_id', group.canonical.id as any).maybeSingle();
+            const { data: existing } = await supabase.from('technical_sheet_items').select('id, quantity').eq('sheet_id', si.sheet_id as any).eq('item_id', group.canonical.id as any).maybeSingle();
             if (existing) {
-              await supabase.from('technical_sheet_items')
-                .update({ quantity: (existing.quantity as number) + ((si.quantity as number) || 0) } as any)
-                .eq('id', existing.id as any);
+              await supabase.from('technical_sheet_items').update({ quantity: (existing.quantity as number) + ((si.quantity as number) || 0) } as any).eq('id', existing.id as any);
               await supabase.from('technical_sheet_items').delete().eq('id', si.id as any);
             } else {
-              await supabase.from('technical_sheet_items')
-                .update({ item_id: group.canonical.id } as any).eq('id', si.id as any);
+              await supabase.from('technical_sheet_items').update({ item_id: group.canonical.id } as any).eq('id', si.id as any);
             }
           }
           await supabase.from('stock_entries').update({ item_id: group.canonical.id } as any).eq('item_id', dup.id as any);
           await supabase.from('stock_outputs').update({ item_id: group.canonical.id } as any).eq('item_id', dup.id as any);
-          if (dup.current_stock > 0) {
-            await supabase.from('stock_items')
-              .update({ current_stock: group.canonical.current_stock + dup.current_stock } as any)
-              .eq('id', group.canonical.id as any);
-          }
+          if (dup.current_stock > 0) await supabase.from('stock_items').update({ current_stock: group.canonical.current_stock + dup.current_stock } as any).eq('id', group.canonical.id as any);
           await supabase.from('stock_items').delete().eq('id', dup.id as any);
           count++;
         } catch (err) { console.error(err); }
@@ -259,34 +208,22 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
     <Dialog open={open} onOpenChange={o => { if (!o) reset(); }}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />Revisar Duplicatas
-          </DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" />Revisar Duplicatas</DialogTitle>
           <DialogDescription>Detecta itens com nomes similares e unifica, atualizando as fichas técnicas automaticamente.</DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto">
           {step === 'idle' && (
             <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <Sparkles className="w-8 h-8 text-primary" />
-              </div>
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto"><Sparkles className="w-8 h-8 text-primary" /></div>
               <p className="text-sm text-muted-foreground">Analisa {items.length} itens localmente, sem custo e sem API externa.</p>
               <Button onClick={analyze}><Sparkles className="w-4 h-4 mr-2" />Analisar Duplicatas</Button>
             </div>
           )}
-          {step === 'analyzing' && (
-            <div className="py-8 text-center">
-              <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Analisando similaridade entre nomes...</p>
-            </div>
-          )}
+          {step === 'analyzing' && <div className="py-8 text-center"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" /><p className="text-sm text-muted-foreground">Analisando similaridade...</p></div>}
           {step === 'review' && (
             <div className="space-y-3 py-2">
               {groups.length === 0 ? (
-                <div className="py-8 text-center">
-                  <CheckCircle2 className="w-10 h-10 text-success mx-auto mb-3" />
-                  <p className="font-medium">Nenhuma duplicata encontrada!</p>
-                </div>
+                <div className="py-8 text-center"><CheckCircle2 className="w-10 h-10 text-success mx-auto mb-3" /><p className="font-medium">Nenhuma duplicata encontrada!</p></div>
               ) : (
                 <>
                   <div className="flex items-center justify-between px-1 mb-2">
@@ -302,26 +239,16 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selected.has(idx) ? 'bg-primary border-primary' : 'border-border'}`}>
                           {selected.has(idx) && <CheckCircle2 className="w-3 h-3 text-primary-foreground" />}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="font-medium text-sm">{group.canonical.name}</span>
-                          <Badge variant="outline" className="ml-2 text-[10px]">principal</Badge>
-                        </div>
-                        <button onClick={e => { e.stopPropagation(); toggleExpand(idx); }}>
-                          {expanded.has(idx) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
+                        <div className="flex-1 min-w-0"><span className="font-medium text-sm">{group.canonical.name}</span><Badge variant="outline" className="ml-2 text-[10px]">principal</Badge></div>
+                        <button onClick={e => { e.stopPropagation(); toggleExpand(idx); }}>{expanded.has(idx) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
                       </div>
                       {expanded.has(idx) && (
                         <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
                           {group.duplicates.map(dup => (
                             <div key={dup.id} className="flex items-center gap-2 p-2 rounded-lg bg-destructive/5 border border-destructive/20">
                               <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                              <div className="flex-1">
-                                <p className="text-sm">{dup.name}</p>
-                                <p className="text-xs text-muted-foreground">Estoque: {dup.current_stock} {dup.unit}</p>
-                              </div>
-                              {dup.current_stock > 0 && (
-                                <Badge variant="outline" className="text-[10px] text-success border-success/30">+{dup.current_stock} somado</Badge>
-                              )}
+                              <div className="flex-1"><p className="text-sm">{dup.name}</p><p className="text-xs text-muted-foreground">Estoque: {dup.current_stock} {dup.unit}</p></div>
+                              {dup.current_stock > 0 && <Badge variant="outline" className="text-[10px] text-success border-success/30">+{dup.current_stock} somado</Badge>}
                             </div>
                           ))}
                         </div>
@@ -332,30 +259,15 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
               )}
             </div>
           )}
-          {step === 'merging' && (
-            <div className="py-8 text-center">
-              <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Unificando itens e atualizando fichas técnicas...</p>
-            </div>
-          )}
-          {step === 'done' && (
-            <div className="py-8 text-center space-y-4">
-              <CheckCircle2 className="w-10 h-10 text-success mx-auto" />
-              <p className="font-medium">Unificação concluída!</p>
-              <Button onClick={reset}>Fechar</Button>
-            </div>
-          )}
+          {step === 'merging' && <div className="py-8 text-center"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" /><p className="text-sm text-muted-foreground">Unificando itens...</p></div>}
+          {step === 'done' && <div className="py-8 text-center space-y-4"><CheckCircle2 className="w-10 h-10 text-success mx-auto" /><p className="font-medium">Unificação concluída!</p><Button onClick={reset}>Fechar</Button></div>}
         </div>
         {step === 'review' && groups.length > 0 && (
           <div className="border-t border-border pt-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <AlertTriangle className="w-3.5 h-3.5 text-warning" />Esta ação não pode ser desfeita
-            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground"><AlertTriangle className="w-3.5 h-3.5 text-warning" />Esta ação não pode ser desfeita</div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={reset}>Cancelar</Button>
-              <Button onClick={merge} disabled={selected.size === 0}>
-                <Merge className="w-4 h-4 mr-2" />Unificar {selected.size} grupo{selected.size !== 1 ? 's' : ''}
-              </Button>
+              <Button onClick={merge} disabled={selected.size === 0}><Merge className="w-4 h-4 mr-2" />Unificar {selected.size} grupo{selected.size !== 1 ? 's' : ''}</Button>
             </div>
           </div>
         )}
@@ -377,6 +289,7 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
   const [minStock, setMinStock] = useState(item?.min_stock?.toString() || '0');
   const [unitCost, setUnitCost] = useState(item?.unit_cost?.toString() || '0');
   const [barcode, setBarcode] = useState(item?.barcode || '');
+  const [imageUrl, setImageUrl] = useState(item?.image_url || null);
 
   const handleSubmit = () => {
     if (!name.trim()) { toast.error('Nome é obrigatório'); return; }
@@ -387,12 +300,26 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
       min_stock: parseFloat(minStock) || 0,
       unit_cost: parseFloat(unitCost) || 0,
       barcode: barcode.trim() || null,
-      image_url: item?.image_url || null,
+      image_url: imageUrl,
     });
   };
 
   return (
     <div className="space-y-4">
+      {/* Imagem — só aparece no modo edição de item existente */}
+      {item?.id && (
+        <div className="flex flex-col items-center py-2">
+          <ItemImage
+            itemId={item.id}
+            itemName={name || item.name}
+            imageUrl={imageUrl}
+            size="lg"
+            editMode={true}
+            onImageUpdate={setImageUrl}
+          />
+        </div>
+      )}
+
       <div>
         <label className="text-sm text-muted-foreground mb-1 block">Nome *</label>
         <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Filé Mignon" autoFocus />
@@ -402,9 +329,7 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
           <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {(allCategories.length > 0 ? allCategories : ['Outros']).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
+            <SelectContent>{(allCategories.length > 0 ? allCategories : ['Outros']).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div>
@@ -546,10 +471,8 @@ export default function StockItemsPage() {
       const preferred = itemSupps.find(s => s.is_preferred);
       return {
         'Nome': i.name, 'Categoria': i.category, 'Unidade': i.unit,
-        'Estoque Atual': i.current_stock, 'Estoque Mínimo': i.min_stock,
-        'Custo Unitário': i.unit_cost,
-        'Fornecedor Preferido': preferred?.supplier_name || '',
-        'Preço Fornecedor': preferred?.unit_price || '',
+        'Estoque Atual': i.current_stock, 'Estoque Mínimo': i.min_stock, 'Custo Unitário': i.unit_cost,
+        'Fornecedor Preferido': preferred?.supplier_name || '', 'Preço Fornecedor': preferred?.unit_price || '',
       };
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -586,11 +509,14 @@ export default function StockItemsPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-display font-bold gold-text">Estoque</h1>
-          <p className="text-muted-foreground mt-1">
-            {filtered.length} itens · Valor total: <span className="text-primary font-semibold">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {filtered.length} itens · Valor total:{' '}
+            <span className="text-foreground font-semibold">
+              R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </span>
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -607,10 +533,10 @@ export default function StockItemsPage() {
       <div className="flex gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9 h-9" placeholder="Buscar item..." value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-9 h-9 bg-white" placeholder="Buscar item..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-44 h-9"><SelectValue placeholder="Categoria" /></SelectTrigger>
+          <SelectTrigger className="w-48 h-9 bg-white"><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as categorias</SelectItem>
             {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -618,43 +544,48 @@ export default function StockItemsPage() {
         </Select>
       </div>
 
-      {/* Spreadsheet table */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      {/* Table */}
+      <div className="rounded-xl border border-border overflow-hidden bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-accent/60 border-b border-border">
-                <th className="text-left px-3 py-3 font-medium text-muted-foreground text-xs w-8">#</th>
-                <th className="text-left px-3 py-3 font-medium text-muted-foreground text-xs w-10"></th>
-                <th className="text-left px-3 py-3 font-medium text-muted-foreground text-xs cursor-pointer select-none min-w-[200px]" onClick={() => toggleSort('name')}>
+              <tr className="border-b border-border" style={{ background: 'hsl(40 30% 97%)' }}>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs w-8">#</th>
+                <th className="w-10 px-2 py-3"></th>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none min-w-[200px]" onClick={() => toggleSort('name')}>
                   <div className="flex items-center gap-1">PRODUTO <SortIcon field="name" /></div>
                 </th>
-                <th className="text-left px-3 py-3 font-medium text-muted-foreground text-xs">CATEGORIA</th>
-                <th className="text-center px-3 py-3 font-medium text-muted-foreground text-xs">UNID.</th>
-                <th className="text-right px-3 py-3 font-medium text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('current_stock')}>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs">CATEGORIA</th>
+                <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">UNID.</th>
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('current_stock')}>
                   <div className="flex items-center justify-end gap-1">ESTOQUE <SortIcon field="current_stock" /></div>
                 </th>
-                <th className="text-right px-3 py-3 font-medium text-muted-foreground text-xs">MÍN.</th>
-                <th className="text-right px-3 py-3 font-medium text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('unit_cost')}>
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs">MÍN.</th>
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('unit_cost')}>
                   <div className="flex items-center justify-end gap-1">PREÇO <SortIcon field="unit_cost" /></div>
                 </th>
-                <th className="text-left px-3 py-3 font-medium text-muted-foreground text-xs min-w-[140px]">FORNECEDOR</th>
-                <th className="text-center px-3 py-3 font-medium text-muted-foreground text-xs w-20">AÇÕES</th>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs min-w-[140px]">FORNECEDOR</th>
+                <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs w-20">AÇÕES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/40">
+            <tbody className="divide-y divide-border/50">
               {filtered.map((item, idx) => {
                 const itemSupps = suppliers[item.id] || [];
                 const preferred = itemSupps.find(s => s.is_preferred) || itemSupps[0];
                 const isLow = item.current_stock <= item.min_stock && item.min_stock > 0;
 
                 return (
-                  <tr key={item.id} className={`hover:bg-accent/20 transition-colors ${isLow ? 'bg-destructive/5' : idx % 2 === 0 ? '' : 'bg-accent/10'}`}>
+                  <tr key={item.id} className={`hover:bg-amber-50/40 transition-colors ${isLow ? 'bg-red-50/50' : ''}`}>
                     <td className="px-3 py-2 text-muted-foreground text-xs">{idx + 1}</td>
 
-                    {/* Imagem */}
+                    {/* Avatar com inicial */}
                     <td className="px-2 py-1.5">
-                      <ItemImage itemId={item.id} itemName={item.name} size="sm" />
+                      <ItemImage
+                        itemId={item.id}
+                        itemName={item.name}
+                        imageUrl={item.image_url}
+                        size="sm"
+                      />
                     </td>
 
                     <td className="px-3 py-2">
@@ -668,55 +599,48 @@ export default function StockItemsPage() {
                     </td>
                     <td className="px-3 py-2 text-center text-muted-foreground text-xs">{item.unit}</td>
 
-                    {/* Editable: current_stock */}
                     <td className="px-3 py-2 text-right">
                       {editingCell?.id === item.id && editingCell.field === 'current_stock' ? (
                         <input ref={cellInputRef} type="number" value={editingValue}
-                          onChange={e => setEditingValue(e.target.value)}
-                          onBlur={commitEdit}
+                          onChange={e => setEditingValue(e.target.value)} onBlur={commitEdit}
                           onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null); }}
-                          className="w-20 text-right bg-primary/10 border border-primary rounded px-2 py-0.5 text-sm outline-none" />
+                          className="w-20 text-right bg-amber-50 border border-amber-300 rounded px-2 py-0.5 text-sm outline-none" />
                       ) : (
-                        <span className={`cursor-pointer hover:text-primary font-semibold transition-colors ${isLow ? 'text-destructive' : 'text-foreground'}`}
+                        <span className={`cursor-pointer font-semibold transition-colors hover:text-primary ${isLow ? 'text-destructive' : 'text-foreground'}`}
                           onClick={() => startEdit(item.id, 'current_stock', item.current_stock)} title="Clique para editar">
                           {item.current_stock}
                         </span>
                       )}
                     </td>
 
-                    {/* Editable: min_stock */}
                     <td className="px-3 py-2 text-right">
                       {editingCell?.id === item.id && editingCell.field === 'min_stock' ? (
                         <input ref={cellInputRef} type="number" value={editingValue}
-                          onChange={e => setEditingValue(e.target.value)}
-                          onBlur={commitEdit}
+                          onChange={e => setEditingValue(e.target.value)} onBlur={commitEdit}
                           onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null); }}
-                          className="w-20 text-right bg-primary/10 border border-primary rounded px-2 py-0.5 text-sm outline-none" />
+                          className="w-20 text-right bg-amber-50 border border-amber-300 rounded px-2 py-0.5 text-sm outline-none" />
                       ) : (
-                        <span className="cursor-pointer hover:text-primary text-muted-foreground transition-colors"
+                        <span className="cursor-pointer text-muted-foreground transition-colors hover:text-primary"
                           onClick={() => startEdit(item.id, 'min_stock', item.min_stock)} title="Clique para editar">
                           {item.min_stock}
                         </span>
                       )}
                     </td>
 
-                    {/* Editable: unit_cost */}
                     <td className="px-3 py-2 text-right">
                       {editingCell?.id === item.id && editingCell.field === 'unit_cost' ? (
                         <input ref={cellInputRef} type="number" step="0.01" value={editingValue}
-                          onChange={e => setEditingValue(e.target.value)}
-                          onBlur={commitEdit}
+                          onChange={e => setEditingValue(e.target.value)} onBlur={commitEdit}
                           onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null); }}
-                          className="w-24 text-right bg-primary/10 border border-primary rounded px-2 py-0.5 text-sm outline-none" />
+                          className="w-24 text-right bg-amber-50 border border-amber-300 rounded px-2 py-0.5 text-sm outline-none" />
                       ) : (
-                        <span className="cursor-pointer hover:text-primary text-foreground transition-colors"
+                        <span className="cursor-pointer text-foreground transition-colors hover:text-primary"
                           onClick={() => startEdit(item.id, 'unit_cost', item.unit_cost)} title="Clique para editar">
                           R$ {item.unit_cost.toFixed(2)}
                         </span>
                       )}
                     </td>
 
-                    {/* Supplier */}
                     <td className="px-3 py-2">
                       <button onClick={() => setSupplierItem(item)}
                         className="flex items-center gap-1.5 hover:text-primary transition-colors group w-full text-left">
@@ -724,9 +648,7 @@ export default function StockItemsPage() {
                           <>
                             <Store className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary flex-shrink-0" />
                             <span className="text-sm truncate max-w-[110px]">{preferred.supplier_name}</span>
-                            {itemSupps.length > 1 && (
-                              <Badge variant="outline" className="text-[10px] flex-shrink-0">+{itemSupps.length - 1}</Badge>
-                            )}
+                            {itemSupps.length > 1 && <Badge variant="outline" className="text-[10px] flex-shrink-0">+{itemSupps.length - 1}</Badge>}
                           </>
                         ) : (
                           <span className="text-xs text-muted-foreground italic group-hover:text-primary">+ Adicionar</span>
@@ -734,15 +656,12 @@ export default function StockItemsPage() {
                       </button>
                     </td>
 
-                    {/* Actions */}
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-center gap-0.5">
-                        <Button variant="ghost" size="icon" className="w-7 h-7"
-                          onClick={() => { setEditingItem(item); setDialogOpen(true); }}>
+                        <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => { setEditingItem(item); setDialogOpen(true); }}>
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="w-7 h-7"
-                          onClick={() => handleDelete(item.id)}>
+                        <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => handleDelete(item.id)}>
                           <Trash2 className="w-3.5 h-3.5 text-destructive" />
                         </Button>
                       </div>
@@ -760,18 +679,17 @@ export default function StockItemsPage() {
         )}
       </div>
 
-      {/* Item form dialog */}
+      {/* Dialogs */}
       <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) setEditingItem(undefined); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
-            <DialogDescription>{editingItem ? 'Atualize os dados' : 'Preencha os dados do novo item'}</DialogDescription>
+            <DialogDescription>{editingItem ? 'Atualize os dados do item' : 'Preencha os dados do novo item'}</DialogDescription>
           </DialogHeader>
           <ItemForm item={editingItem} allCategories={allCategories} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
         </DialogContent>
       </Dialog>
 
-      {/* Import dialog */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Importar Itens</DialogTitle></DialogHeader>
