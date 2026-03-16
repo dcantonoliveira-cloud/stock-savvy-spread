@@ -14,6 +14,7 @@ import StockItemsPage from "./pages/supervisor/StockItemsPage";
 import EntriesPage from "./pages/supervisor/EntriesPage";
 import SupervisorOutputsPage from "./pages/supervisor/OutputsPage";
 import SupervisorSheetsPage from "./pages/supervisor/SheetsPage";
+import SheetDetailPage from "./pages/supervisor/SheetDetailPage";
 import SupervisorComparisonPage from "./pages/supervisor/ComparisonPage";
 import UsersPage from "./pages/supervisor/UsersPage";
 import NotificationsPage from "./pages/supervisor/NotificationsPage";
@@ -60,6 +61,7 @@ function AppRoutes() {
           <Route path="/entries" element={<EntriesPage />} />
           <Route path="/outputs" element={<SupervisorOutputsPage />} />
           <Route path="/sheets" element={<SupervisorSheetsPage />} />
+          <Route path="/sheets/:id" element={<SheetDetailPage />} />
           <Route path="/event-menus" element={<EventMenusPage />} />
           <Route path="/event-menus/:id" element={<EventMenuDetailPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
