@@ -14,7 +14,7 @@ import {
   ChevronDown, ChevronUp, CheckCircle2, TrendingDown, Loader2,
   Plus, Pencil, Trash2, X, Check, ChevronsUpDown, PackagePlus,
   Package, Truck, RotateCcw, AlertTriangle, MessageSquare,
-  ClipboardList, Info
+  ClipboardList, Info, UserCheck, RefreshCw, Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,7 @@ type EventMenu = {
   created_at: string;
   dispatched_at: string | null; dispatched_by: string | null;
   returned_at: string | null; returned_by: string | null;
+  assigned_to: string | null; assigned_at: string | null; assigned_by: string | null;
   dishes: MenuDish[];
 };
 type ShoppingItem = {
@@ -52,6 +53,9 @@ type DispatchItem = {
 type ReturnItem = {
   item_id: string; item_name: string; unit: string;
   dispatched: number; returned: number;
+};
+type Employee = {
+  user_id: string; display_name: string; email: string;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -193,66 +197,193 @@ function AddSheetDialog({ open, onClose, menuId, allSheets, onAdded }: { open: b
   );
 }
 
-// ─── Dispatch Dialog ──────────────────────────────────────────────────────────
-function DispatchDialog({ open, onClose, items, onConfirm, loading }: {
-  open: boolean; onClose: () => void;
-  items: DispatchItem[]; onConfirm: (items: DispatchItem[]) => void; loading: boolean;
+// ─── Assign Separation Dialog ─────────────────────────────────────────────────
+function AssignSeparationDialog({ open, onClose, menuId, employees, shoppingList, stockItems, onAssigned }: {
+  open: boolean; onClose: () => void; menuId: string;
+  employees: Employee[]; shoppingList: ShoppingItem[];
+  stockItems: StockItem[]; onAssigned: () => void;
 }) {
-  const [editItems, setEditItems] = useState<DispatchItem[]>([]);
-  useEffect(() => { setEditItems(items.map(i => ({ ...i }))); }, [items]);
+  const { profile } = useAuth();
+  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [refreshingStock, setRefreshingStock] = useState(false);
+  const [currentStock, setCurrentStock] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState(false);
+  const [stockRefreshed, setStockRefreshed] = useState(false);
 
-  const updateQty = (idx: number, val: number) => setEditItems(prev => prev.map((it, i) => i !== idx ? it : { ...it, actual: val }));
-  const insufficientItems = editItems.filter(i => i.actual > i.inStock);
+  useEffect(() => {
+    if (open) {
+      setSelectedEmployee('');
+      setStockRefreshed(false);
+      // Initialize with current shopping list stock values
+      const initial: Record<string, number> = {};
+      shoppingList.forEach(i => { initial[i.id] = i.inStock; });
+      setCurrentStock(initial);
+    }
+  }, [open, shoppingList]);
+
+  const handleRefreshStock = async () => {
+    setRefreshingStock(true);
+    const ids = shoppingList.map(i => i.id);
+    const { data } = await supabase
+      .from('stock_items')
+      .select('id, current_stock')
+      .in('id', ids);
+    if (data) {
+      const updated: Record<string, number> = {};
+      (data as any[]).forEach(d => { updated[d.id] = d.current_stock; });
+      setCurrentStock(updated);
+      setStockRefreshed(true);
+      toast.success('Estoque atualizado com saldo atual!');
+    }
+    setRefreshingStock(false);
+  };
+
+  const handleAssign = async () => {
+    if (!selectedEmployee) { toast.error('Selecione um funcionário'); return; }
+    setSaving(true);
+    try {
+      // Delete existing separation items for this menu (in case of reassignment)
+      await supabase.from('event_separation_items').delete().eq('menu_id', menuId);
+
+      // Create separation items from shopping list with current stock
+      const separationItems = shoppingList.map(item => ({
+        menu_id: menuId,
+        item_id: item.id,
+        planned_quantity: item.needed,
+        status: 'pending',
+      }));
+
+      const { error: insertError } = await supabase
+        .from('event_separation_items')
+        .insert(separationItems as any);
+
+      if (insertError) throw insertError;
+
+      // Update event_menus with assigned_to
+      const { error: updateError } = await supabase
+        .from('event_menus')
+        .update({
+          assigned_to: selectedEmployee,
+          assigned_at: new Date().toISOString(),
+          assigned_by: profile?.display_name || 'Supervisor',
+          status: 'assigned',
+        } as any)
+        .eq('id', menuId);
+
+      if (updateError) throw updateError;
+
+      const emp = employees.find(e => e.user_id === selectedEmployee);
+      toast.success(`Separação atribuída para ${emp?.display_name}!`);
+      onAssigned();
+      onClose();
+    } catch (err) {
+      toast.error('Erro ao atribuir separação');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const insufficientItems = shoppingList.filter(i => (currentStock[i.id] ?? i.inStock) < i.needed);
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Truck className="w-5 h-5 text-primary" />Saída para o Evento</DialogTitle>
-          <DialogDescription>Confirme as quantidades que serão retiradas do estoque. Ajuste se necessário.</DialogDescription>
+          <DialogTitle className="flex items-center gap-2">
+            <UserCheck className="w-5 h-5 text-primary" />
+            Atribuir Separação
+          </DialogTitle>
+          <DialogDescription>
+            Atribua a separação deste evento a um funcionário. Ele verá a lista no app dele.
+          </DialogDescription>
         </DialogHeader>
 
-        {insufficientItems.length > 0 && (
-          <div className="flex items-start gap-2 p-3 rounded-xl bg-warning/10 border border-warning/30">
-            <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-foreground">{insufficientItems.length} item(s) com estoque insuficiente</p>
-              <p className="text-xs text-muted-foreground mt-0.5">A saída será registrada mesmo assim — a equipe deve verificar fisicamente.</p>
+        {/* Employee selector */}
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-foreground mb-2 block">Funcionário responsável pela separação *</label>
+            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Selecionar funcionário..." />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map(e => (
+                  <SelectItem key={e.user_id} value={e.user_id}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        {e.display_name.charAt(0).toUpperCase()}
+                      </div>
+                      {e.display_name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Stock refresh */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 border border-amber-200">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-800">Estoque pode ter mudado</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  {stockRefreshed
+                    ? 'Saldos atualizados agora ✓'
+                    : 'Recomendado atualizar antes de atribuir.'}
+                </p>
+              </div>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshStock}
+              disabled={refreshingStock}
+              className="border-amber-300 text-amber-700 hover:bg-amber-100 flex-shrink-0"
+            >
+              {refreshingStock
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <RefreshCw className="w-3.5 h-3.5 mr-1" />
+              }
+              Atualizar Estoque
+            </Button>
+          </div>
+        </div>
+
+        {/* Items list */}
+        {insufficientItems.length > 0 && (
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm">
+            <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+            <span><strong>{insufficientItems.length} item(s)</strong> com estoque insuficiente. O funcionário será avisado.</span>
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto border border-border rounded-xl">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground sticky top-0 bg-white">
+              <tr className="border-b border-border text-xs text-muted-foreground bg-muted/30 sticky top-0">
                 <th className="text-left py-2 px-3">Insumo</th>
-                <th className="text-right py-2 px-3">Calculado</th>
-                <th className="text-right py-2 px-3">Em estoque</th>
-                <th className="text-right py-2 px-3 w-32">Qtd saída</th>
+                <th className="text-right py-2 px-3">Necessário</th>
+                <th className="text-right py-2 px-3">Em Estoque</th>
                 <th className="text-center py-2 px-3 w-16">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {editItems.map((item, idx) => {
-                const isInsufficient = item.actual > item.inStock;
+              {shoppingList.map(item => {
+                const stock = currentStock[item.id] ?? item.inStock;
+                const ok = stock >= item.needed;
                 return (
-                  <tr key={item.item_id} className={isInsufficient ? 'bg-warning/5' : ''}>
-                    <td className="py-2 px-3 text-foreground">{item.item_name} <span className="text-muted-foreground text-xs">({item.unit})</span></td>
-                    <td className="py-2 px-3 text-right text-muted-foreground">{item.planned.toFixed(3)}</td>
-                    <td className="py-2 px-3 text-right text-muted-foreground">{item.inStock}</td>
-                    <td className="py-2 px-3 text-right">
-                      <Input
-                        type="number" step="any"
-                        value={item.actual || ''}
-                        onChange={e => updateQty(idx, parseFloat(e.target.value) || 0)}
-                        className={`h-7 w-24 text-xs text-right ml-auto ${isInsufficient ? 'border-warning text-warning' : ''}`}
-                      />
+                  <tr key={item.id} className={!ok ? 'bg-destructive/5' : ''}>
+                    <td className="py-2 px-3 text-foreground">{item.name} <span className="text-muted-foreground text-xs">({item.unit})</span></td>
+                    <td className="py-2 px-3 text-right text-muted-foreground">{item.needed.toFixed(3)}</td>
+                    <td className={`py-2 px-3 text-right font-medium ${ok ? 'text-success' : 'text-destructive'}`}>
+                      {stock}
                     </td>
                     <td className="py-2 px-3 text-center">
-                      {isInsufficient
-                        ? <AlertTriangle className="w-4 h-4 text-warning mx-auto" />
-                        : <CheckCircle2 className="w-4 h-4 text-success mx-auto" />
+                      {ok
+                        ? <CheckCircle2 className="w-4 h-4 text-success mx-auto" />
+                        : <AlertTriangle className="w-4 h-4 text-destructive mx-auto" />
                       }
                     </td>
                   </tr>
@@ -264,9 +395,9 @@ function DispatchDialog({ open, onClose, items, onConfirm, loading }: {
 
         <div className="flex gap-3 pt-3 border-t border-border">
           <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
-          <Button onClick={() => onConfirm(editItems)} disabled={loading} className="flex-1">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Truck className="w-4 h-4 mr-2" />}
-            Confirmar Saída ({editItems.length} itens)
+          <Button onClick={handleAssign} disabled={saving || !selectedEmployee} className="flex-1">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserCheck className="w-4 h-4 mr-2" />}
+            Atribuir Separação
           </Button>
         </div>
       </DialogContent>
@@ -398,20 +529,35 @@ export default function EventMenuDetailPage() {
   const [allSheets, setAllSheets] = useState<Sheet[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pratos' | 'compras' | 'saida'>('pratos');
   const [shopFilter, setShopFilter] = useState<'all' | 'ok' | 'buy'>('all');
   const [editingDishId, setEditingDishId] = useState<string | null>(null);
   const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
 
-  // Dispatch / Return
-  const [dispatchItems, setDispatchItems] = useState<DispatchItem[]>([]);
+  // Return
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
-  const [dispatchOpen, setDispatchOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [movementLoading, setMovementLoading] = useState(false);
 
-  useEffect(() => { if (!id) return; loadMenu(); }, [id]);
+  useEffect(() => { if (!id) return; loadMenu(); loadEmployees(); }, [id]);
+
+  const loadEmployees = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('user_id, display_name, email');
+    // Filter only employees (role = 'employee') via user_roles
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .eq('role', 'employee');
+    if (data && roles) {
+      const employeeIds = new Set(roles.map((r: any) => r.user_id));
+      setEmployees((data as any[]).filter(p => employeeIds.has(p.user_id)) as Employee[]);
+    }
+  };
 
   const loadMenu = async () => {
     setLoading(true);
@@ -463,19 +609,7 @@ export default function EventMenuDetailPage() {
     setShoppingList(list);
   };
 
-  // Build dispatch items from shopping list
-  const prepareDispatch = () => {
-    const items: DispatchItem[] = shoppingList.map(i => ({
-      item_id: i.id, item_name: i.name, unit: i.unit,
-      planned: i.needed, actual: i.needed,
-      inStock: i.inStock, hasEnough: i.inStock >= i.needed,
-    }));
-    setDispatchItems(items);
-    setDispatchOpen(true);
-  };
-
   const prepareReturn = async () => {
-    // Load what was dispatched
     const { data: movements } = await supabase
       .from('event_stock_movements')
       .select('*')
@@ -487,34 +621,6 @@ export default function EventMenuDetailPage() {
     });
     setReturnItems(items);
     setReturnOpen(true);
-  };
-
-  const confirmDispatch = async (items: DispatchItem[]) => {
-    setMovementLoading(true);
-    try {
-      // Insert movements
-      await supabase.from('event_stock_movements').insert(
-        items.map(i => ({ menu_id: id, item_id: i.item_id, movement_type: 'dispatch', planned_quantity: i.planned, actual_quantity: i.actual, created_by: profile?.display_name || 'Sistema' })) as any
-      );
-      // Deduct from stock
-      for (const item of items) {
-        const stock = stockItems.find(s => s.id === item.item_id);
-        if (stock) {
-          const newQty = Math.max(0, stock.current_stock - item.actual);
-          await supabase.from('stock_items').update({ current_stock: newQty } as any).eq('id', item.item_id);
-        }
-      }
-      // Update menu status
-      await supabase.from('event_menus').update({ status: 'dispatched', dispatched_at: new Date().toISOString(), dispatched_by: profile?.display_name || 'Sistema' } as any).eq('id', id!);
-      toast.success(`Saída confirmada! ${items.length} itens descontados do estoque.`);
-      setDispatchOpen(false);
-      loadMenu();
-    } catch (err) {
-      toast.error('Erro ao confirmar saída');
-      console.error(err);
-    } finally {
-      setMovementLoading(false);
-    }
   };
 
   const confirmReturn = async (items: ReturnItem[]) => {
@@ -585,9 +691,22 @@ export default function EventMenuDetailPage() {
   const insufficientCount = shoppingList.filter(i => !i.hasStock).length;
   const filteredShoppingList = shopFilter === 'ok' ? shoppingList.filter(i => i.toBuy === 0) : shopFilter === 'buy' ? shoppingList.filter(i => i.toBuy > 0) : shoppingList;
 
-  const statusColor = { draft: 'secondary', dispatched: 'default', completed: 'default' }[menu.status] || 'secondary';
-  const statusLabel = { draft: 'Rascunho', dispatched: 'Saída Confirmada', completed: 'Concluído' }[menu.status] || menu.status;
-  const canDispatch = menu.status === 'draft';
+  const statusLabel: Record<string, string> = {
+    draft: 'Rascunho',
+    assigned: 'Separação Atribuída',
+    dispatched: 'Saída Confirmada',
+    completed: 'Concluído'
+  };
+  const statusColor: Record<string, string> = {
+    draft: 'secondary',
+    assigned: 'default',
+    dispatched: 'default',
+    completed: 'default'
+  };
+
+  const assignedEmployee = menu.assigned_to ? employees.find(e => e.user_id === menu.assigned_to) : null;
+
+  const canAssign = menu.status === 'draft' || menu.status === 'assigned';
   const canReturn = menu.status === 'dispatched';
 
   return (
@@ -610,21 +729,36 @@ export default function EventMenuDetailPage() {
             {menu.notes && <p className="text-sm text-muted-foreground mt-2">{menu.notes}</p>}
             <p className="text-xs text-muted-foreground mt-2 opacity-60">
               Gerado em {new Date(menu.created_at).toLocaleDateString('pt-BR')} às {new Date(menu.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              {menu.assigned_at && ` · Atribuído: ${new Date(menu.assigned_at).toLocaleDateString('pt-BR')} por ${menu.assigned_by}`}
               {menu.dispatched_at && ` · Saída: ${new Date(menu.dispatched_at).toLocaleDateString('pt-BR')} por ${menu.dispatched_by}`}
               {menu.returned_at && ` · Retorno: ${new Date(menu.returned_at).toLocaleDateString('pt-BR')} por ${menu.returned_by}`}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <Badge variant={statusColor as any} className="text-xs">
+            <Badge variant={statusColor[menu.status] as any} className="text-xs">
+              {menu.status === 'assigned' && <UserCheck className="w-3 h-3 mr-1" />}
               {menu.status === 'dispatched' && <Truck className="w-3 h-3 mr-1" />}
               {menu.status === 'completed' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-              {statusLabel}
+              {statusLabel[menu.status] || menu.status}
             </Badge>
+
+            {/* Assigned employee chip */}
+            {assignedEmployee && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/8 border border-primary/20 text-xs text-primary">
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center font-bold text-[10px]">
+                  {assignedEmployee.display_name.charAt(0).toUpperCase()}
+                </div>
+                <span className="font-medium">{assignedEmployee.display_name}</span>
+                <span className="text-primary/60">separando</span>
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="flex gap-2">
-              {canDispatch && (
-                <Button size="sm" onClick={prepareDispatch} className="gap-1.5">
-                  <Truck className="w-4 h-4" />Dar Saída do Estoque
+              {canAssign && (
+                <Button size="sm" onClick={() => setAssignOpen(true)} className="gap-1.5">
+                  <UserCheck className="w-4 h-4" />
+                  {menu.status === 'assigned' ? 'Reatribuir Separação' : 'Atribuir Separação'}
                 </Button>
               )}
               {canReturn && (
@@ -647,18 +781,17 @@ export default function EventMenuDetailPage() {
           <div className="text-center"><p className="text-2xl font-bold gold-text">R$ {totalToBuy.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p><p className="text-xs text-muted-foreground mt-0.5">custo compra</p></div>
         </div>
 
-        {/* Insufficient stock warning */}
         {insufficientCount > 0 && (
           <div className="flex items-center gap-2 mt-4 p-3 rounded-xl bg-warning/10 border border-warning/30 text-sm">
             <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0" />
-            <span><strong>{insufficientCount} insumo(s)</strong> com estoque insuficiente — compre antes de dar saída.</span>
+            <span><strong>{insufficientCount} insumo(s)</strong> com estoque insuficiente — compre antes de atribuir a separação.</span>
           </div>
         )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-white rounded-xl border border-border p-1 w-fit">
-        {([['pratos', `Fichas (${regularDishes.length})`, null], ['compras', 'Lista de Compras', itemsToBuy > 0 ? itemsToBuy : null], ['saida', 'Saída / Retorno', null]] as const).map(([tab, label, badge]) => (
+        {([['pratos', `Fichas (${regularDishes.length})`, null], ['compras', 'Lista de Compras', itemsToBuy > 0 ? itemsToBuy : null], ['saida', 'Separação / Retorno', null]] as const).map(([tab, label, badge]) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === tab ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
             {label}
             {badge && <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${activeTab === tab ? 'bg-white/20' : 'bg-destructive text-white'}`}>{badge}</span>}
@@ -673,7 +806,6 @@ export default function EventMenuDetailPage() {
             <Button variant="outline" size="sm" onClick={() => setAddSheetOpen(true)}><Plus className="w-4 h-4 mr-1" />Adicionar ficha ao cardápio</Button>
           </div>
 
-          {/* MANTIMENTOS */}
           {mantimentosDish && (
             <div className="rounded-xl border-2 border-primary/20 bg-primary/3 overflow-hidden">
               <div className="flex items-center justify-between px-5 py-3">
@@ -698,7 +830,6 @@ export default function EventMenuDetailPage() {
             </div>
           )}
 
-          {/* Regular dishes */}
           {regularDishes.map(dish => (
             <div key={dish.id} className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4">
@@ -762,7 +893,7 @@ export default function EventMenuDetailPage() {
         </div>
       )}
 
-      {/* ── SAÍDA / RETORNO ── */}
+      {/* ── SEPARAÇÃO / RETORNO ── */}
       {activeTab === 'saida' && (
         <div className="space-y-4">
           {/* Status timeline */}
@@ -771,19 +902,21 @@ export default function EventMenuDetailPage() {
             <div className="flex items-center gap-0">
               {[
                 { key: 'draft', label: 'Cardápio criado', icon: ClipboardList, done: true },
+                { key: 'assigned', label: 'Separação atribuída', icon: UserCheck, done: menu.status === 'assigned' || menu.status === 'dispatched' || menu.status === 'completed' },
                 { key: 'dispatched', label: 'Saída do estoque', icon: Truck, done: menu.status === 'dispatched' || menu.status === 'completed' },
                 { key: 'completed', label: 'Retorno confirmado', icon: RotateCcw, done: menu.status === 'completed' },
-              ].map(({ key, label, icon: Icon, done }, i) => (
+              ].map(({ key, label, icon: Icon, done }, i, arr) => (
                 <div key={key} className="flex items-center flex-1">
                   <div className="flex flex-col items-center gap-1.5">
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all ${done ? 'bg-success border-success' : 'bg-white border-border'}`}>
                       <Icon className={`w-4 h-4 ${done ? 'text-white' : 'text-muted-foreground'}`} />
                     </div>
                     <p className="text-xs text-center text-muted-foreground whitespace-nowrap">{label}</p>
+                    {key === 'assigned' && menu.assigned_at && <p className="text-[10px] text-muted-foreground opacity-70">{new Date(menu.assigned_at).toLocaleDateString('pt-BR')}</p>}
                     {key === 'dispatched' && menu.dispatched_at && <p className="text-[10px] text-muted-foreground opacity-70">{new Date(menu.dispatched_at).toLocaleDateString('pt-BR')}</p>}
                     {key === 'completed' && menu.returned_at && <p className="text-[10px] text-muted-foreground opacity-70">{new Date(menu.returned_at).toLocaleDateString('pt-BR')}</p>}
                   </div>
-                  {i < 2 && <div className={`flex-1 h-0.5 mx-2 mb-5 ${done ? 'bg-success' : 'bg-border'}`} />}
+                  {i < arr.length - 1 && <div className={`flex-1 h-0.5 mx-2 mb-5 ${done ? 'bg-success' : 'bg-border'}`} />}
                 </div>
               ))}
             </div>
@@ -791,21 +924,30 @@ export default function EventMenuDetailPage() {
 
           {/* Action cards */}
           <div className="grid grid-cols-2 gap-4">
-            <div className={`bg-white rounded-xl border shadow-sm p-5 ${canDispatch ? 'border-primary/30' : 'border-border opacity-60'}`}>
+            {/* Assign card */}
+            <div className={`bg-white rounded-xl border shadow-sm p-5 ${canAssign ? 'border-primary/30' : 'border-border opacity-60'}`}>
               <div className="flex items-center gap-2 mb-3">
-                <Truck className={`w-5 h-5 ${canDispatch ? 'text-primary' : 'text-muted-foreground'}`} />
-                <p className="font-semibold text-foreground">Saída para o Evento</p>
+                <UserCheck className={`w-5 h-5 ${canAssign ? 'text-primary' : 'text-muted-foreground'}`} />
+                <p className="font-semibold text-foreground">Atribuir Separação</p>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">Desconta os insumos do estoque físico. A equipe confirma as quantidades antes de efetivar.</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Designa um funcionário para separar fisicamente os itens no estoque. Ele verá a lista no app.
+              </p>
               <div className="text-xs text-muted-foreground mb-4 space-y-1">
-                <p>• {shoppingList.length} insumos calculados</p>
-                <p>• {insufficientCount > 0 ? <span className="text-warning font-medium">{insufficientCount} itens com estoque insuficiente</span> : <span className="text-success">Todos os itens disponíveis</span>}</p>
+                <p>• {shoppingList.length} insumos para separar</p>
+                {assignedEmployee
+                  ? <p>• <span className="text-primary font-medium">{assignedEmployee.display_name}</span> está designado</p>
+                  : <p>• Nenhum funcionário designado ainda</p>
+                }
+                {insufficientCount > 0 && <p>• <span className="text-warning font-medium">{insufficientCount} itens com estoque insuficiente</span></p>}
               </div>
-              <Button className="w-full" disabled={!canDispatch} onClick={prepareDispatch}>
-                <Truck className="w-4 h-4 mr-2" />{canDispatch ? 'Iniciar Saída' : menu.status === 'dispatched' ? 'Saída já realizada' : 'Evento concluído'}
+              <Button className="w-full" disabled={!canAssign} onClick={() => setAssignOpen(true)}>
+                <UserCheck className="w-4 h-4 mr-2" />
+                {menu.status === 'assigned' ? 'Reatribuir Separação' : menu.status === 'dispatched' || menu.status === 'completed' ? 'Separação concluída' : 'Atribuir Separação'}
               </Button>
             </div>
 
+            {/* Return card */}
             <div className={`bg-white rounded-xl border shadow-sm p-5 ${canReturn ? 'border-success/30' : 'border-border opacity-60'}`}>
               <div className="flex items-center gap-2 mb-3">
                 <RotateCcw className={`w-5 h-5 ${canReturn ? 'text-success' : 'text-muted-foreground'}`} />
@@ -815,21 +957,129 @@ export default function EventMenuDetailPage() {
               <div className="text-xs text-muted-foreground mb-4 space-y-1">
                 {menu.dispatched_at
                   ? <p>• Saída realizada em {new Date(menu.dispatched_at).toLocaleDateString('pt-BR')} por {menu.dispatched_by}</p>
-                  : <p>• Realize a saída primeiro</p>
+                  : <p>• O funcionário precisa confirmar a saída primeiro</p>
                 }
               </div>
               <Button className="w-full bg-success hover:bg-success/90" disabled={!canReturn} onClick={prepareReturn}>
-                <RotateCcw className="w-4 h-4 mr-2" />{canReturn ? 'Registrar Sobras' : menu.status === 'completed' ? 'Retorno já registrado' : 'Aguardando saída'}
+                <RotateCcw className="w-4 h-4 mr-2" />
+                {canReturn ? 'Registrar Sobras' : menu.status === 'completed' ? 'Retorno já registrado' : 'Aguardando saída'}
               </Button>
             </div>
           </div>
+
+          {/* Separation progress (if assigned) */}
+          {(menu.status === 'assigned' || menu.status === 'dispatched') && (
+            <SeparationProgress menuId={id!} assignedEmployee={assignedEmployee} />
+          )}
         </div>
       )}
 
       {/* Dialogs */}
       <AddSheetDialog open={addSheetOpen} onClose={() => setAddSheetOpen(false)} menuId={id!} allSheets={allSheets} onAdded={() => loadMenu()} />
-      <DispatchDialog open={dispatchOpen} onClose={() => setDispatchOpen(false)} items={dispatchItems} onConfirm={confirmDispatch} loading={movementLoading} />
+      <AssignSeparationDialog
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        menuId={id!}
+        employees={employees}
+        shoppingList={shoppingList}
+        stockItems={stockItems}
+        onAssigned={() => loadMenu()}
+      />
       <ReturnDialog open={returnOpen} onClose={() => setReturnOpen(false)} items={returnItems} onConfirm={confirmReturn} loading={movementLoading} />
+    </div>
+  );
+}
+
+// ─── Separation Progress Panel ────────────────────────────────────────────────
+function SeparationProgress({ menuId, assignedEmployee }: { menuId: string; assignedEmployee: Employee | null | undefined }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from('event_separation_items')
+        .select('*, stock_items(name, unit)')
+        .eq('menu_id', menuId)
+        .order('created_at');
+      setItems(data || []);
+      setLoading(false);
+    };
+    load();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`separation-${menuId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_separation_items', filter: `menu_id=eq.${menuId}` }, () => load())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [menuId]);
+
+  if (loading) return <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
+  if (items.length === 0) return null;
+
+  const total = items.length;
+  const done = items.filter(i => i.status === 'separated' || i.status === 'skipped').length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-primary" />
+          <p className="font-semibold text-foreground text-sm">Progresso da Separação</p>
+          {assignedEmployee && (
+            <span className="text-xs text-muted-foreground">— {assignedEmployee.display_name}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-primary">{pct}%</span>
+          <span className="text-xs text-muted-foreground">({done}/{total})</span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="px-5 pt-3 pb-1">
+        <div className="h-2 bg-border rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-xs text-muted-foreground bg-muted/20">
+            <th className="text-left py-2 px-5">Insumo</th>
+            <th className="text-right py-2 px-4">Planejado</th>
+            <th className="text-right py-2 px-4">Separado</th>
+            <th className="text-center py-2 px-4 w-24">Status</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/40">
+          {items.map(item => {
+            const name = item.stock_items?.name || '?';
+            const unit = item.stock_items?.unit || '';
+            return (
+              <tr key={item.id} className={item.status === 'separated' ? 'bg-success/5' : item.status === 'skipped' ? 'bg-muted/30' : ''}>
+                <td className="py-2 px-5 text-foreground">{name} <span className="text-muted-foreground text-xs">({unit})</span></td>
+                <td className="py-2 px-4 text-right text-muted-foreground">{item.planned_quantity?.toFixed(3)}</td>
+                <td className="py-2 px-4 text-right font-medium">
+                  {item.separated_quantity != null ? item.separated_quantity.toFixed(3) : <span className="text-muted-foreground">—</span>}
+                </td>
+                <td className="py-2 px-4 text-center">
+                  {item.status === 'separated' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" />OK</span>}
+                  {item.status === 'skipped' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full"><X className="w-3 h-3" />Pulado</span>}
+                  {item.status === 'pending' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" />Pendente</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
