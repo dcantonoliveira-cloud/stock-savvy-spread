@@ -9,12 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import {
-  Plus, Trash2, Eye, Calendar, MapPin, Users, Pencil, X,
-  Upload, Loader2, CheckCircle2, AlertCircle, Copy,
-  FileImage, ArrowRight, Package, ChevronsUpDown, Check, PackagePlus
+  Plus, Trash2, Eye, Pencil, X, Upload, Loader2, CheckCircle2,
+  AlertCircle, Copy, FileImage, ArrowRight, Package, ChevronsUpDown,
+  Check, PackagePlus, AlertTriangle, Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; current_stock: number };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
@@ -124,17 +126,11 @@ function SheetViewEditDialog({ open, onClose, sheet, stockItems, onSaved }: { op
                   : <><Button size="sm" onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Check className="w-3.5 h-3.5 mr-1" />}Salvar</Button><Button variant="ghost" size="sm" onClick={() => { setEditing(false); setFormItems(sheet.items.map(i => ({ ...i }))); }}>Cancelar</Button></>}
               </div>
             </div>
-            <DialogDescription>
-              Rende {editing ? <><Input type="number" value={yieldQty} onChange={e => setYieldQty(e.target.value)} className="h-6 w-16 text-xs inline-block mx-1" /><Input value={yieldUnit} onChange={e => setYieldUnit(e.target.value)} className="h-6 w-14 text-xs inline-block" /></> : `${sheet.yield_quantity} ${sheet.yield_unit}`} · {formItems.length} ingredientes · Custo: R$ {formItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0).toFixed(2)}
-            </DialogDescription>
+            <DialogDescription>Rende {sheet.yield_quantity} {sheet.yield_unit} · {formItems.length} ingredientes · Custo: R$ {formItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0).toFixed(2)}</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-            {/* Receita */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Receita Principal</p>
-                {editing && <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addItem('receita')}><Plus className="w-3 h-3 mr-1" />Adicionar</Button>}
-              </div>
+              <div className="flex items-center justify-between mb-2"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Receita Principal</p>{editing && <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addItem('receita')}><Plus className="w-3 h-3 mr-1" />Adicionar</Button>}</div>
               <table className="w-full text-sm">
                 {recipeItems.length > 0 && <thead><tr className="text-xs text-muted-foreground border-b border-border"><th className="text-left py-1">Insumo</th><th className="text-right py-1 w-24">Qtd</th><th className="text-center py-1 w-12">Un.</th><th className="text-right py-1 w-24">Custo</th>{editing && <th className="w-8"></th>}</tr></thead>}
                 <tbody className="divide-y divide-border/40">
@@ -143,12 +139,8 @@ function SheetViewEditDialog({ open, onClose, sheet, stockItems, onSaved }: { op
               </table>
               {recipeItems.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhum ingrediente</p>}
             </div>
-            {/* Decoração */}
             <div className="border-t border-dashed border-amber-200 pt-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">🎨 Decoração</p>
-                {editing && <Button variant="outline" size="sm" className="h-7 text-xs border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => addItem('decoracao')}><Plus className="w-3 h-3 mr-1" />Adicionar</Button>}
-              </div>
+              <div className="flex items-center justify-between mb-2"><p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">🎨 Decoração</p>{editing && <Button variant="outline" size="sm" className="h-7 text-xs border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => addItem('decoracao')}><Plus className="w-3 h-3 mr-1" />Adicionar</Button>}</div>
               <table className="w-full text-sm">
                 {decoItems.length > 0 && <thead><tr className="text-xs text-muted-foreground border-b border-amber-100"><th className="text-left py-1">Item</th><th className="text-right py-1 w-24">Qtd</th><th className="text-center py-1 w-12">Un.</th><th className="text-right py-1 w-24">Custo</th>{editing && <th className="w-8"></th>}</tr></thead>}
                 <tbody className="divide-y divide-amber-50">
@@ -208,6 +200,37 @@ function CreateSheetDialog({ open, onClose, initialName, stockItems, onCreated }
   );
 }
 
+// ─── Extraction Progress ──────────────────────────────────────────────────────
+
+function ExtractionProgress({ elapsed }: { elapsed: number }) {
+  const estimated = 25;
+  const progress = Math.min((elapsed / estimated) * 100, 95);
+  const remaining = Math.max(0, estimated - elapsed);
+
+  return (
+    <div className="py-8 text-center space-y-4">
+      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+      </div>
+      <div>
+        <p className="font-medium text-foreground">Analisando o cardápio...</p>
+        <p className="text-sm text-muted-foreground mt-1">A IA está lendo e cruzando com suas fichas técnicas</p>
+      </div>
+      <div className="max-w-xs mx-auto space-y-2">
+        <div className="w-full bg-border rounded-full h-2 overflow-hidden">
+          <div className="h-2 rounded-full bg-primary transition-all duration-1000" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{Math.round(progress)}%</span>
+          <span className="flex items-center gap-1"><Clock className="w-3 h-3" />~{remaining}s restantes</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function EventMenusPage() {
   const navigate = useNavigate();
   const [menus, setMenus] = useState<EventMenu[]>([]);
@@ -218,8 +241,11 @@ export default function EventMenusPage() {
   const [step, setStep] = useState(1);
   const [formName, setFormName] = useState(''); const [formLocation, setFormLocation] = useState(''); const [formGuests, setFormGuests] = useState('100'); const [formStaff, setFormStaff] = useState('0'); const [formDate, setFormDate] = useState(''); const [formNotes, setFormNotes] = useState('');
   const [extracting, setExtracting] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [extractedDishes, setExtractedDishes] = useState<ExtractedDish[]>([]);
+  const [showUnmatchedWarning, setShowUnmatchedWarning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [viewingSheet, setViewingSheet] = useState<Sheet | null>(null);
   const [creatingForIdx, setCreatingForIdx] = useState<number | null>(null);
   const [creatingInitialName, setCreatingInitialName] = useState('');
@@ -255,7 +281,10 @@ export default function EventMenusPage() {
 
   useEffect(() => { load(); }, []);
 
-  const resetForm = () => { setFormName(''); setFormLocation(''); setFormGuests('100'); setFormStaff('0'); setFormDate(''); setFormNotes(''); setExtractedDishes([]); setStep(1); setEditingMenu(null); };
+  const resetForm = () => { setFormName(''); setFormLocation(''); setFormGuests('100'); setFormStaff('0'); setFormDate(''); setFormNotes(''); setExtractedDishes([]); setStep(1); setEditingMenu(null); setShowUnmatchedWarning(false); };
+
+  const startTimer = () => { setElapsedSeconds(0); timerRef.current = setInterval(() => setElapsedSeconds(p => p + 1), 1000); };
+  const stopTimer = () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -265,7 +294,7 @@ export default function EventMenusPage() {
   };
 
   const extractDishes = async (base64: string, mediaType: string) => {
-    setExtracting(true); setExtractedDishes([]);
+    setExtracting(true); setExtractedDishes([]); startTimer();
     try {
       const response = await fetch('https://vfrtvnzptaazhzfirflm.supabase.co/functions/v1/extract-menu', {
         method: 'POST',
@@ -276,7 +305,7 @@ export default function EventMenusPage() {
       if (data.error) throw new Error(data.error.message || String(data.error));
       const text = data.content?.find((c: any) => c.type === 'text')?.text || '';
       let parsed: { dishes: any[] };
-      try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); } catch { toast.error('Erro ao processar o cardápio.'); setExtracting(false); return; }
+      try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); } catch { toast.error('Erro ao processar o cardápio.'); return; }
       const matched: ExtractedDish[] = parsed.dishes.map((d: any) => {
         const rawName = d.raw_name?.trim() || '';
         const { sheet, score } = bestMatch(rawName, sheets);
@@ -286,7 +315,7 @@ export default function EventMenusPage() {
       const mc = matched.filter(d => d.status === 'matched').length;
       toast.success(`${matched.length} pratos extraídos · ${mc} associados automaticamente`);
     } catch (err: any) { toast.error('Erro: ' + (err?.message || '')); console.error(err); }
-    finally { setExtracting(false); }
+    finally { setExtracting(false); stopTimer(); }
   };
 
   const updateMatch = (idx: number, sheetId: string | null) => { const sheet = sheets.find(s => s.id === sheetId); setExtractedDishes(prev => prev.map((d, i) => i !== idx ? d : { ...d, matched_sheet_id: sheetId, matched_sheet_name: sheet?.name || null, status: sheetId ? 'matched' : 'unmatched' })); };
@@ -294,9 +323,18 @@ export default function EventMenusPage() {
   const handleSaveMenu = async () => {
     if (!formName.trim()) { toast.error('Nome do evento é obrigatório'); return; }
     const matched = extractedDishes.filter(d => d.matched_sheet_id);
+    const unmatched = extractedDishes.filter(d => !d.matched_sheet_id);
+
+    // Warn about unmatched items
+    if (unmatched.length > 0 && !showUnmatchedWarning) {
+      setShowUnmatchedWarning(true);
+      return;
+    }
+
     if (matched.length === 0) { toast.error('Associe pelo menos um prato a uma ficha técnica'); return; }
     setSaving(true);
-    const menuData = { name: formName.trim(), location: formLocation.trim() || null, guest_count: parseInt(formGuests) || 100, staff_count: parseInt(formStaff) || 0, event_date: formDate || null, notes: formNotes.trim() || null, status: 'draft' };
+    const guestCount = parseInt(formGuests) || 100;
+    const menuData = { name: formName.trim(), location: formLocation.trim() || null, guest_count: guestCount, staff_count: parseInt(formStaff) || 0, event_date: formDate || null, notes: formNotes.trim() || null, status: 'draft' };
     let menuId: string;
     if (editingMenu) {
       await supabase.from('event_menus').update(menuData as any).eq('id', editingMenu.id); menuId = editingMenu.id;
@@ -305,7 +343,14 @@ export default function EventMenusPage() {
       const { data, error } = await supabase.from('event_menus').insert(menuData as any).select().single();
       if (error || !data) { toast.error('Erro ao criar cardápio'); setSaving(false); return; } menuId = (data as any).id;
     }
-    await supabase.from('event_menu_dishes').insert(matched.map((d, idx) => ({ menu_id: menuId, sheet_id: d.matched_sheet_id, planned_quantity: d.quantity, planned_unit: d.unit, sort_order: idx })) as any);
+
+    // Insert dishes
+    const dishInserts = matched.map((d, idx) => ({ menu_id: menuId, sheet_id: d.matched_sheet_id, planned_quantity: d.quantity, planned_unit: d.unit, sort_order: idx }));
+
+    // Add MANTIMENTOS automatically (quantity = guest count)
+    dishInserts.push({ menu_id: menuId, sheet_id: MANTIMENTOS_ID, planned_quantity: guestCount, planned_unit: 'un', sort_order: dishInserts.length });
+
+    await supabase.from('event_menu_dishes').insert(dishInserts as any);
     toast.success(editingMenu ? 'Cardápio atualizado!' : 'Cardápio criado!'); setSaving(false); resetForm(); setDialogOpen(false); load();
   };
 
@@ -325,7 +370,7 @@ export default function EventMenusPage() {
         <Button onClick={() => { resetForm(); setDialogOpen(true); }}><Plus className="w-4 h-4 mr-2" />Criar Cardápio</Button>
       </div>
 
-      <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) resetForm(); }}>
+      <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) { resetForm(); stopTimer(); } }}>
         <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingMenu ? 'Editar Cardápio' : 'Novo Cardápio de Evento'}</DialogTitle>
@@ -335,8 +380,7 @@ export default function EventMenusPage() {
             {[{ n: 1, label: 'Informações' }, { n: 2, label: 'Cardápio' }].map(({ n, label }) => (
               <div key={n} className="flex items-center gap-2 flex-1">
                 <div className={`flex items-center gap-1.5 text-xs font-medium ${step >= n ? 'text-primary' : 'text-muted-foreground'}`}>
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= n ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>{n}</div>
-                  {label}
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= n ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>{n}</div>{label}
                 </div>
                 {n < 2 && <div className={`flex-1 h-px ${step > n ? 'bg-primary' : 'bg-border'}`} />}
               </div>
@@ -371,21 +415,33 @@ export default function EventMenusPage() {
                     <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileUpload} />
                   </div>
                 )}
-                {extracting && (
-                  <div className="py-10 text-center">
-                    <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" />
-                    <p className="font-medium">Extraindo pratos do cardápio...</p>
-                    <p className="text-sm text-muted-foreground mt-1">Aguarde, isso pode levar alguns segundos</p>
-                  </div>
-                )}
+
+                {extracting && <ExtractionProgress elapsed={elapsedSeconds} />}
+
                 {!extracting && extractedDishes.length > 0 && (
                   <>
+                    {/* Unmatched warning */}
+                    {showUnmatchedWarning && unmatchedCount > 0 && (
+                      <div className="flex items-start gap-3 p-4 rounded-xl border border-warning/40 bg-warning/5">
+                        <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="font-medium text-foreground text-sm">Atenção: {unmatchedCount} prato{unmatchedCount > 1 ? 's' : ''} sem ficha técnica</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Eles não entrarão na lista de compras. Deseja continuar assim mesmo?</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setShowUnmatchedWarning(false)}>Voltar</Button>
+                          <Button size="sm" onClick={() => { setShowUnmatchedWarning(false); handleSaveMenu(); }}>Continuar</Button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border">
                       <div className="flex items-center gap-1.5 text-sm"><CheckCircle2 className="w-4 h-4 text-success" /><span className="font-semibold text-success">{matchedCount}</span><span className="text-muted-foreground">associados</span></div>
                       <div className="w-px h-4 bg-border" />
                       <div className="flex items-center gap-1.5 text-sm"><AlertCircle className="w-4 h-4 text-warning" /><span className="font-semibold text-warning">{unmatchedCount}</span><span className="text-muted-foreground">não encontrados</span></div>
-                      <div className="ml-auto"><Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="w-3.5 h-3.5 mr-1" />Reenviar</Button><input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileUpload} /></div>
+                      <div className="ml-auto"><Button variant="outline" size="sm" onClick={() => { setExtractedDishes([]); fileInputRef.current?.click(); }}><Upload className="w-3.5 h-3.5 mr-1" />Reenviar</Button><input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileUpload} /></div>
                     </div>
+
                     <div className="space-y-2">
                       {extractedDishes.map((dish, idx) => (
                         <div key={idx} className={`rounded-xl border p-3 ${dish.status === 'matched' ? 'border-success/30 bg-success/3' : 'border-warning/40 bg-warning/5'}`}>
@@ -404,32 +460,25 @@ export default function EventMenusPage() {
                                   <SelectContent><SelectItem value="__none__">— Sem ficha técnica —</SelectItem>{sheets.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
                                 </Select>
                                 <div className="flex gap-1">
-                                  {dish.matched_sheet_id && (
-                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { const s = sheets.find(x => x.id === dish.matched_sheet_id); setViewingSheet(s || null); }}>
-                                      <Eye className="w-3 h-3 mr-1" />Ver ficha
-                                    </Button>
-                                  )}
-                                  {dish.matched_sheet_id && (
-                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { const s = sheets.find(x => x.id === dish.matched_sheet_id); setDuplicatingSheet(s || null); setDuplicatingForIdx(idx); }}>
-                                      <Copy className="w-3 h-3 mr-1" />Duplicar
-                                    </Button>
-                                  )}
-                                  {dish.status === 'unmatched' && (
-                                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs border-primary/40 text-primary" onClick={() => { setCreatingInitialName(dish.raw_name); setCreatingForIdx(idx); }}>
-                                      <Plus className="w-3 h-3 mr-1" />Criar ficha
-                                    </Button>
-                                  )}
+                                  {dish.matched_sheet_id && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { const s = sheets.find(x => x.id === dish.matched_sheet_id); setViewingSheet(s || null); }}><Eye className="w-3 h-3 mr-1" />Ver ficha</Button>}
+                                  {dish.matched_sheet_id && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { const s = sheets.find(x => x.id === dish.matched_sheet_id); setDuplicatingSheet(s || null); setDuplicatingForIdx(idx); }}><Copy className="w-3 h-3 mr-1" />Duplicar</Button>}
+                                  {dish.status === 'unmatched' && <Button variant="outline" size="sm" className="h-7 px-2 text-xs border-primary/40 text-primary" onClick={() => { setCreatingInitialName(dish.raw_name); setCreatingForIdx(idx); }}><Plus className="w-3 h-3 mr-1" />Criar ficha</Button>}
                                 </div>
                               </div>
-                              {dish.matched_sheet_name && (
-                                <p className="text-[11px] text-muted-foreground mt-1">→ <span className="text-foreground font-medium">{dish.matched_sheet_name}</span>{dish.match_score > 0 && <span className="ml-1 opacity-50">({Math.round(dish.match_score * 100)}% similar)</span>}</p>
-                              )}
+                              {dish.matched_sheet_name && <p className="text-[11px] text-muted-foreground mt-1">→ <span className="text-foreground font-medium">{dish.matched_sheet_name}</span>{dish.match_score > 0 && <span className="ml-1 opacity-50">({Math.round(dish.match_score * 100)}% similar)</span>}</p>}
                             </div>
                             <button onClick={() => setExtractedDishes(prev => prev.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive flex-shrink-0 mt-0.5"><X className="w-4 h-4" /></button>
                           </div>
                         </div>
                       ))}
                     </div>
+
+                    {/* MANTIMENTOS notice */}
+                    <div className="flex items-center gap-2 p-3 rounded-xl border border-primary/20 bg-primary/5 text-sm">
+                      <Package className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="text-muted-foreground">A ficha <span className="font-semibold text-foreground">MANTIMENTOS</span> será adicionada automaticamente com {formGuests} unidades (nº de convidados)</span>
+                    </div>
+
                     <div className="flex gap-3 pt-2">
                       <Button variant="outline" onClick={() => setStep(1)}>Voltar</Button>
                       <Button className="flex-1" onClick={handleSaveMenu} disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}{editingMenu ? 'Salvar Alterações' : `Criar Cardápio (${matchedCount} pratos)`}</Button>
@@ -458,6 +507,7 @@ export default function EventMenusPage() {
               <p className="text-xs text-muted-foreground">
                 {menu.event_date ? new Date(menu.event_date + 'T12:00:00').toLocaleDateString('pt-BR') : 'Sem data'}
                 {menu.location ? ` · ${menu.location}` : ''}{` · ${menu.guest_count} convidados · ${menu.dishes.length} pratos`}
+                <span className="ml-2 opacity-60">· Gerado {new Date(menu.created_at).toLocaleDateString('pt-BR')} às {new Date(menu.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
               </p>
             </div>
             <div className="flex gap-1">
