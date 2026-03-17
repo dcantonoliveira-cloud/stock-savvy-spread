@@ -4,8 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Pencil, Trash2, DollarSign, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -120,7 +119,7 @@ export default function CategoriesPage() {
   };
 
   const navigateToCategory = (catName: string) => {
-    navigate(`/items?category=${encodeURIComponent(catName)}`);
+    navigate(`/categories/${encodeURIComponent(catName)}`);
   };
 
   return (
@@ -158,47 +157,75 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {summaries.map(cat => (
-          <Card
-            key={cat.name}
-            className="glass-card border-0 animate-fade-in cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all group"
-            onClick={() => navigateToCategory(cat.name)}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{CATEGORY_EMOJIS[cat.name] || '📦'}</span>
-                  <div>
-                    <h3 className="font-display font-semibold text-foreground">{cat.name}</h3>
-                    <p className="text-xs text-muted-foreground">{cat.itemCount} {cat.itemCount === 1 ? 'item' : 'itens'}</p>
+      <div className="rounded-xl border border-border overflow-hidden bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted-foreground bg-muted/20">
+              <th className="text-left px-5 py-2.5 w-8">#</th>
+              <th className="text-left px-3 py-2.5">CATEGORIA</th>
+              <th className="text-center px-3 py-2.5">ITENS</th>
+              <th className="text-right px-3 py-2.5">EM ESTOQUE</th>
+              <th className="text-right px-3 py-2.5">VALOR TOTAL</th>
+              <th className="text-right px-3 py-2.5">% DO TOTAL</th>
+              <th className="text-center px-3 py-2.5 w-24">AÇÕES</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/50">
+            {summaries.map((cat, idx) => (
+              <tr
+                key={cat.name}
+                className="hover:bg-amber-50 transition-colors cursor-pointer"
+                onClick={() => navigateToCategory(cat.name)}
+              >
+                <td className="px-5 py-3 text-muted-foreground text-xs">{idx + 1}</td>
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{CATEGORY_EMOJIS[cat.name] || '📦'}</span>
+                    <span className="font-medium text-foreground">{cat.name}</span>
                   </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingCategory(cat.name); setNewCategoryName(cat.name); setDialogOpen(true); }}>
+                </td>
+                <td className="px-3 py-3 text-center text-sm font-medium text-foreground">{cat.itemCount}</td>
+                <td className="px-3 py-3 text-right text-sm text-foreground">{cat.totalStock.toLocaleString('pt-BR')}</td>
+                <td className="px-3 py-3 text-right font-semibold text-amber-700">
+                  R$ {cat.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </td>
+                <td className="px-3 py-3 text-right text-xs text-muted-foreground">
+                  {totalValue > 0 ? `${((cat.totalValue / totalValue) * 100).toFixed(1)}%` : '—'}
+                </td>
+                <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-center gap-0.5">
+                    <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => { setEditingCategory(cat.name); setNewCategoryName(cat.name); setDialogOpen(true); }}>
                       <Pencil className="w-3 h-3" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteCategory(cat.name)}>
+                    <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => handleDeleteCategory(cat.name)}>
                       <Trash2 className="w-3 h-3 text-destructive" />
                     </Button>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-accent rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Em Estoque</p>
-                  <p className="text-lg font-bold text-foreground">{cat.totalStock.toLocaleString('pt-BR')}</p>
-                </div>
-                <div className="bg-accent rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Valor</p>
-                  <p className="text-lg font-bold text-primary">R$ {cat.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                </td>
+              </tr>
+            ))}
+            {summaries.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground text-sm">
+                  Nenhuma categoria cadastrada.
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {summaries.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-border bg-muted/20">
+                <td colSpan={4} className="px-5 py-2.5 text-xs font-semibold text-muted-foreground text-right">
+                  Total em estoque:
+                </td>
+                <td className="px-3 py-2.5 text-right font-bold text-amber-700">
+                  R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
+          )}
+        </table>
       </div>
     </div>
   );
