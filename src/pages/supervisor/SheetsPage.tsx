@@ -478,7 +478,7 @@ export default function SupervisorSheetsPage() {
 
       const headers = [
         'FICHA', 'CATEGORIA', 'TEMPO_PREPARO_MIN',
-        'RENDIMENTO_QTD', 'RENDIMENTO_UNIT', 'RENDIMENTO_PORCOES',
+        'RENDIMENTO_QTD', 'RENDIMENTO_UNIT',
         'INSUMO', 'QUANTIDADE', 'UNIDADE', 'CUSTO_UNIT',
       ];
 
@@ -493,7 +493,6 @@ export default function SupervisorSheetsPage() {
             sheet.prep_time || 0,
             sheet.yield_quantity || 1,
             sheet.yield_unit || '',
-            sheet.servings || 1,
             '', '', '', '',
           ]);
         } else {
@@ -505,7 +504,6 @@ export default function SupervisorSheetsPage() {
               sheet.prep_time || 0,
               sheet.yield_quantity || 1,
               sheet.yield_unit || '',
-              sheet.servings || 1,
               stockItem?.name || '',
               item.quantity || 0,
               stockItem?.unit || '',
@@ -713,10 +711,6 @@ export default function SupervisorSheetsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Porções</label>
-                  <Input type="number" value={servings} onChange={e => setServings(e.target.value)} />
-                </div>
               </div>
 
               {/* Insumos */}
@@ -812,7 +806,6 @@ export default function SupervisorSheetsPage() {
           <div className="flex flex-wrap gap-3 mb-4">
             <Badge variant="secondary"><ChefHat className="w-3 h-3 mr-1" />{viewingSheet.category}</Badge>
             {viewingSheet.prep_time > 0 && <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />{viewingSheet.prep_time} min</Badge>}
-            <Badge variant="outline"><Users className="w-3 h-3 mr-1" />{viewingSheet.servings} porções</Badge>
             <Badge variant="outline">Rende: {viewingSheet.yield_quantity} {viewingSheet.yield_unit}</Badge>
             <Badge className="bg-primary/20 text-primary">Custo: R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</Badge>
           </div>
@@ -939,9 +932,9 @@ export default function SupervisorSheetsPage() {
                   )}
                 </td>
 
-                {/* RENDIMENTO — inline editable (qty, unit, servings) */}
+                {/* RENDIMENTO — inline editable (qty, unit) */}
                 <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">
-                  <div className="inline-flex items-center gap-1 flex-wrap justify-center">
+                  <div className="inline-flex items-center gap-1">
                     {/* yield_quantity */}
                     {editingCell?.id === sheet.id && editingCell.field === 'yield_quantity' ? (
                       <input
@@ -957,7 +950,7 @@ export default function SupervisorSheetsPage() {
                       <span
                         className="cursor-pointer border-b border-dashed border-transparent hover:border-muted-foreground transition-colors"
                         onClick={() => startEdit(sheet, 'yield_quantity')}
-                        title="Editar quantidade de rendimento"
+                        title="Editar quantidade"
                       >
                         {sheet.yield_quantity}
                       </span>
@@ -979,32 +972,9 @@ export default function SupervisorSheetsPage() {
                       <span
                         className="cursor-pointer border-b border-dashed border-transparent hover:border-muted-foreground transition-colors"
                         onClick={() => startEdit(sheet, 'yield_unit')}
-                        title="Editar unidade de rendimento"
+                        title="Editar unidade"
                       >
                         {sheet.yield_unit}
-                      </span>
-                    )}
-
-                    <span>/</span>
-
-                    {/* servings */}
-                    {editingCell?.id === sheet.id && editingCell.field === 'servings' ? (
-                      <input
-                        ref={inlineInputRef}
-                        type="number"
-                        className="w-12 text-center border-b border-primary bg-transparent outline-none text-xs"
-                        value={editingValue}
-                        onChange={e => setEditingValue(e.target.value)}
-                        onBlur={() => commitEdit(sheet)}
-                        onKeyDown={e => handleInlineKeyDown(e, sheet)}
-                      />
-                    ) : (
-                      <span
-                        className="cursor-pointer border-b border-dashed border-transparent hover:border-muted-foreground transition-colors"
-                        onClick={() => startEdit(sheet, 'servings')}
-                        title="Editar porções"
-                      >
-                        {sheet.servings} porç.
                       </span>
                     )}
                   </div>
