@@ -251,7 +251,7 @@ export default function SupervisorSheetsPage() {
               gross_quantity: i.gross_quantity || i.quantity,
               correction_factor: i.correction_factor || 1,
               unit: (item as any)?.unit || '',
-              unit_cost: i.unit_cost || (item as any)?.unit_cost || 0,
+              unit_cost: (item as any)?.unit_cost || 0, // sempre usa preço atual do insumo
             };
           });
           return { ...s, items: sheetItems } as Sheet;
