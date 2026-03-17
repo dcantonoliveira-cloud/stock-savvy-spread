@@ -597,72 +597,128 @@ export default function SupervisorSheetsPage() {
       const { data: dbSheets }     = await supabase.from('technical_sheets').select('id, name');
       const { data: dbStockItems } = await supabase.from('stock_items').select('id, name, unit');
 
-      const matchedSheets = sheetNames.filter(n => dbSheets?.some((s: any) => s.name === n));
-      const totalItems = matchedSheets.reduce((sum, n) => sum + grouped[n].items.length, 0);
+      // Identifica o que vai ser criado vs atualizado
+      const sheetsToCreate = sheetNames.filter(n => !dbSheets?.some((s: any) => s.name === n));
+      const sheetsToUpdate = sheetNames.filter(n =>  dbSheets?.some((s: any) => s.name === n));
 
-      if (matchedSheets.length === 0) {
-        toast.error('Nenhuma ficha do arquivo encontrada no banco de dados');
-        return;
-      }
+      // Coleta insumos novos (não existem no stock_items)
+      const allInsumos = [...new Set(sheetNames.flatMap(n => grouped[n].items.map(i => i.insumo)))];
+      const insumosNovos = allInsumos.filter(name => !dbStockItems?.some((si: any) => si.name.toLowerCase() === name.toLowerCase()));
 
-      const confirmed = window.confirm(
-        `${matchedSheets.length} fichas e ${totalItems} insumos serão atualizados (nome, rendimento, preparo e quantidades). Confirmar?`
-      );
+      const totalItens = sheetNames.reduce((sum, n) => sum + grouped[n].items.length, 0);
+      const msgParts = [];
+      if (sheetsToUpdate.length) msgParts.push(`${sheetsToUpdate.length} ficha(s) serão atualizadas`);
+      if (sheetsToCreate.length) msgParts.push(`${sheetsToCreate.length} ficha(s) novas serão criadas`);
+      if (insumosNovos.length)   msgParts.push(`${insumosNovos.length} insumo(s) novo(s) serão criados`);
+      msgParts.push(`${totalItens} linha(s) de ingredientes processadas`);
+
+      const confirmed = window.confirm(msgParts.join('\n') + '\n\nConfirmar?');
       if (!confirmed) return;
 
       let updatedSheets = 0;
-      let updatedItems = 0;
+      let createdSheets = 0;
+      let createdItems  = 0;
+      let updatedItems  = 0;
 
-      for (const sheetName of matchedSheets) {
-        const dbSheet = dbSheets?.find((s: any) => s.name === sheetName) as any;
-        if (!dbSheet) continue;
+      // ── Mapa mutável de stock items (inclui os que vamos criar)
+      const stockMap: Record<string, string> = {}; // name.toLowerCase() → id
+      (dbStockItems || []).forEach((si: any) => { stockMap[si.name.toLowerCase()] = si.id; });
 
+      // ── 1. Cria insumos novos
+      for (const nome of insumosNovos) {
+        // Tenta pegar a unidade da primeira linha que usa esse insumo
+        let unit = 'un';
+        for (const n of sheetNames) {
+          const row = grouped[n].items.find(i => i.insumo.toLowerCase() === nome.toLowerCase());
+          if (row?.unidade) { unit = row.unidade; break; }
+        }
+        const { data: newItem } = await supabase.from('stock_items').insert({
+          name: nome, unit, unit_cost: 0, current_stock: 0, min_stock: 0, category: 'Outros',
+        } as any).select('id').single();
+        if (newItem) { stockMap[nome.toLowerCase()] = (newItem as any).id; createdItems++; }
+      }
+
+      // ── 2. Processa cada ficha (cria ou atualiza)
+      for (const sheetName of sheetNames) {
         const imp = grouped[sheetName];
+        let sheetId: string;
 
-        // ── 1. Atualiza campos da ficha (categoria, preparo, rendimento)
-        const sheetUpdate: Record<string, any> = {};
-        if (imp.categoria)          sheetUpdate.category        = imp.categoria;
-        if (imp.preparo !== null)   sheetUpdate.prep_time       = imp.preparo;
-        if (imp.rendQtd !== null)   sheetUpdate.yield_quantity  = imp.rendQtd;
-        if (imp.rendUnit)           sheetUpdate.yield_unit      = imp.rendUnit;
-        if (Object.keys(sheetUpdate).length > 0) {
-          await supabase.from('technical_sheets').update(sheetUpdate).eq('id', dbSheet.id);
+        const existing = dbSheets?.find((s: any) => s.name === sheetName) as any;
+
+        if (existing) {
+          // Atualiza campos da ficha existente
+          sheetId = existing.id;
+          const sheetUpdate: Record<string, any> = {};
+          if (imp.categoria)        sheetUpdate.category       = imp.categoria;
+          if (imp.preparo !== null) sheetUpdate.prep_time      = imp.preparo;
+          if (imp.rendQtd !== null) sheetUpdate.yield_quantity = imp.rendQtd;
+          if (imp.rendUnit)         sheetUpdate.yield_unit     = imp.rendUnit;
+          if (Object.keys(sheetUpdate).length > 0) {
+            await supabase.from('technical_sheets').update(sheetUpdate).eq('id', sheetId);
+          }
+          updatedSheets++;
+        } else {
+          // Cria ficha nova
+          const { data: newSheet } = await supabase.from('technical_sheets').insert({
+            name: sheetName,
+            category:       imp.categoria || 'Prato Principal',
+            prep_time:      imp.preparo   ?? 0,
+            yield_quantity: imp.rendQtd   ?? 1,
+            yield_unit:     imp.rendUnit  || 'un',
+            servings:       1,
+            instructions:   '',
+          } as any).select('id').single();
+          if (!newSheet) continue;
+          sheetId = (newSheet as any).id;
+          createdSheets++;
         }
 
-        // ── 2. Busca itens da ficha
+        // ── 3. Busca itens existentes da ficha
         const { data: sheetItems } = await supabase
-          .from('technical_sheet_items')
-          .select('id, item_id')
-          .eq('sheet_id', dbSheet.id);
+          .from('technical_sheet_items').select('id, item_id').eq('sheet_id', sheetId);
 
-        // ── 3. Atualiza cada insumo
+        // ── 4. Processa cada ingrediente
         for (const row of imp.items) {
-          const stockItem = dbStockItems?.find(
-            (si: any) => si.name.toLowerCase() === row.insumo.toLowerCase()
-          ) as any;
-          if (!stockItem) continue;
+          const itemId = stockMap[row.insumo.toLowerCase()];
+          if (!itemId) continue; // não deveria acontecer pois já criamos todos
 
-          // Atualiza unidade do insumo no estoque se mudou
-          if (row.unidade && row.unidade !== stockItem.unit) {
-            await supabase.from('stock_items').update({ unit: row.unidade }).eq('id', stockItem.id);
+          // Atualiza unidade do insumo se mudou
+          if (row.unidade) {
+            const current = (dbStockItems || []).find((si: any) => si.id === itemId) as any;
+            if (current && row.unidade !== current.unit) {
+              await supabase.from('stock_items').update({ unit: row.unidade }).eq('id', itemId);
+            }
           }
 
-          const sheetItem = sheetItems?.find((si: any) => si.item_id === stockItem.id);
-          if (!sheetItem) continue;
+          const sheetItem = sheetItems?.find((si: any) => si.item_id === itemId);
 
-          const itemUpdate: Record<string, any> = {};
-          if (qtdIdx !== -1)    itemUpdate.quantity  = row.quantidade;
-          if (custoIdx !== -1)  itemUpdate.unit_cost = row.custo_unit;
-
-          if (Object.keys(itemUpdate).length > 0) {
-            await supabase.from('technical_sheet_items').update(itemUpdate).eq('id', (sheetItem as any).id);
+          if (sheetItem) {
+            // Atualiza ingrediente existente
+            await supabase.from('technical_sheet_items').update({
+              quantity:  row.quantidade,
+              unit_cost: row.custo_unit,
+            }).eq('id', (sheetItem as any).id);
+            updatedItems++;
+          } else {
+            // Adiciona ingrediente novo à ficha
+            await supabase.from('technical_sheet_items').insert({
+              sheet_id:  sheetId,
+              item_id:   itemId,
+              quantity:  row.quantidade,
+              gross_quantity: row.quantidade,
+              correction_factor: 1,
+              unit_cost: row.custo_unit,
+              section:   'receita',
+            } as any);
             updatedItems++;
           }
         }
-        updatedSheets++;
       }
 
-      toast.success(`${updatedSheets} fichas atualizadas!`);
+      const resumo = [`${updatedSheets} fichas atualizadas`];
+      if (createdSheets) resumo.push(`${createdSheets} fichas criadas`);
+      if (createdItems)  resumo.push(`${createdItems} insumos criados`);
+      toast.success(resumo.join(' · ') + '!');
       load();
     } catch (err) {
       toast.error('Erro ao processar arquivo Excel');
