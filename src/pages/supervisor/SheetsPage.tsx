@@ -528,7 +528,6 @@ export default function SupervisorSheetsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset input so same file can be re-selected
     if (importFileRef.current) importFileRef.current.value = '';
 
     try {
@@ -539,45 +538,67 @@ export default function SupervisorSheetsPage() {
 
       if (raw.length < 2) { toast.error('Arquivo vazio ou inválido'); return; }
 
-      // Find header indexes
       const headerRow = raw[0].map((h: any) => String(h).trim().toUpperCase());
       const col = (name: string) => headerRow.indexOf(name);
 
-      const fichaIdx = col('FICHA');
-      const insumoIdx = col('INSUMO');
-      const qtdIdx = col('QUANTIDADE');
-      const custoIdx = col('CUSTO_UNIT');
+      const fichaIdx    = col('FICHA');
+      const catIdx      = col('CATEGORIA');
+      const prepIdx     = col('TEMPO_PREPARO_MIN');
+      const rendQtdIdx  = col('RENDIMENTO_QTD');
+      const rendUnitIdx = col('RENDIMENTO_UNIT');
+      const insumoIdx   = col('INSUMO');
+      const qtdIdx      = col('QUANTIDADE');
+      const unidadeIdx  = col('UNIDADE');
+      const custoIdx    = col('CUSTO_UNIT');
 
       if (fichaIdx === -1 || insumoIdx === -1) {
         toast.error('Colunas FICHA e INSUMO são obrigatórias');
         return;
       }
 
-      // Group by sheet name
-      const grouped: Record<string, { insumo: string; quantidade: number; custo_unit: number }[]> = {};
+      // Group rows by ficha name — capture sheet-level fields from first row of each ficha
+      type ImportRow = { insumo: string; quantidade: number; unidade: string; custo_unit: number };
+      type ImportSheet = {
+        categoria: string; preparo: number | null;
+        rendQtd: number | null; rendUnit: string;
+        items: ImportRow[];
+      };
+      const grouped: Record<string, ImportSheet> = {};
+
       for (let i = 1; i < raw.length; i++) {
         const row = raw[i];
         const fichaName = String(row[fichaIdx] || '').trim();
-        const insumoName = String(row[insumoIdx] || '').trim();
-        if (!fichaName || !insumoName) continue;
+        if (!fichaName) continue;
 
-        if (!grouped[fichaName]) grouped[fichaName] = [];
-        grouped[fichaName].push({
-          insumo: insumoName,
-          quantidade: parseFloat(row[qtdIdx]) || 0,
-          custo_unit: parseFloat(row[custoIdx]) || 0,
-        });
+        if (!grouped[fichaName]) {
+          grouped[fichaName] = {
+            categoria: catIdx !== -1 ? String(row[catIdx] || '').trim() : '',
+            preparo:   prepIdx !== -1 && row[prepIdx] !== '' ? parseFloat(row[prepIdx]) : null,
+            rendQtd:   rendQtdIdx !== -1 && row[rendQtdIdx] !== '' ? parseFloat(row[rendQtdIdx]) : null,
+            rendUnit:  rendUnitIdx !== -1 ? String(row[rendUnitIdx] || '').trim() : '',
+            items: [],
+          };
+        }
+
+        const insumoName = String(row[insumoIdx] || '').trim();
+        if (insumoName) {
+          grouped[fichaName].items.push({
+            insumo:    insumoName,
+            quantidade: qtdIdx !== -1 ? parseFloat(row[qtdIdx] ?? 0) || 0 : 0,
+            unidade:   unidadeIdx !== -1 ? String(row[unidadeIdx] || '').trim() : '',
+            custo_unit: custoIdx !== -1 ? parseFloat(row[custoIdx] ?? 0) || 0 : 0,
+          });
+        }
       }
 
       const sheetNames = Object.keys(grouped);
       if (sheetNames.length === 0) { toast.error('Nenhum dado encontrado no arquivo'); return; }
 
-      // Fetch DB sheets to match
-      const { data: dbSheets } = await supabase.from('technical_sheets').select('id, name');
-      const { data: dbStockItems } = await supabase.from('stock_items').select('id, name');
+      const { data: dbSheets }     = await supabase.from('technical_sheets').select('id, name');
+      const { data: dbStockItems } = await supabase.from('stock_items').select('id, name, unit');
 
       const matchedSheets = sheetNames.filter(n => dbSheets?.some((s: any) => s.name === n));
-      const totalItems = matchedSheets.reduce((sum, n) => sum + grouped[n].length, 0);
+      const totalItems = matchedSheets.reduce((sum, n) => sum + grouped[n].items.length, 0);
 
       if (matchedSheets.length === 0) {
         toast.error('Nenhuma ficha do arquivo encontrada no banco de dados');
@@ -585,7 +606,7 @@ export default function SupervisorSheetsPage() {
       }
 
       const confirmed = window.confirm(
-        `${matchedSheets.length} fichas e ${totalItems} insumos serão atualizados. Confirmar?`
+        `${matchedSheets.length} fichas e ${totalItems} insumos serão atualizados (nome, rendimento, preparo e quantidades). Confirmar?`
       );
       if (!confirmed) return;
 
@@ -596,29 +617,45 @@ export default function SupervisorSheetsPage() {
         const dbSheet = dbSheets?.find((s: any) => s.name === sheetName) as any;
         if (!dbSheet) continue;
 
+        const imp = grouped[sheetName];
+
+        // ── 1. Atualiza campos da ficha (categoria, preparo, rendimento)
+        const sheetUpdate: Record<string, any> = {};
+        if (imp.categoria)          sheetUpdate.category        = imp.categoria;
+        if (imp.preparo !== null)   sheetUpdate.prep_time       = imp.preparo;
+        if (imp.rendQtd !== null)   sheetUpdate.yield_quantity  = imp.rendQtd;
+        if (imp.rendUnit)           sheetUpdate.yield_unit      = imp.rendUnit;
+        if (Object.keys(sheetUpdate).length > 0) {
+          await supabase.from('technical_sheets').update(sheetUpdate).eq('id', dbSheet.id);
+        }
+
+        // ── 2. Busca itens da ficha
         const { data: sheetItems } = await supabase
           .from('technical_sheet_items')
           .select('id, item_id')
           .eq('sheet_id', dbSheet.id);
 
-        for (const row of grouped[sheetName]) {
+        // ── 3. Atualiza cada insumo
+        for (const row of imp.items) {
           const stockItem = dbStockItems?.find(
             (si: any) => si.name.toLowerCase() === row.insumo.toLowerCase()
           ) as any;
           if (!stockItem) continue;
 
+          // Atualiza unidade do insumo no estoque se mudou
+          if (row.unidade && row.unidade !== stockItem.unit) {
+            await supabase.from('stock_items').update({ unit: row.unidade }).eq('id', stockItem.id);
+          }
+
           const sheetItem = sheetItems?.find((si: any) => si.item_id === stockItem.id);
           if (!sheetItem) continue;
 
-          const updatePayload: Record<string, any> = {};
-          if (qtdIdx !== -1 && row.quantidade > 0) updatePayload.quantity = row.quantidade;
-          if (custoIdx !== -1 && row.custo_unit > 0) updatePayload.unit_cost = row.custo_unit;
+          const itemUpdate: Record<string, any> = {};
+          if (qtdIdx !== -1)    itemUpdate.quantity  = row.quantidade;
+          if (custoIdx !== -1)  itemUpdate.unit_cost = row.custo_unit;
 
-          if (Object.keys(updatePayload).length > 0) {
-            await supabase
-              .from('technical_sheet_items')
-              .update(updatePayload)
-              .eq('id', (sheetItem as any).id);
+          if (Object.keys(itemUpdate).length > 0) {
+            await supabase.from('technical_sheet_items').update(itemUpdate).eq('id', (sheetItem as any).id);
             updatedItems++;
           }
         }
