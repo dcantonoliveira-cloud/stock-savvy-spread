@@ -140,31 +140,37 @@ export type Database = {
       event_menu_dishes: {
         Row: {
           created_at: string
+          decoration: string | null
           id: string
           menu_id: string
           notes: string | null
           planned_quantity: number
           planned_unit: string | null
+          section_name: string | null
           sheet_id: string
           sort_order: number | null
         }
         Insert: {
           created_at?: string
+          decoration?: string | null
           id?: string
           menu_id: string
           notes?: string | null
           planned_quantity?: number
           planned_unit?: string | null
+          section_name?: string | null
           sheet_id: string
           sort_order?: number | null
         }
         Update: {
           created_at?: string
+          decoration?: string | null
           id?: string
           menu_id?: string
           notes?: string | null
           planned_quantity?: number
           planned_unit?: string | null
+          section_name?: string | null
           sheet_id?: string
           sort_order?: number | null
         }
@@ -188,6 +194,7 @@ export type Database = {
       event_menus: {
         Row: {
           created_at: string
+          created_by: string | null
           event_date: string | null
           guest_count: number
           id: string
@@ -200,6 +207,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           event_date?: string | null
           guest_count?: number
           id?: string
@@ -212,6 +220,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           event_date?: string | null
           guest_count?: number
           id?: string

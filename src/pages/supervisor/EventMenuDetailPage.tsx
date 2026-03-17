@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  ArrowLeft, Calendar, MapPin, Users, ShoppingCart,
+  ArrowLeft, Calendar, MapPin, Users,
   ChevronDown, ChevronUp, CheckCircle2, TrendingDown, Loader2,
   Plus, Pencil, Trash2, X, Check, ChevronsUpDown, PackagePlus,
   Package, Truck, RotateCcw, AlertTriangle, MessageSquare,
-  ClipboardList, Info, UserCheck, RefreshCw, Clock
+  ClipboardList, UserCheck, RefreshCw, GripVertical, Download, Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -22,13 +22,15 @@ import { useAuth } from '@/hooks/useAuth';
 
 const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
 
-type StockItem = { id: string; name: string; unit: string; unit_cost: number; current_stock: number };
+type StockItem = { id: string; name: string; unit: string; unit_cost: number; current_stock: number; category: string };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
 type Sheet = { id: string; name: string; yield_quantity: number; yield_unit: string; items: SheetItem[] };
 type MenuDish = {
   id: string; sheet_id: string; sheet_name: string;
   planned_quantity: number; planned_unit: string;
   notes: string | null;
+  decoration: string | null;
+  section_name: string | null;
   sheet: Sheet | null; expanded: boolean; isMantimentos: boolean;
 };
 type EventMenu = {
@@ -42,7 +44,7 @@ type EventMenu = {
   dishes: MenuDish[];
 };
 type ShoppingItem = {
-  id: string; name: string; unit: string;
+  id: string; name: string; unit: string; category: string;
   needed: number; inStock: number; toBuy: number; unitCost: number;
   hasStock: boolean;
 };
@@ -171,25 +173,58 @@ function DishEditPanel({ dish, stockItems, onSave, onCancel }: {
 }
 
 // ─── Add Sheet Dialog ─────────────────────────────────────────────────────────
-function AddSheetDialog({ open, onClose, menuId, allSheets, onAdded }: { open: boolean; onClose: () => void; menuId: string; allSheets: Sheet[]; onAdded: () => void }) {
-  const [sheetId, setSheetId] = useState(''); const [qty, setQty] = useState('1'); const [unit, setUnit] = useState('un'); const [notes, setNotes] = useState(''); const [saving, setSaving] = useState(false);
+function AddSheetDialog({ open, onClose, menuId, allSheets, existingSections, defaultSection, onAdded }: { open: boolean; onClose: () => void; menuId: string; allSheets: Sheet[]; existingSections: string[]; defaultSection?: string; onAdded: () => void }) {
+  const [sheetId, setSheetId] = useState('');
+  const [qty, setQty] = useState('1');
+  const [unit, setUnit] = useState('un');
+  const [notes, setNotes] = useState('');
+  const [sectionName, setSectionName] = useState(defaultSection || '');
+  const [newSection, setNewSection] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) { setSectionName(defaultSection || ''); setNewSection(''); setSheetId(''); setQty('1'); setUnit('un'); setNotes(''); } }, [open, defaultSection]);
+
+  const resolvedSection = sectionName === '__new__' ? newSection.trim() : sectionName;
+
   const handleAdd = async () => {
-    if (!sheetId) { toast.error('Selecione uma ficha técnica'); return; } setSaving(true);
-    const { error } = await supabase.from('event_menu_dishes').insert({ menu_id: menuId, sheet_id: sheetId, planned_quantity: parseFloat(qty) || 1, planned_unit: unit, notes: notes.trim() || null, sort_order: 999 } as any);
+    if (!sheetId) { toast.error('Selecione uma ficha técnica'); return; }
+    setSaving(true);
+    const { error } = await supabase.from('event_menu_dishes').insert({
+      menu_id: menuId, sheet_id: sheetId,
+      planned_quantity: parseFloat(qty) || 1, planned_unit: unit,
+      notes: notes.trim() || null,
+      section_name: resolvedSection || null,
+      sort_order: 999,
+    } as any);
     if (error) { toast.error('Erro ao adicionar ficha'); setSaving(false); return; }
-    toast.success('Ficha adicionada!'); setSheetId(''); setQty('1'); setUnit('un'); setNotes(''); setSaving(false); onAdded(); onClose();
+    toast.success('Ficha adicionada!');
+    setSaving(false); onAdded(); onClose();
   };
+
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Adicionar Ficha ao Cardápio</DialogTitle><DialogDescription>Adicione manualmente uma ficha técnica a este evento</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Adicionar Prato ao Cardápio</DialogTitle><DialogDescription>Adicione uma ficha técnica a este evento</DialogDescription></DialogHeader>
         <div className="space-y-4">
-          <div><label className="text-sm text-muted-foreground mb-1 block">Ficha Técnica *</label><Select value={sheetId} onValueChange={setSheetId}><SelectTrigger><SelectValue placeholder="Selecionar ficha..." /></SelectTrigger><SelectContent>{allSheets.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select></div>
+          <div>
+            <label className="text-sm text-muted-foreground mb-1 block">Seção do cardápio</label>
+            <Select value={sectionName} onValueChange={setSectionName}>
+              <SelectTrigger><SelectValue placeholder="Selecionar seção..." /></SelectTrigger>
+              <SelectContent>
+                {existingSections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                <SelectItem value="__new__">+ Nova seção...</SelectItem>
+              </SelectContent>
+            </Select>
+            {sectionName === '__new__' && (
+              <Input className="mt-2" value={newSection} onChange={e => setNewSection(e.target.value)} placeholder="Nome da nova seção (ex: JANTAR)" autoFocus />
+            )}
+          </div>
+          <div><label className="text-sm text-muted-foreground mb-1 block">Ficha Técnica *</label><Select value={sheetId} onValueChange={v => { setSheetId(v); const s = allSheets.find(x => x.id === v); if (s) setUnit(s.yield_unit || 'un'); }}><SelectTrigger><SelectValue placeholder="Selecionar ficha..." /></SelectTrigger><SelectContent>{allSheets.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select></div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="text-sm text-muted-foreground mb-1 block">Quantidade</label><Input type="number" value={qty} onChange={e => setQty(e.target.value)} /></div>
             <div><label className="text-sm text-muted-foreground mb-1 block">Unidade</label><Input value={unit} onChange={e => setUnit(e.target.value)} /></div>
           </div>
-          <div><label className="text-sm text-muted-foreground mb-1 block flex items-center gap-1"><MessageSquare className="w-3 h-3" />Observações (opcional)</label><Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Ex: Servir gelado, porção extra..." /></div>
+          <div><label className="text-sm text-muted-foreground mb-1 block flex items-center gap-1"><MessageSquare className="w-3 h-3" />Observações (opcional)</label><Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Ex: Servir gelado, sem glúten..." /></div>
           <Button className="w-full" onClick={handleAdd} disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}Adicionar ao Cardápio</Button>
         </div>
       </DialogContent>
@@ -198,23 +233,30 @@ function AddSheetDialog({ open, onClose, menuId, allSheets, onAdded }: { open: b
 }
 
 // ─── Assign Separation Dialog ─────────────────────────────────────────────────
-function AssignSeparationDialog({ open, onClose, menuId, employees, shoppingList, stockItems, onAssigned }: {
+function AssignSeparationDialog({ open, onClose, menuId, employees, shoppingList, onAssigned }: {
   open: boolean; onClose: () => void; menuId: string;
   employees: Employee[]; shoppingList: ShoppingItem[];
   stockItems: StockItem[]; onAssigned: () => void;
 }) {
   const { profile } = useAuth();
-  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [defaultEmployee, setDefaultEmployee] = useState('');
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
   const [refreshingStock, setRefreshingStock] = useState(false);
   const [currentStock, setCurrentStock] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [stockRefreshed, setStockRefreshed] = useState(false);
 
+  const categories = [...new Set(shoppingList.map(i => i.category || 'Outros'))].sort();
+  const itemsByCategory = (cat: string) => shoppingList.filter(i => (i.category || 'Outros') === cat);
+  const getEmployeeForCat = (cat: string) => categoryOverrides[cat] ?? defaultEmployee;
+  const setCatEmployee = (cat: string, val: string) =>
+    setCategoryOverrides(prev => ({ ...prev, [cat]: val }));
+
   useEffect(() => {
     if (open) {
-      setSelectedEmployee('');
+      setDefaultEmployee('');
+      setCategoryOverrides({});
       setStockRefreshed(false);
-      // Initialize with current shopping list stock values
       const initial: Record<string, number> = {};
       shoppingList.forEach(i => { initial[i.id] = i.inStock; });
       setCurrentStock(initial);
@@ -224,10 +266,7 @@ function AssignSeparationDialog({ open, onClose, menuId, employees, shoppingList
   const handleRefreshStock = async () => {
     setRefreshingStock(true);
     const ids = shoppingList.map(i => i.id);
-    const { data } = await supabase
-      .from('stock_items')
-      .select('id, current_stock')
-      .in('id', ids);
+    const { data } = await supabase.from('stock_items').select('id, current_stock').in('id', ids);
     if (data) {
       const updated: Record<string, number> = {};
       (data as any[]).forEach(d => { updated[d.id] = d.current_stock; });
@@ -239,41 +278,41 @@ function AssignSeparationDialog({ open, onClose, menuId, employees, shoppingList
   };
 
   const handleAssign = async () => {
-    if (!selectedEmployee) { toast.error('Selecione um funcionário'); return; }
+    const anyAssigned = categories.some(cat => getEmployeeForCat(cat));
+    if (!anyAssigned) { toast.error('Atribua ao menos uma categoria a um funcionário'); return; }
     setSaving(true);
     try {
-      // Delete existing separation items for this menu (in case of reassignment)
       await supabase.from('event_separation_items').delete().eq('menu_id', menuId);
 
-      // Create separation items from shopping list with current stock
       const separationItems = shoppingList.map(item => ({
         menu_id: menuId,
         item_id: item.id,
         planned_quantity: item.needed,
         status: 'pending',
+        assigned_to: getEmployeeForCat(item.category || 'Outros') || null,
+        category: item.category || 'Outros',
       }));
 
       const { error: insertError } = await supabase
         .from('event_separation_items')
         .insert(separationItems as any);
-
       if (insertError) throw insertError;
 
-      // Update event_menus with assigned_to
+      const primaryEmp = defaultEmployee || Object.values(categoryOverrides).find(Boolean) || '';
       const { error: updateError } = await supabase
         .from('event_menus')
         .update({
-          assigned_to: selectedEmployee,
+          assigned_to: primaryEmp || null,
           assigned_at: new Date().toISOString(),
           assigned_by: profile?.display_name || 'Supervisor',
           status: 'assigned',
         } as any)
         .eq('id', menuId);
-
       if (updateError) throw updateError;
 
-      const emp = employees.find(e => e.user_id === selectedEmployee);
-      toast.success(`Separação atribuída para ${emp?.display_name}!`);
+      const assignedEmps = [...new Set(categories.map(c => getEmployeeForCat(c)).filter(Boolean))];
+      const names = assignedEmps.map(uid => employees.find(e => e.user_id === uid)?.display_name).filter(Boolean);
+      toast.success(`Separação atribuída para ${names.join(', ')}!`);
       onAssigned();
       onClose();
     } catch (err) {
@@ -286,116 +325,127 @@ function AssignSeparationDialog({ open, onClose, menuId, employees, shoppingList
 
   const insufficientItems = shoppingList.filter(i => (currentStock[i.id] ?? i.inStock) < i.needed);
 
+  function EmployeeSelect({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+    return (
+      <Select value={value || '__none__'} onValueChange={v => onChange(v === '__none__' ? '' : v)}>
+        <SelectTrigger className="h-8 text-xs w-44 flex-shrink-0">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">
+            <span className="text-muted-foreground italic">{placeholder}</span>
+          </SelectItem>
+          {employees.map(e => (
+            <SelectItem key={e.user_id} value={e.user_id}>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                  {e.display_name.charAt(0).toUpperCase()}
+                </div>
+                {e.display_name}
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserCheck className="w-5 h-5 text-primary" />
-            Atribuir Separação
+            Atribuir Separação por Categoria
           </DialogTitle>
           <DialogDescription>
-            Atribua a separação deste evento a um funcionário. Ele verá a lista no app dele.
+            Distribua a separação entre funcionários por categoria. O padrão se aplica às categorias sem atribuição específica.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Employee selector */}
-        <div className="space-y-3">
-          <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">Funcionário responsável pela separação *</label>
-            <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-              <SelectTrigger className="h-11">
-                <SelectValue placeholder="Selecionar funcionário..." />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map(e => (
-                  <SelectItem key={e.user_id} value={e.user_id}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                        {e.display_name.charAt(0).toUpperCase()}
-                      </div>
-                      {e.display_name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Default employee + refresh */}
+        <div className="flex items-end gap-3 p-3 rounded-xl border border-border bg-muted/20">
+          <div className="flex-1">
+            <p className="text-xs font-medium text-muted-foreground mb-1.5">RESPONSÁVEL PADRÃO (todas as categorias)</p>
+            <EmployeeSelect value={defaultEmployee} onChange={setDefaultEmployee} placeholder="Selecionar padrão..." />
           </div>
-
-          {/* Stock refresh */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 border border-amber-200">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-amber-800">Estoque pode ter mudado</p>
-                <p className="text-xs text-amber-700 mt-0.5">
-                  {stockRefreshed
-                    ? 'Saldos atualizados agora ✓'
-                    : 'Recomendado atualizar antes de atribuir.'}
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefreshStock}
-              disabled={refreshingStock}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100 flex-shrink-0"
-            >
-              {refreshingStock
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <RefreshCw className="w-3.5 h-3.5 mr-1" />
-              }
-              Atualizar Estoque
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshStock}
+            disabled={refreshingStock}
+            className="border-amber-300 text-amber-700 hover:bg-amber-100 flex-shrink-0"
+          >
+            {refreshingStock ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+            {stockRefreshed ? '✓ Atualizado' : 'Atualizar Estoque'}
+          </Button>
         </div>
 
-        {/* Items list */}
         {insufficientItems.length > 0 && (
           <div className="flex items-start gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm">
             <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-            <span><strong>{insufficientItems.length} item(s)</strong> com estoque insuficiente. O funcionário será avisado.</span>
+            <span><strong>{insufficientItems.length} item(s)</strong> com estoque insuficiente — os funcionários serão avisados.</span>
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto border border-border rounded-xl">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground bg-muted/30 sticky top-0">
-                <th className="text-left py-2 px-3">Insumo</th>
-                <th className="text-right py-2 px-3">Necessário</th>
-                <th className="text-right py-2 px-3">Em Estoque</th>
-                <th className="text-center py-2 px-3 w-16">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {shoppingList.map(item => {
-                const stock = currentStock[item.id] ?? item.inStock;
-                const ok = stock >= item.needed;
-                return (
-                  <tr key={item.id} className={!ok ? 'bg-destructive/5' : ''}>
-                    <td className="py-2 px-3 text-foreground">{item.name} <span className="text-muted-foreground text-xs">({item.unit})</span></td>
-                    <td className="py-2 px-3 text-right text-muted-foreground">{item.needed.toFixed(3)}</td>
-                    <td className={`py-2 px-3 text-right font-medium ${ok ? 'text-success' : 'text-destructive'}`}>
-                      {stock}
-                    </td>
-                    <td className="py-2 px-3 text-center">
-                      {ok
-                        ? <CheckCircle2 className="w-4 h-4 text-success mx-auto" />
-                        : <AlertTriangle className="w-4 h-4 text-destructive mx-auto" />
-                      }
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {/* Items grouped by category */}
+        <div className="flex-1 overflow-y-auto space-y-3 pr-0.5">
+          {categories.map(cat => {
+            const items = itemsByCategory(cat);
+            const overrideVal = categoryOverrides[cat] ?? '';
+            const effectiveEmpId = getEmployeeForCat(cat);
+            const effectiveEmpName = effectiveEmpId ? employees.find(e => e.user_id === effectiveEmpId)?.display_name : null;
+            const overridden = !!categoryOverrides[cat];
+            return (
+              <div key={cat} className="border border-border rounded-xl overflow-hidden">
+                {/* Category header */}
+                <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-semibold text-sm text-foreground">{cat}</span>
+                    <span className="text-xs text-muted-foreground">({items.length})</span>
+                    {overridden && (
+                      <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">personalizado</Badge>
+                    )}
+                    {!overridden && effectiveEmpName && (
+                      <span className="text-xs text-muted-foreground italic truncate">padrão: {effectiveEmpName}</span>
+                    )}
+                  </div>
+                  <EmployeeSelect
+                    value={overrideVal}
+                    onChange={v => setCatEmployee(cat, v)}
+                    placeholder={effectiveEmpName ? `↑ ${effectiveEmpName}` : 'Atribuir...'}
+                  />
+                </div>
+                {/* Items */}
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-border/30">
+                    {items.map(item => {
+                      const stock = currentStock[item.id] ?? item.inStock;
+                      const ok = stock >= item.needed;
+                      return (
+                        <tr key={item.id} className={!ok ? 'bg-destructive/5' : ''}>
+                          <td className="py-1.5 px-3 text-foreground">{item.name} <span className="text-muted-foreground text-xs">({item.unit})</span></td>
+                          <td className="py-1.5 px-3 text-right text-muted-foreground whitespace-nowrap text-xs">{item.needed.toFixed(3)}</td>
+                          <td className={`py-1.5 px-3 text-right font-medium whitespace-nowrap text-xs ${ok ? 'text-success' : 'text-destructive'}`}>{stock}</td>
+                          <td className="py-1.5 px-3 text-center w-8">
+                            {ok
+                              ? <CheckCircle2 className="w-3.5 h-3.5 text-success mx-auto" />
+                              : <AlertTriangle className="w-3.5 h-3.5 text-destructive mx-auto" />
+                            }
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
         </div>
 
         <div className="flex gap-3 pt-3 border-t border-border">
           <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
-          <Button onClick={handleAssign} disabled={saving || !selectedEmployee} className="flex-1">
+          <Button onClick={handleAssign} disabled={saving} className="flex-1">
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserCheck className="w-4 h-4 mr-2" />}
             Atribuir Separação
           </Button>
@@ -529,13 +579,20 @@ export default function EventMenuDetailPage() {
   const [allSheets, setAllSheets] = useState<Sheet[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
+  const [dishesWithNoIngredients, setDishesWithNoIngredients] = useState<string[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pratos' | 'compras' | 'saida'>('pratos');
   const [shopFilter, setShopFilter] = useState<'all' | 'ok' | 'buy'>('all');
   const [editingDishId, setEditingDishId] = useState<string | null>(null);
+  const [dishDialogOpen, setDishDialogOpen] = useState(false);
+  const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
+  const [editingQtyValue, setEditingQtyValue] = useState('');
   const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [addSheetDefaultSection, setAddSheetDefaultSection] = useState<string | undefined>(undefined);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [renamingSectionName, setRenamingSectionName] = useState<string | null>(null);
+  const [renamingSectionValue, setRenamingSectionValue] = useState('');
 
   // Return
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
@@ -563,7 +620,7 @@ export default function EventMenuDetailPage() {
     setLoading(true);
     const [menuRes, itemsRes, sheetsRes] = await Promise.all([
       supabase.from('event_menus').select('*').eq('id', id!).single(),
-      supabase.from('stock_items').select('id, name, unit, unit_cost, current_stock').order('name'),
+      supabase.from('stock_items').select('id, name, unit, unit_cost, current_stock, category').order('name'),
       supabase.from('technical_sheets').select('*').order('name'),
     ]);
     if (!menuRes.data) { navigate('/event-menus'); return; }
@@ -582,10 +639,10 @@ export default function EventMenuDetailPage() {
     const { data: dishes } = await supabase.from('event_menu_dishes').select('*').eq('menu_id', id!).order('sort_order');
     const enrichedDishes: MenuDish[] = await Promise.all((dishes || []).map(async (d: any) => {
       const sheet = (sheetsRes.data as any[])?.find(s => s.id === d.sheet_id);
-      if (!sheet) return { id: d.id, sheet_id: d.sheet_id, sheet_name: '?', planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', notes: d.notes || null, sheet: null, expanded: false, isMantimentos: d.sheet_id === MANTIMENTOS_ID };
+      if (!sheet) return { id: d.id, sheet_id: d.sheet_id, sheet_name: '?', planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', notes: d.notes || null, decoration: d.decoration || null, section_name: d.section_name || null, sheet: null, expanded: false, isMantimentos: d.sheet_id === MANTIMENTOS_ID };
       const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section').eq('sheet_id', d.sheet_id);
       const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: item?.unit || '', unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita' }; });
-      return { id: d.id, sheet_id: d.sheet_id, sheet_name: sheet.name, planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', notes: d.notes || null, sheet: { ...sheet, items }, expanded: false, isMantimentos: d.sheet_id === MANTIMENTOS_ID };
+      return { id: d.id, sheet_id: d.sheet_id, sheet_name: sheet.name, planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', notes: d.notes || null, decoration: d.decoration || null, section_name: d.section_name || null, sheet: { ...sheet, items }, expanded: false, isMantimentos: d.sheet_id === MANTIMENTOS_ID };
     }));
 
     const loadedMenu: EventMenu = { ...(menuRes.data as any), dishes: enrichedDishes };
@@ -596,17 +653,31 @@ export default function EventMenuDetailPage() {
 
   const buildShoppingList = (dishes: MenuDish[], stock: StockItem[]) => {
     const map: Record<string, ShoppingItem> = {};
+    const noIngredients: string[] = [];
     dishes.forEach(dish => {
+      if (dish.isMantimentos) return;
+      if (!dish.sheet) { noIngredients.push(dish.sheet_name); return; }
+      if (dish.sheet.items.filter(i => i.section === 'receita').length === 0) { noIngredients.push(dish.sheet_name); return; }
+      const scale = dish.planned_quantity / (dish.sheet.yield_quantity || 1);
+      dish.sheet.items.forEach(si => {
+        const needed = si.quantity * scale;
+        if (!map[si.item_id]) { const s = stock.find(x => x.id === si.item_id); map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true }; }
+        map[si.item_id].needed += needed;
+      });
+    });
+    // Also process mantimentos separately (its items are all 'receita' type)
+    dishes.filter(d => d.isMantimentos).forEach(dish => {
       if (!dish.sheet) return;
       const scale = dish.planned_quantity / (dish.sheet.yield_quantity || 1);
       dish.sheet.items.forEach(si => {
         const needed = si.quantity * scale;
-        if (!map[si.item_id]) { const s = stock.find(x => x.id === si.item_id); map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true }; }
+        if (!map[si.item_id]) { const s = stock.find(x => x.id === si.item_id); map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true }; }
         map[si.item_id].needed += needed;
       });
     });
     const list = Object.values(map).map(i => ({ ...i, toBuy: Math.max(0, i.needed - i.inStock), hasStock: i.inStock >= i.needed })).sort((a, b) => a.name.localeCompare(b.name));
     setShoppingList(list);
+    setDishesWithNoIngredients(noIngredients);
   };
 
   const prepareReturn = async () => {
@@ -670,6 +741,44 @@ export default function EventMenuDetailPage() {
     await loadMenu();
   };
 
+  const handleSaveQty = async (dishId: string) => {
+    const qty = parseFloat(editingQtyValue);
+    if (!isNaN(qty) && qty > 0) {
+      await supabase.from('event_menu_dishes').update({ planned_quantity: qty } as any).eq('id', dishId);
+      await loadMenu();
+    }
+    setEditingQtyId(null);
+  };
+
+  const handleRenameSection = async (oldName: string, newName: string) => {
+    if (!newName.trim() || newName === oldName) { setRenamingSectionName(null); return; }
+    const dishIds = menu?.dishes.filter(d => d.section_name === oldName).map(d => d.id) || [];
+    for (const id of dishIds) {
+      await supabase.from('event_menu_dishes').update({ section_name: newName.trim() } as any).eq('id', id);
+    }
+    toast.success('Seção renomeada!');
+    setRenamingSectionName(null);
+    await loadMenu();
+  };
+
+  const handleExportCsv = () => {
+    if (!menu) return;
+    const rows: string[][] = [['Seção', 'Prato', 'Qtd', 'Un', 'Observações', 'Decoração / Apresentação']];
+    const sections = Array.from(new Set(menu.dishes.filter(d => !d.isMantimentos).map(d => d.section_name || 'Sem Seção')));
+    for (const sec of sections) {
+      const dishes = menu.dishes.filter(d => !d.isMantimentos && (d.section_name || 'Sem Seção') === sec);
+      for (const d of dishes) {
+        const deco = d.sheet?.items.filter(i => i.section === 'decoracao').map(i => i.item_name).join(' / ') || '';
+        rows.push([sec, d.sheet_name, String(d.planned_quantity), d.planned_unit, d.notes || '', deco]);
+      }
+    }
+    const csv = rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `cardapio-${menu.name}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleDuplicateDish = async (dish: MenuDish) => {
     if (!dish.sheet) return;
     const { data: newSheet, error } = await supabase.from('technical_sheets').insert({ name: `${dish.sheet_name} (cópia)`, yield_quantity: dish.sheet.yield_quantity, yield_unit: dish.sheet.yield_unit, servings: 1 } as any).select().single();
@@ -685,6 +794,18 @@ export default function EventMenuDetailPage() {
 
   const regularDishes = menu.dishes.filter(d => !d.isMantimentos);
   const mantimentosDish = menu.dishes.find(d => d.isMantimentos);
+  const existingSections = Array.from(new Set(regularDishes.map(d => d.section_name || 'Sem Seção').filter(Boolean)));
+  const groupedDishes: { section: string; dishes: MenuDish[] }[] = existingSections.map(sec => ({
+    section: sec,
+    dishes: regularDishes.filter(d => (d.section_name || 'Sem Seção') === sec),
+  }));
+  if (regularDishes.some(d => !d.section_name)) {
+    const uncat = regularDishes.filter(d => !d.section_name);
+    if (uncat.length > 0 && !groupedDishes.find(g => g.section === 'Sem Seção')) {
+      groupedDishes.push({ section: 'Sem Seção', dishes: uncat });
+    }
+  }
+  const editingDish = menu.dishes.find(d => d.id === editingDishId) || null;
   const totalToBuy = shoppingList.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
   const itemsToBuy = shoppingList.filter(i => i.toBuy > 0).length;
   const itemsOk = shoppingList.filter(i => i.toBuy === 0).length;
@@ -791,7 +912,7 @@ export default function EventMenuDetailPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-white rounded-xl border border-border p-1 w-fit">
-        {([['pratos', `Fichas (${regularDishes.length})`, null], ['compras', 'Lista de Compras', itemsToBuy > 0 ? itemsToBuy : null], ['saida', 'Separação / Retorno', null]] as const).map(([tab, label, badge]) => (
+        {([['pratos', `Cardápio (${regularDishes.length})`, null], ['compras', 'Lista de Compras', itemsToBuy > 0 ? itemsToBuy : null], ['saida', 'Separação / Retorno', null]] as const).map(([tab, label, badge]) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === tab ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
             {label}
             {badge && <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${activeTab === tab ? 'bg-white/20' : 'bg-destructive text-white'}`}>{badge}</span>}
@@ -801,60 +922,208 @@ export default function EventMenuDetailPage() {
 
       {/* ── FICHAS TÉCNICAS ── */}
       {activeTab === 'pratos' && (
-        <div className="space-y-3">
-          <div className="flex justify-end">
-            <Button variant="outline" size="sm" onClick={() => setAddSheetOpen(true)}><Plus className="w-4 h-4 mr-1" />Adicionar ficha ao cardápio</Button>
+        <div className="space-y-0">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-muted-foreground">{regularDishes.length} pratos · {groupedDishes.length} seções</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={regularDishes.length === 0}>
+                <Download className="w-4 h-4 mr-1" />CSV
+              </Button>
+              <Button size="sm" onClick={() => { setAddSheetDefaultSection(undefined); setAddSheetOpen(true); }}>
+                <Plus className="w-4 h-4 mr-1" />Adicionar prato
+              </Button>
+            </div>
           </div>
 
+          {/* Mantimentos block */}
           {mantimentosDish && (
-            <div className="rounded-xl border-2 border-primary/20 bg-primary/3 overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3">
+            <div className="rounded-xl border-2 border-primary/20 bg-primary/5 overflow-hidden mb-3">
+              <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <Package className="w-5 h-5 text-primary flex-shrink-0" />
+                  <Package className="w-4 h-4 text-primary flex-shrink-0" />
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-foreground">MANTIMENTOS</p>
-                      <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">Fixo do evento</Badge>
+                      <p className="font-semibold text-sm text-foreground">MANTIMENTOS</p>
+                      <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">Fixo</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground">{mantimentosDish.planned_quantity} {mantimentosDish.planned_unit} · {mantimentosDish.sheet?.items.length || 0} ingredientes</p>
+                    <p className="text-xs text-muted-foreground">{mantimentosDish.planned_quantity} {mantimentosDish.planned_unit} · {mantimentosDish.sheet?.items.length || 0} insumos</p>
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => toggleExpand(mantimentosDish.id)}>{mantimentosDish.expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</Button>
-                  <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setEditingDishId(editingDishId === mantimentosDish.id ? null : mantimentosDish.id)}><Pencil className="w-3.5 h-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="w-8 h-8 text-destructive" onClick={() => handleRemoveDish(mantimentosDish.id)}><X className="w-3.5 h-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => toggleExpand(mantimentosDish.id)}>{mantimentosDish.expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}</Button>
+                  <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => { setEditingDishId(mantimentosDish.id); setDishDialogOpen(true); }}><Pencil className="w-3.5 h-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="w-7 h-7 text-destructive" onClick={() => handleRemoveDish(mantimentosDish.id)}><X className="w-3.5 h-3.5" /></Button>
                 </div>
               </div>
-              {editingDishId === mantimentosDish.id && <div className="px-5 pb-4"><DishEditPanel dish={mantimentosDish} stockItems={stockItems} onSave={(items, qty, unit, notes) => handleSaveDish(mantimentosDish.id, items, qty, unit, notes)} onCancel={() => setEditingDishId(null)} /></div>}
-              {mantimentosDish.expanded && mantimentosDish.sheet && editingDishId !== mantimentosDish.id && <DishExpandedView dish={mantimentosDish} />}
+              {mantimentosDish.expanded && mantimentosDish.sheet && <DishExpandedView dish={mantimentosDish} />}
             </div>
           )}
 
-          {regularDishes.map(dish => (
-            <div key={dish.id} className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4">
-                <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => toggleExpand(dish.id)}>
-                  {dish.expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-foreground">{dish.sheet_name}</p>
-                      {dish.notes && <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 gap-1"><MessageSquare className="w-2.5 h-2.5" />obs</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{dish.planned_quantity} {dish.planned_unit}{dish.sheet ? ` · ${dish.sheet.items.length} ingredientes` : ''}</p>
-                  </div>
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setEditingDishId(editingDishId === dish.id ? null : dish.id)}><Pencil className="w-3.5 h-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => handleDuplicateDish(dish)}><Plus className="w-3.5 h-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="w-8 h-8 text-destructive" onClick={() => handleRemoveDish(dish.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                </div>
-              </div>
-              {editingDishId === dish.id && <div className="px-5 pb-4"><DishEditPanel dish={dish} stockItems={stockItems} onSave={(items, qty, unit, notes) => handleSaveDish(dish.id, items, qty, unit, notes)} onCancel={() => setEditingDishId(null)} /></div>}
-              {dish.expanded && dish.sheet && editingDishId !== dish.id && <DishExpandedView dish={dish} />}
-            </div>
-          ))}
+          {/* Spreadsheet table */}
+          <div className="rounded-xl border border-border overflow-hidden bg-white shadow-sm">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-muted/40 border-b border-border">
+                  <th className="text-right px-3 py-2 font-semibold text-xs text-muted-foreground w-20">QTD</th>
+                  <th className="text-left px-2 py-2 font-semibold text-xs text-muted-foreground w-14">UN</th>
+                  <th className="text-left px-3 py-2 font-semibold text-xs text-muted-foreground">PRATO</th>
+                  <th className="text-left px-3 py-2 font-semibold text-xs text-muted-foreground hidden md:table-cell w-40">OBSERVAÇÕES</th>
+                  <th className="text-left px-3 py-2 font-semibold text-xs text-muted-foreground hidden md:table-cell w-48">DECORAÇÃO / APRESENTAÇÃO</th>
+                  <th className="w-24 px-2 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupedDishes.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground text-sm">
+                      Nenhum prato adicionado. Clique em "Adicionar prato" para começar.
+                    </td>
+                  </tr>
+                )}
+                {groupedDishes.map(({ section, dishes: secDishes }) => (
+                  <React.Fragment key={section}>
+                    {/* Section header row */}
+                    <tr key={`sec-${section}`} className="bg-muted/60 border-y border-border/70">
+                      <td colSpan={6} className="px-3 py-1.5">
+                        <div className="flex items-center justify-between">
+                          {renamingSectionName === section ? (
+                            <input
+                              autoFocus
+                              className="text-xs font-bold uppercase tracking-wide bg-transparent border-b border-primary outline-none w-48"
+                              value={renamingSectionValue}
+                              onChange={e => setRenamingSectionValue(e.target.value)}
+                              onBlur={() => handleRenameSection(section, renamingSectionValue)}
+                              onKeyDown={e => { if (e.key === 'Enter') handleRenameSection(section, renamingSectionValue); if (e.key === 'Escape') setRenamingSectionName(null); }}
+                            />
+                          ) : (
+                            <span
+                              className="text-xs font-bold uppercase tracking-wide text-foreground cursor-pointer hover:text-primary"
+                              onClick={() => { setRenamingSectionName(section); setRenamingSectionValue(section); }}
+                              title="Clique para renomear"
+                            >
+                              {section}
+                            </span>
+                          )}
+                          <button
+                            className="text-xs text-primary hover:underline flex items-center gap-1 ml-2"
+                            onClick={() => { setAddSheetDefaultSection(section); setAddSheetOpen(true); }}
+                          >
+                            <Plus className="w-3 h-3" />prato
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Dish rows */}
+                    {secDishes.map((dish, idx) => (
+                      <tr key={dish.id} className={`border-b border-border/40 hover:bg-amber-50 transition-colors cursor-default ${idx % 2 === 1 ? 'bg-muted/10' : ''}`}>
+                        {/* Qty — inline editable */}
+                        <td className="px-3 py-2 text-right">
+                          {editingQtyId === dish.id ? (
+                            <input
+                              autoFocus
+                              type="number"
+                              step="any"
+                              className="w-16 text-right text-sm border border-primary rounded px-1 py-0.5 outline-none"
+                              value={editingQtyValue}
+                              onChange={e => setEditingQtyValue(e.target.value)}
+                              onBlur={() => handleSaveQty(dish.id)}
+                              onKeyDown={e => { if (e.key === 'Enter') handleSaveQty(dish.id); if (e.key === 'Escape') setEditingQtyId(null); }}
+                            />
+                          ) : (
+                            <span
+                              className="font-semibold text-foreground cursor-pointer hover:text-primary hover:underline"
+                              onClick={() => { setEditingQtyId(dish.id); setEditingQtyValue(String(dish.planned_quantity)); }}
+                              title="Clique para editar"
+                            >
+                              {dish.planned_quantity}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-xs text-muted-foreground font-medium">{dish.planned_unit}</td>
+                        <td className="px-3 py-2 font-medium text-foreground">
+                          <span className="flex items-center gap-1.5">
+                            {dish.sheet_name}
+                            {(!dish.sheet || dish.sheet.items.filter(i => i.section === 'receita').length === 0) && (
+                              <span title="Ficha técnica sem insumos — não contribui para a lista de compras" className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 cursor-help">sem insumos</span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">
+                          {dish.notes || <span className="opacity-30">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">
+                          {dish.decoration || dish.sheet?.items.filter(i => i.section === 'decoracao').map(i => i.item_name).join(' / ') || <span className="opacity-30">—</span>}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <div className="flex items-center gap-0.5 justify-end">
+                            <Button
+                              variant="ghost" size="icon" className="w-7 h-7"
+                              title="Editar receita"
+                              onClick={() => { setEditingDishId(dish.id); setDishDialogOpen(true); }}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon" className="w-7 h-7"
+                              title="Duplicar"
+                              onClick={() => handleDuplicateDish(dish)}
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon" className="w-7 h-7 text-destructive/70 hover:text-destructive"
+                              title="Remover"
+                              onClick={() => handleRemoveDish(dish.id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+              {regularDishes.length > 0 && (
+                <tfoot>
+                  <tr className="border-t border-border bg-muted/30">
+                    <td colSpan={6} className="px-3 py-2">
+                      <button
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                        onClick={() => { setAddSheetDefaultSection(undefined); setAddSheetOpen(true); }}
+                      >
+                        <Plus className="w-3 h-3" />Adicionar prato em nova seção
+                      </button>
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
         </div>
       )}
+
+      {/* Dish edit dialog */}
+      <Dialog open={dishDialogOpen} onOpenChange={o => { if (!o) { setDishDialogOpen(false); setEditingDishId(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Receita — {editingDish?.sheet_name}</DialogTitle>
+            <DialogDescription>Altere os insumos, quantidade e observações deste prato.</DialogDescription>
+          </DialogHeader>
+          {editingDish && (
+            <DishEditPanel
+              dish={editingDish}
+              stockItems={stockItems}
+              onSave={async (items, qty, unit, notes) => {
+                await handleSaveDish(editingDish.id, items, qty, unit, notes);
+                setDishDialogOpen(false);
+              }}
+              onCancel={() => { setDishDialogOpen(false); setEditingDishId(null); }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── LISTA DE COMPRAS ── */}
       {activeTab === 'compras' && (
@@ -874,6 +1143,17 @@ export default function EventMenuDetailPage() {
               <div className="text-right"><p className="text-xs text-muted-foreground">Custo compra</p><p className="font-bold text-sm">R$ {totalToBuy.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
             </div>
           </div>
+          {dishesWithNoIngredients.length > 0 && (
+            <div className="mx-5 mt-4 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+              <p className="font-semibold text-amber-800 mb-1">Pratos sem insumos cadastrados na ficha técnica:</p>
+              <p className="text-amber-700 text-xs">Os pratos abaixo não possuem ingredientes na ficha técnica e por isso não aparecem na lista de compras. Edite a ficha técnica de cada um para adicionar os insumos.</p>
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {dishesWithNoIngredients.map(name => (
+                  <li key={name} className="rounded bg-amber-200/60 px-2 py-0.5 text-xs font-medium text-amber-900">{name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <table className="w-full text-sm">
             <thead><tr className="border-b border-border text-xs" style={{ background: 'hsl(40 30% 97%)' }}><th className="text-left px-5 py-3 font-semibold text-muted-foreground">INSUMO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">NECESSÁRIO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">EM ESTOQUE</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">A COMPRAR</th><th className="text-right px-5 py-3 font-semibold text-muted-foreground">CUSTO EST.</th></tr></thead>
             <tbody className="divide-y divide-border/50">
@@ -931,12 +1211,12 @@ export default function EventMenuDetailPage() {
                 <p className="font-semibold text-foreground">Atribuir Separação</p>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Designa um funcionário para separar fisicamente os itens no estoque. Ele verá a lista no app.
+                Distribua a separação por categoria entre funcionários. Cada um verá seus itens no app.
               </p>
               <div className="text-xs text-muted-foreground mb-4 space-y-1">
                 <p>• {shoppingList.length} insumos para separar</p>
-                {assignedEmployee
-                  ? <p>• <span className="text-primary font-medium">{assignedEmployee.display_name}</span> está designado</p>
+                {menu.status === 'assigned'
+                  ? <p>• <span className="text-primary font-medium">Separação já atribuída</span> — clique para reatribuir</p>
                   : <p>• Nenhum funcionário designado ainda</p>
                 }
                 {insufficientCount > 0 && <p>• <span className="text-warning font-medium">{insufficientCount} itens com estoque insuficiente</span></p>}
@@ -969,13 +1249,15 @@ export default function EventMenuDetailPage() {
 
           {/* Separation progress (if assigned) */}
           {(menu.status === 'assigned' || menu.status === 'dispatched') && (
-            <SeparationProgress menuId={id!} assignedEmployee={assignedEmployee} />
+            <SeparationErrorBoundary>
+              <SeparationProgress menuId={id!} employees={employees} />
+            </SeparationErrorBoundary>
           )}
         </div>
       )}
 
       {/* Dialogs */}
-      <AddSheetDialog open={addSheetOpen} onClose={() => setAddSheetOpen(false)} menuId={id!} allSheets={allSheets} onAdded={() => loadMenu()} />
+      <AddSheetDialog open={addSheetOpen} onClose={() => setAddSheetOpen(false)} menuId={id!} allSheets={allSheets} existingSections={existingSections} defaultSection={addSheetDefaultSection} onAdded={() => loadMenu()} />
       <AssignSeparationDialog
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
@@ -991,7 +1273,15 @@ export default function EventMenuDetailPage() {
 }
 
 // ─── Separation Progress Panel ────────────────────────────────────────────────
-function SeparationProgress({ menuId, assignedEmployee }: { menuId: string; assignedEmployee: Employee | null | undefined }) {
+class SeparationErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: string | null }> {
+  constructor(props: any) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error: any) { return { error: error?.message || String(error) }; }
+  render() {
+    if (this.state.error) return <div className="p-4 text-sm text-destructive bg-destructive/10 rounded-xl">Erro no painel de progresso: {this.state.error}</div>;
+    return this.props.children;
+  }
+}
+function SeparationProgress({ menuId, employees }: { menuId: string; employees: Employee[] }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1002,13 +1292,13 @@ function SeparationProgress({ menuId, assignedEmployee }: { menuId: string; assi
         .from('event_separation_items')
         .select('*, stock_items(name, unit)')
         .eq('menu_id', menuId)
+        .order('category')
         .order('created_at');
       setItems(data || []);
       setLoading(false);
     };
     load();
 
-    // Realtime subscription
     const channel = supabase
       .channel(`separation-${menuId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'event_separation_items', filter: `menu_id=eq.${menuId}` }, () => load())
@@ -1024,15 +1314,38 @@ function SeparationProgress({ menuId, assignedEmployee }: { menuId: string; assi
   const done = items.filter(i => i.status === 'separated' || i.status === 'skipped').length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
+  // Per-employee summary — only when items have assigned_to set
+  const assignedEmps: { id: string; name: string; done: number; total: number }[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const uid = item.assigned_to as string | null;
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    const empName = employees.find(e => e.user_id === uid)?.display_name || uid.slice(0, 8);
+    const empItems = items.filter(i => i.assigned_to === uid);
+    assignedEmps.push({ id: uid, name: empName, done: empItems.filter(i => i.status !== 'pending').length, total: empItems.length });
+  }
+
+  // Group by category (only when per-employee assignments exist)
+  const hasCategoryGroups = assignedEmps.length > 0;
+  const catGroups: { cat: string; empName: string | null; items: typeof items }[] = [];
+  if (hasCategoryGroups) {
+    const cats = [...new Set(items.map(i => (i.category as string) || 'Sem categoria'))].sort();
+    for (const cat of cats) {
+      const catItems = items.filter(i => ((i.category as string) || 'Sem categoria') === cat);
+      const firstEmpId = catItems[0]?.assigned_to as string | null;
+      const empName = firstEmpId ? (employees.find(e => e.user_id === firstEmpId)?.display_name || null) : null;
+      catGroups.push({ cat, empName, items: catItems });
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+      {/* Header */}
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-primary" />
           <p className="font-semibold text-foreground text-sm">Progresso da Separação</p>
-          {assignedEmployee && (
-            <span className="text-xs text-muted-foreground">— {assignedEmployee.display_name}</span>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-primary">{pct}%</span>
@@ -1041,45 +1354,82 @@ function SeparationProgress({ menuId, assignedEmployee }: { menuId: string; assi
       </div>
 
       {/* Progress bar */}
-      <div className="px-5 pt-3 pb-1">
+      <div className="px-5 pt-3 pb-2">
         <div className="h-2 bg-border rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
+          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
       </div>
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-xs text-muted-foreground bg-muted/20">
-            <th className="text-left py-2 px-5">Insumo</th>
-            <th className="text-right py-2 px-4">Planejado</th>
-            <th className="text-right py-2 px-4">Separado</th>
-            <th className="text-center py-2 px-4 w-24">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/40">
-          {items.map(item => {
-            const name = item.stock_items?.name || '?';
-            const unit = item.stock_items?.unit || '';
+      {/* Per-employee chips */}
+      {assignedEmps.length > 0 && (
+        <div className="px-5 pb-2 flex flex-wrap gap-2">
+          {assignedEmps.map(emp => {
+            const empPct = emp.total > 0 ? Math.round((emp.done / emp.total) * 100) : 0;
             return (
-              <tr key={item.id} className={item.status === 'separated' ? 'bg-success/5' : item.status === 'skipped' ? 'bg-muted/30' : ''}>
-                <td className="py-2 px-5 text-foreground">{name} <span className="text-muted-foreground text-xs">({unit})</span></td>
-                <td className="py-2 px-4 text-right text-muted-foreground">{item.planned_quantity?.toFixed(3)}</td>
-                <td className="py-2 px-4 text-right font-medium">
-                  {item.separated_quantity != null ? item.separated_quantity.toFixed(3) : <span className="text-muted-foreground">—</span>}
-                </td>
-                <td className="py-2 px-4 text-center">
-                  {item.status === 'separated' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" />OK</span>}
-                  {item.status === 'skipped' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full"><X className="w-3 h-3" />Pulado</span>}
-                  {item.status === 'pending' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" />Pendente</span>}
-                </td>
-              </tr>
+              <div key={emp.id} className="flex items-center gap-1.5 text-xs bg-muted/40 rounded-lg px-2.5 py-1.5 border border-border">
+                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-[10px] font-bold text-primary">
+                  {emp.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="font-medium">{emp.name}</span>
+                <span className="text-muted-foreground">·</span>
+                <span className={empPct === 100 ? 'text-success font-semibold' : 'text-primary font-semibold'}>{empPct}%</span>
+                <span className="text-muted-foreground">({emp.done}/{emp.total})</span>
+              </div>
             );
           })}
-        </tbody>
-      </table>
+        </div>
+      )}
+
+      {/* Items — grouped by category if per-employee, flat list otherwise */}
+      {hasCategoryGroups ? catGroups.map(group => (
+        <div key={group.cat}>
+          <div className="flex items-center justify-between px-5 py-1.5 bg-muted/20 border-t border-border/60">
+            <span className="text-xs font-semibold text-foreground">{group.cat}</span>
+            {group.empName && (
+              <span className="text-[10px] text-muted-foreground">{group.empName}</span>
+            )}
+          </div>
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-border/40">
+              {group.items.map(item => {
+                const si = item.stock_items as { name?: string; unit?: string } | null;
+                return (
+                  <tr key={item.id} className={item.status === 'separated' ? 'bg-success/5' : item.status === 'skipped' ? 'bg-muted/30' : ''}>
+                    <td className="py-2 px-5 text-foreground">{si?.name || '?'} <span className="text-muted-foreground text-xs">({si?.unit || ''})</span></td>
+                    <td className="py-2 px-4 text-right text-muted-foreground text-xs">{item.planned_quantity?.toFixed(3)}</td>
+                    <td className="py-2 px-4 text-right font-medium text-xs">{item.separated_quantity != null ? item.separated_quantity.toFixed(3) : <span className="text-muted-foreground">—</span>}</td>
+                    <td className="py-2 px-4 text-center w-24">
+                      {item.status === 'separated' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" />OK</span>}
+                      {item.status === 'skipped' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full"><X className="w-3 h-3" />Pulado</span>}
+                      {item.status === 'pending' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" />Pendente</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )) : (
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-border/40">
+            {items.map(item => {
+              const si = item.stock_items as { name?: string; unit?: string } | null;
+              return (
+                <tr key={item.id} className={item.status === 'separated' ? 'bg-success/5' : item.status === 'skipped' ? 'bg-muted/30' : ''}>
+                  <td className="py-2 px-5 text-foreground">{si?.name || '?'} <span className="text-muted-foreground text-xs">({si?.unit || ''})</span></td>
+                  <td className="py-2 px-4 text-right text-muted-foreground text-xs">{item.planned_quantity?.toFixed(3)}</td>
+                  <td className="py-2 px-4 text-right font-medium text-xs">{item.separated_quantity != null ? item.separated_quantity.toFixed(3) : <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-2 px-4 text-center w-24">
+                    {item.status === 'separated' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" />OK</span>}
+                    {item.status === 'skipped' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full"><X className="w-3 h-3" />Pulado</span>}
+                    {item.status === 'pending' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" />Pendente</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -368,6 +369,7 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
 
 // ─── Main Page ───
 export default function StockItemsPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
   const [suppliers, setSuppliers] = useState<Record<string, Supplier[]>>({});
   const [search, setSearch] = useState('');
@@ -591,7 +593,10 @@ export default function StockItemsPage() {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         {isLow && <div className="w-1.5 h-1.5 rounded-full bg-destructive flex-shrink-0" title="Estoque abaixo do mínimo" />}
-                        <span className="font-medium text-foreground leading-tight">{item.name}</span>
+                        <span
+                          className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
+                          onClick={() => navigate(`/items/${item.id}`)}
+                        >{item.name}</span>
                       </div>
                     </td>
                     <td className="px-3 py-2">

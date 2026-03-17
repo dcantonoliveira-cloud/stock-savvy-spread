@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,11 +21,14 @@ import UsersPage from "./pages/supervisor/UsersPage";
 import NotificationsPage from "./pages/supervisor/NotificationsPage";
 import AIAnalysisPage from "./pages/supervisor/AIAnalysisPage";
 import CategoriesPage from "./pages/supervisor/CategoriesPage";
+import CategoryDetailPage from "./pages/supervisor/CategoryDetailPage";
+import StockItemDetailPage from "./pages/supervisor/StockItemDetailPage";
 import InventoryPage from "./pages/supervisor/InventoryPage";
 import KitchensPage from "./pages/supervisor/KitchensPage";
 import EventMenusPage from "./pages/supervisor/EventMenusPage";
 import EventMenuDetailPage from "./pages/supervisor/EventMenuDetailPage";
 import InvoicePage from "./pages/InvoicePage";
+import MobileSupervisorApp from "./pages/supervisor/MobileSupervisorApp";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
@@ -34,8 +38,19 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
+
 function AppRoutes() {
   const { user, role, loading } = useAuth();
+  const isMobile = useIsMobile();
 
   if (loading) {
     return (
@@ -52,12 +67,15 @@ function AppRoutes() {
   if (!role) return <NoRolePage />;
 
   if (role === 'supervisor') {
+    if (isMobile) return <MobileSupervisorApp />;
     return (
       <SupervisorLayout>
         <Routes>
           <Route path="/" element={<SupervisorDashboard />} />
           <Route path="/categories" element={<CategoriesPage />} />
+          <Route path="/categories/:name" element={<CategoryDetailPage />} />
           <Route path="/items" element={<StockItemsPage />} />
+          <Route path="/items/:id" element={<StockItemDetailPage />} />
           <Route path="/entries" element={<EntriesPage />} />
           <Route path="/outputs" element={<SupervisorOutputsPage />} />
           <Route path="/sheets" element={<SupervisorSheetsPage />} />

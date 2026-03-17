@@ -589,42 +589,83 @@ export default function SupervisorSheetsPage() {
       )}
 
       {/* Sheet list */}
-      <div className="space-y-3">
-        {filteredSheets.map(sheet => (
-          <div key={sheet.id} className="glass-card rounded-xl p-4 flex items-center justify-between animate-fade-in">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="font-medium text-foreground truncate">{sheet.name}</p>
-                {sheet.category && <Badge variant="secondary" className="text-[10px]">{sheet.category}</Badge>}
-              </div>
-              <div className="flex gap-3 mt-1">
-                <span className="text-xs text-muted-foreground">{sheet.items.length} insumos</span>
-                {sheet.prep_time > 0 && <span className="text-xs text-muted-foreground">{sheet.prep_time} min</span>}
-                <span className="text-xs text-muted-foreground">Rende: {sheet.yield_quantity} {sheet.yield_unit}</span>
-                <span className="text-xs text-primary font-medium">R$ {getSheetTotalCost(sheet).toFixed(2)}</span>
-              </div>
-            </div>
-            <div className="flex gap-1 flex-shrink-0">
-              <Button variant="ghost" size="icon" title="Visualizar" onClick={() => setViewingSheet(sheet)}>
-                <Eye className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" title="Editar" onClick={() => openEditDialog(sheet)}>
-                <Pencil className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" title="Duplicar" onClick={() => openDuplicateDialog(sheet)}>
-                <Copy className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" title="Remover" onClick={() => handleDelete(sheet.id)}>
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </Button>
-            </div>
-          </div>
-        ))}
-        {filteredSheets.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            {sheets.length === 0 ? 'Nenhuma ficha técnica cadastrada.' : 'Nenhuma receita encontrada.'}
-          </div>
-        )}
+      <div className="rounded-xl border border-border overflow-hidden bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted-foreground bg-muted/20">
+              <th className="text-left px-5 py-2.5 w-8">#</th>
+              <th className="text-left px-3 py-2.5">RECEITA</th>
+              <th className="text-left px-3 py-2.5">CATEGORIA</th>
+              <th className="text-center px-3 py-2.5">INSUMOS</th>
+              <th className="text-center px-3 py-2.5">PREPARO</th>
+              <th className="text-center px-3 py-2.5">RENDIMENTO</th>
+              <th className="text-right px-3 py-2.5">CUSTO TOTAL</th>
+              <th className="text-center px-3 py-2.5 w-28">AÇÕES</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/50">
+            {filteredSheets.map((sheet, idx) => (
+              <tr key={sheet.id} className="hover:bg-amber-50 transition-colors">
+                <td className="px-5 py-2.5 text-muted-foreground text-xs">{idx + 1}</td>
+                <td className="px-3 py-2.5">
+                  <span className="font-medium text-foreground">{sheet.name}</span>
+                  {sheet.description && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[260px]">{sheet.description}</p>}
+                </td>
+                <td className="px-3 py-2.5">
+                  {sheet.category
+                    ? <Badge variant="secondary" className="text-[10px]">{sheet.category}</Badge>
+                    : <span className="text-muted-foreground text-xs">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-center text-sm font-medium text-foreground">{sheet.items.length}</td>
+                <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">
+                  {sheet.prep_time > 0 ? `${sheet.prep_time} min` : '—'}
+                </td>
+                <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">
+                  {sheet.yield_quantity} {sheet.yield_unit} / {sheet.servings} porç.
+                </td>
+                <td className="px-3 py-2.5 text-right font-semibold text-amber-700">
+                  R$ {getSheetTotalCost(sheet).toFixed(2)}
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center justify-center gap-0.5">
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Visualizar" onClick={() => setViewingSheet(sheet)}>
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Editar" onClick={() => openEditDialog(sheet)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Duplicar" onClick={() => openDuplicateDialog(sheet)}>
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Remover" onClick={() => handleDelete(sheet.id)}>
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {filteredSheets.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-5 py-12 text-center text-muted-foreground text-sm">
+                  {sheets.length === 0 ? 'Nenhuma ficha técnica cadastrada.' : 'Nenhuma receita encontrada.'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {filteredSheets.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-border bg-muted/20">
+                <td colSpan={6} className="px-5 py-2 text-xs font-semibold text-muted-foreground text-right">
+                  {filteredSheets.length} receitas
+                </td>
+                <td className="px-3 py-2 text-right font-bold text-amber-700 text-sm">
+                  R$ {filteredSheets.reduce((s, sh) => s + getSheetTotalCost(sh), 0).toFixed(2)}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
       </div>
 
       {/* Quick create item dialog */}

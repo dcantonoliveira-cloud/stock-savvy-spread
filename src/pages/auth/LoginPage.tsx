@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { LogIn, UserPlus, ChefHat } from 'lucide-react';
+import { LogIn, UserPlus, ChefHat, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const { signIn, signInWithGoogle } = useAuth();
@@ -13,6 +13,20 @@ export default function LoginPage() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) { toast.error('Digite seu email'); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) toast.error('Erro ao enviar email: ' + error.message);
+    else { toast.success('Email de redefinição enviado! Verifique sua caixa de entrada.'); setIsForgotPassword(false); }
+    setLoading(false);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +86,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="glass-card rounded-2xl p-6 space-y-4 shadow-xl">
+        <form onSubmit={isForgotPassword ? handleForgotPassword : isSignUp ? handleSignUp : handleLogin} className="glass-card rounded-2xl p-6 space-y-4 shadow-xl">
           {isSignUp && (
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Nome</label>
@@ -83,21 +97,50 @@ export default function LoginPage() {
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Email</label>
             <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" className="h-11 rounded-xl" />
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Senha</label>
-            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="h-11 rounded-xl" />
-          </div>
+          {!isForgotPassword && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Senha</label>
+              <div className="relative">
+                <Input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="h-11 rounded-xl pr-10" />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword(v => !v)}>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
           <Button type="submit" className="w-full h-11 rounded-xl font-semibold text-sm" disabled={loading}>
-            {isSignUp ? <UserPlus className="w-4 h-4 mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
-            {loading ? 'Aguarde...' : isSignUp ? 'Criar Conta' : 'Entrar'}
+            {isForgotPassword ? <KeyRound className="w-4 h-4 mr-2" /> : isSignUp ? <UserPlus className="w-4 h-4 mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
+            {loading ? 'Aguarde...' : isForgotPassword ? 'Enviar link de redefinição' : isSignUp ? 'Criar Conta' : 'Entrar'}
           </Button>
-          <button
-            type="button"
-            className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
-            onClick={() => setIsSignUp(!isSignUp)}
-          >
-            {isSignUp ? 'Já tem conta? Entrar' : 'Primeiro acesso? Criar conta'}
-          </button>
+          {!isForgotPassword && (
+            <>
+              <button
+                type="button"
+                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
+                onClick={() => { setIsSignUp(!isSignUp); }}
+              >
+                {isSignUp ? 'Já tem conta? Entrar' : 'Primeiro acesso? Criar conta'}
+              </button>
+              {!isSignUp && (
+                <button
+                  type="button"
+                  className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setIsForgotPassword(true)}
+                >
+                  Esqueci minha senha
+                </button>
+              )}
+            </>
+          )}
+          {isForgotPassword && (
+            <button
+              type="button"
+              className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
+              onClick={() => setIsForgotPassword(false)}
+            >
+              Voltar ao login
+            </button>
+          )}
         </form>
 
         {/* Google */}
