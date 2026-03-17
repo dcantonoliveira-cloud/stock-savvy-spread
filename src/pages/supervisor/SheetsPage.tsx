@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
-import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDown, Check, PackagePlus } from 'lucide-react';
+import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDown, Check, PackagePlus, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -194,6 +195,8 @@ function QuickCreateItemDialog({ open, onClose, onCreated }: {
   );
 }
 
+const YIELD_UNITS = ['kg', 'g', 'L', 'ml', 'un', 'porções'];
+
 export default function SupervisorSheetsPage() {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
@@ -207,6 +210,11 @@ export default function SupervisorSheetsPage() {
   const [newCatName, setNewCatName] = useState('');
   const [addingCat, setAddingCat] = useState(false);
 
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+  const inlineInputRef = useRef<HTMLInputElement>(null);
+
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -217,6 +225,9 @@ export default function SupervisorSheetsPage() {
   const [prepTime, setPrepTime] = useState('0');
   const [instructions, setInstructions] = useState('');
   const [formItems, setFormItems] = useState<SheetItem[]>([]);
+
+  // File import ref
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     const [itemsRes, sheetsRes, catsRes] = await Promise.all([
@@ -250,6 +261,14 @@ export default function SupervisorSheetsPage() {
     }
   };
   useEffect(() => { load(); }, []);
+
+  // Focus inline input when editing starts
+  useEffect(() => {
+    if (editingCell && inlineInputRef.current) {
+      inlineInputRef.current.focus();
+      inlineInputRef.current.select();
+    }
+  }, [editingCell]);
 
   const resetForm = () => {
     setName(''); setDescription(''); setCategory(sheetCategories[0] || '');
@@ -378,6 +397,243 @@ export default function SupervisorSheetsPage() {
     setStockItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
   };
 
+  // ─── Inline editing handlers ───
+  const startEdit = (sheet: Sheet, field: string) => {
+    let value = '';
+    if (field === 'name') value = sheet.name;
+    else if (field === 'prep_time') value = sheet.prep_time?.toString() || '0';
+    else if (field === 'yield_quantity') value = sheet.yield_quantity?.toString() || '1';
+    else if (field === 'yield_unit') value = sheet.yield_unit || 'kg';
+    else if (field === 'servings') value = sheet.servings?.toString() || '1';
+    setEditingCell({ id: sheet.id, field });
+    setEditingValue(value);
+  };
+
+  const cancelEdit = () => {
+    setEditingCell(null);
+    setEditingValue('');
+  };
+
+  const commitEdit = async (sheet: Sheet) => {
+    if (!editingCell) return;
+    const { field } = editingCell;
+
+    let updateData: Record<string, any> = {};
+    if (field === 'name') {
+      const trimmed = editingValue.trim();
+      if (!trimmed) { cancelEdit(); return; }
+      updateData = { name: trimmed };
+    } else if (field === 'prep_time') {
+      updateData = { prep_time: parseInt(editingValue) || 0 };
+    } else if (field === 'yield_quantity') {
+      updateData = { yield_quantity: parseFloat(editingValue) || 1 };
+    } else if (field === 'yield_unit') {
+      updateData = { yield_unit: editingValue };
+    } else if (field === 'servings') {
+      updateData = { servings: parseInt(editingValue) || 1 };
+    }
+
+    const { error } = await supabase.from('technical_sheets').update(updateData).eq('id', sheet.id);
+    if (error) {
+      toast.error('Erro ao salvar alteração');
+      cancelEdit();
+      return;
+    }
+
+    // Update local state
+    setSheets(prev => prev.map(s => {
+      if (s.id !== sheet.id) return s;
+      return { ...s, ...updateData };
+    }));
+
+    toast.success('Alteração salva!');
+    cancelEdit();
+  };
+
+  const handleInlineKeyDown = (e: React.KeyboardEvent, sheet: Sheet) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitEdit(sheet);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+    }
+  };
+
+  // ─── Excel Export ───
+  const handleExport = async () => {
+    try {
+      const [sheetsRes, itemsRes] = await Promise.all([
+        supabase.from('technical_sheets').select('*').order('name'),
+        supabase.from('technical_sheet_items').select('*, stock_items(name, unit, unit_cost)'),
+      ]);
+
+      if (sheetsRes.error || itemsRes.error) {
+        toast.error('Erro ao exportar dados');
+        return;
+      }
+
+      const allSheets = sheetsRes.data as any[];
+      const allItems = itemsRes.data as any[];
+
+      const headers = [
+        'FICHA', 'CATEGORIA', 'TEMPO_PREPARO_MIN',
+        'RENDIMENTO_QTD', 'RENDIMENTO_UNIT', 'RENDIMENTO_PORCOES',
+        'INSUMO', 'QUANTIDADE', 'UNIDADE', 'CUSTO_UNIT',
+      ];
+
+      const rows: any[][] = [];
+
+      for (const sheet of allSheets) {
+        const sheetItems = allItems.filter(i => i.sheet_id === sheet.id);
+        if (sheetItems.length === 0) {
+          rows.push([
+            sheet.name,
+            sheet.category || '',
+            sheet.prep_time || 0,
+            sheet.yield_quantity || 1,
+            sheet.yield_unit || '',
+            sheet.servings || 1,
+            '', '', '', '',
+          ]);
+        } else {
+          for (const item of sheetItems) {
+            const stockItem = item.stock_items as any;
+            rows.push([
+              sheet.name,
+              sheet.category || '',
+              sheet.prep_time || 0,
+              sheet.yield_quantity || 1,
+              sheet.yield_unit || '',
+              sheet.servings || 1,
+              stockItem?.name || '',
+              item.quantity || 0,
+              stockItem?.unit || '',
+              item.unit_cost || stockItem?.unit_cost || 0,
+            ]);
+          }
+        }
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Fichas Técnicas');
+      XLSX.writeFile(wb, 'fichas_tecnicas.xlsx');
+      toast.success('Excel exportado com sucesso!');
+    } catch (err) {
+      toast.error('Erro ao gerar arquivo Excel');
+    }
+  };
+
+  // ─── Excel Import ───
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so same file can be re-selected
+    if (importFileRef.current) importFileRef.current.value = '';
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      if (raw.length < 2) { toast.error('Arquivo vazio ou inválido'); return; }
+
+      // Find header indexes
+      const headerRow = raw[0].map((h: any) => String(h).trim().toUpperCase());
+      const col = (name: string) => headerRow.indexOf(name);
+
+      const fichaIdx = col('FICHA');
+      const insumoIdx = col('INSUMO');
+      const qtdIdx = col('QUANTIDADE');
+      const custoIdx = col('CUSTO_UNIT');
+
+      if (fichaIdx === -1 || insumoIdx === -1) {
+        toast.error('Colunas FICHA e INSUMO são obrigatórias');
+        return;
+      }
+
+      // Group by sheet name
+      const grouped: Record<string, { insumo: string; quantidade: number; custo_unit: number }[]> = {};
+      for (let i = 1; i < raw.length; i++) {
+        const row = raw[i];
+        const fichaName = String(row[fichaIdx] || '').trim();
+        const insumoName = String(row[insumoIdx] || '').trim();
+        if (!fichaName || !insumoName) continue;
+
+        if (!grouped[fichaName]) grouped[fichaName] = [];
+        grouped[fichaName].push({
+          insumo: insumoName,
+          quantidade: parseFloat(row[qtdIdx]) || 0,
+          custo_unit: parseFloat(row[custoIdx]) || 0,
+        });
+      }
+
+      const sheetNames = Object.keys(grouped);
+      if (sheetNames.length === 0) { toast.error('Nenhum dado encontrado no arquivo'); return; }
+
+      // Fetch DB sheets to match
+      const { data: dbSheets } = await supabase.from('technical_sheets').select('id, name');
+      const { data: dbStockItems } = await supabase.from('stock_items').select('id, name');
+
+      const matchedSheets = sheetNames.filter(n => dbSheets?.some((s: any) => s.name === n));
+      const totalItems = matchedSheets.reduce((sum, n) => sum + grouped[n].length, 0);
+
+      if (matchedSheets.length === 0) {
+        toast.error('Nenhuma ficha do arquivo encontrada no banco de dados');
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `${matchedSheets.length} fichas e ${totalItems} insumos serão atualizados. Confirmar?`
+      );
+      if (!confirmed) return;
+
+      let updatedSheets = 0;
+      let updatedItems = 0;
+
+      for (const sheetName of matchedSheets) {
+        const dbSheet = dbSheets?.find((s: any) => s.name === sheetName) as any;
+        if (!dbSheet) continue;
+
+        const { data: sheetItems } = await supabase
+          .from('technical_sheet_items')
+          .select('id, item_id')
+          .eq('sheet_id', dbSheet.id);
+
+        for (const row of grouped[sheetName]) {
+          const stockItem = dbStockItems?.find(
+            (si: any) => si.name.toLowerCase() === row.insumo.toLowerCase()
+          ) as any;
+          if (!stockItem) continue;
+
+          const sheetItem = sheetItems?.find((si: any) => si.item_id === stockItem.id);
+          if (!sheetItem) continue;
+
+          const updatePayload: Record<string, any> = {};
+          if (qtdIdx !== -1 && row.quantidade > 0) updatePayload.quantity = row.quantidade;
+          if (custoIdx !== -1 && row.custo_unit > 0) updatePayload.unit_cost = row.custo_unit;
+
+          if (Object.keys(updatePayload).length > 0) {
+            await supabase
+              .from('technical_sheet_items')
+              .update(updatePayload)
+              .eq('id', (sheetItem as any).id);
+            updatedItems++;
+          }
+        }
+        updatedSheets++;
+      }
+
+      toast.success(`${updatedSheets} fichas atualizadas!`);
+      load();
+    } catch (err) {
+      toast.error('Erro ao processar arquivo Excel');
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -453,7 +709,7 @@ export default function SupervisorSheetsPage() {
                   <Select value={yieldUnit} onValueChange={setYieldUnit}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {['kg', 'g', 'L', 'ml', 'un', 'porções'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      {YIELD_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -514,9 +770,9 @@ export default function SupervisorSheetsPage() {
         </Dialog>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-4 mb-6">
-        <div className="relative flex-1">
+      {/* Filters + Excel buttons */}
+      <div className="flex gap-3 mb-6 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Input placeholder="Buscar receita..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
@@ -526,6 +782,21 @@ export default function SupervisorSheetsPage() {
             {sheetCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Button variant="outline" onClick={handleExport} className="gap-2 shrink-0">
+          <Download className="w-4 h-4" />
+          Exportar Excel
+        </Button>
+        <label className="inline-flex items-center gap-2 cursor-pointer shrink-0 px-3 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleImport}
+          />
+          <Upload className="w-4 h-4" />
+          Importar Excel
+        </label>
       </div>
 
       {/* Viewing sheet detail */}
@@ -605,24 +876,140 @@ export default function SupervisorSheetsPage() {
           </thead>
           <tbody className="divide-y divide-border/50">
             {filteredSheets.map((sheet, idx) => (
-              <tr key={sheet.id} className="hover:bg-amber-50 transition-colors">
+              <tr key={sheet.id} className="hover:bg-amber-50 transition-colors group">
                 <td className="px-5 py-2.5 text-muted-foreground text-xs">{idx + 1}</td>
+
+                {/* RECEITA — inline editable */}
                 <td className="px-3 py-2.5">
-                  <span className="font-medium text-foreground">{sheet.name}</span>
+                  {editingCell?.id === sheet.id && editingCell.field === 'name' ? (
+                    <input
+                      ref={inlineInputRef}
+                      className="font-medium text-foreground border-b border-primary bg-transparent outline-none w-full"
+                      value={editingValue}
+                      onChange={e => setEditingValue(e.target.value)}
+                      onBlur={() => commitEdit(sheet)}
+                      onKeyDown={e => handleInlineKeyDown(e, sheet)}
+                    />
+                  ) : (
+                    <div
+                      className="cursor-pointer group/cell flex items-center gap-1"
+                      onClick={() => startEdit(sheet, 'name')}
+                      title="Clique para editar"
+                    >
+                      <span className="font-medium text-foreground border-b border-dashed border-transparent group-hover/cell:border-muted-foreground transition-colors">
+                        {sheet.name}
+                      </span>
+                      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  )}
                   {sheet.description && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[260px]">{sheet.description}</p>}
                 </td>
+
                 <td className="px-3 py-2.5">
                   {sheet.category
                     ? <Badge variant="secondary" className="text-[10px]">{sheet.category}</Badge>
                     : <span className="text-muted-foreground text-xs">—</span>}
                 </td>
+
                 <td className="px-3 py-2.5 text-center text-sm font-medium text-foreground">{sheet.items.length}</td>
+
+                {/* PREPARO — inline editable */}
                 <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">
-                  {sheet.prep_time > 0 ? `${sheet.prep_time} min` : '—'}
+                  {editingCell?.id === sheet.id && editingCell.field === 'prep_time' ? (
+                    <input
+                      ref={inlineInputRef}
+                      type="number"
+                      className="w-16 text-center border-b border-primary bg-transparent outline-none text-xs"
+                      value={editingValue}
+                      onChange={e => setEditingValue(e.target.value)}
+                      onBlur={() => commitEdit(sheet)}
+                      onKeyDown={e => handleInlineKeyDown(e, sheet)}
+                    />
+                  ) : (
+                    <div
+                      className="cursor-pointer group/cell inline-flex items-center gap-1"
+                      onClick={() => startEdit(sheet, 'prep_time')}
+                      title="Clique para editar"
+                    >
+                      <span className="border-b border-dashed border-transparent group-hover/cell:border-muted-foreground transition-colors">
+                        {sheet.prep_time > 0 ? `${sheet.prep_time} min` : '—'}
+                      </span>
+                      <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  )}
                 </td>
+
+                {/* RENDIMENTO — inline editable (qty, unit, servings) */}
                 <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">
-                  {sheet.yield_quantity} {sheet.yield_unit} / {sheet.servings} porç.
+                  <div className="inline-flex items-center gap-1 flex-wrap justify-center">
+                    {/* yield_quantity */}
+                    {editingCell?.id === sheet.id && editingCell.field === 'yield_quantity' ? (
+                      <input
+                        ref={inlineInputRef}
+                        type="number"
+                        className="w-14 text-center border-b border-primary bg-transparent outline-none text-xs"
+                        value={editingValue}
+                        onChange={e => setEditingValue(e.target.value)}
+                        onBlur={() => commitEdit(sheet)}
+                        onKeyDown={e => handleInlineKeyDown(e, sheet)}
+                      />
+                    ) : (
+                      <span
+                        className="cursor-pointer border-b border-dashed border-transparent hover:border-muted-foreground transition-colors"
+                        onClick={() => startEdit(sheet, 'yield_quantity')}
+                        title="Editar quantidade de rendimento"
+                      >
+                        {sheet.yield_quantity}
+                      </span>
+                    )}
+
+                    {/* yield_unit */}
+                    {editingCell?.id === sheet.id && editingCell.field === 'yield_unit' ? (
+                      <select
+                        className="border-b border-primary bg-transparent outline-none text-xs"
+                        value={editingValue}
+                        onChange={e => setEditingValue(e.target.value)}
+                        onBlur={() => commitEdit(sheet)}
+                        onKeyDown={e => handleInlineKeyDown(e, sheet)}
+                        autoFocus
+                      >
+                        {YIELD_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    ) : (
+                      <span
+                        className="cursor-pointer border-b border-dashed border-transparent hover:border-muted-foreground transition-colors"
+                        onClick={() => startEdit(sheet, 'yield_unit')}
+                        title="Editar unidade de rendimento"
+                      >
+                        {sheet.yield_unit}
+                      </span>
+                    )}
+
+                    <span>/</span>
+
+                    {/* servings */}
+                    {editingCell?.id === sheet.id && editingCell.field === 'servings' ? (
+                      <input
+                        ref={inlineInputRef}
+                        type="number"
+                        className="w-12 text-center border-b border-primary bg-transparent outline-none text-xs"
+                        value={editingValue}
+                        onChange={e => setEditingValue(e.target.value)}
+                        onBlur={() => commitEdit(sheet)}
+                        onKeyDown={e => handleInlineKeyDown(e, sheet)}
+                      />
+                    ) : (
+                      <span
+                        className="cursor-pointer border-b border-dashed border-transparent hover:border-muted-foreground transition-colors"
+                        onClick={() => startEdit(sheet, 'servings')}
+                        title="Editar porções"
+                      >
+                        {sheet.servings} porç.
+                      </span>
+                    )}
+                  </div>
                 </td>
+
                 <td className="px-3 py-2.5 text-right font-semibold text-amber-700">
                   R$ {getSheetTotalCost(sheet).toFixed(2)}
                 </td>
