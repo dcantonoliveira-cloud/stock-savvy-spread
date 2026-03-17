@@ -21,9 +21,9 @@ const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; current_stock: number };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
 type Sheet = { id: string; name: string; servings: number; yield_quantity: number; yield_unit: string; description: string | null; category: string | null; prep_time: number; instructions: string | null; items: SheetItem[] };
-type ExtractedDish = { raw_name: string; quantity: number; unit: string; section_label: string; matched_sheet_id: string | null; matched_sheet_name: string | null; match_score: number; status: 'matched' | 'unmatched' };
+type ExtractedDish = { raw_name: string; quantity: number; unit: string; section_label: string; notes: string; decoration: string; matched_sheet_id: string | null; matched_sheet_name: string | null; match_score: number; status: 'matched' | 'unmatched' };
 type MenuDish = { id: string; sheet_id: string; sheet_name: string; planned_quantity: number; planned_unit: string; sheet: Sheet | null; expanded: boolean };
-type EventMenu = { id: string; name: string; location: string | null; guest_count: number; staff_count: number; event_date: string | null; status: string; notes: string | null; created_at: string; dishes: MenuDish[] };
+type EventMenu = { id: string; name: string; location: string | null; guest_count: number; staff_count: number; event_date: string | null; status: string; notes: string | null; created_at: string; created_by: string | null; dishes: MenuDish[] };
 
 function strSim(a: string, b: string): number {
   const s1 = a.toLowerCase().replace(/[^a-záàâãéèêíïóôõöúùûüç\s]/g, '').trim();
@@ -36,9 +36,28 @@ function strSim(a: string, b: string): number {
   return 1 - dp[s1.length][s2.length] / len;
 }
 
-function bestMatch(name: string, sheets: Sheet[]): { sheet: Sheet | null; score: number } {
+type SheetAlias = { sheet_id: string; alias: string };
+
+function bestMatch(name: string, sheets: Sheet[], aliases: SheetAlias[] = []): { sheet: Sheet | null; score: number } {
+  // First check for exact alias match (score = 1.0)
+  const norm = name.toLowerCase().trim();
+  for (const a of aliases) {
+    if (a.alias.toLowerCase().trim() === norm) {
+      const sheet = sheets.find(s => s.id === a.sheet_id);
+      if (sheet) return { sheet, score: 1.0 };
+    }
+  }
+  // Then fuzzy match against sheet names AND aliases
   let best: Sheet | null = null, bestScore = 0;
-  for (const s of sheets) { const score = strSim(name, s.name); if (score > bestScore) { bestScore = score; best = s; } }
+  for (const s of sheets) {
+    let score = strSim(name, s.name);
+    // Also check aliases for this sheet
+    for (const a of aliases.filter(a => a.sheet_id === s.id)) {
+      const aScore = strSim(name, a.alias);
+      if (aScore > score) score = aScore;
+    }
+    if (score > bestScore) { bestScore = score; best = s; }
+  }
   return { sheet: bestScore >= 0.42 ? best : null, score: bestScore };
 }
 
@@ -235,7 +254,9 @@ export default function EventMenusPage() {
   const navigate = useNavigate();
   const [menus, setMenus] = useState<EventMenu[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
+  const [sheetAliases, setSheetAliases] = useState<SheetAlias[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState<EventMenu | null>(null);
   const [step, setStep] = useState(1);
@@ -254,11 +275,15 @@ export default function EventMenusPage() {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const [menusRes, sheetsRes, itemsRes] = await Promise.all([
-      supabase.from('event_menus').select('*').order('event_date', { ascending: false }),
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) setCurrentUserEmail(user.email || null);
+    const [menusRes, sheetsRes, itemsRes, aliasesRes] = await Promise.all([
+      supabase.from('event_menus').select('*').order('created_at', { ascending: false }),
       supabase.from('technical_sheets').select('*').order('name'),
       supabase.from('stock_items').select('id, name, unit, unit_cost, current_stock').order('name'),
+      supabase.from('technical_sheet_aliases').select('sheet_id, alias'),
     ]);
+    if (aliasesRes.data) setSheetAliases(aliasesRes.data as SheetAlias[]);
     if (itemsRes.data) setStockItems(itemsRes.data as unknown as StockItem[]);
     if (sheetsRes.data) {
       const loaded = await Promise.all((sheetsRes.data as any[]).map(async s => {
@@ -273,7 +298,7 @@ export default function EventMenusPage() {
       const loaded = await Promise.all((menusRes.data as any[]).map(async m => {
         const { data: dishes } = await supabase.from('event_menu_dishes').select('*').eq('menu_id', m.id).order('sort_order');
         const menuDishes: MenuDish[] = (dishes || []).map((d: any) => { const sheet = sheetsData.find(s => s.id === d.sheet_id); return { id: d.id, sheet_id: d.sheet_id, sheet_name: sheet?.name || '?', planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', sheet: null, expanded: false }; });
-        return { ...m, dishes: menuDishes } as EventMenu;
+        return { ...m, dishes: menuDishes, created_by: m.created_by || null } as EventMenu;
       }));
       setMenus(loaded);
     }
@@ -302,14 +327,22 @@ export default function EventMenusPage() {
         body: JSON.stringify({ base64, mediaType }),
       });
       const data = await response.json();
-      if (data.error) throw new Error(data.error.message || String(data.error));
-      const text = data.content?.find((c: any) => c.type === 'text')?.text || '';
-      let parsed: { dishes: any[] };
-      try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); } catch { toast.error('Erro ao processar o cardápio.'); return; }
-      const matched: ExtractedDish[] = parsed.dishes.map((d: any) => {
+      if (data.error) {
+        if (data.error === 'parse_failed') {
+          console.error('Claude raw response that failed to parse:', data.raw);
+          toast.error('A IA não retornou um formato válido. Tente novamente.');
+        } else {
+          const msg = typeof data.error === 'object' ? (data.error.message || JSON.stringify(data.error)) : String(data.error);
+          throw new Error(msg);
+        }
+        return;
+      }
+      const dishes: any[] = data.dishes || [];
+      if (dishes.length === 0) { toast.error('Nenhum prato encontrado na imagem.'); return; }
+      const matched: ExtractedDish[] = dishes.map((d: any) => {
         const rawName = d.raw_name?.trim() || '';
-        const { sheet, score } = bestMatch(rawName, sheets);
-        return { raw_name: rawName, quantity: d.quantity || 0, unit: d.unit || 'un', section_label: d.section_label || '', matched_sheet_id: sheet?.id || null, matched_sheet_name: sheet?.name || null, match_score: score, status: sheet ? 'matched' : 'unmatched' };
+        const { sheet, score } = bestMatch(rawName, sheets, sheetAliases);
+        return { raw_name: rawName, quantity: d.quantity || 0, unit: d.unit || 'un', section_label: d.section_label || '', notes: d.notes || '', decoration: d.decoration || '', matched_sheet_id: sheet?.id || null, matched_sheet_name: sheet?.name || null, match_score: score, status: sheet ? 'matched' : 'unmatched' };
       });
       setExtractedDishes(matched);
       const mc = matched.filter(d => d.status === 'matched').length;
@@ -318,7 +351,20 @@ export default function EventMenusPage() {
     finally { setExtracting(false); stopTimer(); }
   };
 
-  const updateMatch = (idx: number, sheetId: string | null) => { const sheet = sheets.find(s => s.id === sheetId); setExtractedDishes(prev => prev.map((d, i) => i !== idx ? d : { ...d, matched_sheet_id: sheetId, matched_sheet_name: sheet?.name || null, status: sheetId ? 'matched' : 'unmatched' })); };
+  const updateMatch = async (idx: number, sheetId: string | null) => {
+    const sheet = sheets.find(s => s.id === sheetId);
+    const dish = extractedDishes[idx];
+    setExtractedDishes(prev => prev.map((d, i) => i !== idx ? d : { ...d, matched_sheet_id: sheetId, matched_sheet_name: sheet?.name || null, status: sheetId ? 'matched' : 'unmatched' }));
+    // Auto-save alias so the AI "learns" this match for next time
+    if (sheetId && dish?.raw_name) {
+      const alias = dish.raw_name.trim().toLowerCase();
+      const alreadyExists = sheetAliases.some(a => a.sheet_id === sheetId && a.alias.toLowerCase() === alias);
+      if (!alreadyExists) {
+        await supabase.from('technical_sheet_aliases').upsert({ sheet_id: sheetId, alias: dish.raw_name.trim() }, { onConflict: 'sheet_id,alias' });
+        setSheetAliases(prev => [...prev, { sheet_id: sheetId, alias: dish.raw_name.trim() }]);
+      }
+    }
+  };
 
   const handleSaveMenu = async () => {
     if (!formName.trim()) { toast.error('Nome do evento é obrigatório'); return; }
@@ -334,7 +380,7 @@ export default function EventMenusPage() {
     if (matched.length === 0) { toast.error('Associe pelo menos um prato a uma ficha técnica'); return; }
     setSaving(true);
     const guestCount = parseInt(formGuests) || 100;
-    const menuData = { name: formName.trim(), location: formLocation.trim() || null, guest_count: guestCount, staff_count: parseInt(formStaff) || 0, event_date: formDate || null, notes: formNotes.trim() || null, status: 'draft' };
+    const menuData = { name: formName.trim(), location: formLocation.trim() || null, guest_count: guestCount, staff_count: parseInt(formStaff) || 0, event_date: formDate || null, notes: formNotes.trim() || null, status: 'draft', created_by: editingMenu ? (editingMenu.created_by || currentUserEmail) : currentUserEmail };
     let menuId: string;
     if (editingMenu) {
       await supabase.from('event_menus').update(menuData as any).eq('id', editingMenu.id); menuId = editingMenu.id;
@@ -345,7 +391,16 @@ export default function EventMenusPage() {
     }
 
     // Insert dishes
-    const dishInserts = matched.map((d, idx) => ({ menu_id: menuId, sheet_id: d.matched_sheet_id, planned_quantity: d.quantity, planned_unit: d.unit, sort_order: idx }));
+    const dishInserts = matched.map((d, idx) => ({
+      menu_id: menuId,
+      sheet_id: d.matched_sheet_id,
+      planned_quantity: d.quantity,
+      planned_unit: d.unit,
+      sort_order: idx,
+      section_name: d.section_label || null,
+      notes: d.notes || null,
+      decoration: d.decoration || null,
+    }));
 
     // Add MANTIMENTOS automatically (quantity = guest count)
     dishInserts.push({ menu_id: menuId, sheet_id: MANTIMENTOS_ID, planned_quantity: guestCount, planned_unit: 'un', sort_order: dishInserts.length });
@@ -444,7 +499,7 @@ export default function EventMenusPage() {
 
                     <div className="space-y-2">
                       {extractedDishes.map((dish, idx) => (
-                        <div key={idx} className={`rounded-xl border p-3 ${dish.status === 'matched' ? 'border-success/30 bg-success/3' : 'border-warning/40 bg-warning/5'}`}>
+                        <div key={idx} className={`rounded-xl border p-3 transition-colors hover:brightness-95 ${dish.status === 'matched' ? 'border-success/30 bg-success/3' : 'border-warning/40 bg-warning/5'}`}>
                           <div className="flex items-start gap-3">
                             <div className="mt-0.5 flex-shrink-0">{dish.status === 'matched' ? <CheckCircle2 className="w-4 h-4 text-success" /> : <AlertCircle className="w-4 h-4 text-warning" />}</div>
                             <div className="flex-1 min-w-0">
@@ -466,6 +521,12 @@ export default function EventMenusPage() {
                                 </div>
                               </div>
                               {dish.matched_sheet_name && <p className="text-[11px] text-muted-foreground mt-1">→ <span className="text-foreground font-medium">{dish.matched_sheet_name}</span>{dish.match_score > 0 && <span className="ml-1 opacity-50">({Math.round(dish.match_score * 100)}% similar)</span>}</p>}
+                              {(dish.notes || dish.decoration) && (
+                                <div className="flex gap-2 mt-1 flex-wrap">
+                                  {dish.notes && <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5">Obs: {dish.notes}</span>}
+                                  {dish.decoration && <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5">🎨 {dish.decoration}</span>}
+                                </div>
+                              )}
                             </div>
                             <button onClick={() => setExtractedDishes(prev => prev.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive flex-shrink-0 mt-0.5"><X className="w-4 h-4" /></button>
                           </div>
@@ -496,28 +557,79 @@ export default function EventMenusPage() {
       <CreateSheetDialog open={creatingForIdx !== null} onClose={() => { setCreatingForIdx(null); setCreatingInitialName(''); }} initialName={creatingInitialName} stockItems={stockItems} onCreated={(newSheet) => { setSheets(prev => [...prev, newSheet].sort((a, b) => a.name.localeCompare(b.name))); if (creatingForIdx !== null) updateMatch(creatingForIdx, newSheet.id); setCreatingForIdx(null); }} />
       {duplicatingSheet && <CreateSheetDialog open={true} onClose={() => { setDuplicatingSheet(null); setDuplicatingForIdx(null); }} initialName={`${duplicatingSheet.name} (variação)`} stockItems={stockItems} onCreated={(newSheet) => { setSheets(prev => [...prev, newSheet].sort((a, b) => a.name.localeCompare(b.name))); if (duplicatingForIdx !== null) updateMatch(duplicatingForIdx, newSheet.id); setDuplicatingSheet(null); setDuplicatingForIdx(null); }} />}
 
-      <div className="space-y-3">
-        {menus.map(menu => (
-          <div key={menu.id} className="bg-white rounded-xl border border-border p-4 flex items-center justify-between shadow-xs">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="font-medium text-foreground">{menu.name}</p>
-                <Badge variant={menu.status === 'draft' ? 'secondary' : 'default'} className="text-[10px]">{menu.status === 'draft' ? 'Rascunho' : menu.status}</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {menu.event_date ? new Date(menu.event_date + 'T12:00:00').toLocaleDateString('pt-BR') : 'Sem data'}
-                {menu.location ? ` · ${menu.location}` : ''}{` · ${menu.guest_count} convidados · ${menu.dishes.length} pratos`}
-                <span className="ml-2 opacity-60">· Gerado {new Date(menu.created_at).toLocaleDateString('pt-BR')} às {new Date(menu.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-              </p>
-            </div>
-            <div className="flex gap-1">
-              <Button variant="ghost" size="icon" title="Ver detalhes" onClick={() => navigate(`/event-menus/${menu.id}`)}><Eye className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" title="Editar" onClick={() => openEdit(menu)}><Pencil className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" title="Excluir" onClick={() => handleDelete(menu.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-            </div>
-          </div>
-        ))}
-        {menus.length === 0 && <div className="text-center py-16 text-muted-foreground"><Package className="w-10 h-10 mx-auto mb-3 opacity-30" /><p>Nenhum cardápio criado ainda.</p></div>}
+      <div className="rounded-xl border border-border overflow-x-auto bg-white shadow-sm">
+        <table className="w-full text-sm min-w-[900px]">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted-foreground bg-muted/20">
+              <th className="text-left px-5 py-2.5 w-8">#</th>
+              <th className="text-left px-3 py-2.5">CARDÁPIO</th>
+              <th className="text-center px-3 py-2.5">STATUS</th>
+              <th className="text-center px-3 py-2.5">DATA</th>
+              <th className="text-left px-3 py-2.5">LOCAL</th>
+              <th className="text-center px-3 py-2.5">CONVIDADOS</th>
+              <th className="text-center px-3 py-2.5">PRATOS</th>
+              <th className="text-left px-3 py-2.5">CRIADO POR</th>
+              <th className="text-center px-3 py-2.5">CRIADO EM</th>
+              <th className="text-center px-3 py-2.5 w-24">AÇÕES</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/50">
+            {menus.map((menu, idx) => (
+              <tr
+                key={menu.id}
+                className="hover:bg-amber-50 transition-colors cursor-pointer"
+                onClick={() => navigate(`/event-menus/${menu.id}`)}
+              >
+                <td className="px-5 py-3 text-muted-foreground text-xs">{idx + 1}</td>
+                <td className="px-3 py-3">
+                  <span className="font-medium text-foreground">{menu.name}</span>
+                  {menu.notes && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[220px]">{menu.notes}</p>}
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <Badge variant={menu.status === 'draft' ? 'secondary' : 'default'} className="text-[10px]">
+                    {menu.status === 'draft' ? 'Rascunho' : menu.status}
+                  </Badge>
+                </td>
+                <td className="px-3 py-3 text-center text-xs text-muted-foreground">
+                  {menu.event_date ? new Date(menu.event_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}
+                </td>
+                <td className="px-3 py-3 text-xs text-muted-foreground">{menu.location || '—'}</td>
+                <td className="px-3 py-3 text-center text-sm font-medium text-foreground">{menu.guest_count}</td>
+                <td className="px-3 py-3 text-center text-sm font-medium text-foreground">{menu.dishes.length}</td>
+                <td className="px-3 py-3 text-xs text-muted-foreground">
+                  {menu.created_by
+                    ? <span className="font-medium text-foreground">{menu.created_by.split('@')[0]}</span>
+                    : <span className="italic">—</span>}
+                </td>
+                <td className="px-3 py-3 text-center text-xs text-muted-foreground">
+                  {new Date(menu.created_at).toLocaleDateString('pt-BR')}
+                  <span className="block opacity-70">{new Date(menu.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                </td>
+                <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-center gap-0.5">
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Ver detalhes" onClick={() => navigate(`/event-menus/${menu.id}`)}>
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Editar" onClick={() => openEdit(menu)}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Excluir" onClick={() => handleDelete(menu.id)}>
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {menus.length === 0 && (
+              <tr>
+                <td colSpan={10} className="px-5 py-16 text-center text-muted-foreground">
+                  <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>Nenhum cardápio criado ainda.</p>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
