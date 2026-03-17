@@ -647,35 +647,53 @@ export default function EventMenuDetailPage() {
 
     const loadedMenu: EventMenu = { ...(menuRes.data as any), dishes: enrichedDishes };
     setMenu(loadedMenu);
-    buildShoppingList(enrichedDishes, stockData);
+    buildShoppingList(enrichedDishes, stockData, loadedMenu.guest_count);
     setLoading(false);
   };
 
-  const buildShoppingList = (dishes: MenuDish[], stock: StockItem[]) => {
+  const buildShoppingList = (dishes: MenuDish[], stock: StockItem[], guestCount: number) => {
     const map: Record<string, ShoppingItem> = {};
     const noIngredients: string[] = [];
+
+    // ── Pratos normais: scale = planned_quantity / yield_quantity
+    // A quantidade no cardápio JÁ é o total do evento (ex: 10kg de abadejo).
+    // A ficha técnica descreve o rendimento base (ex: 1kg).
+    // Então multiplicamos os insumos pelo fator: 10 / 1 = 10×.
     dishes.forEach(dish => {
       if (dish.isMantimentos) return;
       if (!dish.sheet) { noIngredients.push(dish.sheet_name); return; }
-      if (dish.sheet.items.filter(i => i.section === 'receita').length === 0) { noIngredients.push(dish.sheet_name); return; }
+      const recipeItems = dish.sheet.items.filter(i => i.section === 'receita');
+      if (recipeItems.length === 0) { noIngredients.push(dish.sheet_name); return; }
       const scale = dish.planned_quantity / (dish.sheet.yield_quantity || 1);
-      dish.sheet.items.forEach(si => {
+      recipeItems.forEach(si => {
         const needed = si.quantity * scale;
-        if (!map[si.item_id]) { const s = stock.find(x => x.id === si.item_id); map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true }; }
+        if (!map[si.item_id]) {
+          const s = stock.find(x => x.id === si.item_id);
+          map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true };
+        }
         map[si.item_id].needed += needed;
       });
     });
-    // Also process mantimentos separately (its items are all 'receita' type)
+
+    // ── Mantimentos: scale = guest_count / yield_quantity
+    // A ficha de mantimentos é cadastrada por pessoa (ex: yield = 1 pessoa).
+    // Multiplicamos pelo número de convidados do evento.
     dishes.filter(d => d.isMantimentos).forEach(dish => {
       if (!dish.sheet) return;
-      const scale = dish.planned_quantity / (dish.sheet.yield_quantity || 1);
+      const scale = guestCount / (dish.sheet.yield_quantity || 1);
       dish.sheet.items.forEach(si => {
         const needed = si.quantity * scale;
-        if (!map[si.item_id]) { const s = stock.find(x => x.id === si.item_id); map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true }; }
+        if (!map[si.item_id]) {
+          const s = stock.find(x => x.id === si.item_id);
+          map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true };
+        }
         map[si.item_id].needed += needed;
       });
     });
-    const list = Object.values(map).map(i => ({ ...i, toBuy: Math.max(0, i.needed - i.inStock), hasStock: i.inStock >= i.needed })).sort((a, b) => a.name.localeCompare(b.name));
+
+    const list = Object.values(map)
+      .map(i => ({ ...i, toBuy: Math.max(0, i.needed - i.inStock), hasStock: i.inStock >= i.needed }))
+      .sort((a, b) => a.name.localeCompare(b.name));
     setShoppingList(list);
     setDishesWithNoIngredients(noIngredients);
   };
