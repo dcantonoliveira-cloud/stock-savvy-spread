@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Upload, FileText, Camera, FileCode, Loader2, Check, X, AlertTriangle, PackagePlus } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, Trash2, Upload, FileText, Camera, FileCode, Loader2, Check, X, AlertTriangle, PackagePlus, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -31,12 +32,24 @@ type ParsedInvoice = {
   items: ParsedItem[];
 };
 
+const exportCsv = (rows: string[][], filename: string) => {
+  const csv = rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+};
+
 export default function EntriesPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterDate, setFilterDate] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   const [itemId, setItemId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -62,7 +75,18 @@ export default function EntriesPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const filtered = filterDate ? entries.filter(e => e.date === filterDate) : entries;
+  const filtered = entries.filter(e => {
+    const item = items.find(i => i.id === e.item_id);
+    const matchDate = filterDate ? e.date === filterDate : true;
+    const q = search.toLowerCase();
+    const matchSearch = q
+      ? (item?.name || '').toLowerCase().includes(q) ||
+        (e.supplier || '').toLowerCase().includes(q)
+      : true;
+    return matchDate && matchSearch;
+  });
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); };
 
@@ -92,6 +116,24 @@ export default function EntriesPage() {
     await supabase.from('stock_entries').delete().eq('id', id);
     toast.success('Entrada removida!');
     load();
+  };
+
+  const handleExportCsv = () => {
+    const header = ['Data', 'Item', 'Quantidade', 'Unidade', 'Custo Unit.', 'Fornecedor', 'NF', 'Observações'];
+    const rows = filtered.map(e => {
+      const item = items.find(i => i.id === e.item_id);
+      return [
+        new Date(e.date).toLocaleDateString('pt-BR'),
+        item?.name || '',
+        String(e.quantity),
+        item?.unit || '',
+        e.unit_cost != null ? String(e.unit_cost) : '',
+        e.supplier || '',
+        e.invoice_number || '',
+        e.notes || '',
+      ];
+    });
+    exportCsv([header, ...rows], `entradas-${filterDate || 'todos'}.csv`);
   };
 
   const selectedItem = items.find(i => i.id === itemId);
@@ -447,8 +489,16 @@ export default function EntriesPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm text-muted-foreground mb-1 block">Quantidade {selectedItem ? `(${selectedItem.unit})` : ''}</label>
-                    <Input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="0" />
+                    <label className="text-sm text-muted-foreground mb-1 block">Quantidade</label>
+                    <div className="relative">
+                      <Input type="number" step="any" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="0" className={selectedItem ? 'pr-16' : ''} />
+                      {selectedItem && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                          {selectedItem.unit}
+                        </span>
+                      )}
+                    </div>
+                    {selectedItem && <p className="text-xs text-muted-foreground mt-1">Estoque atual: {selectedItem.current_stock} {selectedItem.unit}</p>}
                   </div>
                   <div>
                     <label className="text-sm text-muted-foreground mb-1 block">Custo Unit. (R$)</label>
@@ -474,41 +524,78 @@ export default function EntriesPage() {
         </div>
       </div>
 
-      <div className="mb-6 flex items-center gap-2">
+      <div className="mb-6 flex items-center gap-2 flex-wrap">
         <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-48" />
+        <Input
+          type="text"
+          placeholder="Buscar por item ou fornecedor..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-64"
+        />
         {filterDate && <Button variant="ghost" size="sm" onClick={() => setFilterDate('')}>Limpar</Button>}
+        <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={filtered.length === 0}>
+          <Download className="w-4 h-4 mr-2" />Exportar CSV
+        </Button>
       </div>
 
-      <div className="space-y-3">
-        {filtered.map(entry => {
-          const item = items.find(i => i.id === entry.item_id);
-          return (
-            <div key={entry.id} className="glass-card rounded-xl p-4 flex items-center justify-between animate-fade-in">
-              <div>
-                <p className="font-medium text-foreground">{item?.name || '?'}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(entry.date).toLocaleDateString('pt-BR')}
-                  {entry.supplier && ` · ${entry.supplier}`}
-                  {entry.invoice_number && ` · NF: ${entry.invoice_number}`}
-                </p>
-                {entry.notes && <p className="text-xs text-muted-foreground mt-1">{entry.notes}</p>}
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-success">+{entry.quantity}</p>
-                  {entry.unit_cost && <p className="text-xs text-muted-foreground">R$ {entry.unit_cost}</p>}
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)}>
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">Nenhuma entrada registrada.</div>
+      ) : (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Item</TableHead>
+                <TableHead className="text-right">Qtd</TableHead>
+                <TableHead>Un.</TableHead>
+                <TableHead>Custo Unit.</TableHead>
+                <TableHead>Fornecedor</TableHead>
+                <TableHead>NF</TableHead>
+                <TableHead>Observações</TableHead>
+                <TableHead className="w-10"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paged.map(entry => {
+                const item = items.find(i => i.id === entry.item_id);
+                return (
+                  <TableRow key={entry.id}>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      {new Date(entry.date).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell className="font-medium">{item?.name || '?'}</TableCell>
+                    <TableCell className="text-right text-emerald-400 font-semibold">+{entry.quantity}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs font-medium">{item?.unit || ''}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {entry.unit_cost != null ? `R$ ${entry.unit_cost}` : '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{entry.supplier || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{entry.invoice_number || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{entry.notes || '—'}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(entry.id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          {totalPages > 1 && (
+            <div className="px-5 py-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground bg-muted/10">
+              <span>Mostrando {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length} entradas</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Anterior</Button>
+                <span>Página {page + 1} de {totalPages}</span>
+                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Próxima →</Button>
               </div>
             </div>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">Nenhuma entrada registrada.</div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

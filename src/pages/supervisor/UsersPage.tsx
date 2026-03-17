@@ -63,7 +63,7 @@ export default function UsersPage() {
     });
 
     if (error || data?.error) {
-      toast.error(data?.error || 'Erro ao criar funcionário');
+      toast.error(data?.error || error?.message || 'Erro ao criar funcionário');
       setCreating(false);
       return;
     }

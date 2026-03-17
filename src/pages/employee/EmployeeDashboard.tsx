@@ -484,30 +484,66 @@ export default function EmployeeDashboard() {
     if (!user) return;
     setLoadingEvents(true);
     try {
-      const { data: menus } = await supabase
+      // Strategy: find all separation items assigned to this user, then load the menus
+      const { data: myItems } = await supabase
+        .from('event_separation_items')
+        .select('id, menu_id, item_id, planned_quantity, separated_quantity, status, notes, assigned_to, stock_items(name, unit, current_stock)')
+        .eq('assigned_to', user.id)
+        .order('created_at');
+
+      // Also load menus where assigned_to = user.id for backward compatibility (old assignments without per-item assigned_to)
+      const { data: legacyMenus } = await supabase
         .from('event_menus')
         .select('id, name, location, event_date, guest_count, status, assigned_at')
         .eq('assigned_to', user.id)
         .in('status', ['assigned', 'dispatched'])
         .order('event_date', { ascending: true });
 
-      if (!menus || menus.length === 0) {
+      // Collect distinct menu IDs from per-item assignments
+      const perItemMenuIds = [...new Set((myItems || []).map((i: any) => i.menu_id))];
+
+      // Also get legacy menu IDs not already covered
+      const legacyMenuIds = (legacyMenus || [])
+        .map((m: any) => m.id)
+        .filter((id: string) => !perItemMenuIds.includes(id));
+
+      const allMenuIds = [...perItemMenuIds, ...legacyMenuIds];
+
+      if (allMenuIds.length === 0) {
         setAssignedEvents([]);
         setLoadingEvents(false);
         return;
       }
 
-      const eventsWithItems = await Promise.all((menus as any[]).map(async menu => {
-        const { data: sepItems } = await supabase
-          .from('event_separation_items')
-          .select('id, menu_id, item_id, planned_quantity, separated_quantity, status, notes, stock_items(name, unit, current_stock)')
-          .eq('menu_id', menu.id)
-          .order('created_at');
+      // Load menu metadata for all menus
+      const { data: menuDetails } = await supabase
+        .from('event_menus')
+        .select('id, name, location, event_date, guest_count, status, assigned_at')
+        .in('id', allMenuIds)
+        .in('status', ['assigned', 'dispatched'])
+        .order('event_date', { ascending: true });
 
-        return {
-          ...menu,
-          separation_items: (sepItems || []) as SeparationItem[],
-        } as AssignedEvent;
+      if (!menuDetails || menuDetails.length === 0) {
+        setAssignedEvents([]);
+        setLoadingEvents(false);
+        return;
+      }
+
+      const eventsWithItems = await Promise.all((menuDetails as any[]).map(async menu => {
+        let sepItems: SeparationItem[];
+        if (perItemMenuIds.includes(menu.id)) {
+          // Use per-item filtered items (only this user's items)
+          sepItems = ((myItems || []).filter((i: any) => i.menu_id === menu.id)) as SeparationItem[];
+        } else {
+          // Legacy: load all items for the menu (no per-item assignment)
+          const { data: allItems } = await supabase
+            .from('event_separation_items')
+            .select('id, menu_id, item_id, planned_quantity, separated_quantity, status, notes, stock_items(name, unit, current_stock)')
+            .eq('menu_id', menu.id)
+            .order('created_at');
+          sepItems = (allItems || []) as SeparationItem[];
+        }
+        return { ...menu, separation_items: sepItems } as AssignedEvent;
       }));
 
       setAssignedEvents(eventsWithItems);
