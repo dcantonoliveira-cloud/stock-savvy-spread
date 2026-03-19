@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Download } from 'lucide-react';
+import { Plus, Trash2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Item = { id: string; name: string; unit: string; current_stock: number };
@@ -30,6 +30,7 @@ export default function SupervisorOutputsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
+  const [loading, setLoading] = useState(true);
 
   const [itemId, setItemId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -38,12 +39,14 @@ export default function SupervisorOutputsPage() {
   const [notes, setNotes] = useState('');
 
   const load = async () => {
+    setLoading(true);
     const [itemsRes, outputsRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, current_stock').order('name'),
       supabase.from('stock_outputs').select('*').order('created_at', { ascending: false }),
     ]);
     if (itemsRes.data) setItems(itemsRes.data);
     if (outputsRes.data) setOutputs(outputsRes.data);
+    setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
@@ -109,6 +112,12 @@ export default function SupervisorOutputsPage() {
   };
 
   const selectedItem = items.find(i => i.id === itemId);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-32">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div>

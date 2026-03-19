@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText,
   Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
-  ArrowRightLeft, Receipt, ChevronDown, ChevronRight
+  ArrowRightLeft, ChevronDown, ChevronRight, Truck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -35,10 +35,10 @@ const navStructure: NavGroup[] = [
       { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
       { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
       { path: '/comparison', label: 'Transferências', icon: ArrowRightLeft },
+      { path: '/fornecedores', label: 'Fornecedores', icon: Truck },
     ]
   },
   { path: '/event-menus', label: 'Cardápios', icon: UtensilsCrossed },
-  { path: '/invoices', label: 'Notas Fiscais', icon: Receipt },
   { path: '/analysis', label: 'Análise IA', icon: Brain },
   { path: '/users', label: 'Funcionários', icon: Users },
 ];
