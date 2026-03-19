@@ -27,7 +27,7 @@ import InventoryPage from "./pages/supervisor/InventoryPage";
 import KitchensPage from "./pages/supervisor/KitchensPage";
 import EventMenusPage from "./pages/supervisor/EventMenusPage";
 import EventMenuDetailPage from "./pages/supervisor/EventMenuDetailPage";
-import InvoicePage from "./pages/InvoicePage";
+import FornecedoresPage from "./pages/supervisor/FornecedoresPage";
 import MobileSupervisorApp from "./pages/supervisor/MobileSupervisorApp";
 
 import EmployeeLayout from "./components/EmployeeLayout";
@@ -88,7 +88,8 @@ function AppRoutes() {
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/analysis" element={<AIAnalysisPage />} />
           <Route path="/users" element={<UsersPage />} />
-          <Route path="/invoices" element={<InvoicePage />} />
+          <Route path="/fornecedores" element={<FornecedoresPage />} />
+          <Route path="/invoices" element={<Navigate to="/entries" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </SupervisorLayout>
@@ -99,7 +100,6 @@ function AppRoutes() {
     <EmployeeLayout>
       <Routes>
         <Route path="/" element={<EmployeeDashboard />} />
-        <Route path="/invoices" element={<InvoicePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </EmployeeLayout>

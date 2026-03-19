@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, ChefHat, Home, Receipt } from 'lucide-react';
+import { LogOut, ChefHat, Home } from 'lucide-react';
 
 export default function EmployeeLayout({ children }: { children: ReactNode }) {
   const { signOut, profile } = useAuth();
@@ -68,16 +68,6 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
         >
           <Home className="w-5 h-5" />
           Estoque
-        </Link>
-        <Link
-          to="/invoices"
-          className={`flex-1 flex flex-col items-center gap-1 py-3 text-[11px] font-semibold transition-colors ${
-            pathname === '/invoices' ? '' : 'text-muted-foreground'
-          }`}
-          style={pathname === '/invoices' ? { color: 'hsl(38 75% 45%)' } : {}}
-        >
-          <Receipt className="w-5 h-5" />
-          Nota Fiscal
         </Link>
       </nav>
     </div>

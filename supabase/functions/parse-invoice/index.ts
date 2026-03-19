@@ -10,21 +10,12 @@ serve(async (req) => {
 
   try {
     const contentType = req.headers.get("content-type") || "";
-    let invoiceData: any;
 
     if (contentType.includes("application/json")) {
-      // XML or base64 content
       const body = await req.json();
 
-      if (body.xml) {
-        invoiceData = parseXmlInvoice(body.xml);
-        return new Response(JSON.stringify(invoiceData), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
       if (body.base64 && body.mimeType) {
-        invoiceData = await parseWithAI(body.base64, body.mimeType);
+        const invoiceData = await parseWithClaude(body.base64, body.mimeType);
         return new Response(JSON.stringify(invoiceData), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -49,93 +40,58 @@ serve(async (req) => {
   }
 });
 
-function parseXmlInvoice(xml: string) {
-  const items: any[] = [];
-  let supplier = "";
-  let invoiceNumber = "";
+async function parseWithClaude(base64: string, mimeType: string) {
+  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY não configurada nos Secrets da função");
 
-  // Extract invoice number (nNF)
-  const nNFMatch = xml.match(/<nNF>(\d+)<\/nNF>/);
-  if (nNFMatch) invoiceNumber = nNFMatch[1];
+  const prompt = `Leia este documento fiscal (Nota Fiscal, Cupom Fiscal ou Recibo) e extraia os dados em JSON.
 
-  // Extract supplier name (xNome from emit)
-  const emitMatch = xml.match(/<emit>[\s\S]*?<xNome>(.*?)<\/xNome>/);
-  if (emitMatch) supplier = emitMatch[1];
-
-  // Extract products (det blocks)
-  const detRegex = /<det[\s\S]*?<\/det>/g;
-  let detMatch;
-  while ((detMatch = detRegex.exec(xml)) !== null) {
-    const block = detMatch[0];
-    const name = block.match(/<xProd>(.*?)<\/xProd>/)?.[1] || "";
-    const quantity = parseFloat(block.match(/<qCom>(.*?)<\/qCom>/)?.[1] || "0");
-    const unitCost = parseFloat(block.match(/<vUnCom>(.*?)<\/vUnCom>/)?.[1] || "0");
-    const unit = block.match(/<uCom>(.*?)<\/uCom>/)?.[1] || "un";
-    const ean = block.match(/<cEAN>(.*?)<\/cEAN>/)?.[1] || "";
-    const ncm = block.match(/<NCM>(.*?)<\/NCM>/)?.[1] || "";
-
-    items.push({
-      name: name.trim(),
-      quantity,
-      unit_cost: Math.round(unitCost * 100) / 100,
-      unit: normalizeUnit(unit),
-      barcode: ean && ean !== "SEM GTIN" ? ean : null,
-    });
-  }
-
-  return { supplier, invoice_number: invoiceNumber, items };
+Retorne APENAS o JSON no formato abaixo, sem markdown, sem explicação:
+{
+  "supplier": "nome do fornecedor/emitente",
+  "invoice_number": "número da nota ou cupom",
+  "items": [
+    {
+      "name": "nome do produto como está no documento",
+      "quantity": 1.0,
+      "unit_cost": 10.50,
+      "unit": "un",
+      "barcode": null
+    }
+  ]
 }
 
-function normalizeUnit(unit: string): string {
-  const u = unit.toUpperCase().trim();
-  const map: Record<string, string> = {
-    "KG": "kg", "G": "g", "GR": "g", "L": "L", "LT": "L", "ML": "ml",
-    "UN": "un", "UND": "un", "UNID": "un", "CX": "cx", "PCT": "pct",
-    "PC": "un", "PÇ": "un", "FD": "cx", "DZ": "un",
-    "LATA": "lata", "LT.": "L", "GAR": "garrafa", "GF": "garrafa",
-  };
-  return map[u] || unit.toLowerCase();
-}
+Regras:
+- Valores monetários como número (ex: 74.90, não "R$ 74,90")
+- Unidades normalizadas: KG→kg, G→g, LT→L, ML→ml, UN/UND/UNID→un, CX→cx, PCT→pct
+- Se um campo não existir, use null
+- Inclua TODOS os produtos listados no documento`;
 
-async function parseWithAI(base64: string, mimeType: string) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+  // Claude supports image types: image/jpeg, image/png, image/gif, image/webp
+  // For PDFs, use document type
+  const isPdf = mimeType === "application/pdf";
 
-  const systemPrompt = `Você é um assistente especializado em ler Notas Fiscais brasileiras (NF-e / DANFE).
-Extraia os seguintes dados do documento:
-- supplier: nome do fornecedor/emitente
-- invoice_number: número da nota fiscal
-- items: array de produtos, cada um com:
-  - name: nome do produto (como está na nota)
-  - quantity: quantidade comprada (número)
-  - unit_cost: valor unitário em reais (número com 2 decimais)
-  - unit: unidade de medida (normalizar para: kg, g, L, ml, un, cx, pct, lata, garrafa)
-  - barcode: código de barras EAN se disponível, ou null
+  const contentBlock = isPdf
+    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } }
+    : { type: "image", source: { type: "base64", media_type: mimeType, data: base64 } };
 
-IMPORTANTE:
-- Retorne APENAS o JSON, sem markdown ou explicação
-- Valores monetários em formato numérico (ex: 74.90, não "R$ 74,90")
-- Se não conseguir ler algum campo, use null
-- Normalize as unidades (KG→kg, UND→un, LT→L, etc.)`;
-
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-beta": "pdfs-2024-09-25",
+      "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "claude-haiku-4-5",
+      max_tokens: 4096,
       messages: [
-        { role: "system", content: systemPrompt },
         {
           role: "user",
           content: [
-            { type: "text", text: "Leia esta Nota Fiscal e extraia todos os produtos:" },
-            {
-              type: "image_url",
-              image_url: { url: `data:${mimeType};base64,${base64}` },
-            },
+            contentBlock,
+            { type: "text", text: prompt },
           ],
         },
       ],
@@ -143,18 +99,17 @@ IMPORTANTE:
   });
 
   if (!response.ok) {
-    if (response.status === 429) throw new Error("Rate limit exceeded. Tente novamente em alguns segundos.");
-    if (response.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos no painel.");
     const text = await response.text();
-    console.error("AI error:", response.status, text);
-    throw new Error("Erro ao processar NF com IA");
+    console.error("Claude API error:", response.status, text);
+    if (response.status === 401) throw new Error("ANTHROPIC_API_KEY inválida ou sem permissão.");
+    if (response.status === 429) throw new Error("Rate limit atingido. Tente novamente em instantes.");
+    throw new Error("Erro ao processar documento com IA");
   }
 
   const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
+  let jsonStr = (data.content?.[0]?.text || "").trim();
 
-  // Clean markdown wrapping if present
-  let jsonStr = content.trim();
+  // Remove markdown code blocks if present
   if (jsonStr.startsWith("```")) {
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
   }
@@ -162,7 +117,7 @@ IMPORTANTE:
   try {
     return JSON.parse(jsonStr);
   } catch {
-    console.error("Failed to parse AI response:", content);
+    console.error("Failed to parse Claude response:", jsonStr);
     throw new Error("Não foi possível interpretar a resposta da IA");
   }
 }

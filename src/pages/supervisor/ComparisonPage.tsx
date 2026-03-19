@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { BarChart3, TrendingUp, TrendingDown } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 
 type Item = { id: string; name: string; unit: string };
 type Sheet = { id: string; name: string; servings: number; items: { item_id: string; quantity: number }[] };
@@ -15,9 +15,11 @@ export default function SupervisorComparisonPage() {
   const [selectedSheet, setSelectedSheet] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
       const [itemsRes, sheetsRes, outputsRes] = await Promise.all([
         supabase.from('stock_items').select('id, name, unit'),
         supabase.from('technical_sheets').select('*'),
@@ -34,6 +36,7 @@ export default function SupervisorComparisonPage() {
         );
         setSheets(withItems);
       }
+      setLoading(false);
     };
     load();
   }, []);
@@ -47,6 +50,12 @@ export default function SupervisorComparisonPage() {
 
   const actualUsage: Record<string, number> = {};
   filteredOutputs.forEach(o => { actualUsage[o.item_id] = (actualUsage[o.item_id] || 0) + o.quantity; });
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-32">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div>
