@@ -588,6 +588,7 @@ export default function EventMenuDetailPage() {
   const [shopFilter, setShopFilter] = useState<'all' | 'ok' | 'buy'>('all');
   const [shopGroupMode, setShopGroupMode] = useState<'category' | 'supplier'>('category');
   const [copyingSupplier, setCopyingSupplier] = useState<string | null>(null);
+  const [qtyOverrides, setQtyOverrides] = useState<Record<string, number | string>>({});
   const [editingDishId, setEditingDishId] = useState<string | null>(null);
   const [dishDialogOpen, setDishDialogOpen] = useState(false);
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
@@ -656,11 +657,18 @@ export default function EventMenuDetailPage() {
     if (rawList.length > 0) {
       const { data: suppData } = await supabase
         .from('item_suppliers')
-        .select('item_id, supplier_name')
-        .in('item_id', rawList.map(i => i.id))
-        .eq('is_preferred', true);
+        .select('item_id, supplier_name, unit_price')
+        .in('item_id', rawList.map(i => i.id));
+
       const suppMap: Record<string, string> = {};
-      (suppData || []).forEach((s: any) => { suppMap[s.item_id] = s.supplier_name; });
+      const suppBest: Record<string, { name: string; price: number }> = {};
+      (suppData || []).forEach((s: any) => {
+        const cur = suppBest[s.item_id];
+        if (!cur || s.unit_price < cur.price) {
+          suppBest[s.item_id] = { name: s.supplier_name, price: s.unit_price };
+        }
+      });
+      Object.entries(suppBest).forEach(([itemId, { name }]) => { suppMap[itemId] = name; });
       setShoppingList(rawList.map(i => ({ ...i, supplier: suppMap[i.id] })));
     } else {
       setShoppingList(rawList);
@@ -930,15 +938,18 @@ export default function EventMenuDetailPage() {
   const handlePrintBySupplier = (supplierName: string) => {
     const items = shoppingList.filter(i => i.supplier === supplierName && i.toBuy > 0);
     if (items.length === 0) { return; }
-    const rows = items.map(i => `
+    const rows = items.map(i => {
+      const qty = getEffectiveQty(i);
+      return `
       <tr>
-        <td class="right">${i.toBuy.toFixed(3)}</td>
+        <td class="right">${qty.toFixed(3)}</td>
         <td>${i.unit}</td>
         <td>${i.name}</td>
         <td class="right">R$ ${i.unitCost.toFixed(2)}</td>
-        <td class="right">R$ ${(i.toBuy * i.unitCost).toFixed(2)}</td>
-      </tr>`).join('');
-    const total = items.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+        <td class="right">R$ ${(qty * i.unitCost).toFixed(2)}</td>
+      </tr>`;
+    }).join('');
+    const total = items.reduce((s, i) => s + getEffectiveQty(i) * i.unitCost, 0);
     const body = `
       <table>
         <thead><tr><th class="right">QTD</th><th>UN</th><th>PRODUTO</th><th class="right">CUSTO UNIT.</th><th class="right">TOTAL</th></tr></thead>
@@ -948,12 +959,18 @@ export default function EventMenuDetailPage() {
     printBase(`Pedido — ${supplierName}`, body);
   };
 
+  const getEffectiveQty = (item: ShoppingItem) => {
+    const ov = qtyOverrides[item.id];
+    if (ov !== undefined && ov !== '') return parseFloat(String(ov)) || 0;
+    return item.toBuy;
+  };
+
   const copySupplierOrderAsImage = async (supplierName: string) => {
     const items = shoppingList.filter(i => i.supplier === supplierName && i.toBuy > 0);
     if (items.length === 0) return;
     setCopyingSupplier(supplierName);
 
-    const total = items.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+    const total = items.reduce((s, i) => s + getEffectiveQty(i) * i.unitCost, 0);
     const eventDate = menu?.event_date ? new Date(menu.event_date).toLocaleDateString('pt-BR') : '—';
     const now = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
@@ -962,7 +979,6 @@ export default function EventMenuDetailPage() {
     container.innerHTML = `
       <div style="margin-bottom:16px;border-bottom:2px solid #e5dcc8;padding-bottom:12px;">
         <div style="font-size:20px;font-weight:bold;color:#111;">${supplierName}</div>
-        <div style="font-size:12px;color:#777;margin-top:4px;">${menu?.name} &nbsp;·&nbsp; ${eventDate}${menu?.location ? ' &nbsp;·&nbsp; ' + menu.location : ''}</div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead>
@@ -975,15 +991,17 @@ export default function EventMenuDetailPage() {
           </tr>
         </thead>
         <tbody>
-          ${items.map((item, i) => `
+          ${items.map((item, i) => {
+            const qty = getEffectiveQty(item);
+            return `
             <tr style="background:${i % 2 === 0 ? '#fff' : '#fafaf6'};border-bottom:1px solid #eee;">
-              <td style="text-align:right;padding:7px 14px;font-weight:700;">${item.toBuy.toFixed(3)}</td>
+              <td style="text-align:right;padding:7px 14px;font-weight:700;">${qty.toFixed(3)}</td>
               <td style="text-align:left;padding:7px 6px;color:#777;">${item.unit}</td>
               <td style="text-align:left;padding:7px 14px;">${item.name}</td>
               <td style="text-align:right;padding:7px 14px;color:#777;">R$ ${item.unitCost.toFixed(2)}</td>
-              <td style="text-align:right;padding:7px 14px;font-weight:600;">R$ ${(item.toBuy * item.unitCost).toFixed(2)}</td>
-            </tr>
-          `).join('')}
+              <td style="text-align:right;padding:7px 14px;font-weight:600;">R$ ${(qty * item.unitCost).toFixed(2)}</td>
+            </tr>`;
+          }).join('')}
         </tbody>
         <tfoot>
           <tr style="border-top:2px solid #aaa;background:#f5f0e8;">
@@ -1453,7 +1471,7 @@ export default function EventMenuDetailPage() {
                   )}
                   {suppliersInList.map(supplier => {
                     const items = shoppingList.filter(i => i.supplier === supplier && i.toBuy > 0);
-                    const supplierTotal = items.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+                    const supplierTotal = items.reduce((s, i) => s + getEffectiveQty(i) * i.unitCost, 0);
                     return (
                       <div key={supplier}>
                         <div className="flex items-center justify-between px-5 py-3 bg-muted/20">
@@ -1485,15 +1503,32 @@ export default function EventMenuDetailPage() {
                         <table className="w-full text-sm">
                           <thead><tr className="border-b border-border/40 text-xs text-muted-foreground" style={{ background: 'hsl(40 30% 98%)' }}><th className="text-right px-5 py-2 font-semibold w-28">A COMPRAR</th><th className="text-left px-3 py-2 font-semibold w-14">UN</th><th className="text-left px-3 py-2 font-semibold">PRODUTO</th><th className="text-right px-5 py-2 font-semibold">CUSTO UNIT.</th><th className="text-right px-5 py-2 font-semibold">TOTAL</th></tr></thead>
                           <tbody className="divide-y divide-border/40">
-                            {items.map(item => (
-                              <tr key={item.id}>
-                                <td className="px-5 py-2.5 text-right font-semibold text-destructive">{item.toBuy.toFixed(2)}</td>
-                                <td className="px-3 py-2.5 text-muted-foreground text-xs">{item.unit}</td>
-                                <td className="px-3 py-2.5 font-medium text-foreground">{item.name}</td>
-                                <td className="px-5 py-2.5 text-right text-muted-foreground">R$ {item.unitCost.toFixed(2)}</td>
-                                <td className="px-5 py-2.5 text-right font-medium">R$ {(item.toBuy * item.unitCost).toFixed(2)}</td>
-                              </tr>
-                            ))}
+                            {items.map(item => {
+                              const effQty = getEffectiveQty(item);
+                              return (
+                                <tr key={item.id}>
+                                  <td className="px-2 py-1.5 text-right w-28">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      min="0"
+                                      className="w-24 text-right font-semibold text-destructive bg-transparent border border-transparent hover:border-border focus:border-primary focus:outline-none rounded px-2 py-1 text-sm transition-colors"
+                                      value={qtyOverrides[item.id] !== undefined ? qtyOverrides[item.id] : item.toBuy}
+                                      onChange={e => setQtyOverrides(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                      onBlur={e => {
+                                        const v = parseFloat(e.target.value);
+                                        if (isNaN(v) || v < 0) setQtyOverrides(prev => ({ ...prev, [item.id]: item.toBuy }));
+                                        else setQtyOverrides(prev => ({ ...prev, [item.id]: v }));
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2.5 text-muted-foreground text-xs">{item.unit}</td>
+                                  <td className="px-3 py-2.5 font-medium text-foreground">{item.name}</td>
+                                  <td className="px-5 py-2.5 text-right text-muted-foreground">R$ {item.unitCost.toFixed(2)}</td>
+                                  <td className="px-5 py-2.5 text-right font-medium">R$ {(effQty * item.unitCost).toFixed(2)}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
