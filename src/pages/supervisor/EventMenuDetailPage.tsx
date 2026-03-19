@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import html2canvas from 'html2canvas';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import {
   ChevronDown, ChevronUp, CheckCircle2, TrendingDown, Loader2,
   Plus, Pencil, Trash2, X, Check, ChevronsUpDown, PackagePlus,
   Package, Truck, RotateCcw, AlertTriangle, MessageSquare,
-  ClipboardList, UserCheck, RefreshCw, GripVertical, Download, Clock
+  ClipboardList, UserCheck, RefreshCw, GripVertical, Download, Clock, Printer, Copy
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,7 @@ type ShoppingItem = {
   id: string; name: string; unit: string; category: string;
   needed: number; inStock: number; toBuy: number; unitCost: number;
   hasStock: boolean;
+  supplier?: string;
 };
 type DispatchItem = {
   item_id: string; item_name: string; unit: string;
@@ -584,6 +586,8 @@ export default function EventMenuDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pratos' | 'compras' | 'saida'>('pratos');
   const [shopFilter, setShopFilter] = useState<'all' | 'ok' | 'buy'>('all');
+  const [shopGroupMode, setShopGroupMode] = useState<'category' | 'supplier'>('category');
+  const [copyingSupplier, setCopyingSupplier] = useState<string | null>(null);
   const [editingDishId, setEditingDishId] = useState<string | null>(null);
   const [dishDialogOpen, setDishDialogOpen] = useState(false);
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
@@ -647,37 +651,68 @@ export default function EventMenuDetailPage() {
 
     const loadedMenu: EventMenu = { ...(menuRes.data as any), dishes: enrichedDishes };
     setMenu(loadedMenu);
-    buildShoppingList(enrichedDishes, stockData);
+    const rawList = buildShoppingList(enrichedDishes, stockData, loadedMenu.guest_count);
+    // Load preferred suppliers for all items in the list
+    if (rawList.length > 0) {
+      const { data: suppData } = await supabase
+        .from('item_suppliers')
+        .select('item_id, supplier_name')
+        .in('item_id', rawList.map(i => i.id))
+        .eq('is_preferred', true);
+      const suppMap: Record<string, string> = {};
+      (suppData || []).forEach((s: any) => { suppMap[s.item_id] = s.supplier_name; });
+      setShoppingList(rawList.map(i => ({ ...i, supplier: suppMap[i.id] })));
+    } else {
+      setShoppingList(rawList);
+    }
     setLoading(false);
   };
 
-  const buildShoppingList = (dishes: MenuDish[], stock: StockItem[]) => {
+  const buildShoppingList = (dishes: MenuDish[], stock: StockItem[], guestCount: number): ShoppingItem[] => {
     const map: Record<string, ShoppingItem> = {};
     const noIngredients: string[] = [];
+
+    // ── Pratos normais: scale = planned_quantity / yield_quantity
+    // A quantidade no cardápio JÁ é o total do evento (ex: 10kg de abadejo).
+    // A ficha técnica descreve o rendimento base (ex: 1kg).
+    // Então multiplicamos os insumos pelo fator: 10 / 1 = 10×.
     dishes.forEach(dish => {
       if (dish.isMantimentos) return;
       if (!dish.sheet) { noIngredients.push(dish.sheet_name); return; }
-      if (dish.sheet.items.filter(i => i.section === 'receita').length === 0) { noIngredients.push(dish.sheet_name); return; }
+      const recipeItems = dish.sheet.items.filter(i => i.section === 'receita');
+      if (recipeItems.length === 0) { noIngredients.push(dish.sheet_name); return; }
       const scale = dish.planned_quantity / (dish.sheet.yield_quantity || 1);
-      dish.sheet.items.forEach(si => {
+      recipeItems.forEach(si => {
         const needed = si.quantity * scale;
-        if (!map[si.item_id]) { const s = stock.find(x => x.id === si.item_id); map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true }; }
+        if (!map[si.item_id]) {
+          const s = stock.find(x => x.id === si.item_id);
+          map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true };
+        }
         map[si.item_id].needed += needed;
       });
     });
-    // Also process mantimentos separately (its items are all 'receita' type)
+
+    // ── Mantimentos: scale = guest_count / yield_quantity
+    // A ficha de mantimentos é cadastrada por pessoa (ex: yield = 1 pessoa).
+    // Multiplicamos pelo número de convidados do evento.
     dishes.filter(d => d.isMantimentos).forEach(dish => {
       if (!dish.sheet) return;
-      const scale = dish.planned_quantity / (dish.sheet.yield_quantity || 1);
+      const scale = guestCount / (dish.sheet.yield_quantity || 1);
       dish.sheet.items.forEach(si => {
         const needed = si.quantity * scale;
-        if (!map[si.item_id]) { const s = stock.find(x => x.id === si.item_id); map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true }; }
+        if (!map[si.item_id]) {
+          const s = stock.find(x => x.id === si.item_id);
+          map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true };
+        }
         map[si.item_id].needed += needed;
       });
     });
-    const list = Object.values(map).map(i => ({ ...i, toBuy: Math.max(0, i.needed - i.inStock), hasStock: i.inStock >= i.needed })).sort((a, b) => a.name.localeCompare(b.name));
-    setShoppingList(list);
+
+    const list = Object.values(map)
+      .map(i => ({ ...i, toBuy: Math.max(0, i.needed - i.inStock), hasStock: i.inStock >= i.needed }))
+      .sort((a, b) => a.name.localeCompare(b.name));
     setDishesWithNoIngredients(noIngredients);
+    return list;
   };
 
   const prepareReturn = async () => {
@@ -826,6 +861,222 @@ export default function EventMenuDetailPage() {
   };
 
   const assignedEmployee = menu.assigned_to ? employees.find(e => e.user_id === menu.assigned_to) : null;
+
+  // ─── Print helpers ────────────────────────────────────────────────────────────
+  const printBase = (title: string, body: string) => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const eventDate = menu.event_date ? new Date(menu.event_date).toLocaleDateString('pt-BR') : '—';
+    w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+      <title>${title}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 20px; }
+        h1 { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
+        .meta { color: #555; font-size: 10px; margin-bottom: 14px; }
+        h2 { font-size: 12px; font-weight: bold; margin: 14px 0 4px; background: #f0ebe0; padding: 4px 8px; border-radius: 3px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        th { text-align: left; font-size: 10px; color: #555; font-weight: 600; border-bottom: 1px solid #ccc; padding: 4px 6px; }
+        td { padding: 4px 6px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        .right { text-align: right; }
+        .center { text-align: center; }
+        .badge-buy { color: #c00; font-weight: 600; }
+        .badge-ok { color: #060; }
+        .total-row td { border-top: 2px solid #999; font-weight: bold; padding-top: 6px; }
+        .cat-header { font-weight: bold; font-size: 10px; color: #555; background: #f7f4ef; padding: 3px 6px; }
+        .status-pending { color: #b45309; }
+        .status-ok { color: #065f46; }
+        @media print { body { padding: 10px; } }
+      </style></head><body>
+      <h1>${title}</h1>
+      <div class="meta">${menu.name} · ${eventDate} · ${menu.location || ''} · ${menu.guest_count} convidados</div>
+      ${body}
+    </body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+  };
+
+  const handlePrintShoppingList = () => {
+    const byCategory: Record<string, ShoppingItem[]> = {};
+    shoppingList.forEach(i => {
+      const cat = i.category || 'Outros';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(i);
+    });
+
+    const rows = Object.entries(byCategory).sort(([a], [b]) => a.localeCompare(b)).map(([cat, items]) => {
+      const catRows = items.map(i => `
+        <tr>
+          <td>${i.name}</td>
+          <td class="right">${i.needed.toFixed(3)} ${i.unit}</td>
+          <td class="right">${i.inStock.toFixed(3)} ${i.unit}</td>
+          <td class="right ${i.toBuy > 0 ? 'badge-buy' : 'badge-ok'}">${i.toBuy > 0 ? i.toBuy.toFixed(3) + ' ' + i.unit : '✓ ok'}</td>
+          <td class="right">${i.toBuy > 0 ? 'R$ ' + (i.toBuy * i.unitCost).toFixed(2) : '—'}</td>
+        </tr>`).join('');
+      return `<h2>${cat} (${items.length})</h2>
+        <table>
+          <thead><tr><th>INSUMO</th><th class="right">NECESSÁRIO</th><th class="right">EM ESTOQUE</th><th class="right">A COMPRAR</th><th class="right">CUSTO EST.</th></tr></thead>
+          <tbody>${catRows}</tbody>
+        </table>`;
+    }).join('');
+
+    const total = shoppingList.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+    const footer = `<table><tbody class="total-row"><tr class="total-row"><td colspan="4" style="text-align:right;font-weight:bold">Total estimado:</td><td class="right">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr></tbody></table>`;
+    printBase('Lista de Compras', rows + footer);
+  };
+
+  const handlePrintBySupplier = (supplierName: string) => {
+    const items = shoppingList.filter(i => i.supplier === supplierName && i.toBuy > 0);
+    if (items.length === 0) { return; }
+    const rows = items.map(i => `
+      <tr>
+        <td class="right">${i.toBuy.toFixed(3)}</td>
+        <td>${i.unit}</td>
+        <td>${i.name}</td>
+        <td class="right">R$ ${i.unitCost.toFixed(2)}</td>
+        <td class="right">R$ ${(i.toBuy * i.unitCost).toFixed(2)}</td>
+      </tr>`).join('');
+    const total = items.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+    const body = `
+      <table>
+        <thead><tr><th class="right">QTD</th><th>UN</th><th>PRODUTO</th><th class="right">CUSTO UNIT.</th><th class="right">TOTAL</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tbody><tr class="total-row"><td colspan="4" class="right">Total estimado:</td><td class="right">R$ ${total.toFixed(2)}</td></tr></tbody>
+      </table>`;
+    printBase(`Pedido — ${supplierName}`, body);
+  };
+
+  const copySupplierOrderAsImage = async (supplierName: string) => {
+    const items = shoppingList.filter(i => i.supplier === supplierName && i.toBuy > 0);
+    if (items.length === 0) return;
+    setCopyingSupplier(supplierName);
+
+    const total = items.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+    const eventDate = menu?.event_date ? new Date(menu.event_date).toLocaleDateString('pt-BR') : '—';
+    const now = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;padding:24px;font-family:Arial,sans-serif;width:640px;color:#111;';
+    container.innerHTML = `
+      <div style="margin-bottom:16px;border-bottom:2px solid #e5dcc8;padding-bottom:12px;">
+        <div style="font-size:20px;font-weight:bold;color:#111;">${supplierName}</div>
+        <div style="font-size:12px;color:#777;margin-top:4px;">${menu?.name} &nbsp;·&nbsp; ${eventDate}${menu?.location ? ' &nbsp;·&nbsp; ' + menu.location : ''}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f5f0e8;border-bottom:2px solid #c9bfa0;">
+            <th style="text-align:right;padding:8px 14px;font-weight:700;color:#555;white-space:nowrap;">QTD</th>
+            <th style="text-align:left;padding:8px 6px;font-weight:700;color:#555;">UN</th>
+            <th style="text-align:left;padding:8px 14px;font-weight:700;color:#555;">PRODUTO</th>
+            <th style="text-align:right;padding:8px 14px;font-weight:700;color:#555;white-space:nowrap;">CUSTO UNIT.</th>
+            <th style="text-align:right;padding:8px 14px;font-weight:700;color:#555;white-space:nowrap;">TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item, i) => `
+            <tr style="background:${i % 2 === 0 ? '#fff' : '#fafaf6'};border-bottom:1px solid #eee;">
+              <td style="text-align:right;padding:7px 14px;font-weight:700;">${item.toBuy.toFixed(3)}</td>
+              <td style="text-align:left;padding:7px 6px;color:#777;">${item.unit}</td>
+              <td style="text-align:left;padding:7px 14px;">${item.name}</td>
+              <td style="text-align:right;padding:7px 14px;color:#777;">R$ ${item.unitCost.toFixed(2)}</td>
+              <td style="text-align:right;padding:7px 14px;font-weight:600;">R$ ${(item.toBuy * item.unitCost).toFixed(2)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid #aaa;background:#f5f0e8;">
+            <td colspan="4" style="text-align:right;padding:9px 14px;font-weight:700;font-size:13px;">Total estimado:</td>
+            <td style="text-align:right;padding:9px 14px;font-weight:800;font-size:15px;color:#b45309;">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div style="margin-top:10px;font-size:10px;color:#bbb;text-align:right;">Gerado em ${now}</div>
+    `;
+
+    document.body.appendChild(container);
+
+    // Build the blob promise from html2canvas — no await before clipboard.write
+    const blobPromise: Promise<Blob> = html2canvas(container, {
+      scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+    }).then(canvas => new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png');
+    }));
+
+    // Call clipboard.write synchronously (no preceding await) so the user-gesture context is intact
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+      toast.success(`Pedido de "${supplierName}" copiado! Cole no WhatsApp, email ou onde quiser.`);
+    } catch (err) {
+      console.error('clipboard.write failed:', err);
+      toast.error('Não foi possível copiar. Verifique se o navegador permite acesso à área de transferência.');
+    } finally {
+      blobPromise.catch(() => {}).finally(() => {
+        document.body.removeChild(container);
+        setCopyingSupplier(null);
+      });
+    }
+  };
+
+  const handlePrintSeparationList = async () => {
+    const { data: sepItems } = await supabase
+      .from('event_separation_items')
+      .select('*, stock_items(name, unit)')
+      .eq('menu_id', id!)
+      .order('category')
+      .order('created_at');
+
+    if (!sepItems || sepItems.length === 0) {
+      toast.error('Nenhum item de separação encontrado. Atribua a separação primeiro.');
+      return;
+    }
+
+    // Group by assigned employee
+    const byEmp: Record<string, typeof sepItems> = {};
+    for (const item of sepItems) {
+      const empId = (item as any).assigned_to || '__nenhum__';
+      if (!byEmp[empId]) byEmp[empId] = [];
+      byEmp[empId].push(item);
+    }
+
+    const rows = Object.entries(byEmp).map(([empId, items]) => {
+      const emp = empId !== '__nenhum__' ? employees.find(e => e.user_id === empId) : null;
+      const empName = emp?.display_name || (empId !== '__nenhum__' ? empId.slice(0, 8) : 'Não atribuído');
+
+      // Group by category within employee
+      const byCat: Record<string, typeof items> = {};
+      items.forEach(i => {
+        const cat = (i as any).category || 'Outros';
+        if (!byCat[cat]) byCat[cat] = [];
+        byCat[cat].push(i);
+      });
+
+      const catRows = Object.entries(byCat).map(([cat, citems]) => {
+        const trs = citems.map(i => {
+          const si = (i as any).stock_items as { name?: string; unit?: string } | null;
+          const status = i.status === 'separated' ? '<span class="status-ok">✓ Separado</span>' :
+                         i.status === 'skipped'   ? 'Pulado' :
+                         '<span class="status-pending">Pendente</span>';
+          return `<tr>
+            <td>${si?.name || '?'} <span style="color:#888;font-size:9px">(${si?.unit || ''})</span></td>
+            <td class="right">${(i.planned_quantity ?? 0).toFixed(3)}</td>
+            <td class="right">${i.separated_quantity != null ? i.separated_quantity.toFixed(3) : '—'}</td>
+            <td class="center">${status}</td>
+          </tr>`;
+        }).join('');
+        return `<tr><td colspan="4" class="cat-header">${cat}</td></tr>${trs}`;
+      }).join('');
+
+      return `<h2>👤 ${empName} — ${items.length} itens</h2>
+        <table>
+          <thead><tr><th>INSUMO</th><th class="right">PLANEJADO</th><th class="right">SEPARADO</th><th class="center">STATUS</th></tr></thead>
+          <tbody>${catRows}</tbody>
+        </table>`;
+    }).join('');
+
+    printBase('Lista de Separação', rows);
+  };
 
   const canAssign = menu.status === 'draft' || menu.status === 'assigned';
   const canReturn = menu.status === 'dispatched';
@@ -1126,52 +1377,158 @@ export default function EventMenuDetailPage() {
       </Dialog>
 
       {/* ── LISTA DE COMPRAS ── */}
-      {activeTab === 'compras' && (
-        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border" style={{ background: 'hsl(40 30% 97%)' }}>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1.5"><TrendingDown className="w-4 h-4 text-destructive" /><span className="font-semibold text-destructive">{itemsToBuy}</span><span className="text-muted-foreground">a comprar</span></div>
-              <div className="w-px h-4 bg-border" />
-              <div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-success" /><span className="font-semibold text-success">{itemsOk}</span><span className="text-muted-foreground">em estoque</span></div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1 bg-border/40 rounded-lg p-0.5">
-                {([['all', 'Todos'], ['ok', '✓ Em estoque'], ['buy', '⬇ A comprar']] as const).map(([v, l]) => (
-                  <button key={v} onClick={() => setShopFilter(v)} className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${shopFilter === v ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{l}</button>
-                ))}
+      {activeTab === 'compras' && (() => {
+        // Supplier grouping
+        const suppliersInList = Array.from(new Set(
+          shoppingList.filter(i => i.toBuy > 0 && i.supplier).map(i => i.supplier!)
+        )).sort();
+        const itemsNoSupplier = shoppingList.filter(i => i.toBuy > 0 && !i.supplier);
+
+        return (
+          <div className="space-y-3">
+            <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border" style={{ background: 'hsl(40 30% 97%)' }}>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1.5"><TrendingDown className="w-4 h-4 text-destructive" /><span className="font-semibold text-destructive">{itemsToBuy}</span><span className="text-muted-foreground">a comprar</span></div>
+                  <div className="w-px h-4 bg-border" />
+                  <div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-success" /><span className="font-semibold text-success">{itemsOk}</span><span className="text-muted-foreground">em estoque</span></div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* View mode toggle */}
+                  <div className="flex gap-1 bg-border/40 rounded-lg p-0.5">
+                    {([['category', 'Por Categoria'], ['supplier', 'Por Fornecedor']] as const).map(([v, l]) => (
+                      <button key={v} onClick={() => setShopGroupMode(v)} className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${shopGroupMode === v ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{l}</button>
+                    ))}
+                  </div>
+                  {shopGroupMode === 'category' && (
+                    <div className="flex gap-1 bg-border/40 rounded-lg p-0.5">
+                      {([['all', 'Todos'], ['ok', '✓ Ok'], ['buy', '⬇ Comprar']] as const).map(([v, l]) => (
+                        <button key={v} onClick={() => setShopFilter(v)} className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${shopFilter === v ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{l}</button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-right"><p className="text-xs text-muted-foreground">Custo compra</p><p className="font-bold text-sm">R$ {totalToBuy.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
+                  <Button variant="outline" size="sm" onClick={handlePrintShoppingList} className="gap-1.5">
+                    <Printer className="w-3.5 h-3.5" />Imprimir Lista
+                  </Button>
+                </div>
               </div>
-              <div className="text-right"><p className="text-xs text-muted-foreground">Custo compra</p><p className="font-bold text-sm">R$ {totalToBuy.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
+              {dishesWithNoIngredients.length > 0 && (
+                <div className="mx-5 mt-4 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+                  <p className="font-semibold text-amber-800 mb-1">Pratos sem insumos cadastrados na ficha técnica:</p>
+                  <p className="text-amber-700 text-xs">Os pratos abaixo não possuem ingredientes na ficha técnica e por isso não aparecem na lista de compras. Edite a ficha técnica de cada um para adicionar os insumos.</p>
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {dishesWithNoIngredients.map(name => (
+                      <li key={name} className="rounded bg-amber-200/60 px-2 py-0.5 text-xs font-medium text-amber-900">{name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* ── Category view ── */}
+              {shopGroupMode === 'category' && (
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b border-border text-xs" style={{ background: 'hsl(40 30% 97%)' }}><th className="text-left px-5 py-3 font-semibold text-muted-foreground">INSUMO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">NECESSÁRIO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">EM ESTOQUE</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">A COMPRAR</th><th className="text-right px-5 py-3 font-semibold text-muted-foreground">CUSTO EST.</th></tr></thead>
+                  <tbody className="divide-y divide-border/50">
+                    {filteredShoppingList.map(item => (
+                      <tr key={item.id} className={item.toBuy > 0 ? 'bg-red-50/30' : ''}>
+                        <td className="px-5 py-3"><div className="flex items-center gap-2">{item.toBuy > 0 ? <TrendingDown className="w-3.5 h-3.5 text-destructive flex-shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />}<span className={item.toBuy > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}>{item.name}</span>{item.supplier && <span className="text-[10px] text-muted-foreground/60 italic ml-1">({item.supplier})</span>}</div></td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{item.needed.toFixed(2)} {item.unit}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{item.inStock} {item.unit}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{item.toBuy > 0 ? <span className="text-destructive">{item.toBuy.toFixed(2)} {item.unit}</span> : <span className="text-success text-xs">✓ ok</span>}</td>
+                        <td className="px-5 py-3 text-right text-muted-foreground">{item.toBuy > 0 ? `R$ ${(item.toBuy * item.unitCost).toFixed(2)}` : '—'}</td>
+                      </tr>
+                    ))}
+                    {filteredShoppingList.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm">Nenhum item neste filtro</td></tr>}
+                  </tbody>
+                  <tfoot><tr className="border-t-2 border-border" style={{ background: 'hsl(40 30% 97%)' }}><td colSpan={4} className="px-5 py-3 text-right font-semibold text-foreground">Total estimado para comprar:</td><td className="px-5 py-3 text-right font-bold text-lg gold-text">R$ {totalToBuy.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr></tfoot>
+                </table>
+              )}
+
+              {/* ── Supplier view ── */}
+              {shopGroupMode === 'supplier' && (
+                <div className="divide-y divide-border/50">
+                  {suppliersInList.length === 0 && itemsNoSupplier.length === 0 && (
+                    <p className="px-5 py-8 text-center text-muted-foreground text-sm">Nenhum item a comprar.</p>
+                  )}
+                  {suppliersInList.map(supplier => {
+                    const items = shoppingList.filter(i => i.supplier === supplier && i.toBuy > 0);
+                    const supplierTotal = items.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+                    return (
+                      <div key={supplier}>
+                        <div className="flex items-center justify-between px-5 py-3 bg-muted/20">
+                          <div className="flex items-center gap-2">
+                            <Truck className="w-4 h-4 text-primary flex-shrink-0" />
+                            <span className="font-semibold text-foreground text-sm">{supplier}</span>
+                            <span className="text-xs text-muted-foreground">({items.length} item{items.length !== 1 ? 's' : ''})</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-primary">R$ {supplierTotal.toFixed(2)}</span>
+                            <Button
+                              variant="outline" size="sm"
+                              onClick={() => copySupplierOrderAsImage(supplier)}
+                              disabled={copyingSupplier === supplier}
+                              className="gap-1.5 h-7 text-xs"
+                              title="Copiar tabela como imagem para colar no WhatsApp ou email"
+                            >
+                              {copyingSupplier === supplier
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <Copy className="w-3 h-3" />
+                              }
+                              Copiar Imagem
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handlePrintBySupplier(supplier)} className="gap-1.5 h-7 text-xs">
+                              <Printer className="w-3 h-3" />Imprimir Pedido
+                            </Button>
+                          </div>
+                        </div>
+                        <table className="w-full text-sm">
+                          <thead><tr className="border-b border-border/40 text-xs text-muted-foreground" style={{ background: 'hsl(40 30% 98%)' }}><th className="text-right px-5 py-2 font-semibold w-28">A COMPRAR</th><th className="text-left px-3 py-2 font-semibold w-14">UN</th><th className="text-left px-3 py-2 font-semibold">PRODUTO</th><th className="text-right px-5 py-2 font-semibold">CUSTO UNIT.</th><th className="text-right px-5 py-2 font-semibold">TOTAL</th></tr></thead>
+                          <tbody className="divide-y divide-border/40">
+                            {items.map(item => (
+                              <tr key={item.id}>
+                                <td className="px-5 py-2.5 text-right font-semibold text-destructive">{item.toBuy.toFixed(2)}</td>
+                                <td className="px-3 py-2.5 text-muted-foreground text-xs">{item.unit}</td>
+                                <td className="px-3 py-2.5 font-medium text-foreground">{item.name}</td>
+                                <td className="px-5 py-2.5 text-right text-muted-foreground">R$ {item.unitCost.toFixed(2)}</td>
+                                <td className="px-5 py-2.5 text-right font-medium">R$ {(item.toBuy * item.unitCost).toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })}
+                  {itemsNoSupplier.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between px-5 py-3 bg-muted/20">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-muted-foreground text-sm">Sem fornecedor definido</span>
+                          <span className="text-xs text-muted-foreground">({itemsNoSupplier.length} item{itemsNoSupplier.length !== 1 ? 's' : ''})</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground italic">Cadastre fornecedores em Estoque Geral</span>
+                      </div>
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y divide-border/40">
+                          {itemsNoSupplier.map(item => (
+                            <tr key={item.id}>
+                              <td className="px-5 py-2.5 text-right font-semibold text-destructive w-28">{item.toBuy.toFixed(2)}</td>
+                              <td className="px-3 py-2.5 text-muted-foreground text-xs w-14">{item.unit}</td>
+                              <td className="px-3 py-2.5 font-medium text-foreground">{item.name}</td>
+                              <td className="px-5 py-2.5 text-right text-muted-foreground">R$ {item.unitCost.toFixed(2)}</td>
+                              <td className="px-5 py-2.5 text-right font-medium">R$ {(item.toBuy * item.unitCost).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-          {dishesWithNoIngredients.length > 0 && (
-            <div className="mx-5 mt-4 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
-              <p className="font-semibold text-amber-800 mb-1">Pratos sem insumos cadastrados na ficha técnica:</p>
-              <p className="text-amber-700 text-xs">Os pratos abaixo não possuem ingredientes na ficha técnica e por isso não aparecem na lista de compras. Edite a ficha técnica de cada um para adicionar os insumos.</p>
-              <ul className="mt-2 flex flex-wrap gap-1.5">
-                {dishesWithNoIngredients.map(name => (
-                  <li key={name} className="rounded bg-amber-200/60 px-2 py-0.5 text-xs font-medium text-amber-900">{name}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-border text-xs" style={{ background: 'hsl(40 30% 97%)' }}><th className="text-left px-5 py-3 font-semibold text-muted-foreground">INSUMO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">NECESSÁRIO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">EM ESTOQUE</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">A COMPRAR</th><th className="text-right px-5 py-3 font-semibold text-muted-foreground">CUSTO EST.</th></tr></thead>
-            <tbody className="divide-y divide-border/50">
-              {filteredShoppingList.map(item => (
-                <tr key={item.id} className={item.toBuy > 0 ? 'bg-red-50/30' : ''}>
-                  <td className="px-5 py-3"><div className="flex items-center gap-2">{item.toBuy > 0 ? <TrendingDown className="w-3.5 h-3.5 text-destructive flex-shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />}<span className={item.toBuy > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}>{item.name}</span></div></td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">{item.needed.toFixed(2)} {item.unit}</td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">{item.inStock} {item.unit}</td>
-                  <td className="px-4 py-3 text-right font-semibold">{item.toBuy > 0 ? <span className="text-destructive">{item.toBuy.toFixed(2)} {item.unit}</span> : <span className="text-success text-xs">✓ ok</span>}</td>
-                  <td className="px-5 py-3 text-right text-muted-foreground">{item.toBuy > 0 ? `R$ ${(item.toBuy * item.unitCost).toFixed(2)}` : '—'}</td>
-                </tr>
-              ))}
-              {filteredShoppingList.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm">Nenhum item neste filtro</td></tr>}
-            </tbody>
-            <tfoot><tr className="border-t-2 border-border" style={{ background: 'hsl(40 30% 97%)' }}><td colSpan={4} className="px-5 py-3 text-right font-semibold text-foreground">Total estimado para comprar:</td><td className="px-5 py-3 text-right font-bold text-lg gold-text">R$ {totalToBuy.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr></tfoot>
-          </table>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── SEPARAÇÃO / RETORNO ── */}
       {activeTab === 'saida' && (
@@ -1249,9 +1606,16 @@ export default function EventMenuDetailPage() {
 
           {/* Separation progress (if assigned) */}
           {(menu.status === 'assigned' || menu.status === 'dispatched') && (
-            <SeparationErrorBoundary>
-              <SeparationProgress menuId={id!} employees={employees} />
-            </SeparationErrorBoundary>
+            <>
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={handlePrintSeparationList} className="gap-1.5">
+                  <Printer className="w-3.5 h-3.5" />Imprimir Lista de Separação
+                </Button>
+              </div>
+              <SeparationErrorBoundary>
+                <SeparationProgress menuId={id!} employees={employees} />
+              </SeparationErrorBoundary>
+            </>
           )}
         </div>
       )}
