@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
-import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDown, Check, PackagePlus, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDown, Check, PackagePlus, Download, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -195,7 +195,7 @@ function QuickCreateItemDialog({ open, onClose, onCreated }: {
   );
 }
 
-const YIELD_UNITS = ['kg', 'g', 'L', 'ml', 'un', 'porções'];
+const YIELD_UNITS = ['kg', 'g', 'L', 'ml', 'un', 'unid', 'pct', 'cx', 'bd', 'fatias'];
 
 export default function SupervisorSheetsPage() {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
@@ -209,6 +209,11 @@ export default function SupervisorSheetsPage() {
   const [sheetCategories, setSheetCategories] = useState<string[]>([]);
   const [newCatName, setNewCatName] = useState('');
   const [addingCat, setAddingCat] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+
+  // Import highlight state — IDs de fichas criadas/atualizadas na última importação
+  const [updatedSheetIds, setUpdatedSheetIds] = useState<Set<string>>(new Set());
 
   // Inline editing state
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -230,6 +235,7 @@ export default function SupervisorSheetsPage() {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
+    setLoading(true);
     const [itemsRes, sheetsRes, catsRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, unit_cost').order('name'),
       supabase.from('technical_sheets').select('*').order('name'),
@@ -259,6 +265,7 @@ export default function SupervisorSheetsPage() {
       );
       setSheets(sheetsWithItems);
     }
+    setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
@@ -527,7 +534,6 @@ export default function SupervisorSheetsPage() {
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (importFileRef.current) importFileRef.current.value = '';
 
     try {
@@ -538,7 +544,7 @@ export default function SupervisorSheetsPage() {
 
       if (raw.length < 2) { toast.error('Arquivo vazio ou inválido'); return; }
 
-      const headerRow = raw[0].map((h: any) => String(h).trim().toUpperCase());
+      const headerRow = raw[0].map((h: any) => String(h ?? '').trim().toUpperCase());
       const col = (name: string) => headerRow.indexOf(name);
 
       const fichaIdx    = col('FICHA');
@@ -556,37 +562,44 @@ export default function SupervisorSheetsPage() {
         return;
       }
 
-      // Group rows by ficha name — capture sheet-level fields from first row of each ficha
+      // Agrupa linhas por nome de ficha
       type ImportRow = { insumo: string; quantidade: number; unidade: string; custo_unit: number };
-      type ImportSheet = {
-        categoria: string; preparo: number | null;
-        rendQtd: number | null; rendUnit: string;
-        items: ImportRow[];
-      };
+      type ImportSheet = { categoria: string; preparo: number | null; rendQtd: number | null; rendUnit: string; items: ImportRow[] };
       const grouped: Record<string, ImportSheet> = {};
+
+      const toNum = (v: any): number | null => {
+        if (v == null || v === '') return null;
+        const n = parseFloat(String(v).replace(',', '.'));
+        return isNaN(n) ? null : n;
+      };
 
       for (let i = 1; i < raw.length; i++) {
         const row = raw[i];
-        const fichaName = String(row[fichaIdx] || '').trim();
+        const fichaName = String(row[fichaIdx] ?? '').trim();
         if (!fichaName) continue;
 
         if (!grouped[fichaName]) {
           grouped[fichaName] = {
-            categoria: catIdx !== -1 ? String(row[catIdx] || '').trim() : '',
-            preparo:   prepIdx !== -1 && row[prepIdx] !== '' ? parseFloat(row[prepIdx]) : null,
-            rendQtd:   rendQtdIdx !== -1 && row[rendQtdIdx] !== '' ? parseFloat(row[rendQtdIdx]) : null,
-            rendUnit:  rendUnitIdx !== -1 ? String(row[rendUnitIdx] || '').trim() : '',
+            categoria: catIdx !== -1 ? String(row[catIdx] ?? '').trim() : '',
+            preparo:   prepIdx !== -1 ? toNum(row[prepIdx]) : null,
+            rendQtd:   rendQtdIdx !== -1 ? toNum(row[rendQtdIdx]) : null,
+            rendUnit:  rendUnitIdx !== -1 ? String(row[rendUnitIdx] ?? '').trim() : '',
             items: [],
           };
+        } else {
+          // Linhas seguintes da mesma ficha: complementa campos de nível ficha se ainda não preenchidos
+          if (!grouped[fichaName].categoria && catIdx !== -1) grouped[fichaName].categoria = String(row[catIdx] ?? '').trim();
+          if (grouped[fichaName].rendQtd == null && rendQtdIdx !== -1) grouped[fichaName].rendQtd = toNum(row[rendQtdIdx]);
+          if (!grouped[fichaName].rendUnit && rendUnitIdx !== -1) grouped[fichaName].rendUnit = String(row[rendUnitIdx] ?? '').trim();
         }
 
-        const insumoName = String(row[insumoIdx] || '').trim();
+        const insumoName = String(row[insumoIdx] ?? '').trim();
         if (insumoName) {
           grouped[fichaName].items.push({
-            insumo:    insumoName,
-            quantidade: qtdIdx !== -1 ? parseFloat(row[qtdIdx] ?? 0) || 0 : 0,
-            unidade:   unidadeIdx !== -1 ? String(row[unidadeIdx] || '').trim() : '',
-            custo_unit: custoIdx !== -1 ? parseFloat(row[custoIdx] ?? 0) || 0 : 0,
+            insumo:     insumoName,
+            quantidade: toNum(row[qtdIdx ?? -1]) ?? 0,
+            unidade:    unidadeIdx !== -1 ? String(row[unidadeIdx] ?? '').trim() : '',
+            custo_unit: toNum(row[custoIdx ?? -1]) ?? 0,
           });
         }
       }
@@ -597,16 +610,17 @@ export default function SupervisorSheetsPage() {
       const { data: dbSheets }     = await supabase.from('technical_sheets').select('id, name');
       const { data: dbStockItems } = await supabase.from('stock_items').select('id, name, unit');
 
-      // Identifica o que vai ser criado vs atualizado
-      const sheetsToCreate = sheetNames.filter(n => !dbSheets?.some((s: any) => s.name === n));
-      const sheetsToUpdate = sheetNames.filter(n =>  dbSheets?.some((s: any) => s.name === n));
+      // Matching case-insensitive
+      const findSheet = (n: string) => dbSheets?.find((s: any) => s.name.trim().toLowerCase() === n.toLowerCase());
+      const findStock = (n: string) => dbStockItems?.find((s: any) => s.name.trim().toLowerCase() === n.toLowerCase());
 
-      // Coleta insumos novos (não existem no stock_items)
+      const sheetsToCreate = sheetNames.filter(n => !findSheet(n));
+      const sheetsToUpdate = sheetNames.filter(n =>  findSheet(n));
       const allInsumos = [...new Set(sheetNames.flatMap(n => grouped[n].items.map(i => i.insumo)))];
-      const insumosNovos = allInsumos.filter(name => !dbStockItems?.some((si: any) => si.name.toLowerCase() === name.toLowerCase()));
+      const insumosNovos = allInsumos.filter(n => !findStock(n));
 
       const totalItens = sheetNames.reduce((sum, n) => sum + grouped[n].items.length, 0);
-      const msgParts = [];
+      const msgParts: string[] = [];
       if (sheetsToUpdate.length) msgParts.push(`${sheetsToUpdate.length} ficha(s) serão atualizadas`);
       if (sheetsToCreate.length) msgParts.push(`${sheetsToCreate.length} ficha(s) novas serão criadas`);
       if (insumosNovos.length)   msgParts.push(`${insumosNovos.length} insumo(s) novo(s) serão criados`);
@@ -615,18 +629,18 @@ export default function SupervisorSheetsPage() {
       const confirmed = window.confirm(msgParts.join('\n') + '\n\nConfirmar?');
       if (!confirmed) return;
 
-      let updatedSheets = 0;
-      let createdSheets = 0;
-      let createdItems  = 0;
-      let updatedItems  = 0;
+      let updatedSheets = 0, createdSheets = 0, createdInsumos = 0;
+      const highlightIds = new Set<string>();
 
-      // ── Mapa mutável de stock items (inclui os que vamos criar)
-      const stockMap: Record<string, string> = {}; // name.toLowerCase() → id
-      (dbStockItems || []).forEach((si: any) => { stockMap[si.name.toLowerCase()] = si.id; });
+      // Mapa mutável name.toLowerCase() → id (inclui os que vamos criar)
+      const stockMap: Record<string, string> = {};
+      (dbStockItems || []).forEach((si: any) => { stockMap[si.name.trim().toLowerCase()] = si.id; });
+      // Também mapa de unit atual para comparar
+      const stockUnitMap: Record<string, string> = {};
+      (dbStockItems || []).forEach((si: any) => { stockUnitMap[si.id] = si.unit; });
 
-      // ── 1. Cria insumos novos
+      // 1. Cria insumos novos
       for (const nome of insumosNovos) {
-        // Tenta pegar a unidade da primeira linha que usa esse insumo
         let unit = 'un';
         for (const n of sheetNames) {
           const row = grouped[n].items.find(i => i.insumo.toLowerCase() === nome.toLowerCase());
@@ -635,36 +649,38 @@ export default function SupervisorSheetsPage() {
         const { data: newItem } = await supabase.from('stock_items').insert({
           name: nome, unit, unit_cost: 0, current_stock: 0, min_stock: 0, category: 'Outros',
         } as any).select('id').single();
-        if (newItem) { stockMap[nome.toLowerCase()] = (newItem as any).id; createdItems++; }
+        if (newItem) {
+          stockMap[nome.toLowerCase()] = (newItem as any).id;
+          stockUnitMap[(newItem as any).id] = unit;
+          createdInsumos++;
+        }
       }
 
-      // ── 2. Processa cada ficha (cria ou atualiza)
+      // 2. Processa cada ficha
       for (const sheetName of sheetNames) {
         const imp = grouped[sheetName];
         let sheetId: string;
 
-        const existing = dbSheets?.find((s: any) => s.name === sheetName) as any;
+        const existing = findSheet(sheetName) as any;
 
         if (existing) {
-          // Atualiza campos da ficha existente
           sheetId = existing.id;
+          // Atualiza todos os campos presentes na planilha (sem condicionais que omitem valores)
           const sheetUpdate: Record<string, any> = {};
           if (imp.categoria)        sheetUpdate.category       = imp.categoria;
-          if (imp.preparo !== null) sheetUpdate.prep_time      = imp.preparo;
-          if (imp.rendQtd !== null) sheetUpdate.yield_quantity = imp.rendQtd;
+          if (imp.preparo != null)  sheetUpdate.prep_time      = imp.preparo;
+          if (imp.rendQtd != null)  sheetUpdate.yield_quantity = imp.rendQtd;
           if (imp.rendUnit)         sheetUpdate.yield_unit     = imp.rendUnit;
-          if (Object.keys(sheetUpdate).length > 0) {
+          if (Object.keys(sheetUpdate).length > 0)
             await supabase.from('technical_sheets').update(sheetUpdate).eq('id', sheetId);
-          }
           updatedSheets++;
         } else {
-          // Cria ficha nova
           const { data: newSheet } = await supabase.from('technical_sheets').insert({
-            name: sheetName,
-            category:       imp.categoria || 'Prato Principal',
-            prep_time:      imp.preparo   ?? 0,
-            yield_quantity: imp.rendQtd   ?? 1,
-            yield_unit:     imp.rendUnit  || 'un',
+            name:           sheetName,
+            category:       imp.categoria  || 'Prato Principal',
+            prep_time:      imp.preparo    ?? 0,
+            yield_quantity: imp.rendQtd    ?? 1,
+            yield_unit:     imp.rendUnit   || 'un',
             servings:       1,
             instructions:   '',
           } as any).select('id').single();
@@ -673,57 +689,62 @@ export default function SupervisorSheetsPage() {
           createdSheets++;
         }
 
-        // ── 3. Busca itens existentes da ficha
+        highlightIds.add(sheetId);
+
+        // 3. Busca itens existentes da ficha
         const { data: sheetItems } = await supabase
           .from('technical_sheet_items').select('id, item_id').eq('sheet_id', sheetId);
 
-        // ── 4. Processa cada ingrediente
+        // 4. Processa ingredientes
         for (const row of imp.items) {
-          const itemId = stockMap[row.insumo.toLowerCase()];
-          if (!itemId) continue; // não deveria acontecer pois já criamos todos
+          const key = row.insumo.trim().toLowerCase();
+          const itemId = stockMap[key];
+          if (!itemId) continue;
 
-          // Atualiza unidade do insumo se mudou
-          if (row.unidade) {
-            const current = (dbStockItems || []).find((si: any) => si.id === itemId) as any;
-            if (current && row.unidade !== current.unit) {
-              await supabase.from('stock_items').update({ unit: row.unidade }).eq('id', itemId);
-            }
+          // Atualiza unidade do insumo se mudou na planilha
+          if (row.unidade && row.unidade !== stockUnitMap[itemId]) {
+            await supabase.from('stock_items').update({ unit: row.unidade }).eq('id', itemId);
+            stockUnitMap[itemId] = row.unidade;
           }
 
-          const sheetItem = sheetItems?.find((si: any) => si.item_id === itemId);
-
-          if (sheetItem) {
-            // Atualiza ingrediente existente
+          const existing = sheetItems?.find((si: any) => si.item_id === itemId) as any;
+          if (existing) {
             await supabase.from('technical_sheet_items').update({
               quantity:  row.quantidade,
-              unit_cost: row.custo_unit,
-            }).eq('id', (sheetItem as any).id);
-            updatedItems++;
-          } else {
-            // Adiciona ingrediente novo à ficha
-            await supabase.from('technical_sheet_items').insert({
-              sheet_id:  sheetId,
-              item_id:   itemId,
-              quantity:  row.quantidade,
               gross_quantity: row.quantidade,
-              correction_factor: 1,
               unit_cost: row.custo_unit,
-              section:   'receita',
+            }).eq('id', existing.id);
+          } else {
+            await supabase.from('technical_sheet_items').insert({
+              sheet_id: sheetId, item_id: itemId,
+              quantity: row.quantidade, gross_quantity: row.quantidade,
+              correction_factor: 1, unit_cost: row.custo_unit, section: 'receita',
             } as any);
-            updatedItems++;
           }
         }
       }
 
       const resumo = [`${updatedSheets} fichas atualizadas`];
-      if (createdSheets) resumo.push(`${createdSheets} fichas criadas`);
-      if (createdItems)  resumo.push(`${createdItems} insumos criados`);
+      if (createdSheets)  resumo.push(`${createdSheets} fichas criadas`);
+      if (createdInsumos) resumo.push(`${createdInsumos} insumos criados`);
       toast.success(resumo.join(' · ') + '!');
+
+      // Destaca as fichas atualizadas em verde por 8 segundos
+      setUpdatedSheetIds(highlightIds);
+      setTimeout(() => setUpdatedSheetIds(new Set()), 8000);
+
       load();
     } catch (err) {
+      console.error(err);
       toast.error('Erro ao processar arquivo Excel');
     }
   };
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-32">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div>
@@ -790,13 +811,13 @@ export default function SupervisorSheetsPage() {
                 <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Breve descrição do prato" />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Rendimento</label>
                   <Input type="number" value={yieldQty} onChange={e => setYieldQty(e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Unidade Rendimento</label>
+                  <label className="text-sm text-muted-foreground mb-1 block">Unidade</label>
                   <Select value={yieldUnit} onValueChange={setYieldUnit}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -962,7 +983,7 @@ export default function SupervisorSheetsPage() {
           </thead>
           <tbody className="divide-y divide-border/50">
             {filteredSheets.map((sheet, idx) => (
-              <tr key={sheet.id} className="hover:bg-amber-50 transition-colors group">
+              <tr key={sheet.id} className={cn("transition-colors group", updatedSheetIds.has(sheet.id) ? "bg-green-50 hover:bg-green-100" : "hover:bg-amber-50")}>
                 <td className="px-5 py-2.5 text-muted-foreground text-xs">{idx + 1}</td>
 
                 {/* RECEITA — inline editable */}

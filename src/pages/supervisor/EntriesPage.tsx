@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Upload, FileText, Camera, FileCode, Loader2, Check, X, AlertTriangle, PackagePlus, Download } from 'lucide-react';
+import { Plus, Trash2, Upload, FileText, Camera, FileCode, Loader2, Check, X, AlertTriangle, PackagePlus, Download, Receipt, ShoppingCart, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +43,53 @@ const exportCsv = (rows: string[][], filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+// ─── Searchable item combobox ───
+function ItemSearchCombobox({ items, value, onChange }: {
+  items: { id: string; name: string; unit: string }[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = items.find(i => i.id === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 w-full justify-between text-xs font-normal px-2">
+          <span className={cn("truncate", !selected && "text-muted-foreground")}>
+            {selected ? selected.name : 'Vincular...'}
+          </span>
+          <ChevronsUpDown className="w-3 h-3 shrink-0 opacity-50 ml-1" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar insumo..." className="h-8 text-xs" />
+          <CommandList className="max-h-48">
+            <CommandEmpty className="text-xs py-3 text-center text-muted-foreground">Não encontrado</CommandEmpty>
+            {value && (
+              <CommandGroup>
+                <CommandItem value="__clear__" onSelect={() => { onChange(null); setOpen(false); }} className="text-xs text-destructive">
+                  <X className="w-3 h-3 mr-2 shrink-0" />
+                  Desvincular (criar novo no estoque)
+                </CommandItem>
+              </CommandGroup>
+            )}
+            <CommandGroup>
+              {items.map(item => (
+                <CommandItem key={item.id} value={item.name} onSelect={() => { onChange(item.id); setOpen(false); }} className="text-xs">
+                  <Check className={cn("w-3 h-3 mr-2 shrink-0", value === item.id ? "opacity-100" : "opacity-0")} />
+                  <span className="truncate">{item.name}</span>
+                  <span className="ml-auto text-muted-foreground text-[10px] shrink-0">{item.unit}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function EntriesPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
@@ -63,7 +112,16 @@ export default function EntriesPage() {
   const [parsing, setParsing] = useState(false);
   const [parsedInvoice, setParsedInvoice] = useState<ParsedInvoice | null>(null);
   const [submittingNf, setSubmittingNf] = useState(false);
+  const [importType, setImportType] = useState<'nf' | 'cupom' | 'recibo'>('nf');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Fix orphan entry state
+  const [fixEntry, setFixEntry] = useState<typeof entries[0] | null>(null);
+  const [fixName, setFixName] = useState('');
+  const [fixUnit, setFixUnit] = useState('un');
+  const [fixCategory, setFixCategory] = useState('Outros');
+  const [fixLoading, setFixLoading] = useState(false);
 
   const load = async () => {
     const [itemsRes, entriesRes] = await Promise.all([
@@ -118,6 +176,45 @@ export default function EntriesPage() {
     load();
   };
 
+  const handleFixConfirm = async () => {
+    if (!fixEntry || !fixName.trim()) { toast.error('Digite o nome do insumo'); return; }
+    setFixLoading(true);
+    try {
+      // Try to find existing item first
+      let itemId: string | null = null;
+      const existing = items.find(i => i.name.toLowerCase().trim() === fixName.toLowerCase().trim());
+      if (existing) {
+        itemId = existing.id;
+      } else {
+        // Create new stock item
+        const { data: created, error } = await supabase.from('stock_items').insert({
+          name: fixName.trim(),
+          unit: fixUnit,
+          unit_cost: fixEntry.unit_cost || 0,
+          category: fixCategory,
+          current_stock: 0,
+          min_stock: 0,
+        } as any).select('id, name').single();
+        if (error || !created) throw error;
+        itemId = (created as any).id;
+        // Link to default kitchen
+        const { data: dk } = await supabase.from('kitchens').select('id').eq('is_default', true).single();
+        if (dk) await supabase.from('stock_item_locations').insert({ item_id: itemId, kitchen_id: dk.id, current_stock: 0 } as any);
+        toast.success(`Insumo "${fixName.trim()}" criado!`);
+      }
+      // Update the entry to point to this item
+      await supabase.from('stock_entries').update({ item_id: itemId } as any).eq('id', fixEntry.id);
+      toast.success('Entrada corrigida!');
+      setFixEntry(null);
+      load();
+    } catch (e: any) {
+      toast.error('Erro ao corrigir entrada');
+      console.error(e);
+    } finally {
+      setFixLoading(false);
+    }
+  };
+
   const handleExportCsv = () => {
     const header = ['Data', 'Item', 'Quantidade', 'Unidade', 'Custo Unit.', 'Fornecedor', 'NF', 'Observações'];
     const rows = filtered.map(e => {
@@ -140,18 +237,77 @@ export default function EntriesPage() {
 
   // ─── NF Import Logic ───
 
+  // Client-side XML parser (NF-e) — no edge function needed
+  const parseXmlInvoice = (xml: string) => {
+    const tag = (name: string) => new RegExp(`<(?:[\\w]+:)?${name}>([\\s\\S]*?)<\\/(?:[\\w]+:)?${name}>`, 'i');
+    const tagG = (name: string) => new RegExp(`<(?:[\\w]+:)?${name}[\\s\\S]*?<\\/(?:[\\w]+:)?${name}>`, 'g');
+    const decode = (s: string) => s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&apos;/g,"'").replace(/&quot;/g,'"');
+    const normalizeUnit = (u: string) => {
+      const m: Record<string,string> = { KG:'kg',G:'g',GR:'g',L:'L',LT:'L',ML:'ml',UN:'un',UND:'un',UNID:'un',CX:'cx',PCT:'pct',PC:'un',FD:'cx',DZ:'un',LATA:'lata',GAR:'garrafa',GF:'garrafa' };
+      return m[u.toUpperCase().trim()] || u.toLowerCase();
+    };
+    const invoiceNumber = xml.match(tag('nNF'))?.[1]?.trim() || '';
+    const supplierRaw = xml.match(/<(?:[\w]+:)?emit>[\s\S]*?<(?:[\w]+:)?xNome>(.*?)<\/(?:[\w]+:)?xNome>/i)?.[1] || '';
+    const supplier = decode(supplierRaw.trim());
+    const parsedItems: any[] = [];
+    const detRe = tagG('det');
+    let m;
+    while ((m = detRe.exec(xml)) !== null) {
+      const b = m[0];
+      const name = decode((b.match(tag('xProd'))?.[1] || '').trim());
+      if (!name) continue;
+      const quantity = parseFloat(b.match(tag('qCom'))?.[1] || '0');
+      const unit_cost = parseFloat(b.match(tag('vUnCom'))?.[1] || '0');
+      const unit = normalizeUnit((b.match(tag('uCom'))?.[1] || 'un').trim());
+      const ean = (b.match(tag('cEAN'))?.[1] || '').trim();
+      parsedItems.push({ name, quantity, unit_cost: Math.round(unit_cost * 100) / 100, unit, barcode: ean && ean !== 'SEM GTIN' ? ean : null });
+    }
+    return { supplier, invoice_number: invoiceNumber, items: parsedItems };
+  };
+
+  // Normalize string: lowercase, remove accents, remove non-alphanumeric
+  const normalize = (s: string) =>
+    s.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+      .replace(/[^a-z0-9\s]/g, '')                      // keep only letters/numbers/spaces
+      .replace(/\s+/g, ' ').trim();
+
+  // Returns a score 0-1 of how similar two normalized strings are
+  const similarityScore = (a: string, b: string): number => {
+    if (a === b) return 1;
+    const wordsA = a.split(' ').filter(w => w.length > 2); // ignore short words like "g", "de"
+    const wordsB = b.split(' ').filter(w => w.length > 2);
+    if (wordsA.length === 0 || wordsB.length === 0) return 0;
+    const matches = wordsA.filter(w => wordsB.some(wb => wb.includes(w) || w.includes(wb)));
+    return matches.length / Math.max(wordsA.length, wordsB.length);
+  };
+
   const matchItems = (parsedItems: any[]): ParsedItem[] => {
     return parsedItems.map(pi => {
-      // Try barcode match first
+      // 1. Try barcode match first (exact)
       let match = pi.barcode ? items.find(i => i.barcode === pi.barcode) : null;
 
-      // Then name similarity
+      // 2. Fuzzy name match
       if (!match) {
-        const piName = pi.name.toLowerCase().trim();
-        match = items.find(i => {
-          const iName = i.name.toLowerCase().trim();
-          return iName === piName || piName.includes(iName) || iName.includes(piName);
-        });
+        const piNorm = normalize(pi.name);
+        let bestScore = 0;
+        let bestItem: typeof items[0] | null = null;
+        for (const item of items) {
+          const iNorm = normalize(item.name);
+          // Exact or substring match
+          if (iNorm === piNorm || piNorm.includes(iNorm) || iNorm.includes(piNorm)) {
+            bestItem = item;
+            bestScore = 1;
+            break;
+          }
+          // Word overlap score
+          const score = similarityScore(piNorm, iNorm);
+          if (score > bestScore && score >= 0.5) { // at least 50% word overlap
+            bestScore = score;
+            bestItem = item;
+          }
+        }
+        match = bestItem || null;
       }
 
       return {
@@ -175,31 +331,34 @@ export default function EntriesPage() {
       const isXml = file.name.toLowerCase().endsWith('.xml') || file.type === 'text/xml' || file.type === 'application/xml';
 
       if (isXml) {
+        // Parse XML entirely on the client — no edge function needed
         const text = await file.text();
-        const { data, error } = await supabase.functions.invoke('parse-invoice', {
-          body: { xml: text },
-        });
-        if (error) throw new Error(error.message || 'Erro ao processar XML');
-        const matched = matchItems(data.items || []);
+        const data = parseXmlInvoice(text);
+        if (data.items.length === 0) throw new Error('Nenhum produto encontrado no XML. Verifique se é um arquivo NF-e válido.');
+        const matched = matchItems(data.items);
         setParsedInvoice({ supplier: data.supplier || '', invoice_number: data.invoice_number || '', items: matched });
       } else {
-        // PDF or image — convert to base64
+        // PDF or image — send to edge function (AI)
         const buffer = await file.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        // btoa safe for large files
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
         const mimeType = file.type || 'application/pdf';
 
         const { data, error } = await supabase.functions.invoke('parse-invoice', {
           body: { base64, mimeType },
         });
-        if (error) throw new Error(error.message || 'Erro ao processar NF');
+        if (error) throw new Error('Serviço de IA indisponível. Para PDF e fotos, o sistema precisa da Edge Function implantada no Supabase. Para XML, use o arquivo .xml diretamente.');
         const matched = matchItems(data.items || []);
         setParsedInvoice({ supplier: data.supplier || '', invoice_number: data.invoice_number || '', items: matched });
       }
 
-      toast.success('NF processada! Revise os itens abaixo.');
+      toast.success('Documento processado! Revise os itens abaixo.');
     } catch (e: any) {
       console.error('NF parse error:', e);
-      toast.error(e.message || 'Erro ao processar a nota fiscal');
+      toast.error(e.message || 'Erro ao processar o documento');
     } finally {
       setParsing(false);
     }
@@ -215,8 +374,8 @@ export default function EntriesPage() {
     if (!parsedInvoice) return;
     const updated = [...parsedInvoice.items];
     if (field === 'matched_item_id') {
-      const match = items.find(i => i.id === value);
-      updated[idx] = { ...updated[idx], matched_item_id: value, matched_item_name: match?.name || null, status: 'matched' };
+      const match = value ? items.find(i => i.id === value) : null;
+      updated[idx] = { ...updated[idx], matched_item_id: value || null, matched_item_name: match?.name || null, status: match ? 'matched' : 'unmatched' };
     } else {
       (updated[idx] as any)[field] = value;
     }
@@ -231,10 +390,11 @@ export default function EntriesPage() {
   const createItemFromParsed = async (idx: number) => {
     if (!parsedInvoice) return;
     const pi = parsedInvoice.items[idx];
+    if (!pi.name.trim()) { toast.error('Produto sem nome — edite o nome antes de criar'); return; }
     updateParsedItem(idx, 'status', 'creating');
 
     const { data, error } = await supabase.from('stock_items').insert({
-      name: pi.name,
+      name: pi.name.trim(),
       unit: pi.unit,
       unit_cost: pi.unit_cost,
       category: 'Outros',
@@ -267,18 +427,47 @@ export default function EntriesPage() {
 
   const confirmNfImport = async () => {
     if (!parsedInvoice || !user) return;
-    const validItems = parsedInvoice.items.filter(i => i.matched_item_id);
-    if (validItems.length === 0) { toast.error('Nenhum item vinculado ao estoque'); return; }
+    if (parsedInvoice.items.length === 0) { toast.error('Nenhum item para importar'); return; }
 
     setSubmittingNf(true);
     try {
+      const importLabel = importType === 'cupom' ? 'Cupom Fiscal' : importType === 'recibo' ? 'Recibo' : 'NF';
+      const allItems = [...parsedInvoice.items];
+
+      // Auto-create unmatched items
+      const { data: defaultKitchen } = await supabase.from('kitchens').select('id').eq('is_default', true).single();
+      for (let i = 0; i < allItems.length; i++) {
+        if (!allItems[i].matched_item_id) {
+          const name = allItems[i].name.trim();
+          if (!name) continue;
+          const { data: created } = await supabase.from('stock_items').insert({
+            name,
+            unit: allItems[i].unit,
+            unit_cost: allItems[i].unit_cost || 0,
+            category: 'Outros',
+            current_stock: 0,
+            min_stock: 0,
+            barcode: allItems[i].barcode,
+          } as any).select('id, name').single();
+          if (created) {
+            if (defaultKitchen) {
+              await supabase.from('stock_item_locations').insert({ item_id: (created as any).id, kitchen_id: defaultKitchen.id, current_stock: 0 } as any);
+            }
+            allItems[i] = { ...allItems[i], matched_item_id: (created as any).id };
+          }
+        }
+      }
+
+      const validItems = allItems.filter(i => i.matched_item_id);
+      if (validItems.length === 0) { toast.error('Nenhum item pôde ser importado'); return; }
+
       const inserts = validItems.map(i => ({
         item_id: i.matched_item_id!,
         quantity: i.quantity,
         unit_cost: i.unit_cost || null,
         supplier: parsedInvoice.supplier || null,
         invoice_number: parsedInvoice.invoice_number || null,
-        notes: `Importado via NF`,
+        notes: `Importado via ${importLabel}`,
         registered_by: user.id,
       }));
 
@@ -292,7 +481,7 @@ export default function EntriesPage() {
         }
       }
 
-      toast.success(`${validItems.length} entrada(s) registrada(s) via NF!`);
+      toast.success(`${validItems.length} entrada(s) registrada(s) via ${importLabel}!`);
       setParsedInvoice(null);
       setNfDialogOpen(false);
       load();
@@ -316,14 +505,18 @@ export default function EntriesPage() {
         </div>
         <div className="flex gap-2">
           {/* NF Import */}
-          <Dialog open={nfDialogOpen} onOpenChange={o => { setNfDialogOpen(o); if (!o) setParsedInvoice(null); }}>
+          <Dialog open={nfDialogOpen} onOpenChange={o => { setNfDialogOpen(o); if (!o) { setParsedInvoice(null); setImportType('nf'); } }}>
             <DialogTrigger asChild>
-              <Button variant="outline"><Upload className="w-4 h-4 mr-2" />Importar NF</Button>
+              <Button variant="outline"><Upload className="w-4 h-4 mr-2" />Importar Documento</Button>
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
               <DialogHeader>
-                <DialogTitle>Importar Nota Fiscal</DialogTitle>
-                <DialogDescription>Envie a NF (PDF, foto ou XML) para lançar entradas automaticamente</DialogDescription>
+                <DialogTitle>
+                  {importType === 'cupom' ? 'Importar Cupom Fiscal' : importType === 'recibo' ? 'Importar Recibo' : 'Importar Nota Fiscal'}
+                </DialogTitle>
+                <DialogDescription>
+                  Envie o documento (PDF, foto ou XML) para lançar entradas automaticamente via IA
+                </DialogDescription>
               </DialogHeader>
 
               {!parsedInvoice && !parsing && (
@@ -334,7 +527,7 @@ export default function EntriesPage() {
                   >
                     <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
                     <p className="font-medium text-foreground mb-1">Arraste ou clique para enviar</p>
-                    <p className="text-sm text-muted-foreground">PDF, imagem (JPG/PNG) ou XML da NF-e</p>
+                    <p className="text-sm text-muted-foreground">PDF, imagem (JPG/PNG/WEBP) ou XML da NF-e</p>
                   </div>
                   <input
                     ref={fileInputRef}
@@ -343,23 +536,58 @@ export default function EntriesPage() {
                     className="hidden"
                     onChange={handleNfFileChange}
                   />
+                  {/* Camera input — opens camera directly on mobile */}
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleNfFileChange}
+                  />
                   <div className="grid grid-cols-3 gap-3">
-                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => { fileInputRef.current!.accept = '.pdf'; fileInputRef.current?.click(); }}>
+                    {/* Row 1: NF formats */}
+                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => { setImportType('nf'); fileInputRef.current!.accept = '.pdf'; fileInputRef.current?.click(); }}>
                       <CardContent className="p-4 flex flex-col items-center gap-2">
                         <FileText className="w-6 h-6 text-primary" />
                         <span className="text-xs font-medium">PDF (DANFE)</span>
+                        <span className="text-[10px] text-muted-foreground">Nota Fiscal</span>
                       </CardContent>
                     </Card>
-                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => { fileInputRef.current!.accept = '.jpg,.jpeg,.png,.webp'; fileInputRef.current?.click(); }}>
+                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => { setImportType('nf'); fileInputRef.current!.accept = '.jpg,.jpeg,.png,.webp'; fileInputRef.current?.click(); }}>
                       <CardContent className="p-4 flex flex-col items-center gap-2">
                         <Camera className="w-6 h-6 text-primary" />
-                        <span className="text-xs font-medium">Foto da NF</span>
+                        <span className="text-xs font-medium">Foto da Galeria</span>
+                        <span className="text-[10px] text-muted-foreground">Nota Fiscal</span>
                       </CardContent>
                     </Card>
-                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => { fileInputRef.current!.accept = '.xml'; fileInputRef.current?.click(); }}>
+                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => { setImportType('nf'); fileInputRef.current!.accept = '.xml'; fileInputRef.current?.click(); }}>
                       <CardContent className="p-4 flex flex-col items-center gap-2">
                         <FileCode className="w-6 h-6 text-primary" />
                         <span className="text-xs font-medium">XML (NF-e)</span>
+                        <span className="text-[10px] text-muted-foreground">Nota Fiscal</span>
+                      </CardContent>
+                    </Card>
+                    {/* Row 2: Camera + Cupom + Recibo */}
+                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all border-primary/20 bg-primary/3" onClick={() => { setImportType('nf'); cameraInputRef.current?.click(); }}>
+                      <CardContent className="p-4 flex flex-col items-center gap-2">
+                        <Camera className="w-6 h-6 text-primary" />
+                        <span className="text-xs font-medium">Tirar Foto</span>
+                        <span className="text-[10px] text-muted-foreground">Câmera direta</span>
+                      </CardContent>
+                    </Card>
+                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => { setImportType('cupom'); fileInputRef.current!.accept = '.jpg,.jpeg,.png,.webp,.pdf'; fileInputRef.current?.click(); }}>
+                      <CardContent className="p-4 flex flex-col items-center gap-2">
+                        <ShoppingCart className="w-6 h-6 text-amber-500" />
+                        <span className="text-xs font-medium">Cupom Fiscal</span>
+                        <span className="text-[10px] text-muted-foreground">Foto ou PDF</span>
+                      </CardContent>
+                    </Card>
+                    <Card className="cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all" onClick={() => { setImportType('recibo'); fileInputRef.current!.accept = '.jpg,.jpeg,.png,.webp,.pdf'; fileInputRef.current?.click(); }}>
+                      <CardContent className="p-4 flex flex-col items-center gap-2">
+                        <Receipt className="w-6 h-6 text-amber-500" />
+                        <span className="text-xs font-medium">Recibo</span>
+                        <span className="text-[10px] text-muted-foreground">Foto ou PDF</span>
                       </CardContent>
                     </Card>
                   </div>
@@ -386,16 +614,25 @@ export default function EntriesPage() {
 
                   {/* Items table */}
                   <div className="space-y-2">
-                    <div className="grid grid-cols-[1fr_80px_80px_60px_140px_32px] gap-2 text-[10px] text-muted-foreground px-1 font-medium">
-                      <span>Produto (NF)</span><span>Qtd</span><span>Custo Un.</span><span>Un.</span><span>Estoque</span><span></span>
+                    <div className="grid grid-cols-[1fr_80px_80px_60px_1fr_32px] gap-2 text-[10px] text-muted-foreground px-1 font-medium">
+                      <span>Produto (NF)</span><span>Qtd</span><span>Custo Un.</span><span>Un.</span><span>Vincular ao estoque</span><span></span>
                     </div>
                     {parsedInvoice.items.map((pi, idx) => (
                       <div key={idx} className={cn(
-                        "grid grid-cols-[1fr_80px_80px_60px_140px_32px] gap-2 items-center p-2 rounded-lg",
+                        "grid grid-cols-[1fr_80px_80px_60px_1fr_32px] gap-2 items-center p-2 rounded-lg",
                         pi.matched_item_id ? "bg-emerald-500/5" : "bg-amber-500/5"
                       )}>
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">{pi.name}</p>
+                          {pi.name ? (
+                            <p className="text-xs font-medium text-foreground truncate">{pi.name}</p>
+                          ) : (
+                            <Input
+                              className="h-6 text-xs"
+                              placeholder="Nome do produto..."
+                              value={pi.name}
+                              onChange={e => updateParsedItem(idx, 'name', e.target.value)}
+                            />
+                          )}
                           {pi.matched_item_name && (
                             <p className="text-[10px] text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" />{pi.matched_item_name}</p>
                           )}
@@ -415,33 +652,25 @@ export default function EntriesPage() {
                           onChange={e => updateParsedItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)}
                         />
                         <span className="text-xs text-muted-foreground text-center">{pi.unit}</span>
-                        <div>
-                          {pi.matched_item_id ? (
-                            <Select value={pi.matched_item_id} onValueChange={v => updateParsedItem(idx, 'matched_item_id', v)}>
-                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {items.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <div className="flex gap-1">
-                              <Select onValueChange={v => updateParsedItem(idx, 'matched_item_id', v)}>
-                                <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Vincular..." /></SelectTrigger>
-                                <SelectContent>
-                                  {items.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7 shrink-0"
-                                title="Criar insumo"
-                                disabled={pi.status === 'creating'}
-                                onClick={() => createItemFromParsed(idx)}
-                              >
-                                {pi.status === 'creating' ? <Loader2 className="w-3 h-3 animate-spin" /> : <PackagePlus className="w-3 h-3" />}
-                              </Button>
-                            </div>
+                        <div className="flex gap-1 items-center">
+                          <div className="flex-1">
+                            <ItemSearchCombobox
+                              items={items}
+                              value={pi.matched_item_id}
+                              onChange={v => updateParsedItem(idx, 'matched_item_id', v)}
+                            />
+                          </div>
+                          {!pi.matched_item_id && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7 shrink-0 border-primary/40 text-primary hover:bg-primary/10"
+                              title={`Criar "${pi.name}" no estoque e vincular`}
+                              disabled={pi.status === 'creating' || !pi.name.trim()}
+                              onClick={() => createItemFromParsed(idx)}
+                            >
+                              {pi.status === 'creating' ? <Loader2 className="w-3 h-3 animate-spin" /> : <PackagePlus className="w-3 h-3" />}
+                            </Button>
                           )}
                         </div>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeParsedItem(idx)}>
@@ -452,16 +681,16 @@ export default function EntriesPage() {
                   </div>
 
                   {unmatchedCount > 0 && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-400 text-xs">
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-600 text-xs">
                       <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span>{unmatchedCount} item(ns) não encontrado(s) no estoque. Vincule manualmente ou crie novos insumos.</span>
+                      <span>{unmatchedCount} item(ns) não vinculado(s). Clique em <PackagePlus className="w-3 h-3 inline mx-0.5" /> para criar no estoque e vincular, ou selecione um item existente no combobox.</span>
                     </div>
                   )}
 
                   <div className="flex gap-3 pt-2">
-                    <Button onClick={confirmNfImport} className="flex-1" disabled={submittingNf || matchedCount === 0}>
+                    <Button onClick={confirmNfImport} className="flex-1" disabled={submittingNf || parsedInvoice.items.length === 0}>
                       {submittingNf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                      Confirmar {matchedCount} entrada(s)
+                      Confirmar {parsedInvoice.items.length} entrada(s)
                     </Button>
                     <Button variant="outline" onClick={() => setParsedInvoice(null)}>Reenviar NF</Button>
                   </div>
@@ -565,7 +794,16 @@ export default function EntriesPage() {
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {new Date(entry.date).toLocaleDateString('pt-BR')}
                     </TableCell>
-                    <TableCell className="font-medium">{item?.name || '?'}</TableCell>
+                    <TableCell className="font-medium">
+                      {item?.name || (
+                        <button
+                          onClick={() => { setFixEntry(entry); setFixName(''); setFixUnit('un'); setFixCategory('Outros'); }}
+                          className="text-amber-500 italic text-xs underline underline-offset-2 hover:text-amber-400 transition-colors"
+                        >
+                          ⚠ Corrigir item
+                        </button>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right text-emerald-400 font-semibold">+{entry.quantity}</TableCell>
                     <TableCell className="text-muted-foreground text-xs font-medium">{item?.unit || ''}</TableCell>
                     <TableCell className="text-muted-foreground">
@@ -596,6 +834,59 @@ export default function EntriesPage() {
           )}
         </div>
       )}
+      {/* ── Fix orphan entry dialog ── */}
+      <Dialog open={!!fixEntry} onOpenChange={o => { if (!o) setFixEntry(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Corrigir entrada</DialogTitle>
+            <DialogDescription>
+              Informe o insumo desta entrada para religar ao estoque.
+              {fixEntry && <span className="block mt-1 text-xs">Qtd: <strong>+{fixEntry.quantity}</strong> · Custo: <strong>R$ {fixEntry.unit_cost ?? '—'}</strong> · NF: <strong>{fixEntry.invoice_number || '—'}</strong></span>}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Nome do insumo</label>
+              <ItemSearchCombobox
+                items={items}
+                value={null}
+                onChange={id => {
+                  const found = items.find(i => i.id === id);
+                  if (found) { setFixName(found.name); setFixUnit(found.unit); }
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Ou digite abaixo para criar novo:</p>
+              <Input
+                className="mt-1"
+                placeholder="Nome do produto (ex: Torrada Rústica 150g)"
+                value={fixName}
+                onChange={e => setFixName(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Unidade</label>
+                <Select value={fixUnit} onValueChange={setFixUnit}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['un', 'kg', 'g', 'L', 'ml', 'cx', 'pct', 'lata', 'bd', 'fatias'].map(u => (
+                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
+                <Input placeholder="Outros" value={fixCategory} onChange={e => setFixCategory(e.target.value)} />
+              </div>
+            </div>
+            <Button className="w-full" onClick={handleFixConfirm} disabled={fixLoading || !fixName.trim()}>
+              {fixLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+              Criar e religar insumo
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
