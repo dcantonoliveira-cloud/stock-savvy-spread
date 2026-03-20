@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Trash2, Shield, User, ArrowUpCircle } from 'lucide-react';
+import { Plus, Trash2, Shield, User, ArrowUpCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Employee = {
@@ -23,11 +23,11 @@ export default function UsersPage() {
   const [newName, setNewName] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    // Get all profiles with roles and permissions
     const { data: profiles } = await supabase.from('profiles').select('user_id, display_name, email');
-    if (!profiles) return;
+    if (!profiles) { setLoading(false); return; }
 
     const { data: roles } = await supabase.from('user_roles').select('user_id, role');
     const { data: perms } = await supabase.from('employee_permissions').select('user_id, can_entry, can_output');
@@ -46,6 +46,7 @@ export default function UsersPage() {
     });
 
     setEmployees(emps);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -114,6 +115,12 @@ export default function UsersPage() {
   const employeeList = employees.filter(e => e.role === 'employee');
   const supervisorList = employees.filter(e => e.role === 'supervisor');
   const noAccess = employees.filter(e => e.role === 'sem acesso');
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div>

@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, DollarSign } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -32,19 +32,21 @@ export default function CategoriesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
     const [itemsRes, catsRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost').order('name'),
       supabase.from('categories').select('name').order('name'),
     ]);
-    
+
     const dbCats = (catsRes.data || []).map((c: any) => c.name);
     const usedCats = itemsRes.data ? [...new Set((itemsRes.data as any[]).map(i => i.category))] : [];
     const allCats = [...new Set([...dbCats, ...usedCats])];
-    
+
     if (itemsRes.data) setItems(itemsRes.data);
     setCategories(allCats);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -121,6 +123,12 @@ export default function CategoriesPage() {
   const navigateToCategory = (catName: string) => {
     navigate(`/categories/${encodeURIComponent(catName)}`);
   };
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div>

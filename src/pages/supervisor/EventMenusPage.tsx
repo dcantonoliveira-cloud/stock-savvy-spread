@@ -11,8 +11,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import {
   Plus, Trash2, Eye, Pencil, X, Upload, Loader2, CheckCircle2,
   AlertCircle, Copy, FileImage, ArrowRight, Package, ChevronsUpDown,
-  Check, PackagePlus, AlertTriangle, Clock
+  Check, PackagePlus, AlertTriangle, Clock, ShoppingCart
 } from 'lucide-react';
+import ConsolidatedShoppingListDialog from '@/components/ConsolidatedShoppingListDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -272,9 +273,13 @@ export default function EventMenusPage() {
   const [creatingInitialName, setCreatingInitialName] = useState('');
   const [duplicatingSheet, setDuplicatingSheet] = useState<Sheet | null>(null);
   const [duplicatingForIdx, setDuplicatingForIdx] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedMenuIds, setSelectedMenuIds] = useState<Set<string>>(new Set());
+  const [consolidatedOpen, setConsolidatedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
+    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) setCurrentUserEmail(user.email || null);
     const [menusRes, sheetsRes, itemsRes, aliasesRes] = await Promise.all([
@@ -302,6 +307,7 @@ export default function EventMenusPage() {
       }));
       setMenus(loaded);
     }
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -553,6 +559,27 @@ export default function EventMenusPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Floating bar when events are selected */}
+      {selectedMenuIds.size >= 2 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-foreground text-background px-5 py-3 rounded-full shadow-xl">
+          <span className="text-sm font-medium">{selectedMenuIds.size} eventos selecionados</span>
+          <Button size="sm" className="rounded-full gap-2 bg-primary text-white hover:bg-primary/90"
+            onClick={() => setConsolidatedOpen(true)}>
+            <ShoppingCart className="w-4 h-4" />
+            Lista Consolidada
+          </Button>
+          <button className="text-background/60 hover:text-background ml-1" onClick={() => setSelectedMenuIds(new Set())}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <ConsolidatedShoppingListDialog
+        open={consolidatedOpen}
+        onClose={() => setConsolidatedOpen(false)}
+        menuIds={Array.from(selectedMenuIds)}
+      />
+
       <SheetViewEditDialog open={viewingSheet !== null} onClose={() => setViewingSheet(null)} sheet={viewingSheet} stockItems={stockItems} onSaved={(updated) => { setSheets(prev => prev.map(s => s.id === updated.id ? updated : s)); setViewingSheet(null); }} />
       <CreateSheetDialog open={creatingForIdx !== null} onClose={() => { setCreatingForIdx(null); setCreatingInitialName(''); }} initialName={creatingInitialName} stockItems={stockItems} onCreated={(newSheet) => { setSheets(prev => [...prev, newSheet].sort((a, b) => a.name.localeCompare(b.name))); if (creatingForIdx !== null) updateMatch(creatingForIdx, newSheet.id); setCreatingForIdx(null); }} />
       {duplicatingSheet && <CreateSheetDialog open={true} onClose={() => { setDuplicatingSheet(null); setDuplicatingForIdx(null); }} initialName={`${duplicatingSheet.name} (variação)`} stockItems={stockItems} onCreated={(newSheet) => { setSheets(prev => [...prev, newSheet].sort((a, b) => a.name.localeCompare(b.name))); if (duplicatingForIdx !== null) updateMatch(duplicatingForIdx, newSheet.id); setDuplicatingSheet(null); setDuplicatingForIdx(null); }} />}
@@ -561,6 +588,12 @@ export default function EventMenusPage() {
         <table className="w-full text-sm min-w-[900px]">
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground bg-muted/20">
+              <th className="text-left px-3 py-2.5 w-8">
+                <input type="checkbox" className="rounded"
+                  checked={menus.length > 0 && selectedMenuIds.size === menus.length}
+                  onChange={e => setSelectedMenuIds(e.target.checked ? new Set(menus.map(m => m.id)) : new Set())}
+                />
+              </th>
               <th className="text-left px-5 py-2.5 w-8">#</th>
               <th className="text-left px-3 py-2.5">CARDÁPIO</th>
               <th className="text-center px-3 py-2.5">STATUS</th>
@@ -574,12 +607,39 @@ export default function EventMenusPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
-            {menus.map((menu, idx) => (
+            {loading && Array.from({ length: 4 }).map((_, i) => (
+              <tr key={i} className="animate-pulse">
+                <td className="px-3 py-3"><div className="w-4 h-4 bg-muted rounded" /></td>
+                <td className="px-5 py-3"><div className="w-4 h-4 bg-muted rounded" /></td>
+                <td className="px-3 py-3"><div className="h-4 bg-muted rounded w-40" /></td>
+                <td className="px-3 py-3 text-center"><div className="h-4 bg-muted rounded w-16 mx-auto" /></td>
+                <td className="px-3 py-3 text-center"><div className="h-4 bg-muted rounded w-20 mx-auto" /></td>
+                <td className="px-3 py-3"><div className="h-4 bg-muted rounded w-24" /></td>
+                <td className="px-3 py-3 text-center"><div className="h-4 bg-muted rounded w-8 mx-auto" /></td>
+                <td className="px-3 py-3 text-center"><div className="h-4 bg-muted rounded w-8 mx-auto" /></td>
+                <td className="px-3 py-3"><div className="h-4 bg-muted rounded w-24" /></td>
+                <td className="px-3 py-3 text-center"><div className="h-4 bg-muted rounded w-16 mx-auto" /></td>
+                <td className="px-3 py-3"><div className="h-4 bg-muted rounded w-16 mx-auto" /></td>
+              </tr>
+            ))}
+            {!loading && menus.map((menu, idx) => (
               <tr
                 key={menu.id}
                 className="hover:bg-amber-50 transition-colors cursor-pointer"
                 onClick={() => navigate(`/event-menus/${menu.id}`)}
               >
+                <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                  <input type="checkbox" className="rounded"
+                    checked={selectedMenuIds.has(menu.id)}
+                    onChange={e => {
+                      setSelectedMenuIds(prev => {
+                        const next = new Set(prev);
+                        e.target.checked ? next.add(menu.id) : next.delete(menu.id);
+                        return next;
+                      });
+                    }}
+                  />
+                </td>
                 <td className="px-5 py-3 text-muted-foreground text-xs">{idx + 1}</td>
                 <td className="px-3 py-3">
                   <span className="font-medium text-foreground">{menu.name}</span>
@@ -620,9 +680,9 @@ export default function EventMenusPage() {
                 </td>
               </tr>
             ))}
-            {menus.length === 0 && (
+            {!loading && menus.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-5 py-16 text-center text-muted-foreground">
+                <td colSpan={11} className="px-5 py-16 text-center text-muted-foreground">
                   <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p>Nenhum cardápio criado ainda.</p>
                 </td>

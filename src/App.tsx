@@ -28,10 +28,15 @@ import KitchensPage from "./pages/supervisor/KitchensPage";
 import EventMenusPage from "./pages/supervisor/EventMenusPage";
 import EventMenuDetailPage from "./pages/supervisor/EventMenuDetailPage";
 import FornecedoresPage from "./pages/supervisor/FornecedoresPage";
+import FornecedorDetailPage from "./pages/supervisor/FornecedorDetailPage";
+import ShoppingListsPage from "./pages/supervisor/ShoppingListsPage";
+import ShoppingListDetailPage from "./pages/supervisor/ShoppingListDetailPage";
 import MobileSupervisorApp from "./pages/supervisor/MobileSupervisorApp";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
+import EmployeeInventoryPage from "./pages/employee/EmployeeInventoryPage";
+import EmployeeEventsPage from "./pages/employee/EmployeeEventsPage";
 
 import PublicInventoryPage from "./pages/public/PublicInventoryPage";
 import NotFound from "./pages/NotFound";
@@ -82,6 +87,9 @@ function AppRoutes() {
           <Route path="/sheets/:id" element={<SheetDetailPage />} />
           <Route path="/event-menus" element={<EventMenusPage />} />
           <Route path="/event-menus/:id" element={<EventMenuDetailPage />} />
+          <Route path="/shopping-lists" element={<ShoppingListsPage />} />
+          <Route path="/shopping-lists/view" element={<ShoppingListDetailPage />} />
+          <Route path="/shopping-lists/saved/:listId" element={<ShoppingListDetailPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/kitchens" element={<KitchensPage />} />
@@ -89,6 +97,7 @@ function AppRoutes() {
           <Route path="/analysis" element={<AIAnalysisPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/fornecedores" element={<FornecedoresPage />} />
+          <Route path="/fornecedores/:supplierName" element={<FornecedorDetailPage />} />
           <Route path="/invoices" element={<Navigate to="/entries" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -100,6 +109,8 @@ function AppRoutes() {
     <EmployeeLayout>
       <Routes>
         <Route path="/" element={<EmployeeDashboard />} />
+        <Route path="/inventario" element={<EmployeeInventoryPage />} />
+        <Route path="/eventos" element={<EmployeeEventsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </EmployeeLayout>
@@ -113,7 +124,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/inventario" element={<PublicInventoryPage />} />
+          <Route path="/pub-inv" element={<PublicInventoryPage />} />
           <Route path="/*" element={
             <AuthProvider>
               <AppRoutes />
