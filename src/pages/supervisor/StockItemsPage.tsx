@@ -123,8 +123,15 @@ function SupplierDialog({ item, open, onClose }: { item: Item | null; open: bool
           {suppliers.length === 0 && !adding && <p className="text-sm text-muted-foreground text-center py-4">Nenhum fornecedor cadastrado.</p>}
           {suppliers.map(s => (
             <div key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border ${s.is_preferred ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
-              <button onClick={() => setPreferred(s.id)}>
-                {s.is_preferred ? <Star className="w-4 h-4 text-primary fill-primary" /> : <StarOff className="w-4 h-4 text-muted-foreground hover:text-primary" />}
+              <button
+                onClick={() => setPreferred(s.id)}
+                title={s.is_preferred ? 'Preferido' : 'Clique para definir como preferido'}
+                className="cursor-pointer hover:scale-110 transition-transform p-0.5"
+              >
+                {s.is_preferred
+                  ? <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
+                  : <StarOff className="w-4 h-4 text-muted-foreground/40 hover:text-amber-400 transition-colors" />
+                }
               </button>
               <span className="flex-1 text-sm font-medium">{s.supplier_name}</span>
               <div className="flex items-center gap-1">
@@ -382,8 +389,11 @@ export default function StockItemsPage() {
   const [supplierItem, setSupplierItem] = useState<Item | null>(null);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'current_stock' | 'unit_cost'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cellInputRef = useRef<HTMLInputElement>(null);
 
@@ -403,6 +413,7 @@ export default function StockItemsPage() {
       suppMap[s.item_id].push(s);
     }
     setSuppliers(suppMap);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -442,29 +453,52 @@ export default function StockItemsPage() {
     load();
   };
 
-  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleExcelFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const data = await file.arrayBuffer();
-    const wb = XLSX.read(data);
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows: any[] = XLSX.utils.sheet_to_json(ws);
-    let count = 0;
-    for (const row of rows) {
-      const name = row['Nome']?.toString().trim();
-      if (!name) continue;
-      const { error } = await supabase.from('stock_items').insert({
-        name, category: row['Categoria'] || 'Outros', unit: row['Unidade'] || 'un',
-        current_stock: parseFloat(row['Estoque Atual']) || 0,
-        min_stock: parseFloat(row['Estoque Mínimo']) || 0,
-        unit_cost: parseFloat(row['Custo Unitário']) || 0,
-      } as any);
-      if (!error) count++;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const wb = XLSX.read(ev.target?.result);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws);
+      const parsed = rows
+        .map(row => ({
+          name: (row['Nome'] || row['NOME'] || row['name'])?.toString().trim() || '',
+          category: row['Categoria'] || row['CATEGORIA'] || row['category'] || 'Outros',
+          unit: row['Unidade'] || row['UNIDADE'] || row['unit'] || 'un',
+          current_stock: parseFloat(row['Estoque Atual'] ?? row['current_stock']) || 0,
+          min_stock: parseFloat(row['Estoque Mínimo'] ?? row['min_stock']) || 0,
+          unit_cost: parseFloat(row['Custo Unitário'] ?? row['unit_cost']) || 0,
+        }))
+        .filter(r => r.name);
+      setImportRows(parsed);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importRows.length) return;
+    setImportLoading(true);
+
+    // Delete all existing items whose names appear in the spreadsheet (removes duplicates too)
+    const names = importRows.map(r => r.name);
+    const { error: delError } = await supabase.from('stock_items').delete().in('name', names);
+    if (delError) { console.error('Erro ao limpar itens existentes:', delError.message); }
+
+    // Insert all rows fresh
+    const { error } = await supabase.from('stock_items').insert(importRows as any);
+    if (error) {
+      console.error('Erro ao importar:', error.message);
+      toast.error('Erro ao importar planilha.');
+    } else {
+      toast.success(`${importRows.length} itens importados com sucesso!`);
     }
-    toast.success(`${count} itens importados!`);
+
+    setImportLoading(false);
     setImportDialogOpen(false);
-    load();
+    setImportRows([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    load();
   };
 
   const exportStock = () => {
@@ -507,6 +541,12 @@ export default function StockItemsPage() {
     });
 
   const totalValue = filtered.reduce((s, i) => s + i.current_stock * i.unit_cost, 0);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div>
@@ -695,11 +735,19 @@ export default function StockItemsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+      <Dialog open={importDialogOpen} onOpenChange={o => { setImportDialogOpen(o); if (!o) setImportRows([]); }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Importar Itens</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">Planilha com colunas: Nome, Categoria, Unidade, Estoque Atual, Estoque Mínimo, Custo Unitário</p>
-          <Input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleExcelUpload} />
+          <Input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleExcelFileSelect} />
+          {importRows.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm text-green-600 font-medium">{importRows.length} itens encontrados na planilha</p>
+              <Button className="w-full" onClick={handleImportConfirm} disabled={importLoading}>
+                {importLoading ? 'Importando...' : `Importar ${importRows.length} itens`}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

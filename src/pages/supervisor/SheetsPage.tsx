@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDo
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { getCompatibleUnits, calcRecipeUnitCost } from '@/lib/units';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number };
 type SheetItem = {
@@ -198,6 +200,7 @@ function QuickCreateItemDialog({ open, onClose, onCreated }: {
 const YIELD_UNITS = ['kg', 'g', 'L', 'ml', 'un', 'unid', 'pct', 'cx', 'bd', 'fatias'];
 
 export default function SupervisorSheetsPage() {
+  const navigate = useNavigate();
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -249,6 +252,9 @@ export default function SupervisorSheetsPage() {
           const { data: si } = await supabase.from('technical_sheet_items').select('*').eq('sheet_id', s.id);
           const sheetItems: SheetItem[] = (si || []).map((i: any) => {
             const item = itemsRes.data?.find((x: any) => x.id === i.item_id);
+            const itemUnit = (item as any)?.unit || '';
+            const recipeUnit = i.unit || itemUnit;
+            const baseUnitCost = (item as any)?.unit_cost || 0;
             return {
               id: i.id,
               item_id: i.item_id,
@@ -256,8 +262,8 @@ export default function SupervisorSheetsPage() {
               quantity: i.quantity,
               gross_quantity: i.gross_quantity || i.quantity,
               correction_factor: i.correction_factor || 1,
-              unit: (item as any)?.unit || '',
-              unit_cost: (item as any)?.unit_cost || 0, // sempre usa preço atual do insumo
+              unit: recipeUnit,
+              unit_cost: calcRecipeUnitCost(baseUnitCost, itemUnit, recipeUnit),
             };
           });
           return { ...s, items: sheetItems } as Sheet;
@@ -326,6 +332,11 @@ export default function SupervisorSheetsPage() {
         item_name: si?.name || '', unit: si?.unit || '',
         unit_cost: si?.unit_cost || 0,
       };
+    } else if (field === 'unit') {
+      const si = stockItems.find(s => s.id === updated[idx].item_id);
+      const itemUnit = si?.unit || value;
+      const newCost = calcRecipeUnitCost(si?.unit_cost || 0, itemUnit, value);
+      updated[idx] = { ...updated[idx], unit: value, unit_cost: newCost };
     } else if (field === 'quantity') {
       const qty = parseFloat(value) || 0;
       updated[idx] = { ...updated[idx], quantity: qty, gross_quantity: qty };
@@ -361,7 +372,7 @@ export default function SupervisorSheetsPage() {
         validItems.map(i => ({
           sheet_id: editingSheet.id, item_id: i.item_id, quantity: i.quantity,
           gross_quantity: i.gross_quantity, correction_factor: i.correction_factor,
-          unit_cost: i.unit_cost,
+          unit_cost: i.unit_cost, unit: i.unit || null,
         })) as any
       );
       toast.success('Ficha técnica atualizada!');
@@ -373,7 +384,7 @@ export default function SupervisorSheetsPage() {
         validItems.map(i => ({
           sheet_id: (sheet as any).id, item_id: i.item_id, quantity: i.quantity,
           gross_quantity: i.gross_quantity, correction_factor: i.correction_factor,
-          unit_cost: i.unit_cost,
+          unit_cost: i.unit_cost, unit: i.unit || null,
         })) as any
       );
       toast.success('Ficha técnica criada!');
@@ -835,27 +846,42 @@ export default function SupervisorSheetsPage() {
                 </div>
 
                 {formItems.length > 0 && (
-                  <div className="grid grid-cols-[1fr_90px_50px_80px_80px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
+                  <div className="grid grid-cols-[1fr_80px_70px_80px_80px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
                     <span>Item</span><span>Quantidade</span><span>Un.</span>
                     <span>Custo Unit.</span><span>Custo Total</span><span></span>
                   </div>
                 )}
 
-                {formItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_90px_50px_80px_80px_32px] gap-1 items-center mb-1">
-                    <ItemCombobox
-                      stockItems={stockItems}
-                      value={item.item_id}
-                      onSelect={v => updateItem(idx, 'item_id', v)}
-                      onCreateNew={() => setQuickCreateOpen(true)}
-                    />
-                    <Input type="number" step="any" className="h-8 text-xs" placeholder="Ex: 0.1" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} />
-                    <span className="text-xs text-muted-foreground text-center">{item.unit}</span>
-                    <Input type="number" step="0.01" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
-                    <span className="text-xs font-medium text-foreground text-center">R$ {(item.quantity * item.unit_cost).toFixed(2)}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
-                  </div>
-                ))}
+                {formItems.map((item, idx) => {
+                  const compatUnits = item.item_id
+                    ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit)
+                    : [item.unit].filter(Boolean);
+                  return (
+                    <div key={idx} className="grid grid-cols-[1fr_80px_70px_80px_80px_32px] gap-1 items-center mb-1">
+                      <ItemCombobox
+                        stockItems={stockItems}
+                        value={item.item_id}
+                        onSelect={v => updateItem(idx, 'item_id', v)}
+                        onCreateNew={() => setQuickCreateOpen(true)}
+                      />
+                      <Input type="number" step="any" className="h-8 text-xs" placeholder="Ex: 100" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} />
+                      {compatUnits.length > 1 ? (
+                        <select
+                          className="h-8 text-xs border border-input rounded-md px-1 bg-background cursor-pointer"
+                          value={item.unit}
+                          onChange={e => updateItem(idx, 'unit', e.target.value)}
+                        >
+                          {compatUnits.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground text-center">{item.unit}</span>
+                      )}
+                      <Input type="number" step="0.01" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
+                      <span className="text-xs font-medium text-foreground text-center">R$ {(item.quantity * item.unit_cost).toFixed(2)}</span>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
+                    </div>
+                  );
+                })}
 
                 {formItems.length > 0 && (
                   <div className="flex justify-end mt-2 pr-10">
@@ -1099,7 +1125,7 @@ export default function SupervisorSheetsPage() {
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-center gap-0.5">
-                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Visualizar" onClick={() => setViewingSheet(sheet)}>
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title="Abrir ficha" onClick={() => navigate(`/sheets/${sheet.id}`)}>
                       <Eye className="w-3.5 h-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon" className="w-7 h-7" title="Editar" onClick={() => openEditDialog(sheet)}>
