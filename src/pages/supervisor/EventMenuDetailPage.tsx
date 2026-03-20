@@ -19,9 +19,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { convertToItemUnit } from '@/lib/units';
 import { useAuth } from '@/hooks/useAuth';
 
 const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
+
+const fmtQty = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+const fmtCur = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; current_stock: number; category: string };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
@@ -427,7 +431,7 @@ function AssignSeparationDialog({ open, onClose, menuId, employees, shoppingList
                       return (
                         <tr key={item.id} className={!ok ? 'bg-destructive/5' : ''}>
                           <td className="py-1.5 px-3 text-foreground">{item.name} <span className="text-muted-foreground text-xs">({item.unit})</span></td>
-                          <td className="py-1.5 px-3 text-right text-muted-foreground whitespace-nowrap text-xs">{item.needed.toFixed(3)}</td>
+                          <td className="py-1.5 px-3 text-right text-muted-foreground whitespace-nowrap text-xs">{fmtQty(item.needed)}</td>
                           <td className={`py-1.5 px-3 text-right font-medium whitespace-nowrap text-xs ${ok ? 'text-success' : 'text-destructive'}`}>{stock}</td>
                           <td className="py-1.5 px-3 text-center w-8">
                             {ok
@@ -478,11 +482,11 @@ function ReturnDialog({ open, onClose, items, onConfirm, loading }: {
         </DialogHeader>
 
         <div className="flex items-center gap-4 p-3 rounded-xl bg-card border border-border text-sm">
-          <div><span className="text-muted-foreground">Total saiu: </span><span className="font-semibold">{totalDispatched.toFixed(2)}</span></div>
+          <div><span className="text-muted-foreground">Total saiu: </span><span className="font-semibold">{fmtQty(totalDispatched)}</span></div>
           <div className="w-px h-4 bg-border" />
-          <div><span className="text-muted-foreground">Retornando: </span><span className="font-semibold text-success">{totalReturned.toFixed(2)}</span></div>
+          <div><span className="text-muted-foreground">Retornando: </span><span className="font-semibold text-success">{fmtQty(totalReturned)}</span></div>
           <div className="w-px h-4 bg-border" />
-          <div><span className="text-muted-foreground">Consumo real: </span><span className="font-semibold text-primary">{(totalDispatched - totalReturned).toFixed(2)}</span></div>
+          <div><span className="text-muted-foreground">Consumo real: </span><span className="font-semibold text-primary">{fmtQty(totalDispatched - totalReturned)}</span></div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -499,7 +503,7 @@ function ReturnDialog({ open, onClose, items, onConfirm, loading }: {
               {editItems.map((item, idx) => (
                 <tr key={item.item_id}>
                   <td className="py-2 px-3 text-foreground">{item.item_name} <span className="text-muted-foreground text-xs">({item.unit})</span></td>
-                  <td className="py-2 px-3 text-right text-muted-foreground">{item.dispatched.toFixed(3)}</td>
+                  <td className="py-2 px-3 text-right text-muted-foreground">{fmtQty(item.dispatched)}</td>
                   <td className="py-2 px-3 text-right">
                     <Input
                       type="number" step="any"
@@ -510,7 +514,7 @@ function ReturnDialog({ open, onClose, items, onConfirm, loading }: {
                     />
                   </td>
                   <td className="py-2 px-3 text-right font-medium text-foreground">
-                    {(item.dispatched - item.returned).toFixed(3)}
+                    {fmtQty(item.dispatched - item.returned)}
                   </td>
                 </tr>
               ))}
@@ -551,9 +555,9 @@ function DishExpandedView({ dish }: { dish: MenuDish }) {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="text-left pb-2">Insumo</th><th className="text-right pb-2">Na receita</th><th className="text-right pb-2">Para {dish.planned_quantity} {dish.planned_unit}</th><th className="text-right pb-2">Custo</th></tr></thead>
             <tbody className="divide-y divide-border/40">
-              {recipeItems.map(si => (<tr key={si.item_id}><td className="py-2 text-foreground">{si.item_name} <span className="text-muted-foreground text-xs">({si.unit})</span></td><td className="py-2 text-right text-muted-foreground">{si.quantity}</td><td className="py-2 text-right font-medium text-foreground">{(si.quantity * scale).toFixed(3)}</td><td className="py-2 text-right text-muted-foreground text-xs">R$ {(si.quantity * scale * si.unit_cost).toFixed(2)}</td></tr>))}
+              {recipeItems.map(si => (<tr key={si.item_id}><td className="py-2 text-foreground">{si.item_name} <span className="text-muted-foreground text-xs">({si.unit})</span></td><td className="py-2 text-right text-muted-foreground">{si.quantity}</td><td className="py-2 text-right font-medium text-foreground">{fmtQty(si.quantity * scale)}</td><td className="py-2 text-right text-muted-foreground text-xs">R$ {fmtCur(si.quantity * scale * si.unit_cost)}</td></tr>))}
             </tbody>
-            <tfoot><tr className="border-t border-border"><td colSpan={3} className="pt-2 text-right text-xs font-semibold text-muted-foreground">Total receita:</td><td className="pt-2 text-right text-sm font-bold text-primary">R$ {recipeItems.reduce((s, i) => s + i.quantity * scale * i.unit_cost, 0).toFixed(2)}</td></tr></tfoot>
+            <tfoot><tr className="border-t border-border"><td colSpan={3} className="pt-2 text-right text-xs font-semibold text-muted-foreground">Total receita:</td><td className="pt-2 text-right text-sm font-bold text-primary">R$ {fmtCur(recipeItems.reduce((s, i) => s + i.quantity * scale * i.unit_cost, 0))}</td></tr></tfoot>
           </table>
         </div>
       )}
@@ -563,7 +567,7 @@ function DishExpandedView({ dish }: { dish: MenuDish }) {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-amber-200 text-xs text-muted-foreground"><th className="text-left pb-2">Item</th><th className="text-right pb-2">Na receita</th><th className="text-right pb-2">Para {dish.planned_quantity} {dish.planned_unit}</th><th className="text-right pb-2">Custo</th></tr></thead>
             <tbody className="divide-y divide-amber-100">
-              {decoItems.map(si => (<tr key={si.item_id} style={{ background: 'hsl(38 80% 99%)' }}><td className="py-2 text-foreground">{si.item_name} <span className="text-muted-foreground text-xs">({si.unit})</span></td><td className="py-2 text-right text-muted-foreground">{si.quantity}</td><td className="py-2 text-right font-medium text-foreground">{(si.quantity * scale).toFixed(3)}</td><td className="py-2 text-right text-muted-foreground text-xs">R$ {(si.quantity * scale * si.unit_cost).toFixed(2)}</td></tr>))}
+              {decoItems.map(si => (<tr key={si.item_id} style={{ background: 'hsl(38 80% 99%)' }}><td className="py-2 text-foreground">{si.item_name} <span className="text-muted-foreground text-xs">({si.unit})</span></td><td className="py-2 text-right text-muted-foreground">{si.quantity}</td><td className="py-2 text-right font-medium text-foreground">{fmtQty(si.quantity * scale)}</td><td className="py-2 text-right text-muted-foreground text-xs">R$ {fmtCur(si.quantity * scale * si.unit_cost)}</td></tr>))}
             </tbody>
           </table>
         </div>
@@ -634,8 +638,8 @@ export default function EventMenuDetailPage() {
 
     if (sheetsRes.data) {
       const loaded = await Promise.all((sheetsRes.data as any[]).map(async s => {
-        const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section').eq('sheet_id', s.id);
-        const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: item?.unit || '', unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita' }; });
+        const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, unit').eq('sheet_id', s.id);
+        const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); const recipeUnit = i.unit || item?.unit || ''; return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: recipeUnit, unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita' }; });
         return { ...s, items } as Sheet;
       }));
       setAllSheets(loaded);
@@ -691,10 +695,13 @@ export default function EventMenuDetailPage() {
       if (recipeItems.length === 0) { noIngredients.push(dish.sheet_name); return; }
       const scale = dish.planned_quantity / (dish.sheet.yield_quantity || 1);
       recipeItems.forEach(si => {
-        const needed = si.quantity * scale;
+        const s = stock.find(x => x.id === si.item_id);
+        const itemUnit = s?.unit || si.unit;
+        // Convert recipe quantity to item's base unit before aggregating
+        const qtyInItemUnit = convertToItemUnit(si.quantity, si.unit, itemUnit);
+        const needed = qtyInItemUnit * scale;
         if (!map[si.item_id]) {
-          const s = stock.find(x => x.id === si.item_id);
-          map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true };
+          map[si.item_id] = { id: si.item_id, name: si.item_name, unit: itemUnit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: s?.unit_cost || si.unit_cost, hasStock: true };
         }
         map[si.item_id].needed += needed;
       });
@@ -707,10 +714,12 @@ export default function EventMenuDetailPage() {
       if (!dish.sheet) return;
       const scale = guestCount / (dish.sheet.yield_quantity || 1);
       dish.sheet.items.forEach(si => {
-        const needed = si.quantity * scale;
+        const s = stock.find(x => x.id === si.item_id);
+        const itemUnit = s?.unit || si.unit;
+        const qtyInItemUnit = convertToItemUnit(si.quantity, si.unit, itemUnit);
+        const needed = qtyInItemUnit * scale;
         if (!map[si.item_id]) {
-          const s = stock.find(x => x.id === si.item_id);
-          map[si.item_id] = { id: si.item_id, name: si.item_name, unit: si.unit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: si.unit_cost, hasStock: true };
+          map[si.item_id] = { id: si.item_id, name: si.item_name, unit: itemUnit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: s?.unit_cost || si.unit_cost, hasStock: true };
         }
         map[si.item_id].needed += needed;
       });
@@ -771,7 +780,7 @@ export default function EventMenuDetailPage() {
     if (!dish) return;
     await supabase.from('event_menu_dishes').update({ planned_quantity: plannedQty, planned_unit: plannedUnit, notes: notes || null } as any).eq('id', dishId);
     await supabase.from('technical_sheet_items').delete().eq('sheet_id', dish.sheet_id);
-    if (items.length > 0) await supabase.from('technical_sheet_items').insert(items.map(i => ({ sheet_id: dish.sheet_id, item_id: i.item_id, quantity: i.quantity, unit_cost: i.unit_cost, section: i.section || 'receita' })) as any);
+    if (items.length > 0) await supabase.from('technical_sheet_items').insert(items.map(i => ({ sheet_id: dish.sheet_id, item_id: i.item_id, quantity: i.quantity, unit_cost: i.unit_cost, unit: i.unit || null, section: i.section || 'receita' })) as any);
     toast.success('Ficha atualizada!');
     setEditingDishId(null);
     await loadMenu();
@@ -918,10 +927,10 @@ export default function EventMenuDetailPage() {
       const catRows = items.map(i => `
         <tr>
           <td>${i.name}</td>
-          <td class="right">${i.needed.toFixed(3)} ${i.unit}</td>
-          <td class="right">${i.inStock.toFixed(3)} ${i.unit}</td>
-          <td class="right ${i.toBuy > 0 ? 'badge-buy' : 'badge-ok'}">${i.toBuy > 0 ? i.toBuy.toFixed(3) + ' ' + i.unit : '✓ ok'}</td>
-          <td class="right">${i.toBuy > 0 ? 'R$ ' + (i.toBuy * i.unitCost).toFixed(2) : '—'}</td>
+          <td class="right">${fmtQty(i.needed)} ${i.unit}</td>
+          <td class="right">${fmtQty(i.inStock)} ${i.unit}</td>
+          <td class="right ${i.toBuy > 0 ? 'badge-buy' : 'badge-ok'}">${i.toBuy > 0 ? fmtQty(i.toBuy) + ' ' + i.unit : '✓ ok'}</td>
+          <td class="right">${i.toBuy > 0 ? 'R$ ' + fmtCur(i.toBuy * i.unitCost) : '—'}</td>
         </tr>`).join('');
       return `<h2>${cat} (${items.length})</h2>
         <table>
@@ -931,7 +940,7 @@ export default function EventMenuDetailPage() {
     }).join('');
 
     const total = shoppingList.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
-    const footer = `<table><tbody class="total-row"><tr class="total-row"><td colspan="4" style="text-align:right;font-weight:bold">Total estimado:</td><td class="right">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr></tbody></table>`;
+    const footer = `<table><tbody class="total-row"><tr class="total-row"><td colspan="4" style="text-align:right;font-weight:bold">Total estimado:</td><td class="right">R$ ${fmtCur(total)}</td></tr></tbody></table>`;
     printBase('Lista de Compras', rows + footer);
   };
 
@@ -942,11 +951,11 @@ export default function EventMenuDetailPage() {
       const qty = getEffectiveQty(i);
       return `
       <tr>
-        <td class="right">${qty.toFixed(3)}</td>
+        <td class="right">${fmtQty(qty)}</td>
         <td>${i.unit}</td>
         <td>${i.name}</td>
-        <td class="right">R$ ${i.unitCost.toFixed(2)}</td>
-        <td class="right">R$ ${(qty * i.unitCost).toFixed(2)}</td>
+        <td class="right">R$ ${fmtCur(i.unitCost)}</td>
+        <td class="right">R$ ${fmtCur(qty * i.unitCost)}</td>
       </tr>`;
     }).join('');
     const total = items.reduce((s, i) => s + getEffectiveQty(i) * i.unitCost, 0);
@@ -954,7 +963,7 @@ export default function EventMenuDetailPage() {
       <table>
         <thead><tr><th class="right">QTD</th><th>UN</th><th>PRODUTO</th><th class="right">CUSTO UNIT.</th><th class="right">TOTAL</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tbody><tr class="total-row"><td colspan="4" class="right">Total estimado:</td><td class="right">R$ ${total.toFixed(2)}</td></tr></tbody>
+        <tbody><tr class="total-row"><td colspan="4" class="right">Total estimado:</td><td class="right">R$ ${fmtCur(total)}</td></tr></tbody>
       </table>`;
     printBase(`Pedido — ${supplierName}`, body);
   };
@@ -995,11 +1004,11 @@ export default function EventMenuDetailPage() {
             const qty = getEffectiveQty(item);
             return `
             <tr style="background:${i % 2 === 0 ? '#fff' : '#fafaf6'};border-bottom:1px solid #eee;">
-              <td style="text-align:right;padding:7px 14px;font-weight:700;">${qty.toFixed(3)}</td>
+              <td style="text-align:right;padding:7px 14px;font-weight:700;">${fmtQty(qty)}</td>
               <td style="text-align:left;padding:7px 6px;color:#777;">${item.unit}</td>
               <td style="text-align:left;padding:7px 14px;">${item.name}</td>
-              <td style="text-align:right;padding:7px 14px;color:#777;">R$ ${item.unitCost.toFixed(2)}</td>
-              <td style="text-align:right;padding:7px 14px;font-weight:600;">R$ ${(qty * item.unitCost).toFixed(2)}</td>
+              <td style="text-align:right;padding:7px 14px;color:#777;">R$ ${fmtCur(item.unitCost)}</td>
+              <td style="text-align:right;padding:7px 14px;font-weight:600;">R$ ${fmtCur(qty * item.unitCost)}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -1078,8 +1087,8 @@ export default function EventMenuDetailPage() {
                          '<span class="status-pending">Pendente</span>';
           return `<tr>
             <td>${si?.name || '?'} <span style="color:#888;font-size:9px">(${si?.unit || ''})</span></td>
-            <td class="right">${(i.planned_quantity ?? 0).toFixed(3)}</td>
-            <td class="right">${i.separated_quantity != null ? i.separated_quantity.toFixed(3) : '—'}</td>
+            <td class="right">${fmtQty(i.planned_quantity ?? 0)}</td>
+            <td class="right">${i.separated_quantity != null ? fmtQty(i.separated_quantity) : '—'}</td>
             <td class="center">${status}</td>
           </tr>`;
         }).join('');
@@ -1396,6 +1405,11 @@ export default function EventMenuDetailPage() {
 
       {/* ── LISTA DE COMPRAS ── */}
       {activeTab === 'compras' && (() => {
+        // Check if this event's list was consolidated
+        const consolidatedEventIds: string[] = (() => { try { return JSON.parse(localStorage.getItem('consolidatedEventIds') || '[]'); } catch { return []; } })();
+        const savedLists: any[] = (() => { try { return JSON.parse(localStorage.getItem('savedShoppingLists') || '[]'); } catch { return []; } })();
+        const consolidatedList = id ? savedLists.find((l: any) => l.menuIds?.includes(id)) : null;
+
         // Supplier grouping
         const suppliersInList = Array.from(new Set(
           shoppingList.filter(i => i.toBuy > 0 && i.supplier).map(i => i.supplier!)
@@ -1404,6 +1418,17 @@ export default function EventMenuDetailPage() {
 
         return (
           <div className="space-y-3">
+            {consolidatedList && (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/30 text-sm">
+                <span className="text-lg">🔗</span>
+                <p className="text-foreground">
+                  Esta lista foi unificada com outros eventos em{' '}
+                  <span className="font-semibold">"{consolidatedList.name}"</span>.
+                  Veja a lista consolidada em{' '}
+                  <a href="/shopping-lists" className="underline text-primary font-medium">Listas de Compras</a>.
+                </p>
+              </div>
+            )}
             <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-border" style={{ background: 'hsl(40 30% 97%)' }}>
                 <div className="flex items-center gap-4 text-sm">
@@ -1451,10 +1476,10 @@ export default function EventMenuDetailPage() {
                     {filteredShoppingList.map(item => (
                       <tr key={item.id} className={item.toBuy > 0 ? 'bg-red-50/30' : ''}>
                         <td className="px-5 py-3"><div className="flex items-center gap-2">{item.toBuy > 0 ? <TrendingDown className="w-3.5 h-3.5 text-destructive flex-shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />}<span className={item.toBuy > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}>{item.name}</span>{item.supplier && <span className="text-[10px] text-muted-foreground/60 italic ml-1">({item.supplier})</span>}</div></td>
-                        <td className="px-4 py-3 text-right text-muted-foreground">{item.needed.toFixed(2)} {item.unit}</td>
-                        <td className="px-4 py-3 text-right text-muted-foreground">{item.inStock} {item.unit}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{item.toBuy > 0 ? <span className="text-destructive">{item.toBuy.toFixed(2)} {item.unit}</span> : <span className="text-success text-xs">✓ ok</span>}</td>
-                        <td className="px-5 py-3 text-right text-muted-foreground">{item.toBuy > 0 ? `R$ ${(item.toBuy * item.unitCost).toFixed(2)}` : '—'}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{fmtQty(item.needed)} {item.unit}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{fmtQty(item.inStock)} {item.unit}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{item.toBuy > 0 ? <span className="text-destructive">{fmtQty(item.toBuy)} {item.unit}</span> : <span className="text-success text-xs">✓ ok</span>}</td>
+                        <td className="px-5 py-3 text-right text-muted-foreground">{item.toBuy > 0 ? `R$ ${fmtCur(item.toBuy * item.unitCost)}` : '—'}</td>
                       </tr>
                     ))}
                     {filteredShoppingList.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm">Nenhum item neste filtro</td></tr>}
@@ -1481,7 +1506,7 @@ export default function EventMenuDetailPage() {
                             <span className="text-xs text-muted-foreground">({items.length} item{items.length !== 1 ? 's' : ''})</span>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-sm font-semibold text-primary">R$ {supplierTotal.toFixed(2)}</span>
+                            <span className="text-sm font-semibold text-primary">R$ {fmtCur(supplierTotal)}</span>
                             <Button
                               variant="outline" size="sm"
                               onClick={() => copySupplierOrderAsImage(supplier)}
@@ -1524,8 +1549,8 @@ export default function EventMenuDetailPage() {
                                   </td>
                                   <td className="px-3 py-2.5 text-muted-foreground text-xs">{item.unit}</td>
                                   <td className="px-3 py-2.5 font-medium text-foreground">{item.name}</td>
-                                  <td className="px-5 py-2.5 text-right text-muted-foreground">R$ {item.unitCost.toFixed(2)}</td>
-                                  <td className="px-5 py-2.5 text-right font-medium">R$ {(effQty * item.unitCost).toFixed(2)}</td>
+                                  <td className="px-5 py-2.5 text-right text-muted-foreground">R$ {fmtCur(item.unitCost)}</td>
+                                  <td className="px-5 py-2.5 text-right font-medium">R$ {fmtCur(effQty * item.unitCost)}</td>
                                 </tr>
                               );
                             })}
@@ -1547,11 +1572,11 @@ export default function EventMenuDetailPage() {
                         <tbody className="divide-y divide-border/40">
                           {itemsNoSupplier.map(item => (
                             <tr key={item.id}>
-                              <td className="px-5 py-2.5 text-right font-semibold text-destructive w-28">{item.toBuy.toFixed(2)}</td>
+                              <td className="px-5 py-2.5 text-right font-semibold text-destructive w-28">{fmtQty(item.toBuy)}</td>
                               <td className="px-3 py-2.5 text-muted-foreground text-xs w-14">{item.unit}</td>
                               <td className="px-3 py-2.5 font-medium text-foreground">{item.name}</td>
-                              <td className="px-5 py-2.5 text-right text-muted-foreground">R$ {item.unitCost.toFixed(2)}</td>
-                              <td className="px-5 py-2.5 text-right font-medium">R$ {(item.toBuy * item.unitCost).toFixed(2)}</td>
+                              <td className="px-5 py-2.5 text-right text-muted-foreground">R$ {fmtCur(item.unitCost)}</td>
+                              <td className="px-5 py-2.5 text-right font-medium">R$ {fmtCur(item.toBuy * item.unitCost)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1795,8 +1820,8 @@ function SeparationProgress({ menuId, employees }: { menuId: string; employees: 
                 return (
                   <tr key={item.id} className={item.status === 'separated' ? 'bg-success/5' : item.status === 'skipped' ? 'bg-muted/30' : ''}>
                     <td className="py-2 px-5 text-foreground">{si?.name || '?'} <span className="text-muted-foreground text-xs">({si?.unit || ''})</span></td>
-                    <td className="py-2 px-4 text-right text-muted-foreground text-xs">{item.planned_quantity?.toFixed(3)}</td>
-                    <td className="py-2 px-4 text-right font-medium text-xs">{item.separated_quantity != null ? item.separated_quantity.toFixed(3) : <span className="text-muted-foreground">—</span>}</td>
+                    <td className="py-2 px-4 text-right text-muted-foreground text-xs">{item.planned_quantity != null ? fmtQty(item.planned_quantity) : '—'}</td>
+                    <td className="py-2 px-4 text-right font-medium text-xs">{item.separated_quantity != null ? fmtQty(item.separated_quantity) : <span className="text-muted-foreground">—</span>}</td>
                     <td className="py-2 px-4 text-center w-24">
                       {item.status === 'separated' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" />OK</span>}
                       {item.status === 'skipped' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full"><X className="w-3 h-3" />Pulado</span>}
@@ -1816,8 +1841,8 @@ function SeparationProgress({ menuId, employees }: { menuId: string; employees: 
               return (
                 <tr key={item.id} className={item.status === 'separated' ? 'bg-success/5' : item.status === 'skipped' ? 'bg-muted/30' : ''}>
                   <td className="py-2 px-5 text-foreground">{si?.name || '?'} <span className="text-muted-foreground text-xs">({si?.unit || ''})</span></td>
-                  <td className="py-2 px-4 text-right text-muted-foreground text-xs">{item.planned_quantity?.toFixed(3)}</td>
-                  <td className="py-2 px-4 text-right font-medium text-xs">{item.separated_quantity != null ? item.separated_quantity.toFixed(3) : <span className="text-muted-foreground">—</span>}</td>
+                  <td className="py-2 px-4 text-right text-muted-foreground text-xs">{item.planned_quantity != null ? fmtQty(item.planned_quantity) : '—'}</td>
+                  <td className="py-2 px-4 text-right font-medium text-xs">{item.separated_quantity != null ? fmtQty(item.separated_quantity) : <span className="text-muted-foreground">—</span>}</td>
                   <td className="py-2 px-4 text-center w-24">
                     {item.status === 'separated' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-success bg-success/10 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" />OK</span>}
                     {item.status === 'skipped' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full"><X className="w-3 h-3" />Pulado</span>}

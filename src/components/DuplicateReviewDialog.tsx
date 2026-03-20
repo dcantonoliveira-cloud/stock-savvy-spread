@@ -119,51 +119,54 @@ Responda SOMENTE com este JSON (sem markdown):
 
     let mergedCount = 0;
     let errorCount = 0;
+    const selectedArr = Array.from(selected);
 
-    for (const idx of selected) {
+    for (let i = 0; i < selectedArr.length; i++) {
+      const idx = selectedArr[i];
       const group = groups[idx];
+      setProgress(`Unificando grupo ${i + 1} de ${selectedArr.length}: ${group.canonical.name}...`);
+
       try {
+        const dupIds = group.duplicates.map(d => d.id);
+
+        // Batch reassign event_separation_items and item_suppliers
+        await supabase.from('event_separation_items').update({ item_id: group.canonical.id } as any).in('item_id', dupIds as any);
+        await supabase.from('item_suppliers').update({ item_id: group.canonical.id } as any).in('item_id', dupIds as any);
+
+        // Handle technical_sheet_items per duplicate
         for (const dup of group.duplicates) {
           const { data: sheetItems } = await supabase
-            .from('technical_sheet_items')
-            .select('id, sheet_id, quantity')
-            .eq('item_id', dup.id as any);
+            .from('technical_sheet_items').select('id, sheet_id, quantity').eq('item_id', dup.id as any);
 
           for (const si of (sheetItems || [])) {
             const { data: existing } = await supabase
-              .from('technical_sheet_items')
-              .select('id, quantity')
-              .eq('sheet_id', si.sheet_id as any)
-              .eq('item_id', group.canonical.id as any)
-              .maybeSingle();
+              .from('technical_sheet_items').select('id, quantity')
+              .eq('sheet_id', si.sheet_id as any).eq('item_id', group.canonical.id as any).maybeSingle();
 
             if (existing) {
-              await supabase
-                .from('technical_sheet_items')
+              await supabase.from('technical_sheet_items')
                 .update({ quantity: (existing.quantity as number) + ((si.quantity as number) || 0) } as any)
                 .eq('id', existing.id as any);
               await supabase.from('technical_sheet_items').delete().eq('id', si.id as any);
             } else {
-              await supabase
-                .from('technical_sheet_items')
-                .update({ item_id: group.canonical.id } as any)
-                .eq('id', si.id as any);
+              await supabase.from('technical_sheet_items')
+                .update({ item_id: group.canonical.id } as any).eq('id', si.id as any);
             }
           }
-
-          await supabase.from('stock_entries').update({ item_id: group.canonical.id } as any).eq('item_id', dup.id as any);
-          await supabase.from('stock_outputs').update({ item_id: group.canonical.id } as any).eq('item_id', dup.id as any);
-
-          if (dup.current_stock > 0) {
-            await supabase
-              .from('stock_items')
-              .update({ current_stock: group.canonical.current_stock + dup.current_stock } as any)
-              .eq('id', group.canonical.id as any);
-          }
-
-          await supabase.from('stock_items').delete().eq('id', dup.id as any);
-          mergedCount++;
         }
+
+        // Transfer total stock from all duplicates
+        const totalDupStock = group.duplicates.reduce((sum, d) => sum + (d.current_stock || 0), 0);
+        if (totalDupStock > 0) {
+          await supabase.from('stock_items')
+            .update({ current_stock: group.canonical.current_stock + totalDupStock } as any)
+            .eq('id', group.canonical.id as any);
+        }
+
+        // Batch delete all duplicates
+        const { error: delErr } = await supabase.from('stock_items').delete().in('id', dupIds as any);
+        if (delErr) throw new Error(delErr.message);
+        mergedCount += dupIds.length;
       } catch (err) {
         console.error('Erro ao unificar grupo', idx, err);
         errorCount++;
@@ -171,7 +174,7 @@ Responda SOMENTE com este JSON (sem markdown):
     }
 
     if (mergedCount > 0) toast.success(`${mergedCount} itens unificados com sucesso!`);
-    if (errorCount > 0) toast.error(`${errorCount} grupos com erro`);
+    if (errorCount > 0) toast.error(`${errorCount} grupos com erro — veja o console`);
 
     setStep('done');
     onDone();
@@ -313,9 +316,23 @@ Responda SOMENTE com este JSON (sem markdown):
           )}
 
           {step === 'merging' && (
-            <div className="py-8 text-center space-y-4">
+            <div className="py-8 text-center space-y-5">
               <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-              <p className="text-sm text-muted-foreground">Unificando itens e atualizando fichas técnicas...</p>
+              <p className="text-sm text-muted-foreground">{progress || 'Unificando itens...'}</p>
+              {selected.size > 0 && (() => {
+                const match = progress.match(/grupo (\d+) de (\d+)/);
+                const current = match ? parseInt(match[1]) : 0;
+                const total = match ? parseInt(match[2]) : selected.size;
+                const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+                return (
+                  <div className="px-6 space-y-1">
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                      <div className="bg-primary h-2 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-right">{pct}%</p>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

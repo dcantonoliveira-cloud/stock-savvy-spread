@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText,
   Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
-  ArrowRightLeft, ChevronDown, ChevronRight, Truck
+  ArrowRightLeft, ChevronDown, ChevronRight, Truck, ShoppingCart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -27,6 +27,7 @@ const navStructure: NavGroup[] = [
       { path: '/items', label: 'Estoque Geral', icon: Package },
       { path: '/inventory', label: 'Inventários', icon: ClipboardCheck },
       { path: '/kitchens', label: 'Centros de Custo', icon: Building2 },
+      { path: '/fornecedores', label: 'Fornecedores', icon: Truck },
     ]
   },
   {
@@ -35,10 +36,12 @@ const navStructure: NavGroup[] = [
       { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
       { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
       { path: '/comparison', label: 'Transferências', icon: ArrowRightLeft },
-      { path: '/fornecedores', label: 'Fornecedores', icon: Truck },
     ]
   },
-  { path: '/event-menus', label: 'Cardápios', icon: UtensilsCrossed },
+  { label: 'Cardápios', icon: UtensilsCrossed, items: [
+    { path: '/event-menus', label: 'Cardápios de Eventos', icon: UtensilsCrossed },
+    { path: '/shopping-lists', label: 'Listas de Compras', icon: ShoppingCart },
+  ]},
   { path: '/analysis', label: 'Análise IA', icon: Brain },
   { path: '/users', label: 'Funcionários', icon: Users },
 ];
