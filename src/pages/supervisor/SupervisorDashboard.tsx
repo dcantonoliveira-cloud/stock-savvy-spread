@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, ArrowDownCircle, ArrowUpCircle, AlertTriangle, FileText, DollarSign, TrendingUp, Users } from 'lucide-react';
+import { Package, ArrowDownCircle, ArrowUpCircle, AlertTriangle, FileText, DollarSign, TrendingUp, Users, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -25,6 +25,7 @@ export default function SupervisorDashboard() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [employeeCount, setEmployeeCount] = useState(0);
   const [sheetsCount, setSheetsCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -40,6 +41,7 @@ export default function SupervisorDashboard() {
       if (entriesRes.data) setEntries(entriesRes.data);
       if (usersRes.data) setEmployeeCount(usersRes.data.length);
       if (sheetsRes.data) setSheetsCount(sheetsRes.data.length);
+      setLoading(false);
     };
     load();
   }, []);
@@ -81,6 +83,12 @@ export default function SupervisorDashboard() {
       time: e.created_at,
     })),
   ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 8);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div>

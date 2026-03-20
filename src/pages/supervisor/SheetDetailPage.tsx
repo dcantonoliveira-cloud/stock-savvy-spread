@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ArrowLeft, Pencil, Check, X, Plus, Loader2,
-  ChefHat, Clock, Users, ChevronsUpDown, PackagePlus
+  ChefHat, Clock, Users, ChevronsUpDown, PackagePlus, CalendarDays
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getCompatibleUnits, calcRecipeUnitCost } from '@/lib/units';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
@@ -82,6 +83,7 @@ export default function SheetDetailPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [eventCount, setEventCount] = useState(0);
 
   // Edit state
   const [name, setName] = useState('');
@@ -93,16 +95,21 @@ export default function SheetDetailPage() {
 
   const load = async () => {
     setLoading(true);
-    const [sheetRes, itemsRes] = await Promise.all([
+    const [sheetRes, itemsRes, eventRes] = await Promise.all([
       supabase.from('technical_sheets').select('*').eq('id', id!).single(),
       supabase.from('stock_items').select('id, name, unit, unit_cost').order('name'),
+      supabase.from('event_menu_dishes').select('id', { count: 'exact', head: true }).eq('sheet_id', id!),
     ]);
+    setEventCount(eventRes.count || 0);
     if (!sheetRes.data) { navigate('/sheets'); return; }
     if (itemsRes.data) setStockItems(itemsRes.data as unknown as StockItem[]);
     const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section').eq('sheet_id', id!);
     const items: SheetItem[] = (si || []).map((i: any) => {
       const item = (itemsRes.data as any[])?.find((x: any) => x.id === i.item_id);
-      return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: item?.unit || '', unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita' };
+      const itemUnit = item?.unit || '';
+      const recipeUnit = i.unit || itemUnit;
+      const baseUnitCost = item?.unit_cost || 0;
+      return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: recipeUnit, unit_cost: calcRecipeUnitCost(baseUnitCost, itemUnit, recipeUnit), section: i.section || 'receita' };
     });
     const loaded = { ...(sheetRes.data as any), items } as Sheet;
     setSheet(loaded);
@@ -112,7 +119,19 @@ export default function SheetDetailPage() {
   };
 
   const addItem = (section: 'receita' | 'decoracao') => setFormItems(prev => [...prev, { item_id: '', item_name: '', quantity: 0, unit: '', unit_cost: 0, section }]);
-  const updateItem = (idx: number, field: string, value: any) => setFormItems(prev => prev.map((it, i) => { if (i !== idx) return it; if (field === 'item_id') { const si = stockItems.find(s => s.id === value); return { ...it, item_id: value, item_name: si?.name || '', unit: si?.unit || '', unit_cost: si?.unit_cost || 0 }; } return { ...it, [field]: field === 'quantity' ? parseFloat(value) || 0 : value }; }));
+  const updateItem = (idx: number, field: string, value: any) => setFormItems(prev => prev.map((it, i) => {
+    if (i !== idx) return it;
+    if (field === 'item_id') {
+      const si = stockItems.find(s => s.id === value);
+      return { ...it, item_id: value, item_name: si?.name || '', unit: si?.unit || '', unit_cost: si?.unit_cost || 0 };
+    }
+    if (field === 'unit') {
+      const si = stockItems.find(s => s.id === it.item_id);
+      const itemUnit = si?.unit || it.unit;
+      return { ...it, unit: value, unit_cost: calcRecipeUnitCost(si?.unit_cost || 0, itemUnit, value) };
+    }
+    return { ...it, [field]: field === 'quantity' ? parseFloat(value) || 0 : value };
+  }));
   const removeItem = (idx: number) => setFormItems(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
@@ -120,7 +139,7 @@ export default function SheetDetailPage() {
     await supabase.from('technical_sheets').update({ name: name.trim(), yield_quantity: parseFloat(yieldQty) || 1, yield_unit: yieldUnit } as any).eq('id', sheet.id);
     await supabase.from('technical_sheet_items').delete().eq('sheet_id', sheet.id);
     const valid = formItems.filter(i => i.item_id);
-    if (valid.length > 0) await supabase.from('technical_sheet_items').insert(valid.map(i => ({ sheet_id: sheet.id, item_id: i.item_id, quantity: i.quantity, unit_cost: i.unit_cost, section: i.section || 'receita' })) as any);
+    if (valid.length > 0) await supabase.from('technical_sheet_items').insert(valid.map(i => ({ sheet_id: sheet.id, item_id: i.item_id, quantity: i.quantity, unit_cost: i.unit_cost, unit: i.unit || null, section: i.section || 'receita' })) as any);
     toast.success('Ficha atualizada!'); setSaving(false); setEditing(false); load();
   };
 
@@ -152,6 +171,10 @@ export default function SheetDetailPage() {
               {sheet.category && <Badge variant="secondary"><ChefHat className="w-3 h-3 mr-1" />{sheet.category}</Badge>}
               {sheet.prep_time > 0 && <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />{sheet.prep_time} min</Badge>}
               <Badge variant="outline"><Users className="w-3 h-3 mr-1" />{sheet.servings} porções</Badge>
+              <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5">
+                <CalendarDays className="w-3 h-3 mr-1" />
+                {eventCount === 0 ? 'Nunca usado em evento' : `${eventCount} evento${eventCount !== 1 ? 's' : ''}`}
+              </Badge>
               {editing
                 ? <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground">Rende:</span>
@@ -191,7 +214,14 @@ export default function SheetDetailPage() {
                 <tr key={editing ? idx : item.item_id}>
                   <td className="px-5 py-3">{editing ? <ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /> : <span className="text-foreground">{item.item_name}</span>}</td>
                   <td className="px-4 py-3 text-right">{editing ? <Input type="number" step="any" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
-                  <td className="px-3 py-3 text-center text-muted-foreground text-xs">{item.unit}</td>
+                  <td className="px-3 py-3 text-center text-muted-foreground text-xs">
+                    {editing ? (() => {
+                      const compatUnits = item.item_id ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit) : [item.unit].filter(Boolean);
+                      return compatUnits.length > 1
+                        ? <select className="text-xs border border-input rounded px-1 py-0.5 bg-background cursor-pointer" value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)}>{compatUnits.map(u => <option key={u} value={u}>{u}</option>)}</select>
+                        : <span>{item.unit}</span>;
+                    })() : item.unit}
+                  </td>
                   <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
                   <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
                   {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}
@@ -227,7 +257,14 @@ export default function SheetDetailPage() {
                 <tr key={editing ? idx : item.item_id} style={{ background: 'hsl(38 80% 99%)' }}>
                   <td className="px-5 py-3">{editing ? <ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /> : <span className="text-foreground">{item.item_name}</span>}</td>
                   <td className="px-4 py-3 text-right">{editing ? <Input type="number" step="any" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
-                  <td className="px-3 py-3 text-center text-muted-foreground text-xs">{item.unit}</td>
+                  <td className="px-3 py-3 text-center text-muted-foreground text-xs">
+                    {editing ? (() => {
+                      const compatUnits = item.item_id ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit) : [item.unit].filter(Boolean);
+                      return compatUnits.length > 1
+                        ? <select className="text-xs border border-input rounded px-1 py-0.5 bg-background cursor-pointer" value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)}>{compatUnits.map(u => <option key={u} value={u}>{u}</option>)}</select>
+                        : <span>{item.unit}</span>;
+                    })() : item.unit}
+                  </td>
                   <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
                   <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
                   {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}

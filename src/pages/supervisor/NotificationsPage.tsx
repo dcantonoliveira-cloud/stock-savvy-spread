@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, AlertOctagon, Bell, CheckCircle } from 'lucide-react';
+import { AlertTriangle, AlertOctagon, Bell, CheckCircle, Loader2 } from 'lucide-react';
 
 type StockItem = {
   id: string; name: string; category: string; unit: string;
@@ -17,18 +17,20 @@ type Alert = {
 
 export default function NotificationsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock').order('current_stock', { ascending: true });
-      if (!data) return;
-
-      const alertItems: Alert[] = [];
-      data.forEach(item => {
-        if (item.current_stock <= 0) alertItems.push({ item, type: 'zero' });
-        else if (item.current_stock <= item.min_stock) alertItems.push({ item, type: 'low' });
-      });
-      setAlerts(alertItems);
+      if (data) {
+        const alertItems: Alert[] = [];
+        data.forEach(item => {
+          if (item.current_stock <= 0) alertItems.push({ item, type: 'zero' });
+          else if (item.current_stock <= item.min_stock) alertItems.push({ item, type: 'low' });
+        });
+        setAlerts(alertItems);
+      }
+      setLoading(false);
     };
     load();
 
@@ -45,6 +47,12 @@ export default function NotificationsPage() {
 
   const zeroAlerts = alerts.filter(a => a.type === 'zero');
   const lowAlerts = alerts.filter(a => a.type === 'low');
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div>

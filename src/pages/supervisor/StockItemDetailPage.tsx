@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Package, Store, ChevronLeft, ChevronRight,
-  ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2
+  ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2, Star, StarOff
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -87,6 +87,13 @@ export default function StockItemDetailPage() {
     }));
     setSheetUsages(usages);
     setLoading(false);
+  };
+
+  const handleSetPreferred = async (supplierId: string) => {
+    await supabase.from('item_suppliers').update({ is_preferred: false } as any).eq('item_id', id!);
+    await supabase.from('item_suppliers').update({ is_preferred: true } as any).eq('id', supplierId);
+    setSuppliers(prev => prev.map(s => ({ ...s, is_preferred: s.id === supplierId })));
+    toast.success('Fornecedor preferido atualizado!');
   };
 
   const handleSaveSupplier = async () => {
@@ -353,7 +360,18 @@ export default function StockItemDetailPage() {
                     )}
                   </td>
                   <td className="px-3 py-3 text-xs text-muted-foreground">{s.notes || '—'}</td>
-                  <td className="px-3 py-3 text-center">{s.is_preferred ? <span className="text-amber-500 text-lg">⭐</span> : <span className="text-muted-foreground text-xs">—</span>}</td>
+                  <td className="px-3 py-3 text-center">
+                    <button
+                      onClick={() => handleSetPreferred(s.id)}
+                      title={s.is_preferred ? 'Preferido' : 'Clique para definir como preferido'}
+                      className="cursor-pointer hover:scale-110 transition-transform"
+                    >
+                      {s.is_preferred
+                        ? <Star className="w-4 h-4 text-amber-500 fill-amber-400 mx-auto" />
+                        : <StarOff className="w-4 h-4 text-muted-foreground/40 hover:text-amber-400 mx-auto transition-colors" />
+                      }
+                    </button>
+                  </td>
                   <td className="px-3 py-3 text-right">
                     <div className="flex items-center gap-1 justify-end">
                       <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => {

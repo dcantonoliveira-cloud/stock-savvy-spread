@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, ChefHat, Home } from 'lucide-react';
+import { LogOut, ChefHat, Home, ClipboardList, CalendarDays } from 'lucide-react';
 
 export default function EmployeeLayout({ children }: { children: ReactNode }) {
   const { signOut, profile } = useAuth();
@@ -14,6 +14,12 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
     .map((w: string) => w[0])
     .join('')
     .toUpperCase() || '?';
+
+  const tabs = [
+    { to: '/', label: 'Estoque', icon: Home },
+    { to: '/inventario', label: 'Inventário', icon: ClipboardList },
+    { to: '/eventos', label: 'Eventos', icon: CalendarDays },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,16 +65,22 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex z-50">
-        <Link
-          to="/"
-          className={`flex-1 flex flex-col items-center gap-1 py-3 text-[11px] font-semibold transition-colors ${
-            pathname === '/' ? '' : 'text-muted-foreground'
-          }`}
-          style={pathname === '/' ? { color: 'hsl(38 75% 45%)' } : {}}
-        >
-          <Home className="w-5 h-5" />
-          Estoque
-        </Link>
+        {tabs.map(({ to, label, icon: Icon }) => {
+          const active = pathname === to;
+          return (
+            <Link
+              key={to}
+              to={to}
+              className={`flex-1 flex flex-col items-center gap-1 py-3 text-[11px] font-semibold transition-colors ${
+                active ? '' : 'text-muted-foreground'
+              }`}
+              style={active ? { color: 'hsl(38 75% 45%)' } : {}}
+            >
+              <Icon className="w-5 h-5" />
+              {label}
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );

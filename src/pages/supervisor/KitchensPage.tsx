@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, ArrowRightLeft, Building2, Package, Lock } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowRightLeft, Building2, Package, Lock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Kitchen = { id: string; name: string; created_at: string; is_default: boolean };
@@ -22,6 +22,7 @@ export default function KitchensPage() {
   const [items, setItems] = useState<StockItem[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [kitchenDialog, setKitchenDialog] = useState(false);
   const [editingKitchen, setEditingKitchen] = useState<Kitchen | null>(null);
@@ -46,6 +47,7 @@ export default function KitchensPage() {
     if (i.data) setItems(i.data);
     if (l.data) setLocations(l.data as Location[]);
     if (t.data) setTransfers(t.data as Transfer[]);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
@@ -151,6 +153,12 @@ export default function KitchensPage() {
   const kitchenName_fn = (id: string) => kitchens.find(k => k.id === id)?.name || '—';
   const itemName_fn = (id: string) => items.find(i => i.id === id)?.name || '—';
   const itemUnit_fn = (id: string) => items.find(i => i.id === id)?.unit || '';
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div>
