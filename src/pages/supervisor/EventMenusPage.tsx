@@ -374,6 +374,7 @@ export default function EventMenusPage() {
 
   const handleSaveMenu = async () => {
     if (!formName.trim()) { toast.error('Nome do evento é obrigatório'); return; }
+    if (!formDate) { toast.error('Data do evento é obrigatória'); return; }
     const matched = extractedDishes.filter(d => d.matched_sheet_id);
     const unmatched = extractedDishes.filter(d => !d.matched_sheet_id);
 
@@ -454,14 +455,14 @@ export default function EventMenusPage() {
                 <div><label className="text-sm text-muted-foreground mb-1 block">Nome do Evento *</label><Input value={formName} onChange={e => setFormName(e.target.value)} placeholder="Ex: Casamento Silva & Santos" autoFocus /></div>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className="text-sm text-muted-foreground mb-1 block">Local</label><Input value={formLocation} onChange={e => setFormLocation(e.target.value)} /></div>
-                  <div><label className="text-sm text-muted-foreground mb-1 block">Data</label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
+                  <div><label className="text-sm text-muted-foreground mb-1 block">Data *</label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className="text-sm text-muted-foreground mb-1 block">Convidados</label><Input type="number" value={formGuests} onChange={e => setFormGuests(e.target.value)} /></div>
                   <div><label className="text-sm text-muted-foreground mb-1 block">Profissionais</label><Input type="number" value={formStaff} onChange={e => setFormStaff(e.target.value)} /></div>
                 </div>
                 <div><label className="text-sm text-muted-foreground mb-1 block">Observações</label><Input value={formNotes} onChange={e => setFormNotes(e.target.value)} /></div>
-                <Button className="w-full" onClick={() => { if (!formName.trim()) { toast.error('Nome do evento é obrigatório'); return; } setStep(2); }}>Próximo: Carregar Cardápio <ArrowRight className="w-4 h-4 ml-2" /></Button>
+                <Button className="w-full" onClick={() => { if (!formName.trim()) { toast.error('Nome do evento é obrigatório'); return; } if (!formDate) { toast.error('Data do evento é obrigatória'); return; } setStep(2); }}>Próximo: Carregar Cardápio <ArrowRight className="w-4 h-4 ml-2" /></Button>
               </div>
             )}
 

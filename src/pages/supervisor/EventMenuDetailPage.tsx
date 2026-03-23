@@ -592,11 +592,12 @@ export default function EventMenuDetailPage() {
   const [activeTab, setActiveTab] = useState<'pratos' | 'compras' | 'saida' | 'materiais'>('pratos');
 
   // Materials tab
-  const [materialItems, setMaterialItems] = useState<{id:string;name:string;category:string;unit:string;available_qty:number;image_url:string|null}[]>([]);
+  const [materialItems, setMaterialItems] = useState<{id:string;name:string;category:string;unit:string;total_qty:number;available_qty:number;image_url:string|null}[]>([]);
   const [linkedLoanId, setLinkedLoanId] = useState<string|null>(null);
   const [planQty, setPlanQty] = useState<Record<string,number>>({});
   const [savingMaterials, setSavingMaterials] = useState(false);
   const [matLoaded, setMatLoaded] = useState(false);
+  const [editingMaterials, setEditingMaterials] = useState(false);
   const [shopFilter, setShopFilter] = useState<'all' | 'ok' | 'buy'>('all');
   const [shopGroupMode, setShopGroupMode] = useState<'category' | 'supplier'>('category');
   const [copyingSupplier, setCopyingSupplier] = useState<string | null>(null);
@@ -624,7 +625,7 @@ export default function EventMenuDetailPage() {
 
   const loadMaterials = async () => {
     const [itemsRes, loanRes] = await Promise.all([
-      supabase.from('material_items' as any).select('id, name, category, unit, available_qty, image_url').order('category').order('name'),
+      supabase.from('material_items' as any).select('id, name, category, unit, total_qty, available_qty, image_url').order('category').order('name'),
       supabase.from('material_loans' as any).select('id, material_loan_items(material_item_id, qty_out)').eq('event_menu_id', id!).maybeSingle(),
     ]);
     if (itemsRes.data) setMaterialItems(itemsRes.data as any[]);
@@ -1658,22 +1659,131 @@ export default function EventMenuDetailPage() {
             <div className="flex items-center justify-center py-24">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
+
+          /* ── Sem lista criada: botão Criar ── */
+          ) : !linkedLoanId && !editingMaterials ? (
+            <div className="bg-white rounded-xl border border-border p-8 flex flex-col items-center justify-center gap-4 text-center shadow-sm">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Warehouse className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground text-lg">Nenhuma lista de materiais</p>
+                <p className="text-sm text-muted-foreground mt-1">Crie a lista para definir quais materiais serão usados neste evento</p>
+              </div>
+              <Button className="gold-button mt-2" onClick={() => setEditingMaterials(true)}>
+                <Plus className="w-4 h-4 mr-2" />Criar Lista de Materiais
+              </Button>
+            </div>
+
+          /* ── Lista salva: visualização ── */
+          ) : linkedLoanId && !editingMaterials ? (() => {
+            const savedItems = materialItems.filter(i => (planQty[i.id] || 0) > 0);
+            const categories = Array.from(new Set(savedItems.map(i => i.category))).sort();
+            return (
+              <div>
+                {/* Header da lista */}
+                <div className="bg-white rounded-xl border border-border p-4 mb-5 flex items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Warehouse className="w-4 h-4 text-primary" />
+                    <span className="font-medium text-foreground">{savedItems.length} tipo{savedItems.length !== 1 ? 's' : ''} de material na lista</span>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setEditingMaterials(true)}>
+                    <Pencil className="w-3.5 h-3.5 mr-1.5" />Editar Lista
+                  </Button>
+                </div>
+
+                {savedItems.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Package className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">Lista vazia — clique em Editar para adicionar materiais</p>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {categories.map(cat => (
+                      <div key={cat}>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">📦 {cat}</p>
+                        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border bg-muted/20">
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-full">Material</th>
+                                <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Total</th>
+                                <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Disponível</th>
+                                <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Necessário</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                              {materialItems.filter(i => i.category === cat && (planQty[i.id] || 0) > 0).map(item => {
+                                const needed = planQty[item.id] || 0;
+                                const inUse = item.total_qty - item.available_qty;
+                                return (
+                                  <tr key={item.id} className="hover:bg-muted/5 transition-colors">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-3">
+                                        {item.image_url ? (
+                                          <img src={item.image_url} alt={item.name} className="w-9 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
+                                        ) : (
+                                          <div className="w-9 h-9 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
+                                            <Package className="w-4 h-4 text-muted-foreground/40" />
+                                          </div>
+                                        )}
+                                        <div>
+                                          <p className="font-medium text-foreground">{item.name}</p>
+                                          {inUse > 0 && <p className="text-[11px] text-amber-600">{inUse} em uso em outros eventos</p>}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-3 text-right whitespace-nowrap text-muted-foreground">
+                                      {item.total_qty} <span className="text-xs">{item.unit}</span>
+                                    </td>
+                                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                                      <span className={item.available_qty === 0 ? 'text-destructive font-semibold' : item.available_qty < needed ? 'text-amber-600 font-semibold' : 'text-foreground'}>
+                                        {item.available_qty}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                                      <span className={needed > item.available_qty ? 'text-destructive font-bold' : 'text-primary font-semibold'}>
+                                        {needed}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()
+
+          /* ── Modo edição: todos os materiais com inputs ── */
           ) : (
-            <>
-              {/* Summary bar */}
-              <div className="bg-white rounded-xl border border-border p-4 mb-6 flex items-center justify-between gap-4">
+            <div>
+              {/* Barra de ação */}
+              <div className="bg-white rounded-xl border border-border p-4 mb-5 flex items-center justify-between gap-4 shadow-sm">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Warehouse className="w-4 h-4 text-primary" />
                   <span>
                     {Object.values(planQty).filter(q => q > 0).length === 0
-                      ? 'Nenhum material selecionado ainda — preencha as quantidades necessárias'
-                      : `${Object.values(planQty).filter(q => q > 0).length} tipo(s) de material selecionado(s)`}
+                      ? 'Selecione os materiais necessários'
+                      : `${Object.values(planQty).filter(q => q > 0).length} tipo(s) selecionado(s)`}
                   </span>
                 </div>
-                <Button onClick={handleSaveMaterials} disabled={savingMaterials} className="gold-button" size="sm">
-                  {savingMaterials ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                  Salvar Lista
-                </Button>
+                <div className="flex gap-2">
+                  {linkedLoanId && (
+                    <Button variant="outline" size="sm" onClick={() => setEditingMaterials(false)}>Cancelar</Button>
+                  )}
+                  <Button onClick={async () => { await handleSaveMaterials(); setEditingMaterials(false); }} disabled={savingMaterials} className="gold-button" size="sm">
+                    {savingMaterials ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                    Salvar Lista
+                  </Button>
+                </div>
               </div>
 
               {materialItems.length === 0 ? (
@@ -1698,8 +1808,9 @@ export default function EventMenuDetailPage() {
                             <thead>
                               <tr className="border-b border-border bg-muted/20">
                                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-full">Material</th>
+                                <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Total</th>
                                 <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Disponível</th>
-                                <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap w-28">Qtde Necessária</th>
+                                <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap w-28">Necessário</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-border/50">
@@ -1720,8 +1831,13 @@ export default function EventMenuDetailPage() {
                                         <span className={`font-medium ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>{item.name}</span>
                                       </div>
                                     </td>
+                                    <td className="px-3 py-3 text-right whitespace-nowrap text-muted-foreground">
+                                      {item.total_qty} <span className="text-xs">{item.unit}</span>
+                                    </td>
                                     <td className="px-3 py-3 text-right whitespace-nowrap">
-                                      <span className={item.available_qty === 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}>{item.available_qty}</span>
+                                      <span className={item.available_qty === 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}>
+                                        {item.available_qty}
+                                      </span>
                                       <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
                                     </td>
                                     <td className="px-3 py-3 text-center">
@@ -1746,14 +1862,14 @@ export default function EventMenuDetailPage() {
                     );
                   })}
                   <div className="flex justify-end pt-2 pb-6">
-                    <Button onClick={handleSaveMaterials} disabled={savingMaterials} className="gold-button">
+                    <Button onClick={async () => { await handleSaveMaterials(); setEditingMaterials(false); }} disabled={savingMaterials} className="gold-button">
                       {savingMaterials ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                       Salvar Lista de Materiais
                     </Button>
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       )}
