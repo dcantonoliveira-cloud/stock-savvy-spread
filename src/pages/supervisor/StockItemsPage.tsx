@@ -623,11 +623,11 @@ export default function StockItemsPage() {
               <tr className="border-b border-border" style={{ background: 'hsl(40 30% 97%)' }}>
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs w-8">#</th>
                 <th className="w-10 px-2 py-3"></th>
-                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none min-w-[200px]" onClick={() => toggleSort('name')}>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none w-full min-w-[280px]" onClick={() => toggleSort('name')}>
                   <div className="flex items-center gap-1">PRODUTO <SortIcon field="name" /></div>
                 </th>
-                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs">CATEGORIA</th>
-                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('current_stock')}>
+                <th className="text-left px-2 py-3 font-semibold text-muted-foreground text-xs w-px whitespace-nowrap">CATEGORIA</th>
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort('current_stock')}>
                   <div className="flex items-center justify-end gap-1">ESTOQUE <SortIcon field="current_stock" /></div>
                 </th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs">MÍN.</th>
@@ -667,7 +667,7 @@ export default function StockItemsPage() {
                         >{item.name}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-2 py-2 whitespace-nowrap">
                       <Badge variant="outline" className="text-[10px] font-normal whitespace-nowrap">{item.category || '—'}</Badge>
                     </td>
                     <td className="px-3 py-2 text-right">
