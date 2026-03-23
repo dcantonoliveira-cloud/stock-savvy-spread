@@ -104,7 +104,7 @@ export default function SheetDetailPage() {
     setEventCount(eventRes.count || 0);
     if (!sheetRes.data) { navigate('/sheets'); return; }
     if (itemsRes.data) setStockItems(itemsRes.data as unknown as StockItem[]);
-    const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section').eq('sheet_id', id!);
+    const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, unit').eq('sheet_id', id!);
     const items: SheetItem[] = (si || []).map((i: any) => {
       const item = (itemsRes.data as any[])?.find((x: any) => x.id === i.item_id);
       const itemUnit = item?.unit || '';
@@ -141,26 +141,51 @@ export default function SheetDetailPage() {
     if (!sheet) return;
     setSaving(true);
     try {
+      // 1. Atualiza nome / rendimento
       const { error: sheetErr } = await supabase.from('technical_sheets')
         .update({ name: name.trim(), yield_quantity: parseFloat(yieldQty) || 1, yield_unit: yieldUnit } as any)
         .eq('id', sheet.id);
       if (sheetErr) throw sheetErr;
 
-      const { error: delErr } = await supabase.from('technical_sheet_items').delete().eq('sheet_id', sheet.id);
-      if (delErr) throw delErr;
-
       const valid = formItems.filter(i => i.item_id);
-      if (valid.length > 0) {
+
+      // 2. Deleta apenas os itens que o usuário removeu (não todos)
+      const originalIds = sheet.items.filter(i => i.id).map(i => i.id!);
+      const keepIds = new Set(valid.filter(i => i.id).map(i => i.id!));
+      const toDelete = originalIds.filter(id => !keepIds.has(id));
+      if (toDelete.length > 0) {
+        const { error: delErr } = await supabase.from('technical_sheet_items').delete().in('id', toDelete);
+        if (delErr) throw delErr;
+      }
+
+      // 3. Atualiza itens existentes
+      for (const i of valid.filter(i => i.id)) {
+        const { error: updErr } = await supabase.from('technical_sheet_items').update({
+          item_id: i.item_id,
+          quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
+          unit_cost: i.unit_cost,
+          section: i.section || 'receita',
+          unit: i.unit || null,
+        } as any).eq('id', i.id!);
+        if (updErr) throw updErr;
+      }
+
+      // 4. Insere novos itens (sem id)
+      const newItems = valid.filter(i => !i.id);
+      if (newItems.length > 0) {
         const { error: insErr } = await supabase.from('technical_sheet_items').insert(
-          valid.map(i => ({
+          newItems.map(i => ({
             sheet_id: sheet.id,
             item_id: i.item_id,
             quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
             unit_cost: i.unit_cost,
+            section: i.section || 'receita',
+            unit: i.unit || null,
           })) as any
         );
         if (insErr) throw insErr;
       }
+
       toast.success('Ficha atualizada!');
       setEditing(false);
       load();
