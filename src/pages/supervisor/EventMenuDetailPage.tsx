@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { Textarea } from '@/components/ui/textarea';
@@ -612,6 +613,11 @@ export default function EventMenuDetailPage() {
   const [renamingSectionName, setRenamingSectionName] = useState<string | null>(null);
   const [renamingSectionValue, setRenamingSectionValue] = useState('');
 
+  // Edit event info
+  const [editMenuOpen, setEditMenuOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', location: '', event_date: '', guest_count: 0, staff_count: 0, notes: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
+
   // Return
   const [returnItems, setReturnItems] = useState<ReturnItem[]>([]);
   const [returnOpen, setReturnOpen] = useState(false);
@@ -875,6 +881,38 @@ export default function EventMenuDetailPage() {
     await loadMenu();
   };
 
+  const handleSaveEdit = async () => {
+    if (!menu || !editForm.name.trim()) { toast.error('Nome é obrigatório'); return; }
+    setSavingEdit(true);
+    try {
+      const guestChanged = editForm.guest_count !== menu.guest_count;
+      const dateChanged = editForm.event_date !== (menu.event_date || '');
+
+      const { error } = await supabase.from('event_menus').update({
+        name: editForm.name.trim(),
+        location: editForm.location.trim() || null,
+        event_date: editForm.event_date || null,
+        guest_count: Number(editForm.guest_count) || 0,
+        staff_count: Number(editForm.staff_count) || 0,
+        notes: editForm.notes.trim() || null,
+      } as any).eq('id', menu.id);
+      if (error) throw error;
+
+      toast.success('Cardápio atualizado!');
+      if (guestChanged) {
+        toast.info('Nº de convidados alterado — as quantidades de MANTIMENTOS foram recalculadas.');
+      }
+      if (dateChanged) {
+        toast.warning('Data alterada — verifique a disponibilidade de materiais para este período.');
+      }
+      setEditMenuOpen(false);
+      loadMenu();
+    } catch (err: any) {
+      toast.error('Erro ao salvar: ' + (err?.message || 'Tente novamente'));
+    }
+    setSavingEdit(false);
+  };
+
   const handleExportCsv = () => {
     if (!menu) return;
     const rows: string[][] = [['Seção', 'Prato', 'Qtd', 'Un', 'Observações', 'Decoração / Apresentação']];
@@ -921,6 +959,7 @@ export default function EventMenuDetailPage() {
   }
   const editingDish = menu.dishes.find(d => d.id === editingDishId) || null;
   const totalToBuy = shoppingList.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+  const totalEventCost = shoppingList.reduce((s, i) => s + i.needed * i.unitCost, 0);
   const itemsToBuy = shoppingList.filter(i => i.toBuy > 0).length;
   const itemsOk = shoppingList.filter(i => i.toBuy === 0).length;
   const insufficientCount = shoppingList.filter(i => !i.hasStock).length;
@@ -1180,7 +1219,26 @@ export default function EventMenuDetailPage() {
       <div className="bg-white rounded-xl border border-border p-6 mb-6 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-display font-bold text-foreground mb-2">{menu.name}</h1>
+            <div className="flex items-center gap-2 mb-2">
+              <h1 className="text-2xl font-display font-bold text-foreground">{menu.name}</h1>
+              <button
+                onClick={() => {
+                  setEditForm({
+                    name: menu.name,
+                    location: menu.location || '',
+                    event_date: menu.event_date || '',
+                    guest_count: menu.guest_count,
+                    staff_count: menu.staff_count,
+                    notes: menu.notes || '',
+                  });
+                  setEditMenuOpen(true);
+                }}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-muted/30"
+                title="Editar informações do evento"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               {menu.event_date && <Badge variant="outline" className="text-sm px-3 py-1"><Calendar className="w-3.5 h-3.5 mr-1.5" />{new Date(menu.event_date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Badge>}
               {menu.location && <Badge variant="outline" className="text-sm px-3 py-1"><MapPin className="w-3.5 h-3.5 mr-1.5" />{menu.location}</Badge>}
@@ -1275,7 +1333,7 @@ export default function EventMenuDetailPage() {
             <p className={`text-2xl font-bold ${insufficientCount > 0 ? 'text-destructive' : 'text-success'}`}>{insufficientCount > 0 ? insufficientCount : itemsOk}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{insufficientCount > 0 ? 'sem estoque' : 'em estoque'}</p>
           </div>
-          <div className="text-center"><p className="text-2xl font-bold gold-text">R$ {totalToBuy.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p><p className="text-xs text-muted-foreground mt-0.5">custo compra</p></div>
+          <div className="text-center"><p className="text-2xl font-bold gold-text">R$ {totalEventCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p><p className="text-xs text-muted-foreground mt-0.5">custo total</p></div>
         </div>
 
         {insufficientCount > 0 && (
@@ -1291,7 +1349,7 @@ export default function EventMenuDetailPage() {
         {([['pratos', `Cardápio (${regularDishes.length})`, null], ['compras', 'Lista de Compras', itemsToBuy > 0 ? itemsToBuy : null], ['saida', 'Separação / Retorno', null], ['materiais', 'Materiais', null]] as const).map(([tab, label, badge]) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === tab ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
             {label}
-            {badge && <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${activeTab === tab ? 'bg-white/20' : 'bg-destructive text-white'}`}>{badge}</span>}
+            {badge && <span className={`text-[10px] rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center font-bold leading-none ${activeTab === tab ? 'bg-white/20' : 'bg-destructive text-white'}`}>{badge}</span>}
           </button>
         ))}
       </div>
@@ -1727,6 +1785,32 @@ export default function EventMenuDetailPage() {
                 </Button>
               </div>
 
+              {/* Alert: insufficient materials */}
+              {(() => {
+                const shortage = materialItems.filter(i => (planQty[i.id] || 0) > 0 && (planQty[i.id] || 0) > i.available_qty);
+                if (shortage.length === 0) return null;
+                return (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 mb-5">
+                    <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-destructive">
+                        {shortage.length} material{shortage.length !== 1 ? 'is' : ''} com quantidade insuficiente
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {shortage.map(i => (
+                          <li key={i.id} className="text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">{i.name}</span>
+                            {' '}— disponível: <span className="text-amber-600 font-semibold">{i.available_qty}</span>, necessário: <span className="text-destructive font-semibold">{planQty[i.id]}</span>
+                            {' '}({planQty[i.id] - i.available_qty} faltando)
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-xs text-muted-foreground mt-2">Aumente o estoque ou reduza as quantidades necessárias na lista.</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {materialItems.filter(i => (planQty[i.id] || 0) > 0).length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-20" />
@@ -2009,6 +2093,96 @@ export default function EventMenuDetailPage() {
         onAssigned={() => loadMenu()}
       />
       <ReturnDialog open={returnOpen} onClose={() => setReturnOpen(false)} items={returnItems} onConfirm={confirmReturn} loading={movementLoading} />
+
+      {/* Edit event info dialog */}
+      <Dialog open={editMenuOpen} onOpenChange={setEditMenuOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar Informações do Evento</DialogTitle>
+            <DialogDescription>Atualize os dados do cardápio de evento.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Nome do Evento *</Label>
+              <Input
+                className="mt-1"
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Nome do evento..."
+              />
+            </div>
+            <div>
+              <Label>Local</Label>
+              <Input
+                className="mt-1"
+                value={editForm.location}
+                onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}
+                placeholder="Local do evento..."
+              />
+            </div>
+            <div>
+              <Label>Data do Evento</Label>
+              <Input
+                className="mt-1"
+                type="date"
+                value={editForm.event_date}
+                onChange={e => setEditForm(f => ({ ...f, event_date: e.target.value }))}
+              />
+              {editForm.event_date !== (menu?.event_date || '') && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  Alterar a data pode afetar a disponibilidade de materiais em outros eventos no mesmo período.
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Nº de Convidados</Label>
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={0}
+                  value={editForm.guest_count}
+                  onChange={e => setEditForm(f => ({ ...f, guest_count: Number(e.target.value) || 0 }))}
+                />
+                {editForm.guest_count !== menu?.guest_count && (
+                  <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    Altera as quantidades de MANTIMENTOS automaticamente.
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label>Nº de Profissionais</Label>
+                <Input
+                  className="mt-1"
+                  type="number"
+                  min={0}
+                  value={editForm.staff_count}
+                  onChange={e => setEditForm(f => ({ ...f, staff_count: Number(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Observações</Label>
+              <Textarea
+                className="mt-1"
+                rows={2}
+                value={editForm.notes}
+                onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Notas sobre o evento..."
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setEditMenuOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveEdit} disabled={savingEdit} className="gold-button">
+                {savingEdit ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                Salvar Alterações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
