@@ -10,6 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CommandSeparator } from '@/components/ui/command';
 import { Plus, Trash2, Upload, FileText, Camera, FileCode, Loader2, Check, X, AlertTriangle, PackagePlus, Download, Receipt, ShoppingCart, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -101,6 +102,13 @@ export default function EntriesPage() {
   const PAGE_SIZE = 50;
 
   const [itemId, setItemId] = useState('');
+  const [itemComboOpen, setItemComboOpen] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [quickCreateName, setQuickCreateName] = useState('');
+  const [quickCreateUnit, setQuickCreateUnit] = useState('kg');
+  const [quickCreateCategory, setQuickCreateCategory] = useState('Outros');
+  const [quickCreateSaving, setQuickCreateSaving] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [unitCost, setUnitCost] = useState('');
   const [supplier, setSupplier] = useState('');
@@ -147,6 +155,25 @@ export default function EntriesPage() {
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); };
+
+  const handleQuickCreate = async () => {
+    if (!quickCreateName.trim()) { toast.error('Nome é obrigatório'); return; }
+    setQuickCreateSaving(true);
+    const { data, error } = await supabase.from('stock_items').insert({
+      name: quickCreateName.trim(), unit: quickCreateUnit,
+      category: quickCreateCategory, current_stock: 0, min_stock: 0, unit_cost: 0,
+    } as any).select('id, name, unit, current_stock, barcode').single();
+    if (error || !data) { toast.error('Erro ao criar insumo'); setQuickCreateSaving(false); return; }
+    const newItem = data as Item;
+    setItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+    setItemId(newItem.id);
+    setQuickCreateOpen(false);
+    setQuickCreateName('');
+    setQuickCreateUnit('kg');
+    setQuickCreateCategory('Outros');
+    setQuickCreateSaving(false);
+    toast.success(`"${newItem.name}" criado e selecionado!`);
+  };
 
   const handleSave = async () => {
     if (!itemId) { toast.error('Selecione um item'); return; }
@@ -709,12 +736,64 @@ export default function EntriesPage() {
               <div className="space-y-4">
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Item</label>
-                  <Select value={itemId} onValueChange={setItemId}>
-                    <SelectTrigger><SelectValue placeholder="Selecione o item" /></SelectTrigger>
-                    <SelectContent>
-                      {items.map(i => <SelectItem key={i.id} value={i.id}>{i.name} ({i.current_stock} {i.unit})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={itemComboOpen} onOpenChange={setItemComboOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10">
+                        <span className="truncate">
+                          {itemId ? items.find(i => i.id === itemId)?.name : 'Buscar ou criar insumo...'}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput
+                          placeholder="Digitar nome do insumo..."
+                          value={itemSearch}
+                          onValueChange={setItemSearch}
+                        />
+                        <CommandList className="max-h-64">
+                          <CommandEmpty>
+                            <div className="py-2 text-center">
+                              <p className="text-sm text-muted-foreground mb-2">Nenhum insumo encontrado.</p>
+                              <Button size="sm" onClick={() => {
+                                setQuickCreateName(itemSearch);
+                                setItemComboOpen(false);
+                                setQuickCreateOpen(true);
+                              }}>
+                                <PackagePlus className="w-4 h-4 mr-2" />
+                                Criar "{itemSearch}"
+                              </Button>
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {items.map(i => (
+                              <CommandItem key={i.id} value={i.name} onSelect={() => {
+                                setItemId(i.id);
+                                setItemSearch('');
+                                setItemComboOpen(false);
+                              }}>
+                                <Check className={cn('mr-2 h-4 w-4 shrink-0', itemId === i.id ? 'opacity-100' : 'opacity-0')} />
+                                <span className="flex-1 truncate">{i.name}</span>
+                                <span className="text-xs text-muted-foreground ml-2">{i.current_stock} {i.unit}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          <CommandSeparator />
+                          <CommandGroup>
+                            <CommandItem forceMount onSelect={() => {
+                              setQuickCreateName(itemSearch);
+                              setItemComboOpen(false);
+                              setQuickCreateOpen(true);
+                            }} className="text-primary">
+                              <PackagePlus className="mr-2 h-4 w-4" />
+                              + Criar novo insumo...
+                            </CommandItem>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -779,6 +858,43 @@ export default function EntriesPage() {
                   <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Observações" />
                 </div>
                 <Button onClick={handleSave} className="w-full">Registrar Entrada</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Quick create item dialog */}
+          <Dialog open={quickCreateOpen} onOpenChange={o => { setQuickCreateOpen(o); if (!o) { setQuickCreateName(''); setQuickCreateUnit('kg'); setQuickCreateCategory('Outros'); } }}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader><DialogTitle>Criar Novo Insumo</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Nome *</label>
+                  <Input value={quickCreateName} onChange={e => setQuickCreateName(e.target.value)} autoFocus placeholder="Nome do insumo" onKeyDown={e => { if (e.key === 'Enter') handleQuickCreate(); }} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Unidade</label>
+                    <Select value={quickCreateUnit} onValueChange={setQuickCreateUnit}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {['kg', 'g', 'L', 'ml', 'un', 'pct', 'cx', 'lata', 'dz'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
+                    <Select value={quickCreateCategory} onValueChange={setQuickCreateCategory}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {['Hortifruti', 'Carnes', 'Frios', 'Bebidas', 'Panificação', 'Limpeza', 'Descartáveis', 'Outros'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button className="w-full" onClick={handleQuickCreate} disabled={quickCreateSaving}>
+                  {quickCreateSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PackagePlus className="w-4 h-4 mr-2" />}
+                  Criar e Selecionar
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
