@@ -34,6 +34,8 @@ import FornecedorDetailPage from "./pages/supervisor/FornecedorDetailPage";
 import ShoppingListsPage from "./pages/supervisor/ShoppingListsPage";
 import ShoppingListDetailPage from "./pages/supervisor/ShoppingListDetailPage";
 import MobileSupervisorApp from "./pages/supervisor/MobileSupervisorApp";
+import MateriaisInventarioPage from "./pages/supervisor/materiais/MateriaisInventarioPage";
+import EmprestimosPage from "./pages/supervisor/materiais/EmprestimosPage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
@@ -102,6 +104,8 @@ function AppRoutes() {
           <Route path="/users" element={<UsersPage />} />
           <Route path="/fornecedores" element={<FornecedoresPage />} />
           <Route path="/fornecedores/:supplierName" element={<FornecedorDetailPage />} />
+          <Route path="/materiais" element={<MateriaisInventarioPage />} />
+          <Route path="/materiais/emprestimos" element={<EmprestimosPage />} />
           <Route path="/invoices" element={<Navigate to="/entries" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
