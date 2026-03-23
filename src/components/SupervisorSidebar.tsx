@@ -35,7 +35,7 @@ const navStructure: NavGroup[] = [
     items: [
       { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
       { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
-      { path: '/comparison', label: 'Transferências', icon: ArrowRightLeft },
+      { path: '/transfers', label: 'Transferências', icon: ArrowRightLeft },
     ]
   },
   { label: 'Cardápios', icon: UtensilsCrossed, items: [

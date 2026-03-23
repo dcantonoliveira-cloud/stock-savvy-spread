@@ -1,335 +1,178 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, ArrowRightLeft, Building2, Package, Lock, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Building2, Plus, Pencil, Trash2, Lock, Loader2, ChevronRight, Package } from 'lucide-react';
 import { toast } from 'sonner';
 
-type Kitchen = { id: string; name: string; created_at: string; is_default: boolean };
-type StockItem = { id: string; name: string; unit: string; category: string; current_stock: number };
+type Kitchen = { id: string; name: string; is_default: boolean };
 type Location = { id: string; item_id: string; kitchen_id: string; current_stock: number };
-type Transfer = {
-  id: string; item_id: string; from_kitchen_id: string; to_kitchen_id: string;
-  quantity: number; transferred_by: string; notes: string | null; date: string; created_at: string;
-};
 
 export default function KitchensPage() {
+  const navigate = useNavigate();
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
-  const [items, setItems] = useState<StockItem[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [kitchenDialog, setKitchenDialog] = useState(false);
-  const [editingKitchen, setEditingKitchen] = useState<Kitchen | null>(null);
+  const [dialog, setDialog] = useState(false);
+  const [editing, setEditing] = useState<Kitchen | null>(null);
   const [kitchenName, setKitchenName] = useState('');
-
-  const [transferDialog, setTransferDialog] = useState(false);
-  const [tfFromKitchen, setTfFromKitchen] = useState('');
-  const [tfToKitchen, setTfToKitchen] = useState('');
-  const [tfItem, setTfItem] = useState('');
-  const [tfQuantity, setTfQuantity] = useState('');
-  const [tfBy, setTfBy] = useState('');
-  const [tfNotes, setTfNotes] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    const [k, i, l, t] = await Promise.all([
-      supabase.from('kitchens').select('*').order('name'),
-      supabase.from('stock_items').select('id, name, unit, category, current_stock').order('name'),
-      supabase.from('stock_item_locations').select('*'),
-      supabase.from('stock_transfers').select('*').order('created_at', { ascending: false }).limit(50),
+    setLoading(true);
+    const [k, l] = await Promise.all([
+      supabase.from('kitchens').select('id, name, is_default').order('name'),
+      supabase.from('stock_item_locations').select('id, item_id, kitchen_id, current_stock'),
     ]);
     if (k.data) setKitchens(k.data as Kitchen[]);
-    if (i.data) setItems(i.data);
     if (l.data) setLocations(l.data as Location[]);
-    if (t.data) setTransfers(t.data as Transfer[]);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const getLocationStock = (itemId: string, kitchenId: string) => {
-    return locations.find(l => l.item_id === itemId && l.kitchen_id === kitchenId)?.current_stock ?? 0;
-  };
-
-  const handleSaveKitchen = async () => {
+  const handleSave = async () => {
     const name = kitchenName.trim();
     if (!name) { toast.error('Nome é obrigatório'); return; }
-
-    if (editingKitchen) {
-      const { error } = await supabase.from('kitchens').update({ name } as any).eq('id', editingKitchen.id);
-      if (error) { toast.error('Erro ao atualizar'); return; }
-      toast.success('Cozinha atualizada!');
+    setSaving(true);
+    if (editing) {
+      const { error } = await supabase.from('kitchens').update({ name } as any).eq('id', editing.id);
+      if (error) { toast.error('Erro ao atualizar'); setSaving(false); return; }
+      toast.success('Centro atualizado!');
     } else {
       const { error } = await supabase.from('kitchens').insert({ name } as any);
-      if (error) { toast.error('Erro ao criar'); return; }
-      toast.success('Cozinha criada!');
+      if (error) { toast.error('Erro ao criar'); setSaving(false); return; }
+      toast.success('Centro criado!');
     }
-    setKitchenDialog(false);
-    setEditingKitchen(null);
+    setSaving(false);
+    setDialog(false);
+    setEditing(null);
     setKitchenName('');
     load();
   };
 
-  const handleDeleteKitchen = async (kitchen: Kitchen) => {
-    if (kitchen.is_default) {
-      toast.error('O Estoque Geral não pode ser removido');
-      return;
-    }
-    const kitchenLocations = locations.filter(l => l.kitchen_id === kitchen.id && l.current_stock > 0);
-    if (kitchenLocations.length > 0) {
-      toast.error('Transfira todo o estoque antes de remover esta cozinha');
-      return;
-    }
+  const handleDelete = async (kitchen: Kitchen) => {
+    if (kitchen.is_default) { toast.error('O Estoque Geral não pode ser removido'); return; }
+    const hasStock = locations.some(l => l.kitchen_id === kitchen.id && l.current_stock > 0);
+    if (hasStock) { toast.error('Transfira todo o estoque antes de remover'); return; }
     const { error } = await supabase.from('kitchens').delete().eq('id', kitchen.id);
     if (error) { toast.error('Erro ao remover'); return; }
-    toast.success('Cozinha removida!');
+    toast.success('Centro removido!');
     load();
   };
 
-  const handleTransfer = async () => {
-    if (!tfFromKitchen || !tfToKitchen || !tfItem || !tfQuantity || !tfBy.trim()) {
-      toast.error('Preencha todos os campos obrigatórios');
-      return;
-    }
-    if (tfFromKitchen === tfToKitchen) {
-      toast.error('Origem e destino devem ser diferentes');
-      return;
-    }
-    const qty = parseFloat(tfQuantity);
-    if (!qty || qty <= 0) { toast.error('Quantidade inválida'); return; }
-
-    const currentFromStock = getLocationStock(tfItem, tfFromKitchen);
-    if (qty > currentFromStock) {
-      toast.error(`Estoque insuficiente na origem (disponível: ${currentFromStock})`);
-      return;
-    }
-
-    const { error: tfError } = await supabase.from('stock_transfers').insert({
-      item_id: tfItem,
-      from_kitchen_id: tfFromKitchen,
-      to_kitchen_id: tfToKitchen,
-      quantity: qty,
-      transferred_by: tfBy.trim(),
-      notes: tfNotes.trim() || null,
-    } as any);
-    if (tfError) { toast.error('Erro ao registrar transferência'); return; }
-
-    const fromLoc = locations.find(l => l.item_id === tfItem && l.kitchen_id === tfFromKitchen);
-    if (fromLoc) {
-      await supabase.from('stock_item_locations')
-        .update({ current_stock: fromLoc.current_stock - qty } as any)
-        .eq('id', fromLoc.id);
-    }
-
-    const toLoc = locations.find(l => l.item_id === tfItem && l.kitchen_id === tfToKitchen);
-    if (toLoc) {
-      await supabase.from('stock_item_locations')
-        .update({ current_stock: toLoc.current_stock + qty } as any)
-        .eq('id', toLoc.id);
-    } else {
-      await supabase.from('stock_item_locations').insert({
-        item_id: tfItem,
-        kitchen_id: tfToKitchen,
-        current_stock: qty,
-      } as any);
-    }
-
-    toast.success('Transferência realizada com sucesso!');
-    setTransferDialog(false);
-    setTfFromKitchen('');
-    setTfToKitchen('');
-    setTfItem('');
-    setTfQuantity('');
-    setTfBy('');
-    setTfNotes('');
-    load();
+  const getStats = (kitchenId: string) => {
+    const locs = locations.filter(l => l.kitchen_id === kitchenId && l.current_stock > 0);
+    return { itemCount: locs.length, totalUnits: locs.reduce((s, l) => s + l.current_stock, 0) };
   };
-
-  const kitchenName_fn = (id: string) => kitchens.find(k => k.id === id)?.name || '—';
-  const itemName_fn = (id: string) => items.find(i => i.id === id)?.name || '—';
-  const itemUnit_fn = (id: string) => items.find(i => i.id === id)?.unit || '';
-
-  if (loading) return (
-    <div className="flex items-center justify-center py-24">
-      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-    </div>
-  );
 
   return (
     <div>
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-display font-bold gold-text">Cozinhas</h1>
-          <p className="text-muted-foreground mt-1">{kitchens.length} unidades cadastradas</p>
+          <h1 className="text-3xl font-display font-bold gold-text">Centros de Custo</h1>
+          <p className="text-muted-foreground mt-1">{kitchens.length} centros cadastrados</p>
         </div>
-        <div className="flex gap-2">
-          <Dialog open={transferDialog} onOpenChange={o => { setTransferDialog(o); }}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <ArrowRightLeft className="w-4 h-4 mr-2" />Transferir
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Transferência entre Cozinhas</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">De (Origem) *</label>
-                  <Select value={tfFromKitchen} onValueChange={setTfFromKitchen}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {kitchens.map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Para (Destino) *</label>
-                  <Select value={tfToKitchen} onValueChange={setTfToKitchen}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {kitchens.filter(k => k.id !== tfFromKitchen).map(k => <SelectItem key={k.id} value={k.id}>{k.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Item *</label>
-                  <Select value={tfItem} onValueChange={setTfItem}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {items.map(i => (
-                        <SelectItem key={i.id} value={i.id}>
-                          {i.name} {tfFromKitchen ? `(${getLocationStock(i.id, tfFromKitchen)} ${i.unit})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Quantidade *</label>
-                  <Input type="number" value={tfQuantity} onChange={e => setTfQuantity(e.target.value)} placeholder="0" />
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Responsável *</label>
-                  <Input value={tfBy} onChange={e => setTfBy(e.target.value)} placeholder="Nome de quem transferiu" />
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Observação</label>
-                  <Input value={tfNotes} onChange={e => setTfNotes(e.target.value)} placeholder="Ex: Urgente para evento" />
-                </div>
-                <Button className="w-full" onClick={handleTransfer}>
-                  <ArrowRightLeft className="w-4 h-4 mr-2" />Confirmar Transferência
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={kitchenDialog} onOpenChange={o => { setKitchenDialog(o); if (!o) { setEditingKitchen(null); setKitchenName(''); } }}>
-            <DialogTrigger asChild>
-              <Button><Plus className="w-4 h-4 mr-2" />Nova Cozinha</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle>{editingKitchen ? 'Editar Cozinha' : 'Nova Cozinha'}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Input
-                  value={kitchenName}
-                  onChange={e => setKitchenName(e.target.value)}
-                  placeholder="Nome da cozinha"
-                  autoFocus
-                />
-                <div className="flex gap-3">
-                  <Button className="flex-1" onClick={handleSaveKitchen}>
-                    {editingKitchen ? 'Salvar' : 'Criar'}
-                  </Button>
-                  <Button variant="outline" onClick={() => { setKitchenDialog(false); setEditingKitchen(null); }}>Cancelar</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Button onClick={() => { setEditing(null); setKitchenName(''); setDialog(true); }}>
+          <Plus className="w-4 h-4 mr-2" />Novo Centro
+        </Button>
       </div>
 
-      {/* Kitchens grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-        {kitchens.map(kitchen => {
-          const kitchenLocs = locations.filter(l => l.kitchen_id === kitchen.id);
-          const totalItems = kitchenLocs.filter(l => l.current_stock > 0).length;
-          const totalUnits = kitchenLocs.reduce((s, l) => s + l.current_stock, 0);
-          return (
-            <Card key={kitchen.id} className="glass-card border-0 animate-fade-in">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${kitchen.is_default ? 'bg-primary/20' : 'bg-primary/10'}`}>
-                      {kitchen.is_default ? <Package className="w-5 h-5 text-primary" /> : <Building2 className="w-5 h-5 text-primary" />}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-display font-semibold text-foreground">{kitchen.name}</h3>
-                        {kitchen.is_default && <Lock className="w-3 h-3 text-muted-foreground" />}
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted-foreground bg-muted/30">
+              <th className="text-left px-5 py-3">Centro de Custo</th>
+              <th className="text-right px-4 py-3">Itens em estoque</th>
+              <th className="text-right px-4 py-3">Total de unidades</th>
+              <th className="w-24 px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/40">
+            {loading ? (
+              <tr><td colSpan={4} className="text-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mx-auto" />
+              </td></tr>
+            ) : kitchens.length === 0 ? (
+              <tr><td colSpan={4} className="text-center py-12 text-muted-foreground">
+                <Building2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                Nenhum centro cadastrado
+              </td></tr>
+            ) : kitchens.map(kitchen => {
+              const { itemCount, totalUnits } = getStats(kitchen.id);
+              return (
+                <tr
+                  key={kitchen.id}
+                  className="hover:bg-muted/20 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/kitchens/${kitchen.id}`)}
+                >
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${kitchen.is_default ? 'bg-primary/20' : 'bg-primary/10'}`}>
+                        {kitchen.is_default ? <Package className="w-4 h-4 text-primary" /> : <Building2 className="w-4 h-4 text-primary" />}
                       </div>
-                      <p className="text-xs text-muted-foreground">{totalItems} itens em estoque</p>
+                      <div>
+                        <p className="font-medium text-foreground">{kitchen.name}</p>
+                        {kitchen.is_default && <p className="text-xs text-muted-foreground">Estoque principal</p>}
+                      </div>
+                      {kitchen.is_default && <Lock className="w-3 h-3 text-muted-foreground" />}
                     </div>
-                  </div>
-                  {!kitchen.is_default && (
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingKitchen(kitchen); setKitchenName(kitchen.name); setKitchenDialog(true); }}>
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteKitchen(kitchen)}>
-                        <Trash2 className="w-3 h-3 text-destructive" />
-                      </Button>
+                  </td>
+                  <td className="px-4 py-4 text-right font-medium">{itemCount}</td>
+                  <td className="px-4 py-4 text-right text-muted-foreground">
+                    {totalUnits.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                      {!kitchen.is_default && (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditing(kitchen); setKitchenName(kitchen.name); setDialog(true); }}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(kitchen)}>
+                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
                     </div>
-                  )}
-                </div>
-                <div className="bg-accent rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Total em Estoque</p>
-                  <p className="text-lg font-bold text-foreground">{totalUnits.toLocaleString('pt-BR')}</p>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-
-        {kitchens.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            <Building2 className="w-16 h-16 mx-auto mb-3 opacity-30" />
-            <p>Nenhuma cozinha cadastrada. Crie a primeira!</p>
-          </div>
-        )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Recent transfers */}
-      {transfers.length > 0 && (
-        <div>
-          <h2 className="text-lg font-display font-semibold text-foreground mb-4">Últimas Transferências</h2>
-          <div className="space-y-2">
-            {transfers.map(t => (
-              <div key={t.id} className="glass-card rounded-xl p-4 flex items-center gap-4 animate-fade-in">
-                <ArrowRightLeft className="w-5 h-5 text-primary flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">
-                    {itemName_fn(t.item_id)} — <span className="text-primary">{t.quantity} {itemUnit_fn(t.item_id)}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {kitchenName_fn(t.from_kitchen_id)} → {kitchenName_fn(t.to_kitchen_id)} · Por: {t.transferred_by}
-                  </p>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {new Date(t.created_at).toLocaleDateString('pt-BR')}
-                </Badge>
-              </div>
-            ))}
+      {/* Dialog */}
+      <Dialog open={dialog} onOpenChange={o => { setDialog(o); if (!o) { setEditing(null); setKitchenName(''); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Editar Centro de Custo' : 'Novo Centro de Custo'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={kitchenName}
+              onChange={e => setKitchenName(e.target.value)}
+              placeholder="Ex: Cozinha 1, Bar, Confeitaria..."
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') handleSave(); }}
+            />
+            <div className="flex gap-3">
+              <Button className="flex-1" onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {editing ? 'Salvar' : 'Criar'}
+              </Button>
+              <Button variant="outline" onClick={() => setDialog(false)}>Cancelar</Button>
+            </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
