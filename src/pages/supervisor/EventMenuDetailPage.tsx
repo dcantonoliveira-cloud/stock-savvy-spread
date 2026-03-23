@@ -1712,91 +1712,88 @@ export default function EventMenuDetailPage() {
             </div>
 
           /* ── Lista salva: visualização ── */
-          ) : linkedLoanId && !editingMaterials ? (() => {
-            const savedItems = materialItems.filter(i => (planQty[i.id] || 0) > 0);
-            const categories = Array.from(new Set(savedItems.map(i => i.category))).sort();
-            return (
-              <div>
-                {/* Header da lista */}
-                <div className="bg-white rounded-xl border border-border p-4 mb-5 flex items-center justify-between gap-4 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Warehouse className="w-4 h-4 text-primary" />
-                    <span className="font-medium text-foreground">{savedItems.length} tipo{savedItems.length !== 1 ? 's' : ''} de material na lista</span>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => setEditingMaterials(true)}>
-                    <Pencil className="w-3.5 h-3.5 mr-1.5" />Editar Lista
-                  </Button>
+          ) : linkedLoanId && !editingMaterials ? (
+            <div>
+              {/* Header da lista */}
+              <div className="bg-white rounded-xl border border-border p-4 mb-5 flex items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-center gap-2 text-sm">
+                  <Warehouse className="w-4 h-4 text-primary" />
+                  <span className="font-medium text-foreground">
+                    {materialItems.filter(i => (planQty[i.id] || 0) > 0).length} tipo{materialItems.filter(i => (planQty[i.id] || 0) > 0).length !== 1 ? 's' : ''} de material na lista
+                  </span>
                 </div>
-
-                {savedItems.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Package className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                    <p className="text-sm">Lista vazia — clique em Editar para adicionar materiais</p>
-                  </div>
-                ) : (
-                  <div className="space-y-5">
-                    {categories.map(cat => (
-                      <div key={cat}>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">📦 {cat}</p>
-                        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-border bg-muted/20">
-                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-full">Material</th>
-                                <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Total</th>
-                                <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Disponível</th>
-                                <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Necessário</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/50">
-                              {materialItems.filter(i => i.category === cat && (planQty[i.id] || 0) > 0).map(item => {
-                                const needed = planQty[item.id] || 0;
-                                const inUse = item.total_qty - item.available_qty;
-                                return (
-                                  <tr key={item.id} className="hover:bg-muted/5 transition-colors">
-                                    <td className="px-4 py-3">
-                                      <div className="flex items-center gap-3">
-                                        {item.image_url ? (
-                                          <img src={item.image_url} alt={item.name} className="w-9 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
-                                        ) : (
-                                          <div className="w-9 h-9 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
-                                            <Package className="w-4 h-4 text-muted-foreground/40" />
-                                          </div>
-                                        )}
-                                        <div>
-                                          <p className="font-medium text-foreground">{item.name}</p>
-                                          {inUse > 0 && <p className="text-[11px] text-amber-600">{inUse} em uso em outros eventos</p>}
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td className="px-3 py-3 text-right whitespace-nowrap text-muted-foreground">
-                                      {item.total_qty} <span className="text-xs">{item.unit}</span>
-                                    </td>
-                                    <td className="px-3 py-3 text-right whitespace-nowrap">
-                                      <span className={item.available_qty === 0 ? 'text-destructive font-semibold' : item.available_qty < needed ? 'text-amber-600 font-semibold' : 'text-foreground'}>
-                                        {item.available_qty}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                                      <span className={needed > item.available_qty ? 'text-destructive font-bold' : 'text-primary font-semibold'}>
-                                        {needed}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <Button variant="outline" size="sm" onClick={() => setEditingMaterials(true)}>
+                  <Pencil className="w-3.5 h-3.5 mr-1.5" />Editar Lista
+                </Button>
               </div>
-            );
-          })()
+
+              {materialItems.filter(i => (planQty[i.id] || 0) > 0).length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Package className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm">Lista vazia — clique em Editar para adicionar materiais</p>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {Array.from(new Set(materialItems.filter(i => (planQty[i.id] || 0) > 0).map(i => i.category))).sort().map(cat => (
+                    <div key={cat}>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">📦 {cat}</p>
+                      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border bg-muted/20">
+                              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-full">Material</th>
+                              <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Total</th>
+                              <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Disponível</th>
+                              <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Necessário</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/50">
+                            {materialItems.filter(i => i.category === cat && (planQty[i.id] || 0) > 0).map(item => {
+                              const needed = planQty[item.id] || 0;
+                              const inUse = item.total_qty - item.available_qty;
+                              return (
+                                <tr key={item.id} className="hover:bg-muted/5 transition-colors">
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-3">
+                                      {item.image_url ? (
+                                        <img src={item.image_url} alt={item.name} className="w-9 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
+                                      ) : (
+                                        <div className="w-9 h-9 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
+                                          <Package className="w-4 h-4 text-muted-foreground/40" />
+                                        </div>
+                                      )}
+                                      <div>
+                                        <p className="font-medium text-foreground">{item.name}</p>
+                                        {inUse > 0 && <p className="text-[11px] text-amber-600">{inUse} em uso em outros eventos</p>}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3 text-right whitespace-nowrap text-muted-foreground">
+                                    {item.total_qty} <span className="text-xs">{item.unit}</span>
+                                  </td>
+                                  <td className="px-3 py-3 text-right whitespace-nowrap">
+                                    <span className={item.available_qty === 0 ? 'text-destructive font-semibold' : item.available_qty < needed ? 'text-amber-600 font-semibold' : 'text-foreground'}>
+                                      {item.available_qty}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                                    <span className={needed > item.available_qty ? 'text-destructive font-bold' : 'text-primary font-semibold'}>
+                                      {needed}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
           /* ── Modo edição: todos os materiais com inputs ── */
           ) : (
