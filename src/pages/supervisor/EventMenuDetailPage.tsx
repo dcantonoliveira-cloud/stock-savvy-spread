@@ -1195,35 +1195,71 @@ export default function EventMenuDetailPage() {
               {menu.returned_at && ` · Retorno: ${new Date(menu.returned_at).toLocaleDateString('pt-BR')} por ${menu.returned_by}`}
             </p>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <Badge variant={statusColor[menu.status] as any} className="text-xs">
-              {menu.status === 'assigned' && <UserCheck className="w-3 h-3 mr-1" />}
-              {menu.status === 'dispatched' && <Truck className="w-3 h-3 mr-1" />}
-              {menu.status === 'completed' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-              {statusLabel[menu.status] || menu.status}
-            </Badge>
+          <div className="flex flex-col items-end gap-3 flex-shrink-0">
 
-            {/* Assigned employee chip */}
-            {assignedEmployee && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/8 border border-primary/20 text-xs text-primary">
-                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center font-bold text-[10px]">
-                  {assignedEmployee.display_name.charAt(0).toUpperCase()}
+            {/* Info card: status + funcionário responsável */}
+            {menu.status !== 'draft' && (
+              <div className={`rounded-xl border px-4 py-3 flex flex-col gap-2 min-w-[200px] ${
+                menu.status === 'completed'
+                  ? 'bg-green-50 border-green-200'
+                  : menu.status === 'dispatched'
+                  ? 'bg-blue-50 border-blue-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                {/* Status label */}
+                <div className={`flex items-center gap-1.5 text-xs font-semibold ${
+                  menu.status === 'completed' ? 'text-green-700'
+                  : menu.status === 'dispatched' ? 'text-blue-700'
+                  : 'text-amber-700'
+                }`}>
+                  {menu.status === 'assigned' && <UserCheck className="w-3.5 h-3.5" />}
+                  {menu.status === 'dispatched' && <Truck className="w-3.5 h-3.5" />}
+                  {menu.status === 'completed' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  {statusLabel[menu.status]}
                 </div>
-                <span className="font-medium">{assignedEmployee.display_name}</span>
-                <span className="text-primary/60">separando</span>
+
+                {/* Funcionário */}
+                {assignedEmployee && (
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${
+                      menu.status === 'completed' ? 'bg-green-200 text-green-800'
+                      : menu.status === 'dispatched' ? 'bg-blue-200 text-blue-800'
+                      : 'bg-amber-200 text-amber-800'
+                    }`}>
+                      {assignedEmployee.display_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className={`text-xs font-semibold truncate ${
+                        menu.status === 'completed' ? 'text-green-800'
+                        : menu.status === 'dispatched' ? 'text-blue-800'
+                        : 'text-amber-800'
+                      }`}>{assignedEmployee.display_name}</p>
+                      <p className={`text-[10px] ${
+                        menu.status === 'completed' ? 'text-green-600'
+                        : menu.status === 'dispatched' ? 'text-blue-600'
+                        : 'text-amber-600'
+                      }`}>responsável pela separação</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
+            {/* Status rascunho (sem card colorido) */}
+            {menu.status === 'draft' && (
+              <Badge variant="secondary" className="text-xs">Rascunho</Badge>
+            )}
+
             {/* Action buttons */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full">
               {canAssign && (
-                <Button size="sm" onClick={() => setAssignOpen(true)} className="gap-1.5">
+                <Button size="sm" onClick={() => setAssignOpen(true)} className="gap-1.5 gold-button flex-1 justify-center">
                   <UserCheck className="w-4 h-4" />
                   {menu.status === 'assigned' ? 'Reatribuir Separação' : 'Atribuir Separação'}
                 </Button>
               )}
               {canReturn && (
-                <Button size="sm" onClick={prepareReturn} className="gap-1.5 bg-success hover:bg-success/90">
+                <Button size="sm" onClick={prepareReturn} className="gap-1.5 bg-success hover:bg-success/90 flex-1 justify-center">
                   <RotateCcw className="w-4 h-4" />Registrar Retorno
                 </Button>
               )}
