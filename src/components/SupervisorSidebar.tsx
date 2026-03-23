@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText,
   Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
-  ArrowRightLeft, ChevronDown, ChevronRight, Truck, ShoppingCart
+  ArrowRightLeft, ChevronDown, ChevronRight, Truck, ShoppingCart, Warehouse, ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -42,6 +42,13 @@ const navStructure: NavGroup[] = [
     { path: '/event-menus', label: 'Cardápios de Eventos', icon: UtensilsCrossed },
     { path: '/shopping-lists', label: 'Listas de Compras', icon: ShoppingCart },
   ]},
+  {
+    label: 'Materiais', icon: Warehouse,
+    items: [
+      { path: '/materiais', label: 'Inventário', icon: Package },
+      { path: '/materiais/emprestimos', label: 'Empréstimos', icon: ClipboardList },
+    ]
+  },
   { path: '/analysis', label: 'Análise IA', icon: Brain },
   { path: '/users', label: 'Funcionários', icon: Users },
 ];
@@ -57,7 +64,7 @@ export default function SupervisorSidebar() {
   const getDefaultOpen = () => {
     const open = new Set<string>();
     navStructure.forEach(item => {
-      if (isGroup(item) && item.items.some(i => pathname === i.path)) {
+      if (isGroup(item) && item.items.some(i => pathname === i.path || pathname.startsWith(i.path + '/'))) {
         open.add(item.label);
       }
     });
@@ -121,7 +128,7 @@ export default function SupervisorSidebar() {
 
           const Icon = item.icon;
           const isOpen = openGroups.has(item.label);
-          const isActiveGroup = item.items.some(i => pathname === i.path);
+          const isActiveGroup = item.items.some(i => pathname === i.path || pathname.startsWith(i.path + '/'));
 
           return (
             <div key={item.label}>
