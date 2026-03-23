@@ -31,9 +31,11 @@ export default function PerdasPage() {
 
   const load = async () => {
     setLoading(true);
+    // Only load events where a devolution was already made (returned or partial)
     const { data: loans } = await supabase
       .from('material_loans' as any)
       .select('id, event_name, date_out, date_return, status')
+      .in('status', ['returned', 'partial'])
       .order('date_out', { ascending: false });
 
     if (!loans || (loans as any[]).length === 0) {
@@ -54,7 +56,9 @@ export default function PerdasPage() {
       if (!loan) continue;
       const lost = (li.qty_out ?? 0) - (li.qty_returned ?? 0);
       const damaged = li.qty_damaged ?? 0;
-      // Only show rows with losses or damage
+      // For partial loans: only show items where a return was actually recorded
+      if (loan.status === 'partial' && (li.qty_returned ?? 0) === 0 && damaged === 0) continue;
+      // Only show rows with actual losses or damage
       if (lost <= 0 && damaged <= 0) continue;
       result.push({
         loan_id: loan.id,
