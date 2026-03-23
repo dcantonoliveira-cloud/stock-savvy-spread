@@ -20,8 +20,8 @@ type SheetItem = {
   id?: string;
   item_id: string;
   item_name: string;
-  quantity: number;
-  gross_quantity: number;
+  quantity: number | string;
+  gross_quantity: number | string;
   correction_factor: number;
   unit: string;
   unit_cost: number;
@@ -338,8 +338,7 @@ export default function SupervisorSheetsPage() {
       const newCost = calcRecipeUnitCost(si?.unit_cost || 0, itemUnit, value);
       updated[idx] = { ...updated[idx], unit: value, unit_cost: newCost };
     } else if (field === 'quantity') {
-      const qty = parseFloat(value) || 0;
-      updated[idx] = { ...updated[idx], quantity: qty, gross_quantity: qty };
+      updated[idx] = { ...updated[idx], quantity: value, gross_quantity: value };
     } else {
       (updated[idx] as any)[field] = value;
     }
@@ -370,8 +369,10 @@ export default function SupervisorSheetsPage() {
       await supabase.from('technical_sheet_items').delete().eq('sheet_id', editingSheet.id);
       await supabase.from('technical_sheet_items').insert(
         validItems.map(i => ({
-          sheet_id: editingSheet.id, item_id: i.item_id, quantity: i.quantity,
-          gross_quantity: i.gross_quantity, correction_factor: i.correction_factor,
+          sheet_id: editingSheet.id, item_id: i.item_id,
+          quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
+          gross_quantity: parseFloat(String(i.gross_quantity).replace(',', '.')) || 0,
+          correction_factor: i.correction_factor,
           unit_cost: i.unit_cost, unit: i.unit || null,
         })) as any
       );
@@ -382,8 +383,10 @@ export default function SupervisorSheetsPage() {
       if (error || !sheet) { toast.error('Erro ao criar ficha'); return; }
       await supabase.from('technical_sheet_items').insert(
         validItems.map(i => ({
-          sheet_id: (sheet as any).id, item_id: i.item_id, quantity: i.quantity,
-          gross_quantity: i.gross_quantity, correction_factor: i.correction_factor,
+          sheet_id: (sheet as any).id, item_id: i.item_id,
+          quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
+          gross_quantity: parseFloat(String(i.gross_quantity).replace(',', '.')) || 0,
+          correction_factor: i.correction_factor,
           unit_cost: i.unit_cost, unit: i.unit || null,
         })) as any
       );
@@ -864,7 +867,7 @@ export default function SupervisorSheetsPage() {
                         onSelect={v => updateItem(idx, 'item_id', v)}
                         onCreateNew={() => setQuickCreateOpen(true)}
                       />
-                      <Input type="number" step="any" className="h-8 text-xs" placeholder="Ex: 100" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} />
+                      <Input type="text" inputMode="decimal" className="h-8 text-xs" placeholder="Ex: 0.5" value={String(item.quantity)} onChange={e => updateItem(idx, 'quantity', e.target.value)} />
                       {compatUnits.length > 1 ? (
                         <select
                           className="h-8 text-xs border border-input rounded-md px-1 bg-background cursor-pointer"
@@ -877,7 +880,7 @@ export default function SupervisorSheetsPage() {
                         <span className="text-xs text-muted-foreground text-center">{item.unit}</span>
                       )}
                       <Input type="number" step="0.01" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
-                      <span className="text-xs font-medium text-foreground text-center">R$ {(item.quantity * item.unit_cost).toFixed(2)}</span>
+                      <span className="text-xs font-medium text-foreground text-center">R$ {((parseFloat(String(item.quantity).replace(',', '.')) || 0) * item.unit_cost).toFixed(2)}</span>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
                     </div>
                   );
@@ -886,7 +889,7 @@ export default function SupervisorSheetsPage() {
                 {formItems.length > 0 && (
                   <div className="flex justify-end mt-2 pr-10">
                     <span className="text-sm font-semibold text-primary">
-                      Total: R$ {formItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0).toFixed(2)}
+                      Total: R$ {formItems.reduce((s, i) => s + (parseFloat(String(i.quantity).replace(',', '.')) || 0) * i.unit_cost, 0).toFixed(2)}
                     </span>
                   </div>
                 )}
