@@ -626,6 +626,7 @@ export default function StockItemsPage() {
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none w-full min-w-[280px]" onClick={() => toggleSort('name')}>
                   <div className="flex items-center gap-1">PRODUTO <SortIcon field="name" /></div>
                 </th>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">CATEGORIA</th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort('current_stock')}>
                   <div className="flex items-center justify-end gap-1">ESTOQUE <SortIcon field="current_stock" /></div>
                 </th>
@@ -658,16 +659,16 @@ export default function StockItemsPage() {
                     </td>
 
                     <td className="px-3 py-2">
-                      <div className="flex items-start gap-2">
-                        {isLow && <div className="w-1.5 h-1.5 rounded-full bg-destructive flex-shrink-0 mt-1.5" title="Estoque abaixo do mínimo" />}
-                        <div className="flex flex-col gap-0.5 min-w-0">
-                          <span
-                            className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
-                            onClick={() => navigate(`/items/${item.id}`)}
-                          >{item.name}</span>
-                          <Badge variant="outline" className="text-[10px] font-normal self-start px-1.5 py-0">{item.category || '—'}</Badge>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        {isLow && <div className="w-1.5 h-1.5 rounded-full bg-destructive flex-shrink-0" title="Estoque abaixo do mínimo" />}
+                        <span
+                          className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
+                          onClick={() => navigate(`/items/${item.id}`)}
+                        >{item.name}</span>
                       </div>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <Badge variant="outline" className="text-[10px] font-normal">{item.category || '—'}</Badge>
                     </td>
                     <td className="px-3 py-2 text-right">
                       {editingCell?.id === item.id && editingCell.field === 'current_stock' ? (
