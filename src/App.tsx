@@ -25,6 +25,8 @@ import CategoryDetailPage from "./pages/supervisor/CategoryDetailPage";
 import StockItemDetailPage from "./pages/supervisor/StockItemDetailPage";
 import InventoryPage from "./pages/supervisor/InventoryPage";
 import KitchensPage from "./pages/supervisor/KitchensPage";
+import KitchenDetailPage from "./pages/supervisor/KitchenDetailPage";
+import TransfersPage from "./pages/supervisor/TransfersPage";
 import EventMenusPage from "./pages/supervisor/EventMenusPage";
 import EventMenuDetailPage from "./pages/supervisor/EventMenuDetailPage";
 import FornecedoresPage from "./pages/supervisor/FornecedoresPage";
@@ -91,8 +93,10 @@ function AppRoutes() {
           <Route path="/shopping-lists/view" element={<ShoppingListDetailPage />} />
           <Route path="/shopping-lists/saved/:listId" element={<ShoppingListDetailPage />} />
           <Route path="/comparison" element={<SupervisorComparisonPage />} />
+          <Route path="/transfers" element={<TransfersPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/kitchens" element={<KitchensPage />} />
+          <Route path="/kitchens/:id" element={<KitchenDetailPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/analysis" element={<AIAnalysisPage />} />
           <Route path="/users" element={<UsersPage />} />
