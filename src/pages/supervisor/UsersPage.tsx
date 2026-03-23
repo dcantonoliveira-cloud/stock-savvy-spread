@@ -32,7 +32,7 @@ export default function UsersPage() {
     if (!profiles) { setLoading(false); return; }
 
     const { data: roles } = await supabase.from('user_roles').select('user_id, role');
-    const { data: perms } = await supabase.from('employee_permissions').select('user_id, can_entry, can_output');
+    const { data: perms } = await supabase.from('employee_permissions').select('user_id, can_entry, can_output, access_stock, access_materials');
 
     const emps: Employee[] = profiles.map(p => {
       const role = roles?.find(r => r.user_id === p.user_id);
