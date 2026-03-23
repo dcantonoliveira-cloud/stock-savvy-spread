@@ -2,16 +2,24 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  ArrowRightLeft, Plus, Loader2, X, Check, RotateCcw, Trash2, PackageOpen
+  ArrowRightLeft, Plus, Loader2, Check, RotateCcw, Trash2,
+  PackageOpen, ArrowLeft, Package, Save, ClipboardList,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type MaterialItem = { id: string; name: string; unit: string; available_qty: number };
+type MaterialItem = {
+  id: string;
+  name: string;
+  category: string;
+  unit: string;
+  available_qty: number;
+  total_qty: number;
+  image_url: string | null;
+};
 
 type LoanItem = {
   id?: string;
@@ -35,9 +43,10 @@ type Loan = {
 };
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  active: { label: 'Ativo', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  returned: { label: 'Devolvido', color: 'bg-green-100 text-green-700 border-green-200' },
-  partial: { label: 'Parcial', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  active:   { label: 'Ativo',      color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  returned: { label: 'Devolvido',  color: 'bg-green-100 text-green-700 border-green-200' },
+  partial:  { label: 'Parcial',    color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  planning: { label: 'Planejando', color: 'bg-purple-100 text-purple-700 border-purple-200' },
 };
 
 export default function EmprestimosPage() {
@@ -46,10 +55,18 @@ export default function EmprestimosPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'returned'>('all');
 
+  // Detail view
+  const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
+  // qty map: material_item_id → qty_out planned
+  const [planQty, setPlanQty] = useState<Record<string, number>>({});
+  const [savingPlan, setSavingPlan] = useState(false);
+
   // New loan dialog
   const [newDialog, setNewDialog] = useState(false);
-  const [nForm, setNForm] = useState({ event_name: '', responsible: '', date_out: new Date().toISOString().split('T')[0], notes: '' });
-  const [nItems, setNItems] = useState<{ material_item_id: string; qty_out: number }[]>([{ material_item_id: '', qty_out: 1 }]);
+  const [nForm, setNForm] = useState({
+    event_name: '', responsible: '',
+    date_out: new Date().toISOString().split('T')[0], notes: '',
+  });
   const [saving, setSaving] = useState(false);
 
   // Return dialog
@@ -63,12 +80,14 @@ export default function EmprestimosPage() {
     setLoading(true);
     const [loansRes, itemsRes] = await Promise.all([
       supabase.from('material_loans' as any).select('*').order('date_out', { ascending: false }),
-      supabase.from('material_items' as any).select('id, name, unit, available_qty').order('name'),
+      supabase.from('material_items' as any)
+        .select('id, name, category, unit, available_qty, total_qty, image_url')
+        .order('category').order('name'),
     ]);
+
     const rawLoans = (loansRes.data || []) as any[];
     if (itemsRes.data) setMaterialItems(itemsRes.data as MaterialItem[]);
 
-    // Load loan items for each loan
     if (rawLoans.length > 0) {
       const loanIds = rawLoans.map((l: any) => l.id);
       const { data: loanItemsData } = await supabase
@@ -97,44 +116,77 @@ export default function EmprestimosPage() {
 
   useEffect(() => { load(); }, []);
 
+  // ── Open detail view ──
+  const openDetail = (loan: Loan) => {
+    setSelectedLoan(loan);
+    // Pre-fill planQty from existing items
+    const qty: Record<string, number> = {};
+    for (const li of loan.items) {
+      qty[li.material_item_id] = li.qty_out;
+    }
+    setPlanQty(qty);
+  };
+
+  // ── Save materials list ──
+  const handleSavePlan = async () => {
+    if (!selectedLoan) return;
+    setSavingPlan(true);
+    try {
+      // Build list of items with qty > 0
+      const planned = Object.entries(planQty).filter(([, q]) => q > 0);
+
+      // Delete all existing loan_items for this loan and re-insert
+      await supabase.from('material_loan_items' as any).delete().eq('loan_id', selectedLoan.id);
+
+      if (planned.length > 0) {
+        const { error } = await supabase.from('material_loan_items' as any).insert(
+          planned.map(([material_item_id, qty]) => ({
+            loan_id: selectedLoan.id,
+            material_item_id,
+            qty_out: qty,
+            qty_returned: 0,
+            qty_damaged: 0,
+          }))
+        );
+        if (error) throw error;
+      }
+
+      // Update status: if has items → active, else → planning
+      const newStatus = planned.length > 0 ? 'active' : 'planning';
+      await supabase.from('material_loans' as any)
+        .update({ status: newStatus })
+        .eq('id', selectedLoan.id);
+
+      toast.success('Lista de materiais salva!');
+      await load();
+      // Refresh selectedLoan
+      setSelectedLoan(prev => {
+        if (!prev) return null;
+        const updated = loans.find(l => l.id === prev.id);
+        return updated || prev;
+      });
+    } catch (err: any) {
+      toast.error('Erro ao salvar: ' + (err?.message || 'Tente novamente'));
+    }
+    setSavingPlan(false);
+  };
+
   // ── New Loan ──
   const handleNewLoan = async () => {
     if (!nForm.event_name.trim()) { toast.error('Nome do evento é obrigatório'); return; }
-    const validItems = nItems.filter(i => i.material_item_id && i.qty_out > 0);
-    if (validItems.length === 0) { toast.error('Adicione ao menos um item'); return; }
     setSaving(true);
     try {
-      const { data: loan, error: loanErr } = await supabase
-        .from('material_loans' as any)
-        .insert({
-          event_name: nForm.event_name.trim(),
-          responsible: nForm.responsible.trim() || null,
-          date_out: nForm.date_out,
-          notes: nForm.notes.trim() || null,
-          status: 'active',
-        })
-        .select().single();
-      if (loanErr || !loan) throw loanErr || new Error('Erro ao criar evento');
-
-      const { error: itemsErr } = await supabase.from('material_loan_items' as any).insert(
-        validItems.map(i => ({ loan_id: (loan as any).id, material_item_id: i.material_item_id, qty_out: i.qty_out, qty_returned: 0, qty_damaged: 0 }))
-      );
-      if (itemsErr) throw itemsErr;
-
-      // Decrease available_qty for each item
-      for (const i of validItems) {
-        const mat = materialItems.find(m => m.id === i.material_item_id);
-        if (mat) {
-          await supabase.from('material_items' as any)
-            .update({ available_qty: Math.max(0, mat.available_qty - i.qty_out) })
-            .eq('id', i.material_item_id);
-        }
-      }
-
-      toast.success('Evento registrado!');
+      const { error } = await supabase.from('material_loans' as any).insert({
+        event_name: nForm.event_name.trim(),
+        responsible: nForm.responsible.trim() || null,
+        date_out: nForm.date_out,
+        notes: nForm.notes.trim() || null,
+        status: 'planning',
+      });
+      if (error) throw error;
+      toast.success('Evento criado! Agora monte a lista de materiais.');
       setNewDialog(false);
       setNForm({ event_name: '', responsible: '', date_out: new Date().toISOString().split('T')[0], notes: '' });
-      setNItems([{ material_item_id: '', qty_out: 1 }]);
       load();
     } catch (err: any) {
       toast.error('Erro: ' + (err?.message || 'Tente novamente'));
@@ -143,7 +195,8 @@ export default function EmprestimosPage() {
   };
 
   // ── Return ──
-  const openReturn = (loan: Loan) => {
+  const openReturn = (loan: Loan, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setReturnLoan(loan);
     setReturnItems(loan.items.map(i => ({ ...i, qty_returned: i.qty_out - i.qty_returned, qty_damaged: 0 })));
     setReturnDate(new Date().toISOString().split('T')[0]);
@@ -163,7 +216,6 @@ export default function EmprestimosPage() {
           qty_damaged: (original?.qty_damaged ?? 0) + ri.qty_damaged,
         }).eq('id', ri.id);
 
-        // Update available_qty and damaged_qty
         const mat = materialItems.find(m => m.id === ri.material_item_id);
         if (mat) {
           await supabase.from('material_items' as any).update({
@@ -173,7 +225,6 @@ export default function EmprestimosPage() {
         }
       }
 
-      // Determine new status
       const totalOut = returnLoan.items.reduce((s, i) => s + i.qty_out, 0);
       const totalReturned = returnItems.reduce((s, i) => s + i.qty_returned, 0) +
         returnLoan.items.reduce((s, i) => s + i.qty_returned, 0);
@@ -186,6 +237,7 @@ export default function EmprestimosPage() {
 
       toast.success(newStatus === 'returned' ? 'Devolução total registrada!' : 'Devolução parcial registrada!');
       setReturnDialog(false);
+      if (selectedLoan?.id === returnLoan.id) setSelectedLoan(null);
       load();
     } catch (err: any) {
       toast.error('Erro: ' + (err?.message || 'Tente novamente'));
@@ -193,15 +245,26 @@ export default function EmprestimosPage() {
     setReturning(false);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!confirm('Remover este evento?')) return;
+    await supabase.from('material_loan_items' as any).delete().eq('loan_id', id);
     await supabase.from('material_loans' as any).delete().eq('id', id);
     toast.success('Evento removido');
+    if (selectedLoan?.id === id) setSelectedLoan(null);
     load();
   };
 
-  const filtered = loans.filter(l => filter === 'all' || l.status === filter || (filter === 'active' && l.status === 'partial'));
-  const activeCount = loans.filter(l => l.status === 'active' || l.status === 'partial').length;
+  const filtered = loans.filter(l =>
+    filter === 'all' ||
+    l.status === filter ||
+    (filter === 'active' && (l.status === 'partial' || l.status === 'planning'))
+  );
+  const activeCount = loans.filter(l => ['active', 'partial', 'planning'].includes(l.status)).length;
+
+  // Group material items by category
+  const categories = Array.from(new Set(materialItems.map(i => i.category))).sort();
+  const totalPlanned = Object.values(planQty).filter(q => q > 0).length;
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
@@ -209,6 +272,218 @@ export default function EmprestimosPage() {
     </div>
   );
 
+  // ── EVENT DETAIL PAGE ─────────────────────────────────────────────────────
+  if (selectedLoan) {
+    const st = STATUS_LABEL[selectedLoan.status] || STATUS_LABEL.active;
+    return (
+      <div>
+        {/* Header */}
+        <div className="flex items-start gap-3 mb-6">
+          <button
+            onClick={() => { setSelectedLoan(null); load(); }}
+            className="text-muted-foreground hover:text-foreground transition-colors p-1 mt-0.5 flex-shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-display font-bold gold-text leading-tight">{selectedLoan.event_name}</h1>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${st.color}`}>
+                {st.label}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
+              <span>📅 {new Date(selectedLoan.date_out + 'T12:00:00').toLocaleDateString('pt-BR')}</span>
+              {selectedLoan.responsible && <span>👤 {selectedLoan.responsible}</span>}
+              {selectedLoan.notes && <span className="italic">"{selectedLoan.notes}"</span>}
+            </div>
+          </div>
+          {selectedLoan.status !== 'returned' && (
+            <Button variant="outline" size="sm" onClick={() => openReturn(selectedLoan)}>
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />Devolução
+            </Button>
+          )}
+        </div>
+
+        {/* Summary bar */}
+        <div className="bg-white rounded-xl border border-border p-4 mb-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <ClipboardList className="w-4 h-4 text-primary" />
+            <span>
+              {totalPlanned === 0
+                ? 'Nenhum item selecionado ainda'
+                : `${totalPlanned} tipo${totalPlanned !== 1 ? 's' : ''} de material selecionado${totalPlanned !== 1 ? 's' : ''}`}
+            </span>
+          </div>
+          <Button onClick={handleSavePlan} disabled={savingPlan} className="gold-button" size="sm">
+            {savingPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+            Salvar Lista
+          </Button>
+        </div>
+
+        {/* Materials by category */}
+        {materialItems.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
+            <p className="font-medium">Nenhum material cadastrado</p>
+            <p className="text-sm mt-1">Cadastre itens em Materiais → Inventário</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {categories.map(cat => {
+              const catItems = materialItems.filter(i => i.category === cat);
+              const catSelected = catItems.filter(i => (planQty[i.id] || 0) > 0).length;
+              return (
+                <div key={cat}>
+                  {/* Category header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      📦 {cat}
+                    </h3>
+                    {catSelected > 0 && (
+                      <span className="text-xs text-primary font-medium">
+                        {catSelected} selecionado{catSelected !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Items */}
+                  <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/20">
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-full">Material</th>
+                          <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Disponível</th>
+                          <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap w-28">Qtde Necessária</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {catItems.map(item => {
+                          const qty = planQty[item.id] || 0;
+                          const isSelected = qty > 0;
+                          return (
+                            <tr
+                              key={item.id}
+                              className={`transition-colors ${isSelected ? 'bg-amber-50/40' : 'hover:bg-muted/10'}`}
+                            >
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  {item.image_url ? (
+                                    <img src={item.image_url} alt={item.name}
+                                      className="w-9 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
+                                  ) : (
+                                    <div className="w-9 h-9 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
+                                      <Package className="w-4 h-4 text-muted-foreground/40" />
+                                    </div>
+                                  )}
+                                  <span className={`font-medium ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                    {item.name}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 text-right whitespace-nowrap">
+                                <span className={item.available_qty === 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}>
+                                  {item.available_qty}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                              </td>
+                              <td className="px-3 py-3 text-center">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  value={qty === 0 ? '' : qty}
+                                  placeholder="0"
+                                  className={`w-20 text-center h-8 text-sm mx-auto ${isSelected ? 'border-primary/50 bg-white' : ''}`}
+                                  onChange={e => {
+                                    const v = Math.max(0, Number(e.target.value) || 0);
+                                    setPlanQty(prev => {
+                                      const next = { ...prev };
+                                      if (v === 0) delete next[item.id];
+                                      else next[item.id] = v;
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Bottom save */}
+            <div className="flex justify-end pt-2 pb-6">
+              <Button onClick={handleSavePlan} disabled={savingPlan} className="gold-button">
+                {savingPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                Salvar Lista de Materiais
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Return Dialog */}
+        <Dialog open={returnDialog} onOpenChange={setReturnDialog}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Registrar Devolução — {returnLoan?.event_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div>
+                <Label>Data de Devolução</Label>
+                <Input className="mt-1" type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} />
+              </div>
+              <div>
+                <Label className="mb-2 block">Itens devolvidos</Label>
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/30 border-b border-border">
+                        <th className="text-left px-3 py-2 text-xs text-muted-foreground font-semibold">ITEM</th>
+                        <th className="text-center px-2 py-2 text-xs text-muted-foreground font-semibold">SAIU</th>
+                        <th className="text-center px-2 py-2 text-xs text-muted-foreground font-semibold">VOLTOU</th>
+                        <th className="text-center px-2 py-2 text-xs text-muted-foreground font-semibold">DANIF.</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {returnItems.map((ri, idx) => (
+                        <tr key={idx}>
+                          <td className="px-3 py-2 text-sm font-medium">{ri.item_name}</td>
+                          <td className="px-2 py-2 text-center text-muted-foreground">{ri.qty_out}</td>
+                          <td className="px-2 py-2">
+                            <Input type="number" min={0} max={ri.qty_out} className="w-16 text-center h-7 text-sm"
+                              value={ri.qty_returned}
+                              onChange={e => setReturnItems(prev => prev.map((p, i) => i === idx ? { ...p, qty_returned: Number(e.target.value) } : p))} />
+                          </td>
+                          <td className="px-2 py-2">
+                            <Input type="number" min={0} className="w-16 text-center h-7 text-sm"
+                              value={ri.qty_damaged}
+                              onChange={e => setReturnItems(prev => prev.map((p, i) => i === idx ? { ...p, qty_damaged: Number(e.target.value) } : p))} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setReturnDialog(false)}>Cancelar</Button>
+                <Button onClick={handleReturn} disabled={returning} className="gold-button">
+                  {returning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+                  Confirmar Devolução
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ── EVENT LIST ────────────────────────────────────────────────────────────
   return (
     <div>
       {/* Header */}
@@ -221,7 +496,7 @@ export default function EmprestimosPage() {
             <h1 className="text-3xl font-display font-bold gold-text">Eventos</h1>
             <p className="text-muted-foreground mt-0.5">
               {activeCount > 0
-                ? <span>{activeCount} evento{activeCount !== 1 ? 's' : ''} ativo{activeCount !== 1 ? 's' : ''}</span>
+                ? `${activeCount} evento${activeCount !== 1 ? 's' : ''} ativo${activeCount !== 1 ? 's' : ''}`
                 : 'Nenhum evento ativo'}
             </p>
           </div>
@@ -251,7 +526,7 @@ export default function EmprestimosPage() {
         <div className="text-center py-16 text-muted-foreground">
           <PackageOpen className="w-14 h-14 mx-auto mb-3 opacity-20" />
           <p className="font-medium">Nenhum evento encontrado</p>
-          <p className="text-sm mt-1">Registre a saída de materiais para eventos</p>
+          <p className="text-sm mt-1">Crie um evento e monte a lista de materiais</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
@@ -259,10 +534,10 @@ export default function EmprestimosPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border" style={{ background: 'hsl(40 30% 97%)' }}>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">DATA SAÍDA</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">DATA</th>
                   <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs w-full min-w-[180px]">EVENTO</th>
                   <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">RESPONSÁVEL</th>
-                  <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs">ITENS</th>
+                  <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">MATERIAIS</th>
                   <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">STATUS</th>
                   <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs w-28">AÇÕES</th>
                 </tr>
@@ -271,7 +546,11 @@ export default function EmprestimosPage() {
                 {filtered.map(loan => {
                   const st = STATUS_LABEL[loan.status] || STATUS_LABEL.active;
                   return (
-                    <tr key={loan.id} className="hover:bg-amber-50/30 transition-colors">
+                    <tr
+                      key={loan.id}
+                      className="hover:bg-amber-50/30 transition-colors cursor-pointer"
+                      onClick={() => openDetail(loan)}
+                    >
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">
                         {new Date(loan.date_out + 'T12:00:00').toLocaleDateString('pt-BR')}
                         {loan.date_return && (
@@ -280,34 +559,35 @@ export default function EmprestimosPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-3 font-medium text-foreground">{loan.event_name}</td>
+                      <td className="px-3 py-3">
+                        <span className="font-medium text-foreground">{loan.event_name}</span>
+                        {loan.notes && <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]">{loan.notes}</p>}
+                      </td>
                       <td className="px-3 py-3 text-muted-foreground whitespace-nowrap">{loan.responsible || '—'}</td>
                       <td className="px-3 py-3">
-                        <div className="space-y-0.5">
-                          {loan.items.length === 0 && <span className="text-muted-foreground text-xs">—</span>}
-                          {loan.items.map((li, idx) => (
-                            <div key={idx} className="text-xs text-muted-foreground">
-                              <span className="font-medium text-foreground">{li.qty_out}x</span> {li.item_name}
-                              {li.qty_returned > 0 && (
-                                <span className="text-green-600 ml-1">(dev: {li.qty_returned + (loan.items.find(i => i.id === li.id)?.qty_returned ?? 0)})</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                        {loan.items.length === 0 ? (
+                          <span className="text-xs text-muted-foreground italic">Sem itens</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {loan.items.length} tipo{loan.items.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${st.color}`}>
                           {st.label}
                         </span>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
                           {loan.status !== 'returned' && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => openReturn(loan)}>
+                            <Button variant="outline" size="sm" className="h-7 text-xs px-2"
+                              onClick={e => openReturn(loan, e)}>
                               <RotateCcw className="w-3 h-3 mr-1" />Devolver
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => handleDelete(loan.id)}>
+                          <Button variant="ghost" size="icon" className="w-7 h-7"
+                            onClick={e => handleDelete(loan.id, e)}>
                             <Trash2 className="w-3.5 h-3.5 text-destructive" />
                           </Button>
                         </div>
@@ -321,129 +601,47 @@ export default function EmprestimosPage() {
         </div>
       )}
 
-      {/* New Loan Dialog */}
+      {/* New Event Dialog — só info básica */}
       <Dialog open={newDialog} onOpenChange={setNewDialog}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Novo Evento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <Label>Evento *</Label>
-              <Input className="mt-1" placeholder="Ex: Casamento Silva" value={nForm.event_name} onChange={e => setNForm(f => ({ ...f, event_name: e.target.value }))} />
+              <Label>Nome do Evento *</Label>
+              <Input className="mt-1" placeholder="Ex: Casamento Silva, Formatura Turma 2026..."
+                value={nForm.event_name}
+                onChange={e => setNForm(f => ({ ...f, event_name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Responsável</Label>
-                <Input className="mt-1" placeholder="Nome..." value={nForm.responsible} onChange={e => setNForm(f => ({ ...f, responsible: e.target.value }))} />
+                <Input className="mt-1" placeholder="Nome..."
+                  value={nForm.responsible}
+                  onChange={e => setNForm(f => ({ ...f, responsible: e.target.value }))} />
               </div>
               <div>
-                <Label>Data de Saída</Label>
-                <Input className="mt-1" type="date" value={nForm.date_out} onChange={e => setNForm(f => ({ ...f, date_out: e.target.value }))} />
+                <Label>Data</Label>
+                <Input className="mt-1" type="date"
+                  value={nForm.date_out}
+                  onChange={e => setNForm(f => ({ ...f, date_out: e.target.value }))} />
               </div>
             </div>
-
-            {/* Items */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Itens</Label>
-                <Button type="button" variant="outline" size="sm" className="h-7 text-xs"
-                  onClick={() => setNItems(prev => [...prev, { material_item_id: '', qty_out: 1 }])}>
-                  <Plus className="w-3 h-3 mr-1" />Adicionar
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {nItems.map((ni, idx) => (
-                  <div key={idx} className="flex gap-2 items-center">
-                    <select
-                      className="flex-1 border border-input rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                      value={ni.material_item_id}
-                      onChange={e => setNItems(prev => prev.map((p, i) => i === idx ? { ...p, material_item_id: e.target.value } : p))}
-                    >
-                      <option value="">Selecionar item...</option>
-                      {materialItems.map(m => (
-                        <option key={m.id} value={m.id}>{m.name} (disp: {m.available_qty} {m.unit})</option>
-                      ))}
-                    </select>
-                    <Input
-                      type="number" min={1} className="w-20"
-                      value={ni.qty_out}
-                      onChange={e => setNItems(prev => prev.map((p, i) => i === idx ? { ...p, qty_out: Number(e.target.value) } : p))}
-                    />
-                    <Button variant="ghost" size="icon" className="w-8 h-8 flex-shrink-0"
-                      onClick={() => setNItems(prev => prev.filter((_, i) => i !== idx))}>
-                      <X className="w-3.5 h-3.5 text-muted-foreground" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <div>
               <Label>Observações</Label>
-              <Textarea className="mt-1" rows={2} placeholder="Notas..." value={nForm.notes} onChange={e => setNForm(f => ({ ...f, notes: e.target.value }))} />
+              <Textarea className="mt-1" rows={2} placeholder="Notas..."
+                value={nForm.notes}
+                onChange={e => setNForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
-
-            <div className="flex justify-end gap-2 pt-2">
+            <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
+              💡 Após criar o evento, clique nele para montar a lista de materiais necessários.
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
               <Button variant="outline" onClick={() => setNewDialog(false)}>Cancelar</Button>
               <Button onClick={handleNewLoan} disabled={saving} className="gold-button">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Registrar Saída
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Return Dialog */}
-      <Dialog open={returnDialog} onOpenChange={setReturnDialog}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Registrar Devolução — {returnLoan?.event_name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div>
-              <Label>Data de Devolução</Label>
-              <Input className="mt-1" type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} />
-            </div>
-            <div>
-              <Label className="mb-2 block">Itens devolvidos</Label>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/30 border-b border-border">
-                      <th className="text-left px-3 py-2 text-xs text-muted-foreground font-semibold">ITEM</th>
-                      <th className="text-center px-2 py-2 text-xs text-muted-foreground font-semibold">SAIU</th>
-                      <th className="text-center px-2 py-2 text-xs text-muted-foreground font-semibold">VOLTOU</th>
-                      <th className="text-center px-2 py-2 text-xs text-muted-foreground font-semibold">DANIF.</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {returnItems.map((ri, idx) => (
-                      <tr key={idx}>
-                        <td className="px-3 py-2 text-sm font-medium">{ri.item_name}</td>
-                        <td className="px-2 py-2 text-center text-muted-foreground">{ri.qty_out}</td>
-                        <td className="px-2 py-2">
-                          <Input type="number" min={0} max={ri.qty_out} className="w-16 text-center h-7 text-sm"
-                            value={ri.qty_returned}
-                            onChange={e => setReturnItems(prev => prev.map((p, i) => i === idx ? { ...p, qty_returned: Number(e.target.value) } : p))} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Input type="number" min={0} className="w-16 text-center h-7 text-sm"
-                            value={ri.qty_damaged}
-                            onChange={e => setReturnItems(prev => prev.map((p, i) => i === idx ? { ...p, qty_damaged: Number(e.target.value) } : p))} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setReturnDialog(false)}>Cancelar</Button>
-              <Button onClick={handleReturn} disabled={returning} className="gold-button">
-                {returning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-                Confirmar Devolução
+                Criar Evento
               </Button>
             </div>
           </div>
