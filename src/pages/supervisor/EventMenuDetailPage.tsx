@@ -898,9 +898,16 @@ export default function EventMenuDetailPage() {
       } as any).eq('id', menu.id);
       if (error) throw error;
 
-      toast.success('Cardápio atualizado!');
+      // When guest_count changes, update planned_quantity for all MANTIMENTOS dishes
       if (guestChanged) {
-        toast.info('Nº de convidados alterado — as quantidades de MANTIMENTOS foram recalculadas.');
+        const newGuests = Number(editForm.guest_count) || 0;
+        const mantimentosDishes = menu.dishes.filter(d => d.isMantimentos);
+        for (const dish of mantimentosDishes) {
+          await supabase.from('event_menu_dishes').update({
+            planned_quantity: newGuests,
+          } as any).eq('id', dish.id);
+        }
+        toast.info(`MANTIMENTOS atualizado para ${newGuests} convidados.`);
       }
       if (dateChanged) {
         toast.warning('Data alterada — verifique a disponibilidade de materiais para este período.');
