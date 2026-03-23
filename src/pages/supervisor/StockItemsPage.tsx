@@ -627,7 +627,6 @@ export default function StockItemsPage() {
                   <div className="flex items-center gap-1">PRODUTO <SortIcon field="name" /></div>
                 </th>
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs">CATEGORIA</th>
-                <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">UNID.</th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('current_stock')}>
                   <div className="flex items-center justify-end gap-1">ESTOQUE <SortIcon field="current_stock" /></div>
                 </th>
@@ -671,8 +670,6 @@ export default function StockItemsPage() {
                     <td className="px-3 py-2">
                       <Badge variant="outline" className="text-[10px] font-normal whitespace-nowrap">{item.category || '—'}</Badge>
                     </td>
-                    <td className="px-3 py-2 text-center text-muted-foreground text-xs">{item.unit}</td>
-
                     <td className="px-3 py-2 text-right">
                       {editingCell?.id === item.id && editingCell.field === 'current_stock' ? (
                         <input ref={cellInputRef} type="number" value={editingValue}
