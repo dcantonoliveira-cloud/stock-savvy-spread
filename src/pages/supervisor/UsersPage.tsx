@@ -14,6 +14,8 @@ type Employee = {
   role: string;
   can_entry: boolean;
   can_output: boolean;
+  access_stock: boolean;
+  access_materials: boolean;
 };
 
 export default function UsersPage() {
@@ -42,6 +44,8 @@ export default function UsersPage() {
         role: role?.role || 'sem acesso',
         can_entry: perm?.can_entry ?? true,
         can_output: perm?.can_output ?? true,
+        access_stock: (perm as any)?.access_stock ?? true,
+        access_materials: (perm as any)?.access_materials ?? false,
       };
     });
 
@@ -78,8 +82,7 @@ export default function UsersPage() {
     load();
   };
 
-  const togglePermission = async (userId: string, field: 'can_entry' | 'can_output', value: boolean) => {
-    // Upsert permission
+  const togglePermission = async (userId: string, field: 'can_entry' | 'can_output' | 'access_stock' | 'access_materials', value: boolean) => {
     const emp = employees.find(e => e.user_id === userId);
     if (!emp) return;
 
@@ -87,7 +90,9 @@ export default function UsersPage() {
       user_id: userId,
       can_entry: field === 'can_entry' ? value : emp.can_entry,
       can_output: field === 'can_output' ? value : emp.can_output,
-    }, { onConflict: 'user_id' });
+      access_stock: field === 'access_stock' ? value : emp.access_stock,
+      access_materials: field === 'access_materials' ? value : emp.access_materials,
+    } as any, { onConflict: 'user_id' });
 
     if (error) { toast.error('Erro ao atualizar permissão'); return; }
     toast.success('Permissão atualizada!');
@@ -198,15 +203,29 @@ export default function UsersPage() {
                   </Button>
                 </div>
               </div>
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 text-sm">
-                  <Switch checked={emp.can_entry} onCheckedChange={v => togglePermission(emp.user_id, 'can_entry', v)} />
-                  <span className="text-muted-foreground">Entrada</span>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <Switch checked={emp.can_output} onCheckedChange={v => togglePermission(emp.user_id, 'can_output', v)} />
-                  <span className="text-muted-foreground">Saída</span>
-                </label>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Movimentações</p>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch checked={emp.can_entry} onCheckedChange={v => togglePermission(emp.user_id, 'can_entry', v)} />
+                    <span className="text-muted-foreground">Entrada</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch checked={emp.can_output} onCheckedChange={v => togglePermission(emp.user_id, 'can_output', v)} />
+                    <span className="text-muted-foreground">Saída</span>
+                  </label>
+                </div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">Acesso às seções</p>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch checked={emp.access_stock} onCheckedChange={v => togglePermission(emp.user_id, 'access_stock', v)} />
+                    <span className="text-muted-foreground">Estoque</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <Switch checked={emp.access_materials} onCheckedChange={v => togglePermission(emp.user_id, 'access_materials', v)} />
+                    <span className="text-muted-foreground">Materiais</span>
+                  </label>
+                </div>
               </div>
             </div>
           ))}

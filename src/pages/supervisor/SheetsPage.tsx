@@ -13,9 +13,9 @@ import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDo
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { getCompatibleUnits, calcRecipeUnitCost } from '@/lib/units';
+import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib/units';
 
-type StockItem = { id: string; name: string; unit: string; unit_cost: number };
+type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
 type SheetItem = {
   id?: string;
   item_id: string;
@@ -240,7 +240,7 @@ export default function SupervisorSheetsPage() {
   const load = async () => {
     setLoading(true);
     const [itemsRes, sheetsRes, catsRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, unit, unit_cost').order('name'),
+      supabase.from('stock_items').select('id, name, unit, unit_cost, purchase_qty').order('name'),
       supabase.from('technical_sheets').select('*').order('name'),
       supabase.from('sheet_categories').select('name, sort_order').order('sort_order'),
     ]);
@@ -254,7 +254,7 @@ export default function SupervisorSheetsPage() {
             const item = itemsRes.data?.find((x: any) => x.id === i.item_id);
             const itemUnit = (item as any)?.unit || '';
             const recipeUnit = i.unit || itemUnit;
-            const baseUnitCost = (item as any)?.unit_cost || 0;
+            const baseUnitCost = effectiveUnitCost((item as any)?.unit_cost || 0, (item as any)?.purchase_qty);
             return {
               id: i.id,
               item_id: i.item_id,
@@ -327,15 +327,17 @@ export default function SupervisorSheetsPage() {
     const updated = [...formItems];
     if (field === 'item_id') {
       const si = stockItems.find(s => s.id === value);
+      const effCost = si ? effectiveUnitCost(si.unit_cost || 0, si.purchase_qty) : 0;
       updated[idx] = {
         ...updated[idx], item_id: value,
         item_name: si?.name || '', unit: si?.unit || '',
-        unit_cost: si?.unit_cost || 0,
+        unit_cost: effCost,
       };
     } else if (field === 'unit') {
       const si = stockItems.find(s => s.id === updated[idx].item_id);
+      const effCost = si ? effectiveUnitCost(si.unit_cost || 0, si.purchase_qty) : 0;
       const itemUnit = si?.unit || value;
-      const newCost = calcRecipeUnitCost(si?.unit_cost || 0, itemUnit, value);
+      const newCost = calcRecipeUnitCost(effCost, itemUnit, value);
       updated[idx] = { ...updated[idx], unit: value, unit_cost: newCost };
     } else if (field === 'quantity') {
       updated[idx] = { ...updated[idx], quantity: value, gross_quantity: value };
@@ -849,9 +851,9 @@ export default function SupervisorSheetsPage() {
                 </div>
 
                 {formItems.length > 0 && (
-                  <div className="grid grid-cols-[1fr_80px_70px_80px_80px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
+                  <div className="grid grid-cols-[1fr_80px_70px_90px_32px] gap-1 text-[10px] text-muted-foreground mb-1 px-1">
                     <span>Item</span><span>Quantidade</span><span>Un.</span>
-                    <span>Custo Unit.</span><span>Custo Total</span><span></span>
+                    <span className="text-right">Custo Total</span><span></span>
                   </div>
                 )}
 
@@ -860,7 +862,7 @@ export default function SupervisorSheetsPage() {
                     ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit)
                     : [item.unit].filter(Boolean);
                   return (
-                    <div key={idx} className="grid grid-cols-[1fr_80px_70px_80px_80px_32px] gap-1 items-center mb-1">
+                    <div key={idx} className="grid grid-cols-[1fr_80px_70px_90px_32px] gap-1 items-center mb-1">
                       <ItemCombobox
                         stockItems={stockItems}
                         value={item.item_id}
@@ -879,8 +881,7 @@ export default function SupervisorSheetsPage() {
                       ) : (
                         <span className="text-xs text-muted-foreground text-center">{item.unit}</span>
                       )}
-                      <Input type="number" step="0.01" className="h-8 text-xs" value={item.unit_cost || ''} onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)} />
-                      <span className="text-xs font-medium text-foreground text-center">R$ {((parseFloat(String(item.quantity).replace(',', '.')) || 0) * item.unit_cost).toFixed(2)}</span>
+                      <span className="text-xs font-medium text-foreground text-right">R$ {((parseFloat(String(item.quantity).replace(',', '.')) || 0) * item.unit_cost).toFixed(2)}</span>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
                     </div>
                   );
