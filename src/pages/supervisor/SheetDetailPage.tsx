@@ -17,10 +17,10 @@ import { cn } from '@/lib/utils';
 import { getCompatibleUnits, calcRecipeUnitCost } from '@/lib/units';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number };
-type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
+type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
 type Sheet = { id: string; name: string; servings: number; description: string | null; category: string | null; prep_time: number; yield_quantity: number; yield_unit: string; instructions: string | null; items: SheetItem[] };
 
-function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems: StockItem[]; value: string; onSelect: (id: string) => void; onCreateNew: () => void }) {
+function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems: StockItem[]; value: string; onSelect: (id: string) => void; onCreateNew: (idx?: number) => void }) {
   const [open, setOpen] = useState(false);
   const selected = stockItems.find(s => s.id === value);
   return (
@@ -37,8 +37,8 @@ function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems
           <CommandList>
             <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
             <CommandGroup>{stockItems.map(si => (<CommandItem key={si.id} value={si.name} onSelect={() => { onSelect(si.id); setOpen(false); }}><Check className={cn("mr-2 h-3 w-3", value === si.id ? "opacity-100" : "opacity-0")} /><span className="truncate">{si.name}</span><span className="ml-auto text-[10px] text-muted-foreground">{si.unit}</span></CommandItem>))}</CommandGroup>
-            <CommandSeparator />
-            <CommandGroup><CommandItem onSelect={() => { setOpen(false); onCreateNew(); }} className="text-primary"><PackagePlus className="mr-2 h-3 w-3" />Criar novo insumo...</CommandItem></CommandGroup>
+            <CommandSeparator alwaysRender />
+            <CommandGroup forceMount><CommandItem forceMount onSelect={() => { setOpen(false); onCreateNew(); }} className="text-primary"><PackagePlus className="mr-2 h-3 w-3" />Criar novo insumo...</CommandItem></CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>
@@ -83,6 +83,7 @@ export default function SheetDetailPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [pendingSelectIdx, setPendingSelectIdx] = useState<number | null>(null);
   const [eventCount, setEventCount] = useState(0);
 
   // Edit state
@@ -130,17 +131,43 @@ export default function SheetDetailPage() {
       const itemUnit = si?.unit || it.unit;
       return { ...it, unit: value, unit_cost: calcRecipeUnitCost(si?.unit_cost || 0, itemUnit, value) };
     }
-    return { ...it, [field]: field === 'quantity' ? parseFloat(value) || 0 : value };
+    return { ...it, [field]: value }; // quantity stored as raw string; parsed only on save
   }));
   const removeItem = (idx: number) => setFormItems(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
-    if (!sheet) return; setSaving(true);
-    await supabase.from('technical_sheets').update({ name: name.trim(), yield_quantity: parseFloat(yieldQty) || 1, yield_unit: yieldUnit } as any).eq('id', sheet.id);
-    await supabase.from('technical_sheet_items').delete().eq('sheet_id', sheet.id);
-    const valid = formItems.filter(i => i.item_id);
-    if (valid.length > 0) await supabase.from('technical_sheet_items').insert(valid.map(i => ({ sheet_id: sheet.id, item_id: i.item_id, quantity: i.quantity, unit_cost: i.unit_cost, unit: i.unit || null, section: i.section || 'receita' })) as any);
-    toast.success('Ficha atualizada!'); setSaving(false); setEditing(false); load();
+    if (!sheet) return;
+    setSaving(true);
+    try {
+      const { error: sheetErr } = await supabase.from('technical_sheets')
+        .update({ name: name.trim(), yield_quantity: parseFloat(yieldQty) || 1, yield_unit: yieldUnit } as any)
+        .eq('id', sheet.id);
+      if (sheetErr) throw sheetErr;
+
+      const { error: delErr } = await supabase.from('technical_sheet_items').delete().eq('sheet_id', sheet.id);
+      if (delErr) throw delErr;
+
+      const valid = formItems.filter(i => i.item_id);
+      if (valid.length > 0) {
+        const { error: insErr } = await supabase.from('technical_sheet_items').insert(
+          valid.map(i => ({
+            sheet_id: sheet.id,
+            item_id: i.item_id,
+            quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
+            unit_cost: i.unit_cost,
+          })) as any
+        );
+        if (insErr) throw insErr;
+      }
+      toast.success('Ficha atualizada!');
+      setEditing(false);
+      load();
+    } catch (err: any) {
+      toast.error('Erro ao salvar: ' + (err?.message || 'Tente novamente'));
+      console.error('[handleSave]', JSON.stringify(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cancelEdit = () => { if (!sheet) return; setName(sheet.name); setYieldQty(sheet.yield_quantity?.toString() || '1'); setYieldUnit(sheet.yield_unit || 'kg'); setFormItems(sheet.items.map(i => ({ ...i }))); setEditing(false); };
@@ -151,7 +178,8 @@ export default function SheetDetailPage() {
   const displayItems = editing ? formItems : sheet.items;
   const recipeItems = displayItems.filter(i => i.section !== 'decoracao');
   const decoItems = displayItems.filter(i => i.section === 'decoracao');
-  const totalCost = displayItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0);
+  const parseQty = (q: number | string) => parseFloat(String(q).replace(',', '.')) || 0;
+  const totalCost = displayItems.reduce((s, i) => s + parseQty(i.quantity) * i.unit_cost, 0);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -212,8 +240,8 @@ export default function SheetDetailPage() {
               const idx = formItems.indexOf(item);
               return (
                 <tr key={editing ? idx : item.item_id}>
-                  <td className="px-5 py-3">{editing ? <ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /> : <span className="text-foreground">{item.item_name}</span>}</td>
-                  <td className="px-4 py-3 text-right">{editing ? <Input type="number" step="any" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
+                  <td className="px-5 py-3">{editing ? <ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /> : <span className="text-foreground">{item.item_name}</span>}</td>
+                  <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
                   <td className="px-3 py-3 text-center text-muted-foreground text-xs">
                     {editing ? (() => {
                       const compatUnits = item.item_id ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit) : [item.unit].filter(Boolean);
@@ -223,7 +251,7 @@ export default function SheetDetailPage() {
                     })() : item.unit}
                   </td>
                   <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
+                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(parseQty(item.quantity) * item.unit_cost).toFixed(2)}</td>
                   {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}
                 </tr>
               );
@@ -233,7 +261,7 @@ export default function SheetDetailPage() {
             <tfoot>
               <tr className="border-t-2 border-border" style={{ background: 'hsl(40 30% 97%)' }}>
                 <td colSpan={editing ? 4 : 4} className="px-5 py-3 text-right font-semibold text-foreground">Total receita:</td>
-                <td className="px-5 py-3 text-right font-bold text-primary">R$ {recipeItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0).toFixed(2)}</td>
+                <td className="px-5 py-3 text-right font-bold text-primary">R$ {recipeItems.reduce((s, i) => s + parseQty(i.quantity) * i.unit_cost, 0).toFixed(2)}</td>
                 {editing && <td></td>}
               </tr>
             </tfoot>
@@ -255,8 +283,8 @@ export default function SheetDetailPage() {
               const idx = formItems.indexOf(item);
               return (
                 <tr key={editing ? idx : item.item_id} style={{ background: 'hsl(38 80% 99%)' }}>
-                  <td className="px-5 py-3">{editing ? <ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /> : <span className="text-foreground">{item.item_name}</span>}</td>
-                  <td className="px-4 py-3 text-right">{editing ? <Input type="number" step="any" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
+                  <td className="px-5 py-3">{editing ? <ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /> : <span className="text-foreground">{item.item_name}</span>}</td>
+                  <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
                   <td className="px-3 py-3 text-center text-muted-foreground text-xs">
                     {editing ? (() => {
                       const compatUnits = item.item_id ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit) : [item.unit].filter(Boolean);
@@ -266,7 +294,7 @@ export default function SheetDetailPage() {
                     })() : item.unit}
                   </td>
                   <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
+                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(parseQty(item.quantity) * item.unit_cost).toFixed(2)}</td>
                   {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}
                 </tr>
               );
@@ -284,7 +312,17 @@ export default function SheetDetailPage() {
         </div>
       )}
 
-      <QuickCreateItemDialog open={quickCreateOpen} onClose={() => setQuickCreateOpen(false)} onCreated={item => setStockItems(prev => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)))} />
+      <QuickCreateItemDialog
+        open={quickCreateOpen}
+        onClose={() => { setQuickCreateOpen(false); setPendingSelectIdx(null); }}
+        onCreated={item => {
+          setStockItems(prev => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)));
+          if (pendingSelectIdx !== null) {
+            updateItem(pendingSelectIdx, 'item_id', item.id);
+            setPendingSelectIdx(null);
+          }
+        }}
+      />
     </div>
   );
 }
