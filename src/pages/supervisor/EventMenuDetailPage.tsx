@@ -15,7 +15,8 @@ import {
   ChevronDown, ChevronUp, CheckCircle2, TrendingDown, Loader2,
   Plus, Pencil, Trash2, X, Check, ChevronsUpDown, PackagePlus,
   Package, Truck, RotateCcw, AlertTriangle, MessageSquare,
-  ClipboardList, UserCheck, RefreshCw, GripVertical, Download, Clock, Printer, Copy
+  ClipboardList, UserCheck, RefreshCw, GripVertical, Download, Clock, Printer, Copy,
+  Warehouse, Save
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -588,7 +589,14 @@ export default function EventMenuDetailPage() {
   const [dishesWithNoIngredients, setDishesWithNoIngredients] = useState<string[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'pratos' | 'compras' | 'saida'>('pratos');
+  const [activeTab, setActiveTab] = useState<'pratos' | 'compras' | 'saida' | 'materiais'>('pratos');
+
+  // Materials tab
+  const [materialItems, setMaterialItems] = useState<{id:string;name:string;category:string;unit:string;available_qty:number;image_url:string|null}[]>([]);
+  const [linkedLoanId, setLinkedLoanId] = useState<string|null>(null);
+  const [planQty, setPlanQty] = useState<Record<string,number>>({});
+  const [savingMaterials, setSavingMaterials] = useState(false);
+  const [matLoaded, setMatLoaded] = useState(false);
   const [shopFilter, setShopFilter] = useState<'all' | 'ok' | 'buy'>('all');
   const [shopGroupMode, setShopGroupMode] = useState<'category' | 'supplier'>('category');
   const [copyingSupplier, setCopyingSupplier] = useState<string | null>(null);
@@ -609,6 +617,59 @@ export default function EventMenuDetailPage() {
   const [movementLoading, setMovementLoading] = useState(false);
 
   useEffect(() => { if (!id) return; loadMenu(); loadEmployees(); }, [id]);
+
+  useEffect(() => {
+    if (activeTab === 'materiais' && !matLoaded && id) loadMaterials();
+  }, [activeTab]);
+
+  const loadMaterials = async () => {
+    const [itemsRes, loanRes] = await Promise.all([
+      supabase.from('material_items' as any).select('id, name, category, unit, available_qty, image_url').order('category').order('name'),
+      supabase.from('material_loans' as any).select('id, material_loan_items(material_item_id, qty_out)').eq('event_menu_id', id!).maybeSingle(),
+    ]);
+    if (itemsRes.data) setMaterialItems(itemsRes.data as any[]);
+    if ((loanRes as any).data) {
+      const loan = (loanRes as any).data;
+      setLinkedLoanId(loan.id);
+      const qty: Record<string, number> = {};
+      for (const li of loan.material_loan_items || []) qty[li.material_item_id] = li.qty_out;
+      setPlanQty(qty);
+    }
+    setMatLoaded(true);
+  };
+
+  const handleSaveMaterials = async () => {
+    if (!menu) return;
+    setSavingMaterials(true);
+    try {
+      let loanId = linkedLoanId;
+      if (!loanId) {
+        const { data, error } = await supabase.from('material_loans' as any).insert({
+          event_name: menu.name,
+          event_menu_id: id,
+          responsible: null,
+          date_out: menu.event_date || new Date().toISOString().split('T')[0],
+          status: 'planning',
+        }).select('id').single();
+        if (error || !data) throw error || new Error('Erro ao criar lista');
+        loanId = (data as any).id;
+        setLinkedLoanId(loanId);
+      }
+      await supabase.from('material_loan_items' as any).delete().eq('loan_id', loanId!);
+      const planned = Object.entries(planQty).filter(([, q]) => q > 0);
+      if (planned.length > 0) {
+        const { error } = await supabase.from('material_loan_items' as any).insert(
+          planned.map(([material_item_id, qty]) => ({ loan_id: loanId, material_item_id, qty_out: qty, qty_returned: 0, qty_damaged: 0 }))
+        );
+        if (error) throw error;
+      }
+      await supabase.from('material_loans' as any).update({ status: planned.length > 0 ? 'active' : 'planning' }).eq('id', loanId!);
+      toast.success('Lista de materiais salva!');
+    } catch (err: any) {
+      toast.error('Erro: ' + (err?.message || 'Tente novamente'));
+    }
+    setSavingMaterials(false);
+  };
 
   const loadEmployees = async () => {
     const { data } = await supabase
@@ -1190,7 +1251,7 @@ export default function EventMenuDetailPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 bg-white rounded-xl border border-border p-1 w-fit">
-        {([['pratos', `Cardápio (${regularDishes.length})`, null], ['compras', 'Lista de Compras', itemsToBuy > 0 ? itemsToBuy : null], ['saida', 'Separação / Retorno', null]] as const).map(([tab, label, badge]) => (
+        {([['pratos', `Cardápio (${regularDishes.length})`, null], ['compras', 'Lista de Compras', itemsToBuy > 0 ? itemsToBuy : null], ['saida', 'Separação / Retorno', null], ['materiais', 'Materiais', null]] as const).map(([tab, label, badge]) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === tab ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
             {label}
             {badge && <span className={`text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ${activeTab === tab ? 'bg-white/20' : 'bg-destructive text-white'}`}>{badge}</span>}
@@ -1589,6 +1650,113 @@ export default function EventMenuDetailPage() {
           </div>
         );
       })()}
+
+      {/* ── MATERIAIS ── */}
+      {activeTab === 'materiais' && (
+        <div>
+          {!matLoaded ? (
+            <div className="flex items-center justify-center py-24">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              {/* Summary bar */}
+              <div className="bg-white rounded-xl border border-border p-4 mb-6 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Warehouse className="w-4 h-4 text-primary" />
+                  <span>
+                    {Object.values(planQty).filter(q => q > 0).length === 0
+                      ? 'Nenhum material selecionado ainda — preencha as quantidades necessárias'
+                      : `${Object.values(planQty).filter(q => q > 0).length} tipo(s) de material selecionado(s)`}
+                  </span>
+                </div>
+                <Button onClick={handleSaveMaterials} disabled={savingMaterials} className="gold-button" size="sm">
+                  {savingMaterials ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                  Salvar Lista
+                </Button>
+              </div>
+
+              {materialItems.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p className="font-medium">Nenhum material cadastrado</p>
+                  <p className="text-sm mt-1">Cadastre itens em Materiais → Inventário</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {Array.from(new Set(materialItems.map(i => i.category))).sort().map(cat => {
+                    const catItems = materialItems.filter(i => i.category === cat);
+                    const catSelected = catItems.filter(i => (planQty[i.id] || 0) > 0).length;
+                    return (
+                      <div key={cat}>
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">📦 {cat}</h3>
+                          {catSelected > 0 && <span className="text-xs text-primary font-medium">{catSelected} selecionado(s)</span>}
+                        </div>
+                        <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border bg-muted/20">
+                                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-full">Material</th>
+                                <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Disponível</th>
+                                <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap w-28">Qtde Necessária</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                              {catItems.map(item => {
+                                const qty = planQty[item.id] || 0;
+                                const isSelected = qty > 0;
+                                return (
+                                  <tr key={item.id} className={`transition-colors ${isSelected ? 'bg-amber-50/40' : 'hover:bg-muted/10'}`}>
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-3">
+                                        {item.image_url ? (
+                                          <img src={item.image_url} alt={item.name} className="w-9 h-9 rounded-lg object-cover border border-border flex-shrink-0" />
+                                        ) : (
+                                          <div className="w-9 h-9 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
+                                            <Package className="w-4 h-4 text-muted-foreground/40" />
+                                          </div>
+                                        )}
+                                        <span className={`font-medium ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>{item.name}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                                      <span className={item.available_qty === 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}>{item.available_qty}</span>
+                                      <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
+                                    </td>
+                                    <td className="px-3 py-3 text-center">
+                                      <Input
+                                        type="number" min={0}
+                                        value={qty === 0 ? '' : qty}
+                                        placeholder="0"
+                                        className={`w-20 text-center h-8 text-sm mx-auto ${isSelected ? 'border-primary/50 bg-white' : ''}`}
+                                        onChange={e => {
+                                          const v = Math.max(0, Number(e.target.value) || 0);
+                                          setPlanQty(prev => { const next = { ...prev }; if (v === 0) delete next[item.id]; else next[item.id] = v; return next; });
+                                        }}
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-end pt-2 pb-6">
+                    <Button onClick={handleSaveMaterials} disabled={savingMaterials} className="gold-button">
+                      {savingMaterials ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                      Salvar Lista de Materiais
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── SEPARAÇÃO / RETORNO ── */}
       {activeTab === 'saida' && (
