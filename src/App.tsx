@@ -42,6 +42,7 @@ import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeInventoryPage from "./pages/employee/EmployeeInventoryPage";
 import EmployeeEventsPage from "./pages/employee/EmployeeEventsPage";
+import EmployeeMateriaisPage from "./pages/employee/EmployeeMateriaisPage";
 
 import PublicInventoryPage from "./pages/public/PublicInventoryPage";
 import NotFound from "./pages/NotFound";
@@ -121,6 +122,7 @@ function AppRoutes() {
         <Route path="/" element={<EmployeeDashboard />} />
         <Route path="/inventario" element={<EmployeeInventoryPage />} />
         <Route path="/eventos" element={<EmployeeEventsPage />} />
+        <Route path="/materiais" element={<EmployeeMateriaisPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </EmployeeLayout>

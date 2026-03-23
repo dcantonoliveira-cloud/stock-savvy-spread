@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Warehouse, Plus, Pencil, Trash2, Loader2, Search, AlertTriangle, Package, Image
+  Warehouse, Plus, Pencil, Trash2, Loader2, Search, AlertTriangle, Package
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MaterialImageUpload } from '@/components/MaterialImageUpload';
 
 type MaterialItem = {
   id: string;
@@ -303,13 +304,13 @@ export default function MateriaisInventarioPage() {
               <Input className="mt-1" placeholder="Detalhes opcionais..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
 
-            {/* Image URL */}
+            {/* Image Upload */}
             <div>
-              <Label className="flex items-center gap-1.5"><Image className="w-3.5 h-3.5" />URL da Foto</Label>
-              <Input className="mt-1" placeholder="https://..." value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} />
-              {form.image_url && (
-                <img src={form.image_url} alt="preview" className="mt-2 w-16 h-16 rounded-lg object-cover border border-border" onError={e => (e.currentTarget.style.display = 'none')} />
-              )}
+              <Label className="mb-2 block">Foto</Label>
+              <MaterialImageUpload
+                value={form.image_url || null}
+                onChange={url => setForm(f => ({ ...f, image_url: url || '' }))}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

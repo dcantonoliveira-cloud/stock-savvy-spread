@@ -2,10 +2,10 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, ChefHat, Home, ClipboardList, CalendarDays } from 'lucide-react';
+import { LogOut, ChefHat, Home, ClipboardList, CalendarDays, Warehouse } from 'lucide-react';
 
 export default function EmployeeLayout({ children }: { children: ReactNode }) {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, permissions } = useAuth();
   const { pathname } = useLocation();
 
   const initials = profile?.display_name
@@ -19,6 +19,7 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
     { to: '/', label: 'Estoque', icon: Home },
     { to: '/inventario', label: 'Inventário', icon: ClipboardList },
     { to: '/eventos', label: 'Eventos', icon: CalendarDays },
+    ...(permissions.access_materials ? [{ to: '/materiais', label: 'Materiais', icon: Warehouse }] : []),
   ];
 
   return (
