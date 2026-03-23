@@ -114,7 +114,7 @@ export default function EmprestimosPage() {
           status: 'active',
         })
         .select().single();
-      if (loanErr || !loan) throw loanErr || new Error('Erro ao criar empréstimo');
+      if (loanErr || !loan) throw loanErr || new Error('Erro ao criar evento');
 
       const { error: itemsErr } = await supabase.from('material_loan_items' as any).insert(
         validItems.map(i => ({ loan_id: (loan as any).id, material_item_id: i.material_item_id, qty_out: i.qty_out, qty_returned: 0, qty_damaged: 0 }))
@@ -131,7 +131,7 @@ export default function EmprestimosPage() {
         }
       }
 
-      toast.success('Empréstimo registrado!');
+      toast.success('Evento registrado!');
       setNewDialog(false);
       setNForm({ event_name: '', responsible: '', date_out: new Date().toISOString().split('T')[0], notes: '' });
       setNItems([{ material_item_id: '', qty_out: 1 }]);
@@ -194,9 +194,9 @@ export default function EmprestimosPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remover este empréstimo?')) return;
+    if (!confirm('Remover este evento?')) return;
     await supabase.from('material_loans' as any).delete().eq('id', id);
-    toast.success('Empréstimo removido');
+    toast.success('Evento removido');
     load();
   };
 
@@ -218,16 +218,16 @@ export default function EmprestimosPage() {
             <ArrowRightLeft className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-display font-bold gold-text">Empréstimos</h1>
+            <h1 className="text-3xl font-display font-bold gold-text">Eventos</h1>
             <p className="text-muted-foreground mt-0.5">
               {activeCount > 0
-                ? <span>{activeCount} empréstimo{activeCount !== 1 ? 's' : ''} ativo{activeCount !== 1 ? 's' : ''}</span>
-                : 'Nenhum empréstimo ativo'}
+                ? <span>{activeCount} evento{activeCount !== 1 ? 's' : ''} ativo{activeCount !== 1 ? 's' : ''}</span>
+                : 'Nenhum evento ativo'}
             </p>
           </div>
         </div>
         <Button onClick={() => setNewDialog(true)} className="gold-button">
-          <Plus className="w-4 h-4 mr-2" />Novo Empréstimo
+          <Plus className="w-4 h-4 mr-2" />Novo Evento
         </Button>
       </div>
 
@@ -250,7 +250,7 @@ export default function EmprestimosPage() {
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <PackageOpen className="w-14 h-14 mx-auto mb-3 opacity-20" />
-          <p className="font-medium">Nenhum empréstimo encontrado</p>
+          <p className="font-medium">Nenhum evento encontrado</p>
           <p className="text-sm mt-1">Registre a saída de materiais para eventos</p>
         </div>
       ) : (
@@ -325,7 +325,7 @@ export default function EmprestimosPage() {
       <Dialog open={newDialog} onOpenChange={setNewDialog}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Empréstimo</DialogTitle>
+            <DialogTitle>Novo Evento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
