@@ -426,10 +426,16 @@ export default function StockItemsPage() {
 
   const commitEdit = async () => {
     if (!editingCell) return;
-    const val = parseFloat(editingValue);
+    const val = parseFloat(editingValue.replace(',', '.'));
     if (isNaN(val)) { setEditingCell(null); return; }
-    await supabase.from('stock_items').update({ [editingCell.field]: val } as any).eq('id', editingCell.id);
+    const { error } = await supabase.from('stock_items').update({ [editingCell.field]: val } as any).eq('id', editingCell.id);
+    if (error) {
+      toast.error('Erro ao salvar: ' + error.message);
+      setEditingCell(null);
+      return;
+    }
     setItems(prev => prev.map(i => i.id === editingCell.id ? { ...i, [editingCell.field]: val } : i));
+    toast.success('Salvo!');
     setEditingCell(null);
   };
 
