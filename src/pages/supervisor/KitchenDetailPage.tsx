@@ -29,37 +29,27 @@ export default function KitchenDetailPage() {
     setLoading(true);
     const [kRes, locRes] = await Promise.all([
       supabase.from('kitchens').select('id, name, is_default').eq('id', id!).single(),
-      supabase.from('stock_item_locations').select('id, item_id, current_stock').eq('kitchen_id', id!),
+      supabase.from('stock_item_locations')
+        .select('id, item_id, current_stock, stock_items(id, name, category, unit, unit_cost)')
+        .eq('kitchen_id', id!),
     ]);
     if (!kRes.data) { navigate('/kitchens'); return; }
     setKitchen(kRes.data as Kitchen);
 
-    if (locRes.data && locRes.data.length > 0) {
-      const itemIds = locRes.data.map((l: any) => l.item_id);
-      const { data: itemsData } = await supabase
-        .from('stock_items')
-        .select('id, name, category, unit, unit_cost')
-        .in('id', itemIds)
-        .order('category')
-        .order('name');
+    const mapped: LocationItem[] = ((locRes.data || []) as any[])
+      .filter(loc => loc.current_stock > 0 && loc.stock_items)
+      .map(loc => ({
+        location_id: loc.id,
+        item_id: loc.item_id,
+        name: loc.stock_items?.name || '—',
+        category: loc.stock_items?.category || '—',
+        unit: loc.stock_items?.unit || '',
+        unit_cost: loc.stock_items?.unit_cost || 0,
+        current_stock: loc.current_stock,
+      }))
+      .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
 
-      const mapped: LocationItem[] = (locRes.data as any[]).map(loc => {
-        const item = (itemsData || []).find((i: any) => i.id === loc.item_id);
-        return {
-          location_id: loc.id,
-          item_id: loc.item_id,
-          name: item?.name || '—',
-          category: item?.category || '—',
-          unit: item?.unit || '',
-          unit_cost: item?.unit_cost || 0,
-          current_stock: loc.current_stock,
-        };
-      }).filter(l => l.current_stock > 0).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
-
-      setLocationItems(mapped);
-    } else {
-      setLocationItems([]);
-    }
+    setLocationItems(mapped);
     setLoading(false);
   };
 
