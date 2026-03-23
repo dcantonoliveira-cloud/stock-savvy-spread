@@ -42,3 +42,8 @@ export function calcRecipeUnitCost(itemCost: number, itemUnit: string, recipeUni
   const recipeFactor = TO_BASE[recipeUnit] ?? 1;
   return itemCost * recipeFactor / itemFactor;
 }
+
+/** Custo real por unidade, levando em conta qtde por embalagem de compra */
+export function effectiveUnitCost(unitCost: number, purchaseQty: number | null | undefined): number {
+  return unitCost / (purchaseQty || 1);
+}

@@ -14,9 +14,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { getCompatibleUnits, calcRecipeUnitCost } from '@/lib/units';
+import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib/units';
 
-type StockItem = { id: string; name: string; unit: string; unit_cost: number };
+type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
 type Sheet = { id: string; name: string; servings: number; description: string | null; category: string | null; prep_time: number; yield_quantity: number; yield_unit: string; instructions: string | null; items: SheetItem[] };
 
@@ -98,7 +98,7 @@ export default function SheetDetailPage() {
     setLoading(true);
     const [sheetRes, itemsRes, eventRes] = await Promise.all([
       supabase.from('technical_sheets').select('*').eq('id', id!).single(),
-      supabase.from('stock_items').select('id, name, unit, unit_cost').order('name'),
+      supabase.from('stock_items').select('id, name, unit, unit_cost, purchase_qty').order('name'),
       supabase.from('event_menu_dishes').select('id', { count: 'exact', head: true }).eq('sheet_id', id!),
     ]);
     setEventCount(eventRes.count || 0);
@@ -109,7 +109,7 @@ export default function SheetDetailPage() {
       const item = (itemsRes.data as any[])?.find((x: any) => x.id === i.item_id);
       const itemUnit = item?.unit || '';
       const recipeUnit = i.unit || itemUnit;
-      const baseUnitCost = item?.unit_cost || 0;
+      const baseUnitCost = effectiveUnitCost(item?.unit_cost || 0, item?.purchase_qty);
       return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: recipeUnit, unit_cost: calcRecipeUnitCost(baseUnitCost, itemUnit, recipeUnit), section: i.section || 'receita' };
     });
     const loaded = { ...(sheetRes.data as any), items } as Sheet;
@@ -124,12 +124,14 @@ export default function SheetDetailPage() {
     if (i !== idx) return it;
     if (field === 'item_id') {
       const si = stockItems.find(s => s.id === value);
-      return { ...it, item_id: value, item_name: si?.name || '', unit: si?.unit || '', unit_cost: si?.unit_cost || 0 };
+      const effCost = si ? effectiveUnitCost(si.unit_cost || 0, si.purchase_qty) : 0;
+      return { ...it, item_id: value, item_name: si?.name || '', unit: si?.unit || '', unit_cost: effCost };
     }
     if (field === 'unit') {
       const si = stockItems.find(s => s.id === it.item_id);
+      const effCost = si ? effectiveUnitCost(si.unit_cost || 0, si.purchase_qty) : 0;
       const itemUnit = si?.unit || it.unit;
-      return { ...it, unit: value, unit_cost: calcRecipeUnitCost(si?.unit_cost || 0, itemUnit, value) };
+      return { ...it, unit: value, unit_cost: calcRecipeUnitCost(effCost, itemUnit, value) };
     }
     return { ...it, [field]: value }; // quantity stored as raw string; parsed only on save
   }));
@@ -250,8 +252,8 @@ export default function SheetDetailPage() {
                         : <span>{item.unit}</span>;
                     })() : item.unit}
                   </td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(parseQty(item.quantity) * item.unit_cost).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(parseQty(item.quantity) * item.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}
                 </tr>
               );
@@ -293,8 +295,8 @@ export default function SheetDetailPage() {
                         : <span>{item.unit}</span>;
                     })() : item.unit}
                   </td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(parseQty(item.quantity) * item.unit_cost).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(parseQty(item.quantity) * item.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}
                 </tr>
               );

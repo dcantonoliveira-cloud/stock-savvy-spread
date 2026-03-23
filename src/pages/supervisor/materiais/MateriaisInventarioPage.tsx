@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Warehouse, Plus, Pencil, Trash2, Loader2, Search, AlertTriangle, Package
+  Warehouse, Plus, Pencil, Trash2, Loader2, Search, AlertTriangle, Package, Image
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -22,23 +23,25 @@ type MaterialItem = {
   damaged_qty: number;
   min_qty: number;
   unit: string;
+  unit_price: number | null;
+  image_url: string | null;
   notes: string | null;
 };
-
-const CATEGORY_SUGGESTIONS = [
-  'Louças', 'Cutelaria', 'Taças e Copos', 'Rechauds', 'Equipamentos',
-  'Decoração', 'Toalhas e Tecidos', 'Mesas e Cadeiras', 'Iluminação', 'Outros'
-];
 
 const UNITS = ['unid', 'peça', 'conjunto', 'par', 'kit', 'jogo', 'metro'];
 
 const defaultForm = {
   name: '', category: '', description: '', total_qty: 0,
-  available_qty: 0, damaged_qty: 0, min_qty: 0, unit: 'unid', notes: ''
+  available_qty: 0, damaged_qty: 0, min_qty: 0, unit: 'unid',
+  unit_price: '', image_url: '', notes: ''
 };
 
 export default function MateriaisInventarioPage() {
+  const { role } = useAuth();
+  const isSupervisor = role === 'supervisor';
+
   const [items, setItems] = useState<MaterialItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -50,23 +53,18 @@ export default function MateriaisInventarioPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('material_items' as any)
-      .select('*')
-      .order('category')
-      .order('name');
-    if (data) setItems(data as MaterialItem[]);
+    const [itemsRes, catsRes] = await Promise.all([
+      supabase.from('material_items' as any).select('*').order('category').order('name'),
+      supabase.from('material_categories' as any).select('name').order('sort_order').order('name'),
+    ]);
+    if (itemsRes.data) setItems(itemsRes.data as MaterialItem[]);
+    if (catsRes.data) setCategories((catsRes.data as any[]).map(c => c.name));
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm(defaultForm);
-    setDialog(true);
-  };
-
+  const openCreate = () => { setEditing(null); setForm(defaultForm); setDialog(true); };
   const openEdit = (item: MaterialItem) => {
     setEditing(item);
     setForm({
@@ -78,6 +76,8 @@ export default function MateriaisInventarioPage() {
       damaged_qty: item.damaged_qty,
       min_qty: item.min_qty,
       unit: item.unit,
+      unit_price: item.unit_price != null ? String(item.unit_price) : '',
+      image_url: item.image_url || '',
       notes: item.notes || '',
     });
     setDialog(true);
@@ -87,7 +87,7 @@ export default function MateriaisInventarioPage() {
     if (!form.name.trim()) { toast.error('Nome é obrigatório'); return; }
     if (!form.category.trim()) { toast.error('Categoria é obrigatória'); return; }
     setSaving(true);
-    const payload = {
+    const payload: any = {
       name: form.name.trim(),
       category: form.category.trim(),
       description: form.description.trim() || null,
@@ -96,8 +96,12 @@ export default function MateriaisInventarioPage() {
       damaged_qty: Number(form.damaged_qty) || 0,
       min_qty: Number(form.min_qty) || 0,
       unit: form.unit,
+      image_url: form.image_url.trim() || null,
       notes: form.notes.trim() || null,
     };
+    if (isSupervisor) {
+      payload.unit_price = form.unit_price ? parseFloat(String(form.unit_price).replace(',', '.')) || 0 : null;
+    }
     if (editing) {
       const { error } = await supabase.from('material_items' as any).update(payload).eq('id', editing.id);
       if (error) { toast.error('Erro ao atualizar: ' + error.message); setSaving(false); return; }
@@ -120,7 +124,11 @@ export default function MateriaisInventarioPage() {
     load();
   };
 
-  const categories = Array.from(new Set(items.map(i => i.category))).sort();
+  // Merge DB categories with any categories already in use
+  const allCategories = Array.from(new Set([
+    ...categories,
+    ...items.map(i => i.category),
+  ])).sort();
 
   const filtered = items.filter(item => {
     const matchSearch = !search ||
@@ -174,7 +182,7 @@ export default function MateriaisInventarioPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as categorias</SelectItem>
-            {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -192,11 +200,13 @@ export default function MateriaisInventarioPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border" style={{ background: 'hsl(40 30% 97%)' }}>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs w-full min-w-[220px]">ITEM</th>
+                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-xs w-12"></th>
+                  <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs w-full min-w-[200px]">ITEM</th>
                   <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">CATEGORIA</th>
                   <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">DISPONÍVEL</th>
                   <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">TOTAL</th>
                   <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">DANIF.</th>
+                  {isSupervisor && <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">PREÇO</th>}
                   <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">UN.</th>
                   <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs w-20">AÇÕES</th>
                 </tr>
@@ -207,7 +217,16 @@ export default function MateriaisInventarioPage() {
                   const hasDamaged = item.damaged_qty > 0;
                   return (
                     <tr key={item.id} className={`hover:bg-amber-50/40 transition-colors ${isLow ? 'bg-red-50/40' : ''}`}>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} className="w-8 h-8 rounded-lg object-cover border border-border" onError={e => (e.currentTarget.style.display = 'none')} />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center">
+                            <Package className="w-4 h-4 text-muted-foreground/40" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
                           {isLow && <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0" title="Disponível abaixo do mínimo" />}
                           <div>
@@ -220,21 +239,20 @@ export default function MateriaisInventarioPage() {
                         <Badge variant="outline" className="text-[10px] font-normal">{item.category}</Badge>
                       </td>
                       <td className="px-3 py-3 text-right">
-                        <span className={`font-semibold ${isLow ? 'text-destructive' : 'text-foreground'}`}>
-                          {item.available_qty}
-                        </span>
-                        {item.min_qty > 0 && (
-                          <span className="text-xs text-muted-foreground ml-1">/ mín {item.min_qty}</span>
-                        )}
+                        <span className={`font-semibold ${isLow ? 'text-destructive' : 'text-foreground'}`}>{item.available_qty}</span>
+                        {item.min_qty > 0 && <span className="text-xs text-muted-foreground ml-1">/ mín {item.min_qty}</span>}
                       </td>
                       <td className="px-3 py-3 text-right text-muted-foreground">{item.total_qty}</td>
                       <td className="px-3 py-3 text-right">
-                        {hasDamaged ? (
-                          <span className="font-medium text-amber-600">{item.damaged_qty}</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        {hasDamaged ? <span className="font-medium text-amber-600">{item.damaged_qty}</span> : <span className="text-muted-foreground">—</span>}
                       </td>
+                      {isSupervisor && (
+                        <td className="px-3 py-3 text-right text-muted-foreground">
+                          {item.unit_price != null && item.unit_price > 0
+                            ? `R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : '—'}
+                        </td>
+                      )}
                       <td className="px-3 py-3 text-center text-muted-foreground text-xs">{item.unit}</td>
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-0.5">
@@ -268,15 +286,32 @@ export default function MateriaisInventarioPage() {
             </div>
             <div>
               <Label>Categoria *</Label>
-              <Input className="mt-1" placeholder="Ex: Taças e Copos" list="cat-suggestions" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
-              <datalist id="cat-suggestions">
-                {CATEGORY_SUGGESTIONS.map(c => <option key={c} value={c} />)}
-              </datalist>
+              <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Selecionar categoria..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {allCategories.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">Crie categorias em <strong>Materiais → Categorias</strong></p>
+              )}
             </div>
             <div>
               <Label>Descrição</Label>
               <Input className="mt-1" placeholder="Detalhes opcionais..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
+
+            {/* Image URL */}
+            <div>
+              <Label className="flex items-center gap-1.5"><Image className="w-3.5 h-3.5" />URL da Foto</Label>
+              <Input className="mt-1" placeholder="https://..." value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} />
+              {form.image_url && (
+                <img src={form.image_url} alt="preview" className="mt-2 w-16 h-16 rounded-lg object-cover border border-border" onError={e => (e.currentTarget.style.display = 'none')} />
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Qtde Total</Label>
@@ -297,16 +332,22 @@ export default function MateriaisInventarioPage() {
                 <Input className="mt-1" type="number" min={0} value={form.min_qty} onChange={e => setForm(f => ({ ...f, min_qty: Number(e.target.value) }))} />
               </div>
             </div>
-            <div>
-              <Label>Unidade</Label>
-              <Select value={form.unit} onValueChange={v => setForm(f => ({ ...f, unit: v }))}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Unidade</Label>
+                <Select value={form.unit} onValueChange={v => setForm(f => ({ ...f, unit: v }))}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {isSupervisor && (
+                <div>
+                  <Label>Preço (R$)</Label>
+                  <Input className="mt-1" type="text" inputMode="decimal" placeholder="0,00" value={form.unit_price} onChange={e => setForm(f => ({ ...f, unit_price: e.target.value }))} />
+                </div>
+              )}
             </div>
             <div>
               <Label>Observações</Label>

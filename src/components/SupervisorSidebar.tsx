@@ -46,6 +46,7 @@ const navStructure: NavGroup[] = [
     label: 'Materiais', icon: Warehouse,
     items: [
       { path: '/materiais', label: 'Inventário', icon: Package },
+      { path: '/materiais/categorias', label: 'Categorias', icon: FolderOpen },
       { path: '/materiais/emprestimos', label: 'Eventos', icon: ClipboardList },
     ]
   },
