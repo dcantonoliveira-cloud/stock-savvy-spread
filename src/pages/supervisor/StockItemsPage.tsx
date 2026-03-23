@@ -19,6 +19,7 @@ import { ItemImage } from '@/components/ItemImage';
 type Item = {
   id: string; name: string; category: string; unit: string;
   current_stock: number; min_stock: number; unit_cost: number;
+  purchase_qty: number | null;
   image_url: string | null; barcode: string | null;
 };
 
@@ -296,6 +297,7 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
   const [currentStock, setCurrentStock] = useState(item?.current_stock?.toString() || '0');
   const [minStock, setMinStock] = useState(item?.min_stock?.toString() || '0');
   const [unitCost, setUnitCost] = useState(item?.unit_cost?.toString() || '0');
+  const [purchaseQty, setPurchaseQty] = useState(item?.purchase_qty?.toString() || '1');
   const [barcode, setBarcode] = useState(item?.barcode || '');
   const [imageUrl, setImageUrl] = useState(item?.image_url || null);
 
@@ -307,6 +309,7 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
       current_stock: parseFloat(currentStock) || 0,
       min_stock: parseFloat(minStock) || 0,
       unit_cost: parseFloat(unitCost) || 0,
+      purchase_qty: parseFloat(purchaseQty) || 1,
       barcode: barcode.trim() || null,
       image_url: imageUrl,
     });
@@ -361,6 +364,26 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
           <label className="text-sm text-muted-foreground mb-1 block">Custo Unit.</label>
           <Input type="number" step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} />
         </div>
+      </div>
+      <div>
+        <label className="text-sm text-muted-foreground mb-1 block">
+          Qtde por embalagem de compra
+          <span className="ml-1 text-xs text-muted-foreground/70">(ex: 5 para "pacote de 5{unit})"</span>
+        </label>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number" step="any" value={purchaseQty}
+            onChange={e => setPurchaseQty(e.target.value)}
+            className="w-32"
+            min="0.001"
+          />
+          <span className="text-sm text-muted-foreground">{unit} / compra</span>
+        </div>
+        {parseFloat(purchaseQty) > 1 && parseFloat(unitCost) > 0 && (
+          <p className="text-xs text-primary mt-1">
+            Preço do pacote ≈ R$ {(parseFloat(purchaseQty) * parseFloat(unitCost)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        )}
       </div>
       <div>
         <label className="text-sm text-muted-foreground mb-1 block">Código de Barras</label>
@@ -660,6 +683,7 @@ export default function StockItemsPage() {
                         <span className={`cursor-pointer font-semibold transition-colors hover:text-primary ${isLow ? 'text-destructive' : 'text-foreground'}`}
                           onClick={() => startEdit(item.id, 'current_stock', item.current_stock)} title="Clique para editar">
                           {item.current_stock}
+                          <span className="ml-1 text-xs font-normal text-muted-foreground">{item.unit}</span>
                         </span>
                       )}
                     </td>
