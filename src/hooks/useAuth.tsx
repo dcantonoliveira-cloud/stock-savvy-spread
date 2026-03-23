@@ -8,6 +8,8 @@ type Role = 'supervisor' | 'employee' | null;
 interface Permissions {
   can_entry: boolean;
   can_output: boolean;
+  access_stock: boolean;
+  access_materials: boolean;
 }
 
 interface AuthContextType {
@@ -26,14 +28,14 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role>(null);
-  const [permissions, setPermissions] = useState<Permissions>({ can_entry: true, can_output: true });
+  const [permissions, setPermissions] = useState<Permissions>({ can_entry: true, can_output: true, access_stock: true, access_materials: false });
   const [profile, setProfile] = useState<{ display_name: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
     const [rolesRes, permRes, profileRes] = await Promise.all([
       supabase.from('user_roles').select('role').eq('user_id', userId),
-      supabase.from('employee_permissions').select('can_entry, can_output').eq('user_id', userId).maybeSingle(),
+      supabase.from('employee_permissions').select('can_entry, can_output, access_stock, access_materials').eq('user_id', userId).maybeSingle(),
       supabase.from('profiles').select('display_name, email').eq('user_id', userId).maybeSingle(),
     ]);
 
@@ -45,7 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (permRes.data) {
-      setPermissions({ can_entry: permRes.data.can_entry, can_output: permRes.data.can_output });
+      setPermissions({
+        can_entry: permRes.data.can_entry,
+        can_output: permRes.data.can_output,
+        access_stock: (permRes.data as any).access_stock ?? true,
+        access_materials: (permRes.data as any).access_materials ?? false,
+      });
     }
 
     if (profileRes.data) {
