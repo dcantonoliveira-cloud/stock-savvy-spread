@@ -730,9 +730,41 @@ export default function EntriesPage() {
                     {selectedItem && <p className="text-xs text-muted-foreground mt-1">Estoque atual: {selectedItem.current_stock} {selectedItem.unit}</p>}
                   </div>
                   <div>
-                    <label className="text-sm text-muted-foreground mb-1 block">Custo Unit. (R$)</label>
-                    <Input type="number" step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} placeholder="0.00" />
+                    <label className="text-sm text-muted-foreground mb-1 block">Custo Unit. (R$/{selectedItem?.unit || 'un'})</label>
+                    <Input
+                      type="number" step="0.01" value={unitCost}
+                      onChange={e => setUnitCost(e.target.value)}
+                      placeholder="0.00"
+                    />
                   </div>
+                </div>
+                {/* Total price helper */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <label className="text-sm font-medium text-amber-800 mb-1 block">
+                    💡 Calcular pelo preço total da nota
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground mb-0.5 block">Preço total pago (R$)</label>
+                      <Input
+                        type="number" step="0.01" placeholder="Ex: 50,00"
+                        className="h-8 text-sm bg-white"
+                        onChange={e => {
+                          const total = parseFloat(e.target.value);
+                          const qty = parseFloat(quantity);
+                          if (total > 0 && qty > 0) {
+                            setUnitCost((total / qty).toFixed(4));
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-4">÷ qtde = custo/un</div>
+                  </div>
+                  {unitCost && quantity && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      = R$ {parseFloat(unitCost).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} por {selectedItem?.unit || 'un'}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Fornecedor (opcional)</label>
