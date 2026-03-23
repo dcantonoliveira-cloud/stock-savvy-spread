@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 type Item = { id: string; name: string; unit: string; current_stock: number; barcode: string | null };
+type Kitchen = { id: string; name: string; is_default: boolean };
+type ItemLocation = { id: string; kitchen_id: string; current_stock: number };
 type Entry = { id: string; item_id: string; quantity: number; unit_cost: number | null; supplier: string | null; invoice_number: string | null; notes: string | null; date: string; created_at: string };
 
 type ParsedItem = {
@@ -95,6 +97,7 @@ export default function EntriesPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterDate, setFilterDate] = useState('');
   const [search, setSearch] = useState('');
@@ -109,6 +112,10 @@ export default function EntriesPage() {
   const [quickCreateUnit, setQuickCreateUnit] = useState('kg');
   const [quickCreateCategory, setQuickCreateCategory] = useState('Outros');
   const [quickCreateSaving, setQuickCreateSaving] = useState(false);
+  // allocation
+  const [itemLocations, setItemLocations] = useState<ItemLocation[]>([]);
+  const [allocationKitchenId, setAllocationKitchenId] = useState('');
+  const [loadingLocations, setLoadingLocations] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [unitCost, setUnitCost] = useState('');
   const [supplier, setSupplier] = useState('');
@@ -131,15 +138,41 @@ export default function EntriesPage() {
   const [fixCategory, setFixCategory] = useState('Outros');
   const [fixLoading, setFixLoading] = useState(false);
 
+  const defaultKitchen = kitchens.find(k => k.is_default);
+
   const load = async () => {
-    const [itemsRes, entriesRes] = await Promise.all([
+    const [itemsRes, entriesRes, kitchensRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, current_stock, barcode').order('name'),
       supabase.from('stock_entries').select('*').order('created_at', { ascending: false }),
+      supabase.from('kitchens').select('id, name, is_default').order('name'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data as Item[]);
     if (entriesRes.data) setEntries(entriesRes.data);
+    if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
   };
   useEffect(() => { load(); }, []);
+
+  // When item changes, load its locations and set default allocation
+  const handleItemSelect = async (id: string) => {
+    setItemId(id);
+    setItemSearch('');
+    setItemComboOpen(false);
+    setAllocationKitchenId('');
+    setItemLocations([]);
+    if (!id) return;
+    setLoadingLocations(true);
+    const { data } = await supabase.from('stock_item_locations').select('id, kitchen_id, current_stock').eq('item_id', id);
+    const locs = (data || []) as ItemLocation[];
+    setItemLocations(locs);
+    // Default: if item has non-default kitchen with stock > 0, let user choose; else Estoque Geral
+    const nonDefaultWithStock = locs.filter(l => {
+      const k = kitchens.find(k => k.id === l.kitchen_id);
+      return k && !k.is_default && l.current_stock > 0;
+    });
+    const def = kitchens.find(k => k.is_default);
+    setAllocationKitchenId(nonDefaultWithStock.length > 0 ? '' : (def?.id || ''));
+    setLoadingLocations(false);
+  };
 
   const filtered = entries.filter(e => {
     const item = items.find(i => i.id === e.item_id);
@@ -154,7 +187,7 @@ export default function EntriesPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); };
+  const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setItemLocations([]); setAllocationKitchenId(''); };
 
   const handleQuickCreate = async () => {
     if (!quickCreateName.trim()) { toast.error('Nome é obrigatório'); return; }
@@ -165,8 +198,9 @@ export default function EntriesPage() {
     } as any).select('id, name, unit, current_stock, barcode').single();
     if (error || !data) { toast.error('Erro ao criar insumo'); setQuickCreateSaving(false); return; }
     const newItem = data as Item;
-    setItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
-    setItemId(newItem.id);
+    const updatedItems = [...items, newItem].sort((a, b) => a.name.localeCompare(b.name));
+    setItems(updatedItems);
+    handleItemSelect(newItem.id);
     setQuickCreateOpen(false);
     setQuickCreateName('');
     setQuickCreateUnit('kg');
@@ -178,19 +212,46 @@ export default function EntriesPage() {
   const handleSave = async () => {
     if (!itemId) { toast.error('Selecione um item'); return; }
     if (!quantity || parseFloat(quantity) <= 0) { toast.error('Quantidade inválida'); return; }
+    if (!allocationKitchenId) { toast.error('Selecione o destino (centro de custo)'); return; }
     if (!user) return;
+
+    const qty = parseFloat(quantity);
 
     const { error } = await supabase.from('stock_entries').insert({
       item_id: itemId,
-      quantity: parseFloat(quantity),
+      quantity: qty,
       unit_cost: unitCost ? parseFloat(unitCost) : null,
       supplier: supplier.trim() || null,
       invoice_number: invoiceNumber.trim() || null,
       notes: notes.trim() || null,
       registered_by: user.id,
     });
+    if (error) { toast.error('Erro ao registrar entrada'); return; }
 
-    if (error) { toast.error('Erro ao registrar'); return; }
+    // Update stock_item_locations for the chosen kitchen
+    const existingLoc = itemLocations.find(l => l.kitchen_id === allocationKitchenId);
+    if (existingLoc) {
+      await supabase.from('stock_item_locations')
+        .update({ current_stock: existingLoc.current_stock + qty } as any)
+        .eq('id', existingLoc.id);
+    } else {
+      await supabase.from('stock_item_locations').insert({
+        item_id: itemId,
+        kitchen_id: allocationKitchenId,
+        current_stock: qty,
+      } as any);
+    }
+
+    // Also ensure Estoque Geral has a row for this item (0 if not already)
+    if (defaultKitchen && allocationKitchenId !== defaultKitchen.id) {
+      const hasDefault = itemLocations.some(l => l.kitchen_id === defaultKitchen.id);
+      if (!hasDefault) {
+        await supabase.from('stock_item_locations').insert({
+          item_id: itemId, kitchen_id: defaultKitchen.id, current_stock: 0,
+        } as any);
+      }
+    }
+
     toast.success('Entrada registrada!');
     resetForm();
     setDialogOpen(false);
@@ -768,11 +829,7 @@ export default function EntriesPage() {
                           </CommandEmpty>
                           <CommandGroup>
                             {items.map(i => (
-                              <CommandItem key={i.id} value={i.name} onSelect={() => {
-                                setItemId(i.id);
-                                setItemSearch('');
-                                setItemComboOpen(false);
-                              }}>
+                              <CommandItem key={i.id} value={i.name} onSelect={() => handleItemSelect(i.id)}>
                                 <Check className={cn('mr-2 h-4 w-4 shrink-0', itemId === i.id ? 'opacity-100' : 'opacity-0')} />
                                 <span className="flex-1 truncate">{i.name}</span>
                                 <span className="text-xs text-muted-foreground ml-2">{i.current_stock} {i.unit}</span>
@@ -795,6 +852,52 @@ export default function EntriesPage() {
                     </PopoverContent>
                   </Popover>
                 </div>
+                {/* Allocation */}
+                {itemId && (
+                  <div>
+                    {loadingLocations ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />Verificando centros de custo...
+                      </div>
+                    ) : (() => {
+                      const nonDefaultWithStock = itemLocations.filter(l => {
+                        const k = kitchens.find(k => k.id === l.kitchen_id);
+                        return k && !k.is_default && l.current_stock > 0;
+                      });
+                      if (nonDefaultWithStock.length > 0) {
+                        // Ask user where to allocate
+                        return (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <label className="text-sm font-medium text-blue-800 mb-2 block">
+                              📦 Este item já tem estoque em centros específicos. Onde alocar?
+                            </label>
+                            <div className="space-y-1.5">
+                              {[defaultKitchen, ...nonDefaultWithStock.map(l => kitchens.find(k => k.id === l.kitchen_id))].filter(Boolean).map(k => {
+                                const loc = itemLocations.find(l => l.kitchen_id === k!.id);
+                                return (
+                                  <label key={k!.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${allocationKitchenId === k!.id ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-blue-100'}`}>
+                                    <input type="radio" name="allocation" value={k!.id} checked={allocationKitchenId === k!.id} onChange={() => setAllocationKitchenId(k!.id)} className="text-primary" />
+                                    <span className="flex-1 text-sm font-medium">{k!.name}</span>
+                                    <span className="text-xs text-muted-foreground">{loc ? `${loc.current_stock} ${selectedItem?.unit || ''}` : 'sem estoque'}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        // Auto Estoque Geral
+                        return (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+                            <span>📦 Será adicionado ao</span>
+                            <span className="font-semibold text-foreground">{defaultKitchen?.name || 'Estoque Geral'}</span>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm text-muted-foreground mb-1 block">Quantidade</label>
