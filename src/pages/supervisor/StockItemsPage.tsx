@@ -457,6 +457,14 @@ export default function StockItemsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cellInputRef = useRef<HTMLInputElement>(null);
 
+  // Delete conflict dialog
+  type DeleteConflict = { id: string; name: string; sheetRefs: { sheetItemId: string; sheetName: string }[]; movCount: number };
+  const [deleteConflict, setDeleteConflict] = useState<DeleteConflict | null>(null);
+  const [sheetReplaceId, setSheetReplaceId] = useState('');
+  const [movAction, setMovAction] = useState<'replace' | 'tombstone' | ''>('');
+  const [movReplaceId, setMovReplaceId] = useState('');
+  const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
+
   const load = async () => {
     const [itemsRes, catsRes, suppRes] = await Promise.all([
       supabase.from('stock_items').select('*' as any).order('name'),
@@ -466,7 +474,7 @@ export default function StockItemsPage() {
     if (itemsRes.data) setItems(itemsRes.data as unknown as Item[]);
     const dbCats = (catsRes.data || []).map((c: any) => c.name);
     const usedCats = itemsRes.data ? [...new Set((itemsRes.data as any[]).map(i => i.category))] : [];
-    setAllCategories([...new Set([...dbCats, ...usedCats])].filter(c => c && c.trim() !== '').sort());
+    setAllCategories([...new Set([...dbCats, ...usedCats])].filter(c => c && c.trim() !== '' && c !== '_sistema_').sort());
     const suppMap: Record<string, Supplier[]> = {};
     for (const s of ((suppRes.data || []) as Supplier[])) {
       if (!suppMap[s.item_id]) suppMap[s.item_id] = [];
@@ -500,16 +508,102 @@ export default function StockItemsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remover este item do estoque? Esta ação não pode ser desfeita.')) return;
-    // Remove dependent records first
-    await supabase.from('item_suppliers').delete().eq('item_id', id);
-    const { error } = await supabase.from('stock_items').delete().eq('id', id);
-    if (error) {
-      toast.error('Não foi possível remover. O item está em fichas técnicas ou movimentações.');
+    const [sheetsRes, entriesRes, outputsRes] = await Promise.all([
+      supabase.from('technical_sheet_items').select('id, technical_sheets(id, name)').eq('item_id', id),
+      supabase.from('stock_entries').select('id', { count: 'exact', head: true }).eq('item_id', id),
+      supabase.from('stock_outputs').select('id', { count: 'exact', head: true }).eq('item_id', id),
+    ]);
+    const sheetRefs = (sheetsRes.data || []).map((r: any) => ({
+      sheetItemId: r.id,
+      sheetName: r.technical_sheets?.name || '?',
+    }));
+    const movCount = (entriesRes.count || 0) + (outputsRes.count || 0);
+
+    if (sheetRefs.length === 0 && movCount === 0) {
+      const itemName = items.find(i => i.id === id)?.name || 'este item';
+      if (!confirm(`Remover "${itemName}"? Esta ação não pode ser desfeita.`)) return;
+      await supabase.from('item_suppliers').delete().eq('item_id', id);
+      const { error } = await supabase.from('stock_items').delete().eq('id', id);
+      if (error) { toast.error('Erro ao remover: ' + error.message); return; }
+      toast.success('Item removido!');
+      load();
       return;
     }
-    toast.success('Item removido!');
-    load();
+
+    const itemName = items.find(i => i.id === id)?.name || '';
+    setDeleteConflict({ id, name: itemName, sheetRefs, movCount });
+    setSheetReplaceId('');
+    setMovAction('');
+    setMovReplaceId('');
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConflict) return;
+    const { id, sheetRefs, movCount } = deleteConflict;
+
+    if (sheetRefs.length > 0 && !sheetReplaceId) {
+      toast.error('Escolha um item substituto para as fichas técnicas');
+      return;
+    }
+    if (movCount > 0 && !movAction) {
+      toast.error('Escolha como tratar as movimentações');
+      return;
+    }
+    if (movCount > 0 && movAction === 'replace' && !movReplaceId) {
+      toast.error('Escolha o item substituto para as movimentações');
+      return;
+    }
+
+    setDeleteConfirmLoading(true);
+    try {
+      // 1. Substituir nas fichas técnicas
+      if (sheetRefs.length > 0 && sheetReplaceId) {
+        const { error } = await supabase.from('technical_sheet_items')
+          .update({ item_id: sheetReplaceId } as any)
+          .eq('item_id', id);
+        if (error) throw error;
+      }
+
+      // 2. Tratar movimentações
+      if (movCount > 0) {
+        if (movAction === 'replace') {
+          await Promise.all([
+            supabase.from('stock_entries').update({ item_id: movReplaceId } as any).eq('item_id', id),
+            supabase.from('stock_outputs').update({ item_id: movReplaceId } as any).eq('item_id', id),
+          ]);
+        } else if (movAction === 'tombstone') {
+          // Encontrar ou criar item-fantasma de sistema
+          let { data: tombstone } = await supabase.from('stock_items')
+            .select('id').eq('name', '(item removido)').maybeSingle();
+          if (!tombstone) {
+            const { data: created } = await supabase.from('stock_items').insert({
+              name: '(item removido)', unit: 'un', category: '_sistema_',
+              current_stock: 0, min_stock: 0, unit_cost: 0,
+            } as any).select('id').single();
+            tombstone = created;
+          }
+          if (tombstone) {
+            await Promise.all([
+              supabase.from('stock_entries').update({ item_id: tombstone.id } as any).eq('item_id', id),
+              supabase.from('stock_outputs').update({ item_id: tombstone.id } as any).eq('item_id', id),
+            ]);
+          }
+        }
+      }
+
+      // 3. Deletar item
+      await supabase.from('item_suppliers').delete().eq('item_id', id);
+      const { error } = await supabase.from('stock_items').delete().eq('id', id);
+      if (error) throw error;
+
+      toast.success('Item removido com sucesso!');
+      setDeleteConflict(null);
+      load();
+    } catch (err: any) {
+      toast.error('Erro ao remover: ' + (err?.message || 'Tente novamente'));
+    } finally {
+      setDeleteConfirmLoading(false);
+    }
   };
 
   const handleSave = async (data: Partial<Item> & { name: string; category: string; unit: string }) => {
@@ -601,6 +695,7 @@ export default function StockItemsPage() {
       : <ChevronUp className="w-3 h-3 opacity-20" />;
 
   const filtered = items
+    .filter(i => i.category !== '_sistema_')
     .filter(i => {
       const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
       const matchCat = filterCategory === 'all' || i.category === filterCategory;
@@ -828,6 +923,92 @@ export default function StockItemsPage() {
       <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} />
       <DuplicateReviewDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} items={items} onDone={() => { setDuplicateOpen(false); load(); }} />
       <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
+
+      {/* Delete conflict dialog */}
+      <Dialog open={deleteConflict !== null} onOpenChange={o => { if (!o) setDeleteConflict(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Conflito ao remover "{deleteConflict?.name}"
+            </DialogTitle>
+            <DialogDescription>
+              Este item está sendo usado em outros lugares. Escolha como proceder antes de remover.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            {/* Fichas técnicas */}
+            {(deleteConflict?.sheetRefs.length ?? 0) > 0 && (
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <p className="text-sm font-semibold">
+                  Fichas técnicas ({deleteConflict?.sheetRefs.length})
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Presente em: {deleteConflict?.sheetRefs.map(r => r.sheetName).join(', ')}
+                </p>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Substituir por:</label>
+                  <Select value={sheetReplaceId} onValueChange={setSheetReplaceId}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Selecione o item substituto..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {items.filter(i => i.id !== deleteConflict?.id && i.category !== '_sistema_').map(i => (
+                        <SelectItem key={i.id} value={i.id}>{i.name} ({i.unit})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* Movimentações */}
+            {(deleteConflict?.movCount ?? 0) > 0 && (
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <p className="text-sm font-semibold">
+                  Movimentações ({deleteConflict?.movCount} registros)
+                </p>
+                <div className="space-y-2">
+                  <label className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer border transition-colors ${movAction === 'tombstone' ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted/40'}`}>
+                    <input type="radio" name="mov-action" value="tombstone" checked={movAction === 'tombstone'} onChange={() => setMovAction('tombstone')} className="mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Manter como "(item removido)"</p>
+                      <p className="text-xs text-muted-foreground">Os registros são preservados com a indicação de item removido</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer border transition-colors ${movAction === 'replace' ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted/40'}`}>
+                    <input type="radio" name="mov-action" value="replace" checked={movAction === 'replace'} onChange={() => setMovAction('replace')} className="mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Substituir por outro item</p>
+                      {movAction === 'replace' && (
+                        <Select value={movReplaceId} onValueChange={setMovReplaceId}>
+                          <SelectTrigger className="h-8 text-sm mt-2">
+                            <SelectValue placeholder="Selecione o item substituto..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {items.filter(i => i.id !== deleteConflict?.id && i.category !== '_sistema_').map(i => (
+                              <SelectItem key={i.id} value={i.id}>{i.name} ({i.unit})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end pt-1">
+              <Button variant="outline" onClick={() => setDeleteConflict(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={handleDeleteConfirm} disabled={deleteConfirmLoading}>
+                {deleteConfirmLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                Remover item
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
