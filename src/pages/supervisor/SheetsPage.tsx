@@ -375,7 +375,7 @@ export default function SupervisorSheetsPage() {
           quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
           gross_quantity: parseFloat(String(i.gross_quantity).replace(',', '.')) || 0,
           correction_factor: i.correction_factor,
-          unit_cost: i.unit_cost, unit: i.unit || null,
+          unit_cost: i.unit_cost,
         })) as any
       );
       toast.success('Ficha técnica atualizada!');
@@ -389,7 +389,7 @@ export default function SupervisorSheetsPage() {
           quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
           gross_quantity: parseFloat(String(i.gross_quantity).replace(',', '.')) || 0,
           correction_factor: i.correction_factor,
-          unit_cost: i.unit_cost, unit: i.unit || null,
+          unit_cost: i.unit_cost,
         })) as any
       );
       toast.success('Ficha técnica criada!');
