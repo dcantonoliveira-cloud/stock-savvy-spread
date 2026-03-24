@@ -398,7 +398,7 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
           <Input type="number" value={minStock} onChange={e => setMinStock(e.target.value)} />
         </div>
         <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Custo Unit.</label>
+          <label className="text-sm text-muted-foreground mb-1 block">Preço da embalagem (R$)</label>
           <Input type="number" step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} />
         </div>
       </div>
@@ -414,11 +414,11 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
             className="w-32"
             min="0.001"
           />
-          <span className="text-sm text-muted-foreground">{unit} / compra</span>
+          <span className="text-sm text-muted-foreground">{unit} / embalagem</span>
         </div>
         {parseFloat(purchaseQty) > 1 && parseFloat(unitCost) > 0 && (
           <p className="text-xs text-primary mt-1">
-            Preço do pacote ≈ R$ {(parseFloat(purchaseQty) * parseFloat(unitCost)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            Custo por {unit} ≈ R$ {(parseFloat(unitCost) / parseFloat(purchaseQty)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
           </p>
         )}
       </div>
