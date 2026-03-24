@@ -157,9 +157,30 @@ export default function MateriaisInventarioPage() {
       payload.unit_price = form.unit_price ? parseFloat(String(form.unit_price).replace(',', '.')) || 0 : null;
     }
     if (editing) {
+      const newTotalQty = Number(form.total_qty) || 0;
+      const qtyDelta = newTotalQty - editing.total_qty; // positive = increase, negative = decrease
+
       // When editing, do not overwrite available_qty or damaged_qty
       const { error } = await supabase.from('material_items' as any).update(payload).eq('id', editing.id);
       if (error) { toast.error('Erro ao atualizar: ' + error.message); setSaving(false); return; }
+
+      // Keep available_qty in sync with total_qty delta
+      if (qtyDelta !== 0) {
+        const newAvail = Math.max(0, editing.available_qty + qtyDelta);
+        await supabase.from('material_items' as any)
+          .update({ available_qty: newAvail } as any)
+          .eq('id', editing.id);
+      }
+
+      // Record inventory loss in Perdas if qty decreased
+      if (qtyDelta < 0) {
+        await supabase.from('material_inventory_losses' as any).insert({
+          material_item_id: editing.id,
+          qty_lost: Math.abs(qtyDelta),
+          reason: 'Ajuste de inventário',
+        } as any);
+      }
+
       toast.success('Item atualizado!');
     } else {
       // When creating, set available_qty = total_qty and damaged_qty = 0
