@@ -354,11 +354,13 @@ export default function EmprestimosPage() {
     load();
   };
 
-  const filtered = loans.filter(l =>
-    filter === 'all' ||
-    l.status === filter ||
-    (filter === 'active' && (l.status === 'partial' || l.status === 'planning'))
-  );
+  const filtered = loans
+    .filter(l =>
+      filter === 'all' ||
+      l.status === filter ||
+      (filter === 'active' && (l.status === 'partial' || l.status === 'planning'))
+    )
+    .sort((a, b) => new Date(b.date_out).getTime() - new Date(a.date_out).getTime());
   const activeCount = loans.filter(l => ['active', 'partial', 'planning'].includes(l.status)).length;
 
   const categories = Array.from(new Set(materialItems.map(i => i.category))).sort();
