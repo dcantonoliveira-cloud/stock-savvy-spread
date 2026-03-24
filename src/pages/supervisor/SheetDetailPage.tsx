@@ -104,13 +104,12 @@ export default function SheetDetailPage() {
     setEventCount(eventRes.count || 0);
     if (!sheetRes.data) { navigate('/sheets'); return; }
     if (itemsRes.data) setStockItems(itemsRes.data as unknown as StockItem[]);
-    const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, unit').eq('sheet_id', id!);
+    const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section').eq('sheet_id', id!);
     const items: SheetItem[] = (si || []).map((i: any) => {
       const item = (itemsRes.data as any[])?.find((x: any) => x.id === i.item_id);
       const itemUnit = item?.unit || '';
-      const recipeUnit = i.unit || itemUnit;
       const baseUnitCost = effectiveUnitCost(item?.unit_cost || 0, item?.purchase_qty);
-      return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: recipeUnit, unit_cost: calcRecipeUnitCost(baseUnitCost, itemUnit, recipeUnit), section: i.section || 'receita' };
+      return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: itemUnit, unit_cost: baseUnitCost, section: i.section || 'receita' };
     });
     const loaded = { ...(sheetRes.data as any), items } as Sheet;
     setSheet(loaded);
@@ -165,7 +164,6 @@ export default function SheetDetailPage() {
           quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
           unit_cost: i.unit_cost,
           section: i.section || 'receita',
-          unit: i.unit || null,
         } as any).eq('id', i.id!);
         if (updErr) throw updErr;
       }
@@ -180,7 +178,6 @@ export default function SheetDetailPage() {
             quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
             unit_cost: i.unit_cost,
             section: i.section || 'receita',
-            unit: i.unit || null,
           })) as any
         );
         if (insErr) throw insErr;
