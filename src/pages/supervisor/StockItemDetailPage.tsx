@@ -157,11 +157,23 @@ export default function StockItemDetailPage() {
         item_id: item.id,
         quantity: Math.abs(diff),
         notes,
-        employee_name: null,
+        employee_name: 'Correção de estoque',
         event_name: null,
       } as any);
     }
     await supabase.from('stock_items').update({ current_stock: newQty } as any).eq('id', item.id);
+
+    // Sync stock_item_locations: apply the diff to the default kitchen location
+    const { data: defaultKitchen } = await supabase.from('kitchens').select('id').eq('is_default', true).single();
+    if (defaultKitchen) {
+      const { data: loc } = await supabase.from('stock_item_locations')
+        .select('id, current_stock').eq('item_id', item.id).eq('kitchen_id', (defaultKitchen as any).id).maybeSingle();
+      if (loc) {
+        const newLocStock = Math.max(0, (loc as any).current_stock + diff);
+        await supabase.from('stock_item_locations').update({ current_stock: newLocStock } as any).eq('id', (loc as any).id);
+      }
+    }
+
     toast.success(`Estoque corrigido para ${newQty} ${item.unit}`);
     setCorrectionOpen(false);
     setCorrectionQty('');

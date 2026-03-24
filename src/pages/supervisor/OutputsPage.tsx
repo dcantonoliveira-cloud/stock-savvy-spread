@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 
 type Item = { id: string; name: string; unit: string; current_stock: number };
 type Output = { id: string; item_id: string; quantity: number; employee_name: string; event_name: string | null; notes: string | null; date: string; created_at: string };
+type Kitchen = { id: string; name: string; is_default: boolean };
+type ItemLocation = { id: string; kitchen_id: string; current_stock: number };
 
 const exportCsv = (rows: string[][], filename: string) => {
   const csv = rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -37,18 +39,41 @@ export default function SupervisorOutputsPage() {
   const [employeeName, setEmployeeName] = useState('');
   const [eventName, setEventName] = useState('');
   const [notes, setNotes] = useState('');
+  const [kitchens, setKitchens] = useState<Kitchen[]>([]);
+  const [itemLocations, setItemLocations] = useState<ItemLocation[]>([]);
+  const [allocationKitchenId, setAllocationKitchenId] = useState('');
 
   const load = async () => {
     setLoading(true);
-    const [itemsRes, outputsRes] = await Promise.all([
+    const [itemsRes, outputsRes, kitchensRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, current_stock').order('name'),
       supabase.from('stock_outputs').select('*').order('created_at', { ascending: false }),
+      supabase.from('kitchens').select('id, name, is_default').order('name'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data);
     if (outputsRes.data) setOutputs(outputsRes.data);
+    if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  const handleItemSelect = async (id: string) => {
+    setItemId(id);
+    setAllocationKitchenId('');
+    setItemLocations([]);
+    if (!id) return;
+    const { data } = await supabase.from('stock_item_locations').select('id, kitchen_id, current_stock').eq('item_id', id);
+    const locs = (data || []) as ItemLocation[];
+    setItemLocations(locs);
+    // Default: prefer non-default kitchen with stock, else default kitchen
+    const withStock = locs.filter(l => l.current_stock > 0);
+    const def = kitchens.find(k => k.is_default);
+    if (withStock.length === 1) {
+      setAllocationKitchenId(withStock[0].kitchen_id);
+    } else if (def) {
+      setAllocationKitchenId(def.id);
+    }
+  };
 
   const filtered = outputs.filter(o => {
     const item = items.find(i => i.id === o.item_id);
@@ -64,24 +89,35 @@ export default function SupervisorOutputsPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const resetForm = () => { setItemId(''); setQuantity(''); setEmployeeName(''); setEventName(''); setNotes(''); };
+  const resetForm = () => { setItemId(''); setQuantity(''); setEmployeeName(''); setEventName(''); setNotes(''); setItemLocations([]); setAllocationKitchenId(''); };
 
   const handleSave = async () => {
     if (!itemId) { toast.error('Selecione um item'); return; }
     if (!quantity || parseFloat(quantity) <= 0) { toast.error('Quantidade inválida'); return; }
     if (!employeeName.trim()) { toast.error('Nome do funcionário é obrigatório'); return; }
+    if (!allocationKitchenId) { toast.error('Selecione o centro de custo de origem'); return; }
     if (!user) return;
+
+    const qty = parseFloat(quantity);
 
     const { error } = await supabase.from('stock_outputs').insert({
       item_id: itemId,
-      quantity: parseFloat(quantity),
+      quantity: qty,
       employee_name: employeeName.trim(),
       event_name: eventName.trim() || null,
       notes: notes.trim() || null,
       registered_by: user.id,
     });
-
     if (error) { toast.error('Erro ao registrar'); return; }
+
+    // Sync stock_item_locations for the chosen kitchen
+    const loc = itemLocations.find(l => l.kitchen_id === allocationKitchenId);
+    if (loc) {
+      await supabase.from('stock_item_locations')
+        .update({ current_stock: Math.max(0, loc.current_stock - qty) } as any)
+        .eq('id', loc.id);
+    }
+
     toast.success('Saída registrada!');
     resetForm();
     setDialogOpen(false);
@@ -135,13 +171,33 @@ export default function SupervisorOutputsPage() {
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Item</label>
-                <Select value={itemId} onValueChange={setItemId}>
+                <Select value={itemId} onValueChange={handleItemSelect}>
                   <SelectTrigger><SelectValue placeholder="Selecione o item" /></SelectTrigger>
                   <SelectContent>
                     {items.map(i => <SelectItem key={i.id} value={i.id}>{i.name} ({i.current_stock} {i.unit})</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+              {itemId && kitchens.length > 0 && (
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Centro de custo de origem</label>
+                  <div className="space-y-1.5">
+                    {kitchens.map(k => {
+                      const loc = itemLocations.find(l => l.kitchen_id === k.id);
+                      const locStock = loc?.current_stock ?? 0;
+                      return (
+                        <label key={k.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${allocationKitchenId === k.id ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted/40'}`}>
+                          <input type="radio" name="output-kitchen" value={k.id} checked={allocationKitchenId === k.id} onChange={() => setAllocationKitchenId(k.id)} className="text-primary" />
+                          <span className="text-sm font-medium flex-1">{k.name}</span>
+                          <span className={`text-xs ${locStock === 0 ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                            {locStock} {selectedItem?.unit}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Quantidade</label>
                 <div className="relative">
