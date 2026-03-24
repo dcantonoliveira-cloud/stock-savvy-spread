@@ -651,6 +651,7 @@ export default function EmprestimosPage() {
                       <thead>
                         <tr className="border-b border-border bg-muted/20">
                           <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-full">Material</th>
+                          <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Total</th>
                           <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">Disponível</th>
                           <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap w-28">Qtde Necessária</th>
                         </tr>
@@ -659,6 +660,14 @@ export default function EmprestimosPage() {
                         {catItems.map(item => {
                           const qty = planQty[item.id] || 0;
                           const isSelected = qty > 0;
+                          // available_qty already has prevSavedQty deducted; add it back then subtract current plan
+                          const prevSavedQty = selectedLoan.items.find(li => li.material_item_id === item.id)?.qty_out || 0;
+                          const effectiveAvail = item.available_qty + prevSavedQty - qty;
+                          const availColor = effectiveAvail < 0
+                            ? 'text-destructive font-semibold'
+                            : effectiveAvail === 0
+                              ? 'text-amber-600 font-semibold'
+                              : 'text-muted-foreground';
                           return (
                             <tr
                               key={item.id}
@@ -679,10 +688,12 @@ export default function EmprestimosPage() {
                                   </span>
                                 </div>
                               </td>
+                              <td className="px-3 py-3 text-right whitespace-nowrap text-muted-foreground">
+                                {item.total_qty}
+                                <span className="text-xs ml-1">{item.unit}</span>
+                              </td>
                               <td className="px-3 py-3 text-right whitespace-nowrap">
-                                <span className={item.available_qty === 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}>
-                                  {item.available_qty}
-                                </span>
+                                <span className={availColor}>{effectiveAvail}</span>
                                 <span className="text-xs text-muted-foreground ml-1">{item.unit}</span>
                               </td>
                               <td className="px-3 py-3 text-center">
