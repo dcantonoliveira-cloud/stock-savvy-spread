@@ -10,10 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Warehouse, Plus, Pencil, Trash2, Loader2, Search, AlertTriangle, Package,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MaterialImageUpload } from '@/components/MaterialImageUpload';
+import { MaterialLabelPrint, type LabelItem } from '@/components/MaterialLabelPrint';
 
 type MaterialItem = {
   id: string;
@@ -47,6 +48,8 @@ export default function MateriaisInventarioPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+
+  const [labelItem, setLabelItem] = useState<LabelItem | null>(null);
 
   const [dialog, setDialog] = useState(false);
   const [editing, setEditing] = useState<MaterialItem | null>(null);
@@ -373,6 +376,10 @@ export default function MateriaisInventarioPage() {
                               <td className="px-3 py-3 text-center text-muted-foreground text-xs">{item.unit}</td>
                               <td className="px-3 py-3">
                                 <div className="flex items-center justify-center gap-0.5">
+                                  <Button variant="ghost" size="icon" className="w-7 h-7" title="Imprimir etiqueta"
+                                    onClick={() => setLabelItem({ id: item.id, name: item.name, category: item.category, total_qty: item.total_qty, unit: item.unit })}>
+                                    <Printer className="w-3.5 h-3.5 text-muted-foreground" />
+                                  </Button>
                                   <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => openEdit(item)}>
                                     <Pencil className="w-3.5 h-3.5" />
                                   </Button>
@@ -393,6 +400,9 @@ export default function MateriaisInventarioPage() {
           })}
         </div>
       )}
+
+      {/* Label print dialog */}
+      <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
 
       {/* Dialog */}
       <Dialog open={dialog} onOpenChange={setDialog}>
