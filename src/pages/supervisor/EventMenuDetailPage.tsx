@@ -641,6 +641,21 @@ export default function EventMenuDetailPage() {
       const qty: Record<string, number> = {};
       for (const li of loan.material_loan_items || []) qty[li.material_item_id] = li.qty_out;
       setPlanQty(qty);
+    } else {
+      // No existing loan — pre-populate from base list
+      try {
+        const { data: baseList } = await supabase
+          .from('material_base_list' as any)
+          .select('material_item_id, qty');
+        if (baseList && (baseList as any[]).length > 0) {
+          const qty: Record<string, number> = {};
+          for (const b of (baseList as any[])) qty[b.material_item_id] = b.qty;
+          setPlanQty(qty);
+          setEditingMaterials(true);
+        }
+      } catch {
+        // base list table may not exist yet
+      }
     }
     setMatLoaded(true);
   };

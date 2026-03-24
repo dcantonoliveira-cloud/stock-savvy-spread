@@ -119,11 +119,24 @@ export default function EmprestimosPage() {
   useEffect(() => { load(); }, []);
 
   // ── Open detail view ──
-  const openDetail = (loan: Loan) => {
+  const openDetail = async (loan: Loan) => {
     setSelectedLoan(loan);
     const qty: Record<string, number> = {};
     for (const li of loan.items) {
       qty[li.material_item_id] = li.qty_out;
+    }
+    // If no items yet, pre-populate from base list
+    if (loan.items.length === 0) {
+      try {
+        const { data: baseList } = await supabase
+          .from('material_base_list' as any)
+          .select('material_item_id, qty');
+        for (const b of (baseList || []) as any[]) {
+          qty[b.material_item_id] = b.qty;
+        }
+      } catch {
+        // base list table may not exist yet
+      }
     }
     setPlanQty(qty);
   };

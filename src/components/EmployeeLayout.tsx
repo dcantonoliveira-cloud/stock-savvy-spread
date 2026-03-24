@@ -16,9 +16,11 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
     .toUpperCase() || '?';
 
   const tabs = [
-    { to: '/', label: 'Estoque', icon: Home },
-    { to: '/inventario', label: 'Inventário', icon: ClipboardList },
-    { to: '/eventos', label: 'Eventos', icon: CalendarDays },
+    ...(permissions.access_stock ? [
+      { to: '/', label: 'Estoque', icon: Home },
+      { to: '/inventario', label: 'Inventário', icon: ClipboardList },
+      { to: '/eventos', label: 'Eventos', icon: CalendarDays },
+    ] : []),
     ...(permissions.access_materials ? [{ to: '/materiais', label: 'Materiais', icon: Warehouse }] : []),
   ];
 
