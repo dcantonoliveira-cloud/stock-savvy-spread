@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MaterialImageUpload } from '@/components/MaterialImageUpload';
 import {
   Plus, Search, Package, Loader2, ChevronRight, ArrowLeft,
-  ClipboardList, Calendar, CheckCircle2, RotateCcw, X,
+  ClipboardList, Calendar, CheckCircle2, RotateCcw, X, Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MaterialLabelPrint, type LabelItem } from '@/components/MaterialLabelPrint';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 // ── ItemCard ──────────────────────────────────────────────────────────────────
 
-function ItemCard({ item, compact = false }: { item: MaterialItem; compact?: boolean }) {
+function ItemCard({ item, compact = false, onPrint }: { item: MaterialItem; compact?: boolean; onPrint?: () => void }) {
   const inUse = item.total_qty - item.available_qty;
   const imgSize = compact ? 'w-10 h-10' : 'w-12 h-12';
   const iconSize = compact ? 'w-4 h-4' : 'w-5 h-5';
@@ -81,6 +82,14 @@ function ItemCard({ item, compact = false }: { item: MaterialItem; compact?: boo
         {item.description && <p className="text-xs text-muted-foreground truncate">{item.description}</p>}
       </div>
       <div className="flex items-center gap-3 flex-shrink-0 text-right">
+        {onPrint && (
+          <button
+            onClick={e => { e.stopPropagation(); onPrint(); }}
+            className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+        )}
         <div>
           <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Total</p>
           <p className="text-sm font-semibold text-foreground">{item.total_qty} <span className="text-xs font-normal text-muted-foreground">{item.unit}</span></p>
@@ -122,6 +131,9 @@ export default function EmployeeMateriaisPage() {
 
   // Devolution state (active/partial events)
   const [returnQtys, setReturnQtys] = useState<Record<string, number>>({});
+
+  // Label print
+  const [labelItem, setLabelItem] = useState<LabelItem | null>(null);
 
   // Add existing item dialog
   const [addItemDialog, setAddItemDialog] = useState(false);
@@ -675,7 +687,11 @@ export default function EmployeeMateriaisPage() {
           </span>
         </div>
         <div className="space-y-2">
-          {catItems.map(item => <ItemCard key={item.id} item={item} />)}
+          {catItems.map(item => (
+            <ItemCard key={item.id} item={item}
+              onPrint={() => setLabelItem({ id: item.id, name: item.name, category: item.category, total_qty: item.total_qty, unit: item.unit })}
+            />
+          ))}
           {catItems.length === 0 && (
             <div className="text-center py-10 text-muted-foreground text-sm">Nenhum item nesta categoria</div>
           )}
@@ -731,7 +747,11 @@ export default function EmployeeMateriaisPage() {
 
           {search ? (
             <div className="space-y-2">
-              {filtered.map(item => <ItemCard key={item.id} item={item} compact />)}
+              {filtered.map(item => (
+                <ItemCard key={item.id} item={item} compact
+                  onPrint={() => setLabelItem({ id: item.id, name: item.name, category: item.category, total_qty: item.total_qty, unit: item.unit })}
+                />
+              ))}
               {filtered.length === 0 && (
                 <p className="text-center py-10 text-muted-foreground text-sm">Nenhum resultado</p>
               )}
@@ -851,6 +871,9 @@ export default function EmployeeMateriaisPage() {
           )}
         </div>
       )}
+
+      {/* ── Label print ── */}
+      <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
 
       {/* ── Add existing item dialog ── */}
       <Dialog open={addItemDialog} onOpenChange={setAddItemDialog}>
