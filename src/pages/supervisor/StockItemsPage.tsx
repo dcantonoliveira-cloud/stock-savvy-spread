@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import {
   Plus, Pencil, Trash2, Search, Upload, FileSpreadsheet,
   Sparkles, Loader2, ChevronUp, ChevronDown, AlertTriangle, CheckCircle2,
-  Merge, Store, X, Star, StarOff
+  Merge, Store, X, Star, StarOff, Printer
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MaterialLabelPrint, type LabelItem } from '@/components/MaterialLabelPrint';
 import { UNITS } from '@/types/inventory';
 import * as XLSX from 'xlsx';
 import { ItemImage } from '@/components/ItemImage';
@@ -410,6 +411,7 @@ export default function StockItemsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | undefined>();
   const [supplierItem, setSupplierItem] = useState<Item | null>(null);
+  const [labelItem, setLabelItem] = useState<LabelItem | null>(null);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importRows, setImportRows] = useState<any[]>([]);
@@ -730,6 +732,10 @@ export default function StockItemsPage() {
 
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-center gap-0.5">
+                        <Button variant="ghost" size="icon" className="w-7 h-7" title="Imprimir etiqueta"
+                          onClick={() => setLabelItem({ id: item.id, name: item.name, category: item.category, total_qty: item.current_stock, unit: item.unit })}>
+                          <Printer className="w-3.5 h-3.5 text-muted-foreground" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => { setEditingItem(item); setDialogOpen(true); }}>
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
@@ -780,6 +786,7 @@ export default function StockItemsPage() {
 
       <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} />
       <DuplicateReviewDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} items={items} onDone={() => { setDuplicateOpen(false); load(); }} />
+      <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
     </div>
   );
 }
