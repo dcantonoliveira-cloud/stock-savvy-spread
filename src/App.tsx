@@ -38,6 +38,7 @@ import MateriaisInventarioPage from "./pages/supervisor/materiais/MateriaisInven
 import MateriaisCategoriasPage from "./pages/supervisor/materiais/MateriaisCategoriasPage";
 import EmprestimosPage from "./pages/supervisor/materiais/EmprestimosPage";
 import PerdasPage from "./pages/supervisor/materiais/PerdasPage";
+import ListaBasePage from "./pages/supervisor/materiais/ListaBasePage";
 
 import EmployeeLayout from "./components/EmployeeLayout";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
@@ -61,7 +62,7 @@ function useIsMobile() {
 }
 
 function AppRoutes() {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, permissions } = useAuth();
   const isMobile = useIsMobile();
 
   if (loading) {
@@ -110,6 +111,7 @@ function AppRoutes() {
           <Route path="/materiais" element={<MateriaisInventarioPage />} />
           <Route path="/materiais/categorias" element={<MateriaisCategoriasPage />} />
           <Route path="/materiais/emprestimos" element={<EmprestimosPage />} />
+          <Route path="/materiais/lista-base" element={<ListaBasePage />} />
           <Route path="/materiais/perdas" element={<PerdasPage />} />
           <Route path="/invoices" element={<Navigate to="/entries" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -121,11 +123,11 @@ function AppRoutes() {
   return (
     <EmployeeLayout>
       <Routes>
-        <Route path="/" element={<EmployeeDashboard />} />
-        <Route path="/inventario" element={<EmployeeInventoryPage />} />
-        <Route path="/eventos" element={<EmployeeEventsPage />} />
-        <Route path="/materiais" element={<EmployeeMateriaisPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/" element={permissions.access_stock ? <EmployeeDashboard /> : <Navigate to="/materiais" replace />} />
+        <Route path="/inventario" element={permissions.access_stock ? <EmployeeInventoryPage /> : <Navigate to="/materiais" replace />} />
+        <Route path="/eventos" element={permissions.access_stock ? <EmployeeEventsPage /> : <Navigate to="/materiais" replace />} />
+        <Route path="/materiais" element={permissions.access_materials ? <EmployeeMateriaisPage /> : <Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={permissions.access_stock ? "/" : "/materiais"} replace />} />
       </Routes>
     </EmployeeLayout>
   );
