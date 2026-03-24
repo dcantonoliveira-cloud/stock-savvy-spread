@@ -126,7 +126,7 @@ export default function EmployeeMateriaisPage() {
   // Separation state (planning events)
   const [sepItems, setSepItems] = useState<LoanItem[]>([]);
   const [sepQtys, setSepQtys] = useState<Record<string, number>>({});
-  const [viewMode, setViewMode] = useState<'separation' | 'devolution' | null>(null);
+  const [viewMode, setViewMode] = useState<'separation' | 'devolution' | 'waiting' | null>(null);
   const [processing, setProcessing] = useState(false);
 
   // Devolution state (active/partial events)
@@ -201,6 +201,13 @@ export default function EmployeeMateriaisPage() {
 
   // ── Event open / close ─────────────────────────────────────────────────────
 
+  const eventDatePassed = (dateOut: string) => {
+    const eventDate = new Date(dateOut + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return eventDate <= today;
+  };
+
   const openEvent = (ev: EventLoan) => {
     setSelectedEvent(ev);
     if (ev.status === 'planning') {
@@ -210,10 +217,12 @@ export default function EmployeeMateriaisPage() {
       setSepItems([...ev.items]);
       setViewMode('separation');
     } else {
+      // active or partial — devolution only after event date
       const qtys: Record<string, number> = {};
       for (const li of ev.items) qtys[li.material_item_id] = 0;
       setReturnQtys(qtys);
-      setViewMode('devolution');
+      const canReturn = ev.status === 'partial' || eventDatePassed(ev.date_out);
+      setViewMode(canReturn ? 'devolution' : 'waiting');
     }
   };
 
@@ -568,6 +577,66 @@ export default function EmployeeMateriaisPage() {
     );
   }
 
+  // ── WAITING VIEW (event date not yet passed) ──────────────────────────────
+
+  if (selectedEvent && viewMode === 'waiting') {
+    const sc = STATUS_CONFIG[selectedEvent.status] || STATUS_CONFIG.active;
+    const eventDateStr = new Date(selectedEvent.date_out + 'T12:00:00').toLocaleDateString('pt-BR', {
+      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+    });
+    return (
+      <div>
+        <div className="flex items-center gap-3 mb-5">
+          <button onClick={closeEvent} className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-bold text-foreground truncate">{selectedEvent.event_name}</h2>
+            <p className="text-xs text-muted-foreground">
+              📅 {new Date(selectedEvent.date_out + 'T12:00:00').toLocaleDateString('pt-BR')}
+            </p>
+          </div>
+          <span className={`text-xs px-2 py-1 rounded-full font-medium ${sc.color}`}>{sc.label}</span>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-center">
+          <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
+            <Calendar className="w-6 h-6 text-amber-600" />
+          </div>
+          <p className="font-semibold text-amber-900 mb-1">Evento ainda não ocorreu</p>
+          <p className="text-sm text-amber-700">
+            A devolução poderá ser registrada a partir de
+          </p>
+          <p className="text-sm font-bold text-amber-800 mt-1 capitalize">{eventDateStr}</p>
+        </div>
+
+        <div className="mt-4 bg-white rounded-xl border border-border p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Itens na lista
+          </p>
+          <div className="space-y-2">
+            {selectedEvent.items.map(li => (
+              <div key={li.material_item_id} className="flex items-center gap-3">
+                {li.image_url ? (
+                  <img src={li.image_url} alt={li.item_name}
+                    className="w-8 h-8 rounded-lg object-cover border border-border flex-shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center flex-shrink-0">
+                    <Package className="w-3.5 h-3.5 text-muted-foreground/40" />
+                  </div>
+                )}
+                <p className="flex-1 text-sm text-foreground truncate">{li.item_name}</p>
+                <span className="text-sm font-semibold text-muted-foreground flex-shrink-0">
+                  {li.qty_out} {li.item_unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── DEVOLUTION VIEW ────────────────────────────────────────────────────────
 
   if (selectedEvent && viewMode === 'devolution') {
@@ -832,7 +901,14 @@ export default function EmployeeMateriaisPage() {
               {events.map(ev => {
                 const sc = STATUS_CONFIG[ev.status] || STATUS_CONFIG.active;
                 const isPlanning = ev.status === 'planning';
-                const actionLabel = isPlanning ? 'Separar' : 'Devolver';
+                const isPartial = ev.status === 'partial';
+                const canReturn = isPartial || eventDatePassed(ev.date_out);
+                const actionLabel = isPlanning ? 'Separar' : canReturn ? 'Devolver' : 'Aguardando';
+                const actionStyle = isPlanning
+                  ? 'bg-blue-50 text-blue-600'
+                  : canReturn
+                    ? 'bg-amber-50 text-amber-600'
+                    : 'bg-gray-100 text-gray-400';
                 return (
                   <button
                     key={ev.id}
@@ -860,7 +936,7 @@ export default function EmployeeMateriaisPage() {
                           )}
                         </div>
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg flex-shrink-0 mt-0.5 ${isPlanning ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'}`}>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-lg flex-shrink-0 mt-0.5 ${actionStyle}`}>
                         {actionLabel}
                       </span>
                     </div>
