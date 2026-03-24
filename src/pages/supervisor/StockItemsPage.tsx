@@ -72,8 +72,8 @@ function findDuplicates(items: Item[]): DuplicateGroup[] {
 }
 
 // ─── Supplier Dialog ───
-function SupplierDialog({ item, open, onClose }: { item: Item | null; open: boolean; onClose: () => void }) {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+function SupplierDialog({ item, open, onClose, initialSuppliers = [] }: { item: Item | null; open: boolean; onClose: () => void; initialSuppliers?: Supplier[] }) {
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
@@ -83,9 +83,10 @@ function SupplierDialog({ item, open, onClose }: { item: Item | null; open: bool
 
   useEffect(() => {
     if (!item || !open) return;
+    setSuppliers(initialSuppliers);
     supabase.from('item_suppliers').select('*').eq('item_id', item.id)
       .order('is_preferred', { ascending: false })
-      .then(({ data }) => setSuppliers((data || []) as Supplier[]));
+      .then(({ data }) => { if (data) setSuppliers(data as Supplier[]); });
     // Load distinct supplier names for autocomplete
     supabase.from('item_suppliers').select('supplier_name')
       .then(({ data }) => {
@@ -920,7 +921,7 @@ export default function StockItemsPage() {
         </DialogContent>
       </Dialog>
 
-      <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} />
+      <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} initialSuppliers={supplierItem ? (suppliers[supplierItem.id] || []) : []} />
       <DuplicateReviewDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} items={items} onDone={() => { setDuplicateOpen(false); load(); }} />
       <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
 
