@@ -78,12 +78,20 @@ function SupplierDialog({ item, open, onClose }: { item: Item | null; open: bool
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [saving, setSaving] = useState(false);
+  const [existingNames, setExistingNames] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     if (!item || !open) return;
     supabase.from('item_suppliers').select('*').eq('item_id', item.id)
       .order('is_preferred', { ascending: false })
       .then(({ data }) => setSuppliers((data || []) as Supplier[]));
+    // Load distinct supplier names for autocomplete
+    supabase.from('item_suppliers').select('supplier_name')
+      .then(({ data }) => {
+        const names = Array.from(new Set((data || []).map((r: any) => r.supplier_name as string))).sort();
+        setExistingNames(names);
+      });
   }, [item, open]);
 
   const addSupplier = async () => {
@@ -146,12 +154,39 @@ function SupplierDialog({ item, open, onClose }: { item: Item | null; open: bool
             </div>
           ))}
           {adding && (
-            <div className="flex items-center gap-2 p-3 rounded-xl border border-primary/40 bg-primary/5">
-              <Input placeholder="Nome do fornecedor" value={newName} onChange={e => setNewName(e.target.value)} className="flex-1 h-8 text-sm" autoFocus />
-              <Input type="number" step="0.01" placeholder="Preço" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-24 h-8 text-sm"
-                onKeyDown={e => e.key === 'Enter' && addSupplier()} />
-              <Button size="sm" onClick={addSupplier} disabled={saving} className="h-8">{saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'OK'}</Button>
-              <button onClick={() => { setAdding(false); setNewName(''); setNewPrice(''); }}><X className="w-4 h-4 text-muted-foreground" /></button>
+            <div className="flex flex-col gap-2 p-3 rounded-xl border border-primary/40 bg-primary/5">
+              <div className="relative">
+                <Input
+                  placeholder="Nome do fornecedor"
+                  value={newName}
+                  onChange={e => { setNewName(e.target.value); setShowSuggestions(true); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  className="h-8 text-sm w-full"
+                  autoFocus
+                />
+                {showSuggestions && newName && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                    {existingNames
+                      .filter(n => n.toLowerCase().includes(newName.toLowerCase()) && n !== newName)
+                      .map(n => (
+                        <button
+                          key={n}
+                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted/60 transition-colors"
+                          onMouseDown={() => { setNewName(n); setShowSuggestions(false); }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input type="number" step="0.01" placeholder="Preço unitário" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="flex-1 h-8 text-sm"
+                  onKeyDown={e => e.key === 'Enter' && addSupplier()} />
+                <Button size="sm" onClick={addSupplier} disabled={saving} className="h-8">{saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Adicionar'}</Button>
+                <button onClick={() => { setAdding(false); setNewName(''); setNewPrice(''); }}><X className="w-4 h-4 text-muted-foreground" /></button>
+              </div>
             </div>
           )}
         </div>
@@ -465,8 +500,14 @@ export default function StockItemsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remover este item do estoque?')) return;
-    await supabase.from('stock_items').delete().eq('id', id);
+    if (!confirm('Remover este item do estoque? Esta ação não pode ser desfeita.')) return;
+    // Remove dependent records first
+    await supabase.from('item_suppliers').delete().eq('item_id', id);
+    const { error } = await supabase.from('stock_items').delete().eq('id', id);
+    if (error) {
+      toast.error('Não foi possível remover. O item está em fichas técnicas ou movimentações.');
+      return;
+    }
     toast.success('Item removido!');
     load();
   };

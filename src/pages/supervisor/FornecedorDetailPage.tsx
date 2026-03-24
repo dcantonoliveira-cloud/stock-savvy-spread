@@ -156,6 +156,12 @@ export default function FornecedorDetailPage() {
     loadItems();
   };
 
+  const handleInlinePrice = async (recordId: string, price: number) => {
+    await supabase.from('item_suppliers').update({ unit_price: price } as any).eq('id', recordId);
+    setItems(prev => prev.map(i => i.record_id === recordId ? { ...i, unit_price: price } : i));
+    toast.success('Preço atualizado!');
+  };
+
   const selectedItemLabel = itemForm.selectedItemId
     ? stockItems.find(s => s.id === itemForm.selectedItemId)?.name || 'Selecionar insumo...'
     : 'Selecionar insumo...';
@@ -304,8 +310,24 @@ export default function FornecedorDetailPage() {
                       <span className="font-medium text-foreground">{item.item_name}</span>
                       <span className="text-muted-foreground text-xs ml-1.5">({item.item_unit})</span>
                     </td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {item.unit_price > 0 ? `R$ ${fmtCur(item.unit_price)}` : <span className="text-muted-foreground">—</span>}
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-muted-foreground">R$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          defaultValue={item.unit_price}
+                          onBlur={e => {
+                            const v = parseFloat(e.target.value) || 0;
+                            if (v !== item.unit_price) handleInlinePrice(item.record_id, v);
+                          }}
+                          onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                          className="w-24 text-right text-sm font-medium border border-transparent rounded px-1.5 py-0.5 hover:border-border focus:border-primary focus:outline-none bg-transparent focus:bg-white transition-all"
+                          title="Clique para editar o preço"
+                        />
+                        <span className="text-xs text-muted-foreground">/{item.item_unit}</span>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {item.is_preferred

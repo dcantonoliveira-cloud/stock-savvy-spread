@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Package, Store, ChevronLeft, ChevronRight,
-  ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2, Star, StarOff
+  ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2, Star, StarOff, SlidersHorizontal
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -50,6 +50,12 @@ export default function StockItemDetailPage() {
 
   // Pagination
   const [movPage, setMovPage] = useState(0);
+
+  // Stock correction dialog
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionQty, setCorrectionQty] = useState('');
+  const [correctionNotes, setCorrectionNotes] = useState('');
+  const [correctionSaving, setCorrectionSaving] = useState(false);
 
   // Supplier dialog state
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
@@ -129,6 +135,41 @@ export default function StockItemDetailPage() {
     load();
   };
 
+  const handleCorrection = async () => {
+    if (!item) return;
+    const newQty = parseFloat(correctionQty.replace(',', '.'));
+    if (isNaN(newQty) || newQty < 0) { toast.error('Quantidade inválida'); return; }
+    setCorrectionSaving(true);
+    const diff = newQty - item.current_stock;
+    if (diff === 0) { setCorrectionSaving(false); setCorrectionOpen(false); return; }
+    const notes = correctionNotes.trim() || 'Correção de estoque';
+    if (diff > 0) {
+      await supabase.from('stock_entries').insert({
+        item_id: item.id,
+        quantity: diff,
+        unit_cost: item.unit_cost,
+        notes,
+        supplier: null,
+        invoice_number: null,
+      } as any);
+    } else {
+      await supabase.from('stock_outputs').insert({
+        item_id: item.id,
+        quantity: Math.abs(diff),
+        notes,
+        employee_name: null,
+        event_name: null,
+      } as any);
+    }
+    await supabase.from('stock_items').update({ current_stock: newQty } as any).eq('id', item.id);
+    toast.success(`Estoque corrigido para ${newQty} ${item.unit}`);
+    setCorrectionOpen(false);
+    setCorrectionQty('');
+    setCorrectionNotes('');
+    setCorrectionSaving(false);
+    load();
+  };
+
   if (loading || !item) return (
     <div className="flex items-center justify-center h-64">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -181,8 +222,24 @@ export default function StockItemDetailPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Estoque Atual — with correction button */}
+        <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Package className={`w-4 h-4 ${isLow ? 'text-destructive' : 'text-success'}`} />
+              <span className="text-xs text-muted-foreground">Estoque Atual</span>
+            </div>
+            <button
+              onClick={() => { setCorrectionQty(String(item.current_stock)); setCorrectionOpen(true); }}
+              title="Corrigir estoque"
+              className="text-muted-foreground hover:text-primary transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className={`text-xl font-bold ${isLow ? 'text-destructive' : 'text-success'}`}>{item.current_stock} {item.unit}</p>
+        </div>
         {[
-          { label: 'Estoque Atual', value: `${item.current_stock} ${item.unit}`, icon: Package, color: isLow ? 'text-destructive' : 'text-success' },
           { label: 'Custo Médio', value: `R$ ${fmt(avgCost)}`, icon: DollarSign, color: 'text-amber-600' },
           { label: 'Total Entradas', value: `${fmt(totalEntries)} ${item.unit}`, icon: TrendingUp, color: 'text-success' },
           { label: 'Total Saídas', value: `${fmt(totalOutputs)} ${item.unit}`, icon: TrendingDown, color: 'text-destructive' },
@@ -438,6 +495,58 @@ export default function StockItemDetailPage() {
           </table>
         </div>
       )}
+
+      {/* Stock Correction Dialog */}
+      <Dialog open={correctionOpen} onOpenChange={o => { if (!o) setCorrectionOpen(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4" />
+              Corrigir Estoque — {item.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <p className="text-xs text-muted-foreground">
+              Atual: <strong>{item.current_stock} {item.unit}</strong>. A diferença será registrada como movimentação de correção.
+            </p>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Nova quantidade ({item.unit})</label>
+              <Input
+                type="number"
+                step="0.001"
+                min="0"
+                value={correctionQty}
+                onChange={e => setCorrectionQty(e.target.value)}
+                autoFocus
+              />
+              {correctionQty !== '' && !isNaN(parseFloat(correctionQty)) && (
+                <p className={`text-xs mt-1 ${parseFloat(correctionQty) > item.current_stock ? 'text-green-600' : parseFloat(correctionQty) < item.current_stock ? 'text-red-600' : 'text-muted-foreground'}`}>
+                  {parseFloat(correctionQty) > item.current_stock
+                    ? `Entrada de ${fmt(parseFloat(correctionQty) - item.current_stock)} ${item.unit}`
+                    : parseFloat(correctionQty) < item.current_stock
+                      ? `Saída de ${fmt(item.current_stock - parseFloat(correctionQty))} ${item.unit}`
+                      : 'Sem alteração'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Motivo (opcional)</label>
+              <Input
+                value={correctionNotes}
+                onChange={e => setCorrectionNotes(e.target.value)}
+                placeholder="Ex: Contagem física, perda, etc."
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setCorrectionOpen(false)}>Cancelar</Button>
+              <Button className="flex-1 gold-button" onClick={handleCorrection} disabled={correctionSaving}>
+                {correctionSaving && <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />}
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Supplier Add/Edit Dialog */}
       <Dialog open={supplierDialogOpen} onOpenChange={o => { if (!o) setSupplierDialogOpen(false); }}>
