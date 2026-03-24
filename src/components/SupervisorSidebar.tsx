@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useOnlineUsers } from '@/hooks/useOnlineUsers';
 import {
   LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText,
   Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
@@ -64,6 +65,7 @@ function isGroup(item: NavGroup): item is { label: string; icon: any; items: Nav
 export default function SupervisorSidebar() {
   const { pathname } = useLocation();
   const { signOut, profile } = useAuth();
+  const onlineUsers = useOnlineUsers();
 
   const getDefaultOpen = () => {
     const open = new Set<string>();
@@ -177,6 +179,46 @@ export default function SupervisorSidebar() {
           );
         })}
       </nav>
+
+      {/* Online users */}
+      {onlineUsers.length > 0 && (
+        <div className="mx-3 mb-2 px-3 py-2.5 rounded-xl" style={{ background: 'hsl(222 25% 14%)' }}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(210 20% 50%)' }}>
+              Online ({onlineUsers.length})
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {onlineUsers.map(u => {
+              const initials = u.display_name
+                .split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+              const isSupervisor = u.role === 'supervisor';
+              return (
+                <div key={u.user_id} className="flex items-center gap-2">
+                  <div
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                    style={{
+                      background: isSupervisor ? 'hsl(38 75% 52% / 0.25)' : 'hsl(210 50% 52% / 0.25)',
+                      color: isSupervisor ? 'hsl(38 80% 62%)' : 'hsl(210 70% 70%)',
+                    }}
+                  >
+                    {initials}
+                  </div>
+                  <span className="text-[11px] truncate" style={{ color: 'hsl(210 25% 65%)' }}>
+                    {u.display_name}
+                  </span>
+                  {isSupervisor && (
+                    <span className="text-[9px] px-1 rounded" style={{ background: 'hsl(38 75% 52% / 0.15)', color: 'hsl(38 80% 62%)' }}>
+                      sup
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Divider */}
       <div className="mx-5 h-px" style={{ background: 'hsl(222 25% 18%)' }} />
