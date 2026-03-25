@@ -19,7 +19,6 @@ export default defineConfig(({ mode }) => ({
     // O browser escolhe automaticamente qual bundle carregar via <script type="module"> / <script nomodule>
     legacy({
       targets: ["ios >= 12", "safari >= 12"],
-      additionalLegacyPolyfills: ["regenerator-runtime/runtime"],
     }),
     mode === "development" && componentTagger(),
   ].filter(Boolean),
