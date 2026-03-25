@@ -135,6 +135,14 @@ export default function StockItemDetailPage() {
     load();
   };
 
+  const handleUpdateSupplierPrice = async (supplierId: string, newPrice: number) => {
+    const prev = suppliers.find(s => s.id === supplierId);
+    if (!prev || prev.unit_price === newPrice) return;
+    await supabase.from('item_suppliers').update({ unit_price: newPrice } as any).eq('id', supplierId);
+    setSuppliers(p => p.map(s => s.id === supplierId ? { ...s, unit_price: newPrice } : s));
+    toast.success('Preço atualizado!');
+  };
+
   const handleCorrection = async () => {
     if (!item) return;
     const newQty = parseFloat(correctionQty.replace(',', '.'));
@@ -234,22 +242,21 @@ export default function StockItemDetailPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Estoque Atual — with correction button */}
-        <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+        {/* Estoque Atual — clicável para corrigir */}
+        <div
+          className="bg-white rounded-xl border border-border shadow-sm p-4 cursor-pointer group hover:border-primary/40 hover:shadow-md transition-all"
+          onClick={() => { setCorrectionQty(String(item.current_stock)); setCorrectionOpen(true); }}
+          title="Clique para ajustar o estoque"
+        >
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <Package className={`w-4 h-4 ${isLow ? 'text-destructive' : 'text-success'}`} />
               <span className="text-xs text-muted-foreground">Estoque Atual</span>
             </div>
-            <button
-              onClick={() => { setCorrectionQty(String(item.current_stock)); setCorrectionOpen(true); }}
-              title="Corrigir estoque"
-              className="text-muted-foreground hover:text-primary transition-colors"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-            </button>
+            <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
           </div>
           <p className={`text-xl font-bold ${isLow ? 'text-destructive' : 'text-success'}`}>{item.current_stock} {item.unit}</p>
+          <p className="text-[10px] text-muted-foreground/50 mt-0.5 group-hover:text-primary/60 transition-colors">clique para ajustar</p>
         </div>
         {[
           { label: 'Custo Médio', value: `R$ ${fmt(avgCost)}`, icon: DollarSign, color: 'text-amber-600' },
@@ -421,12 +428,27 @@ export default function StockItemDetailPage() {
                 <tr key={s.id} className="hover:bg-amber-50/40 transition-colors">
                   <td className="px-5 py-3 font-medium text-foreground">{s.supplier_name}</td>
                   <td className="px-3 py-3 text-right font-semibold text-amber-700">
-                    <span>R$ {fmt(s.unit_price)}</span>
-                    {lowestPrice !== null && s.unit_price === lowestPrice && (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-green-100 text-green-700 px-1.5 py-0.5 text-[10px] font-semibold">
-                        menor preço
-                      </span>
-                    )}
+                    <div className="flex items-center justify-end gap-1.5">
+                      {lowestPrice !== null && s.unit_price === lowestPrice && (
+                        <span className="inline-flex items-center rounded-full bg-green-100 text-green-700 px-1.5 py-0.5 text-[10px] font-semibold">
+                          menor preço
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground">R$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={s.unit_price}
+                          key={s.id + '-' + s.unit_price}
+                          className="w-24 text-right text-sm font-semibold text-amber-700 bg-transparent border border-transparent rounded px-1 py-0.5 hover:border-border focus:border-primary focus:bg-white focus:outline-none transition-all"
+                          onBlur={e => handleUpdateSupplierPrice(s.id, parseFloat(e.target.value) || 0)}
+                          onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                          title="Clique para editar o preço"
+                        />
+                        <span className="text-xs text-muted-foreground">/{item.unit}</span>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-3 py-3 text-xs text-muted-foreground">{s.notes || '—'}</td>
                   <td className="px-3 py-3 text-center">
