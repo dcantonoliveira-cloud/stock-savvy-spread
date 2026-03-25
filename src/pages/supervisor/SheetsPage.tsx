@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib/units';
+import { fmtNum, fmtCur } from '@/lib/format';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
 type SheetItem = {
@@ -881,7 +882,7 @@ export default function SupervisorSheetsPage() {
                       ) : (
                         <span className="text-xs text-muted-foreground text-center">{item.unit}</span>
                       )}
-                      <span className="text-xs font-medium text-foreground text-right">R$ {((parseFloat(String(item.quantity).replace(',', '.')) || 0) * item.unit_cost).toFixed(2)}</span>
+                      <span className="text-xs font-medium text-foreground text-right">{fmtCur((parseFloat(String(item.quantity).replace(',', '.')) || 0) * item.unit_cost)}</span>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}><X className="w-3 h-3" /></Button>
                     </div>
                   );
@@ -890,7 +891,7 @@ export default function SupervisorSheetsPage() {
                 {formItems.length > 0 && (
                   <div className="flex justify-end mt-2 pr-10">
                     <span className="text-sm font-semibold text-primary">
-                      Total: R$ {formItems.reduce((s, i) => s + (parseFloat(String(i.quantity).replace(',', '.')) || 0) * i.unit_cost, 0).toFixed(2)}
+                      Total: {fmtCur(formItems.reduce((s, i) => s + (parseFloat(String(i.quantity).replace(',', '.')) || 0) * i.unit_cost, 0))}
                     </span>
                   </div>
                 )}
@@ -951,7 +952,7 @@ export default function SupervisorSheetsPage() {
             <Badge variant="secondary"><ChefHat className="w-3 h-3 mr-1" />{viewingSheet.category}</Badge>
             {viewingSheet.prep_time > 0 && <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />{viewingSheet.prep_time} min</Badge>}
             <Badge variant="outline">Rende: {viewingSheet.yield_quantity} {viewingSheet.yield_unit}</Badge>
-            <Badge className="bg-primary/20 text-primary">Custo: R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</Badge>
+            <Badge className="bg-primary/20 text-primary">Custo: {fmtCur(getSheetTotalCost(viewingSheet))}</Badge>
           </div>
 
           {/* Ingredients table */}
@@ -970,17 +971,17 @@ export default function SupervisorSheetsPage() {
                 {viewingSheet.items.map((item, idx) => (
                   <tr key={idx} className="border-b border-border/50">
                     <td className="py-2 text-foreground">{item.item_name}</td>
-                    <td className="py-2 text-center text-foreground font-medium">{item.quantity}</td>
+                    <td className="py-2 text-center text-foreground font-medium">{fmtNum(item.quantity)}</td>
                     <td className="py-2 text-center text-muted-foreground">{item.unit}</td>
-                    <td className="py-2 text-right text-muted-foreground">R$ {item.unit_cost.toFixed(2)}</td>
-                    <td className="py-2 text-right text-foreground font-medium">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>
+                    <td className="py-2 text-right text-muted-foreground">{fmtCur(item.unit_cost)}</td>
+                    <td className="py-2 text-right text-foreground font-medium">{fmtCur(item.quantity * item.unit_cost)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-border">
                   <td colSpan={4} className="py-2 text-right font-semibold text-foreground">Total:</td>
-                  <td className="py-2 text-right font-bold text-primary">R$ {getSheetTotalCost(viewingSheet).toFixed(2)}</td>
+                  <td className="py-2 text-right font-bold text-primary">{fmtCur(getSheetTotalCost(viewingSheet))}</td>
                 </tr>
               </tfoot>
             </table>
@@ -1125,7 +1126,7 @@ export default function SupervisorSheetsPage() {
                 </td>
 
                 <td className="px-3 py-2.5 text-right font-semibold text-amber-700">
-                  R$ {getSheetTotalCost(sheet).toFixed(2)}
+                  {fmtCur(getSheetTotalCost(sheet))}
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-center gap-0.5">
@@ -1160,7 +1161,7 @@ export default function SupervisorSheetsPage() {
                   {filteredSheets.length} receitas
                 </td>
                 <td className="px-3 py-2 text-right font-bold text-amber-700 text-sm">
-                  R$ {filteredSheets.reduce((s, sh) => s + getSheetTotalCost(sh), 0).toFixed(2)}
+                  {fmtCur(filteredSheets.reduce((s, sh) => s + getSheetTotalCost(sh), 0))}
                 </td>
                 <td />
               </tr>

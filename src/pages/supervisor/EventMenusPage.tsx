@@ -16,6 +16,7 @@ import {
 import ConsolidatedShoppingListDialog from '@/components/ConsolidatedShoppingListDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { fmtNum, fmtCur } from '@/lib/format';
 
 const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
 
@@ -146,7 +147,7 @@ function SheetViewEditDialog({ open, onClose, sheet, stockItems, onSaved }: { op
                   : <><Button size="sm" onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Check className="w-3.5 h-3.5 mr-1" />}Salvar</Button><Button variant="ghost" size="sm" onClick={() => { setEditing(false); setFormItems(sheet.items.map(i => ({ ...i }))); }}>Cancelar</Button></>}
               </div>
             </div>
-            <DialogDescription>Rende {sheet.yield_quantity} {sheet.yield_unit} · {formItems.length} ingredientes · Custo: R$ {formItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0).toFixed(2)}</DialogDescription>
+            <DialogDescription>Rende {sheet.yield_quantity} {sheet.yield_unit} · {formItems.length} ingredientes · Custo: {fmtCur(formItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0))}</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             <div>
@@ -154,7 +155,7 @@ function SheetViewEditDialog({ open, onClose, sheet, stockItems, onSaved }: { op
               <table className="w-full text-sm">
                 {recipeItems.length > 0 && <thead><tr className="text-xs text-muted-foreground border-b border-border"><th className="text-left py-1">Insumo</th><th className="text-right py-1 w-24">Qtd</th><th className="text-center py-1 w-12">Un.</th><th className="text-right py-1 w-24">Custo</th>{editing && <th className="w-8"></th>}</tr></thead>}
                 <tbody className="divide-y divide-border/40">
-                  {recipeItems.map((item) => { const idx = formItems.indexOf(item); return (<tr key={idx}><td className="py-1.5">{editing ? <ItemCombobox stockItems={localStock} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /> : <span>{item.item_name}</span>}</td><td className="py-1.5 text-right">{editing ? <Input type="number" step="any" className="h-7 w-20 text-xs text-right ml-auto" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td><td className="py-1.5 text-center text-muted-foreground text-xs">{item.unit}</td><td className="py-1.5 text-right text-muted-foreground text-xs">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>{editing && <td className="py-1.5"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button></td>}</tr>); })}
+                  {recipeItems.map((item) => { const idx = formItems.indexOf(item); return (<tr key={idx}><td className="py-1.5">{editing ? <ItemCombobox stockItems={localStock} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /> : <span>{item.item_name}</span>}</td><td className="py-1.5 text-right">{editing ? <Input type="number" step="any" className="h-7 w-20 text-xs text-right ml-auto" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{fmtNum(item.quantity)}</span>}</td><td className="py-1.5 text-center text-muted-foreground text-xs">{item.unit}</td><td className="py-1.5 text-right text-muted-foreground text-xs">{fmtCur(item.quantity * item.unit_cost)}</td>{editing && <td className="py-1.5"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button></td>}</tr>); })}
                 </tbody>
               </table>
               {recipeItems.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhum ingrediente</p>}
@@ -164,7 +165,7 @@ function SheetViewEditDialog({ open, onClose, sheet, stockItems, onSaved }: { op
               <table className="w-full text-sm">
                 {decoItems.length > 0 && <thead><tr className="text-xs text-muted-foreground border-b border-amber-100"><th className="text-left py-1">Item</th><th className="text-right py-1 w-24">Qtd</th><th className="text-center py-1 w-12">Un.</th><th className="text-right py-1 w-24">Custo</th>{editing && <th className="w-8"></th>}</tr></thead>}
                 <tbody className="divide-y divide-amber-50">
-                  {decoItems.map((item) => { const idx = formItems.indexOf(item); return (<tr key={idx} style={{ background: 'hsl(38 80% 99%)' }}><td className="py-1.5">{editing ? <ItemCombobox stockItems={localStock} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /> : <span>{item.item_name}</span>}</td><td className="py-1.5 text-right">{editing ? <Input type="number" step="any" className="h-7 w-20 text-xs text-right ml-auto" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td><td className="py-1.5 text-center text-muted-foreground text-xs">{item.unit}</td><td className="py-1.5 text-right text-muted-foreground text-xs">R$ {(item.quantity * item.unit_cost).toFixed(2)}</td>{editing && <td className="py-1.5"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button></td>}</tr>); })}
+                  {decoItems.map((item) => { const idx = formItems.indexOf(item); return (<tr key={idx} style={{ background: 'hsl(38 80% 99%)' }}><td className="py-1.5">{editing ? <ItemCombobox stockItems={localStock} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /> : <span>{item.item_name}</span>}</td><td className="py-1.5 text-right">{editing ? <Input type="number" step="any" className="h-7 w-20 text-xs text-right ml-auto" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{fmtNum(item.quantity)}</span>}</td><td className="py-1.5 text-center text-muted-foreground text-xs">{item.unit}</td><td className="py-1.5 text-right text-muted-foreground text-xs">{fmtCur(item.quantity * item.unit_cost)}</td>{editing && <td className="py-1.5"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button></td>}</tr>); })}
                 </tbody>
               </table>
               {decoItems.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">Nenhum item de decoração</p>}

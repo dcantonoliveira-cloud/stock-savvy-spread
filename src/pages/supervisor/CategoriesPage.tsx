@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fmtNum } from '@/lib/format';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -136,7 +137,7 @@ export default function CategoriesPage() {
         <div>
           <h1 className="text-3xl font-display font-bold gold-text">Categorias</h1>
           <p className="text-muted-foreground mt-1">
-            {categories.length} categorias · Valor total: <span className="text-primary font-semibold">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            {categories.length} categorias · Valor total: <span className="text-primary font-semibold">R$ {fmtNum(totalValue)}</span>
           </p>
         </div>
         <div className="flex gap-2">
@@ -193,9 +194,9 @@ export default function CategoriesPage() {
                   </div>
                 </td>
                 <td className="px-3 py-3 text-center text-sm font-medium text-foreground">{cat.itemCount}</td>
-                <td className="px-3 py-3 text-right text-sm text-foreground">{cat.totalStock.toLocaleString('pt-BR')}</td>
+                <td className="px-3 py-3 text-right text-sm text-foreground">{fmtNum(cat.totalStock)}</td>
                 <td className="px-3 py-3 text-right font-semibold text-amber-700">
-                  R$ {cat.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {fmtNum(cat.totalValue)}
                 </td>
                 <td className="px-3 py-3 text-right text-xs text-muted-foreground">
                   {totalValue > 0 ? `${((cat.totalValue / totalValue) * 100).toFixed(1)}%` : '—'}
@@ -227,7 +228,7 @@ export default function CategoriesPage() {
                   Total em estoque:
                 </td>
                 <td className="px-3 py-2.5 text-right font-bold text-amber-700">
-                  R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {fmtNum(totalValue)}
                 </td>
                 <td colSpan={2} />
               </tr>

@@ -10,11 +10,9 @@ import {
 import { toast } from 'sonner';
 import { convertToItemUnit } from '@/lib/units';
 import { getSavedShoppingLists, SavedShoppingList } from '@/components/ConsolidatedShoppingListDialog';
+import { fmtNum, fmtCur } from '@/lib/format';
 
 const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
-
-const fmtQty = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
-const fmtCur = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 type ShoppingItem = {
   id: string; name: string; unit: string; category: string;
@@ -168,7 +166,7 @@ export default function ShoppingListDetailPage() {
   const handlePrintAll = () => {
     const toBuy = shoppingList.filter(i => i.toBuy > 0);
     if (toBuy.length === 0) return;
-    const rows = toBuy.map(i => `<tr><td>${i.name}</td><td>${i.category}</td><td class="right">${fmtQty(i.toBuy)} ${i.unit}</td><td class="right">R$ ${fmtCur(i.unitCost)}</td><td class="right">R$ ${fmtCur(i.toBuy * i.unitCost)}</td></tr>`).join('');
+    const rows = toBuy.map(i => `<tr><td>${i.name}</td><td>${i.category}</td><td class="right">${fmtNum(i.toBuy)} ${i.unit}</td><td class="right">R$ ${fmtCur(i.unitCost)}</td><td class="right">R$ ${fmtCur(i.toBuy * i.unitCost)}</td></tr>`).join('');
     const total = toBuy.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
     const eventNames = events.map(e => e.name).join(', ');
     printBase('Lista de Compras', `<h2>Lista de Compras</h2><p>${eventNames}</p>
@@ -179,7 +177,7 @@ export default function ShoppingListDetailPage() {
   const handlePrintBySupplier = (supplierName: string) => {
     const items = shoppingList.filter(i => i.supplier === supplierName && i.toBuy > 0);
     if (items.length === 0) return;
-    const rows = items.map(i => `<tr><td>${i.name}</td><td class="right">${fmtQty(getEffectiveQty(i))} ${i.unit}</td><td class="right">R$ ${fmtCur(i.unitCost)}</td><td class="right">R$ ${fmtCur(getEffectiveQty(i) * i.unitCost)}</td></tr>`).join('');
+    const rows = items.map(i => `<tr><td>${i.name}</td><td class="right">${fmtNum(getEffectiveQty(i))} ${i.unit}</td><td class="right">R$ ${fmtCur(i.unitCost)}</td><td class="right">R$ ${fmtCur(getEffectiveQty(i) * i.unitCost)}</td></tr>`).join('');
     const total = items.reduce((s, i) => s + getEffectiveQty(i) * i.unitCost, 0);
     printBase(`Pedido — ${supplierName}`, `<h2>Pedido — ${supplierName}</h2><p>${events.map(e => e.name).join(', ')}</p>
       <table><thead><tr><th>Item</th><th class="right">Qtd</th><th class="right">Preço</th><th class="right">Total</th></tr></thead>
@@ -343,11 +341,11 @@ export default function ShoppingListDetailPage() {
                         {item.supplier && <span className="text-[10px] text-muted-foreground/60 italic ml-1">({item.supplier})</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{fmtQty(item.needed)} {item.unit}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{fmtQty(item.inStock)} {item.unit}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(item.needed)} {item.unit}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(item.inStock)} {item.unit}</td>
                     <td className="px-4 py-3 text-right font-semibold">
                       {item.toBuy > 0
-                        ? <span className="text-destructive">{fmtQty(item.toBuy)} {item.unit}</span>
+                        ? <span className="text-destructive">{fmtNum(item.toBuy)} {item.unit}</span>
                         : <span className="text-success text-xs">✓ ok</span>}
                     </td>
                     <td className="px-5 py-3 text-right text-muted-foreground">
@@ -453,7 +451,7 @@ export default function ShoppingListDetailPage() {
                         <tr key={item.id}>
                           <td className="px-5 py-2.5 font-medium text-foreground">{item.name}</td>
                           <td className="px-3 py-2.5 text-muted-foreground">{item.category}</td>
-                          <td className="px-5 py-2.5 text-right text-destructive font-semibold">{fmtQty(item.toBuy)} {item.unit}</td>
+                          <td className="px-5 py-2.5 text-right text-destructive font-semibold">{fmtNum(item.toBuy)} {item.unit}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fmtNum } from '@/lib/format';
 
 type Item = { id: string; name: string; unit: string; current_stock: number };
 type Output = { id: string; item_id: string; quantity: number; employee_name: string; event_name: string | null; notes: string | null; date: string; created_at: string };
@@ -208,7 +209,7 @@ export default function SupervisorOutputsPage() {
                     </span>
                   )}
                 </div>
-                {selectedItem && <p className="text-xs text-muted-foreground mt-1">Estoque atual: {selectedItem.current_stock} {selectedItem.unit}</p>}
+                {selectedItem && <p className="text-xs text-muted-foreground mt-1">Estoque atual: {fmtNum(selectedItem.current_stock)} {selectedItem.unit}</p>}
               </div>
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Funcionário</label>
@@ -269,7 +270,7 @@ export default function SupervisorOutputsPage() {
                       {new Date(output.date).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell className="font-medium">{item?.name || '?'}</TableCell>
-                    <TableCell className="text-right text-destructive font-semibold">-{output.quantity}</TableCell>
+                    <TableCell className="text-right text-destructive font-semibold">-{fmtNum(output.quantity)}</TableCell>
                     <TableCell className="text-muted-foreground text-xs font-medium">{item?.unit || ''}</TableCell>
                     <TableCell>{output.employee_name}</TableCell>
                     <TableCell className="text-muted-foreground">{output.event_name || '—'}</TableCell>

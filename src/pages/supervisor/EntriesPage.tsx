@@ -14,6 +14,7 @@ import { CommandSeparator } from '@/components/ui/command';
 import { Plus, Trash2, Upload, FileText, Camera, FileCode, Loader2, Check, X, AlertTriangle, PackagePlus, Download, Receipt, ShoppingCart, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { fmtNum, fmtCur } from '@/lib/format';
 
 type Item = { id: string; name: string; unit: string; current_stock: number; barcode: string | null };
 type Kitchen = { id: string; name: string; is_default: boolean };
@@ -832,7 +833,7 @@ export default function EntriesPage() {
                               <CommandItem key={i.id} value={i.name} onSelect={() => handleItemSelect(i.id)}>
                                 <Check className={cn('mr-2 h-4 w-4 shrink-0', itemId === i.id ? 'opacity-100' : 'opacity-0')} />
                                 <span className="flex-1 truncate">{i.name}</span>
-                                <span className="text-xs text-muted-foreground ml-2">{i.current_stock} {i.unit}</span>
+                                <span className="text-xs text-muted-foreground ml-2">{fmtNum(i.current_stock)} {i.unit}</span>
                               </CommandItem>
                             ))}
                           </CommandGroup>
@@ -878,7 +879,7 @@ export default function EntriesPage() {
                                   <label key={k!.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border transition-colors ${allocationKitchenId === k!.id ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-blue-100'}`}>
                                     <input type="radio" name="allocation" value={k!.id} checked={allocationKitchenId === k!.id} onChange={() => setAllocationKitchenId(k!.id)} className="text-primary" />
                                     <span className="flex-1 text-sm font-medium">{k!.name}</span>
-                                    <span className="text-xs text-muted-foreground">{loc ? `${loc.current_stock} ${selectedItem?.unit || ''}` : 'sem estoque'}</span>
+                                    <span className="text-xs text-muted-foreground">{loc ? `${fmtNum(loc.current_stock)} ${selectedItem?.unit || ''}` : 'sem estoque'}</span>
                                   </label>
                                 );
                               })}
@@ -909,7 +910,7 @@ export default function EntriesPage() {
                         </span>
                       )}
                     </div>
-                    {selectedItem && <p className="text-xs text-muted-foreground mt-1">Estoque atual: {selectedItem.current_stock} {selectedItem.unit}</p>}
+                    {selectedItem && <p className="text-xs text-muted-foreground mt-1">Estoque atual: {fmtNum(selectedItem.current_stock)} {selectedItem.unit}</p>}
                   </div>
                   <div>
                     <label className="text-sm text-muted-foreground mb-1 block">Custo Unit. (R$/{selectedItem?.unit || 'un'})</label>
@@ -944,7 +945,7 @@ export default function EntriesPage() {
                   </div>
                   {unitCost && quantity && (
                     <p className="text-xs text-amber-700 mt-1">
-                      = R$ {parseFloat(unitCost).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} por {selectedItem?.unit || 'un'}
+                      = {fmtCur(parseFloat(unitCost))} por {selectedItem?.unit || 'un'}
                     </p>
                   )}
                 </div>
@@ -1055,10 +1056,10 @@ export default function EntriesPage() {
                         </button>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-emerald-400 font-semibold">+{entry.quantity}</TableCell>
+                    <TableCell className="text-right text-emerald-400 font-semibold">+{fmtNum(entry.quantity)}</TableCell>
                     <TableCell className="text-muted-foreground text-xs font-medium">{item?.unit || ''}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {entry.unit_cost != null ? `R$ ${entry.unit_cost}` : '—'}
+                      {entry.unit_cost != null ? fmtCur(entry.unit_cost) : '—'}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{entry.supplier || '—'}</TableCell>
                     <TableCell className="text-muted-foreground">{entry.invoice_number || '—'}</TableCell>
