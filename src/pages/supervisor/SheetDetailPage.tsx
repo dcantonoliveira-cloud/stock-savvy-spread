@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ArrowLeft, Pencil, Check, X, Plus, Loader2,
-  ChefHat, Clock, Users, ChevronsUpDown, PackagePlus, CalendarDays
+  ChefHat, Clock, Users, ChevronsUpDown, PackagePlus, CalendarDays, SquarePen
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -74,6 +74,76 @@ function QuickCreateItemDialog({ open, onClose, onCreated }: { open: boolean; on
   );
 }
 
+function QuickEditItemDialog({ item, onClose, onSaved }: { item: StockItem | null; onClose: () => void; onSaved: (updated: StockItem) => void }) {
+  const [name, setName] = useState('');
+  const [unitCost, setUnitCost] = useState('0');
+  const [purchaseQty, setPurchaseQty] = useState('1');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (item) {
+      setName(item.name);
+      setUnitCost(String(item.unit_cost));
+      setPurchaseQty(String(item.purchase_qty ?? 1));
+    }
+  }, [item]);
+
+  const handleSave = async () => {
+    if (!item || !name.trim()) { toast.error('Nome é obrigatório'); return; }
+    setSaving(true);
+    const { data, error } = await supabase.from('stock_items')
+      .update({ name: name.trim(), unit_cost: parseFloat(unitCost) || 0, purchase_qty: parseFloat(purchaseQty) || null } as any)
+      .eq('id', item.id)
+      .select('id, name, unit, unit_cost, purchase_qty')
+      .single();
+    setSaving(false);
+    if (error || !data) { toast.error('Erro ao salvar'); return; }
+    toast.success('Insumo atualizado!');
+    onSaved(data as unknown as StockItem);
+    onClose();
+  };
+
+  const perUnit = parseFloat(purchaseQty) > 1 && parseFloat(unitCost) > 0
+    ? parseFloat(unitCost) / parseFloat(purchaseQty) : null;
+
+  return (
+    <Dialog open={!!item} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Editar Insumo</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">Alterações refletem em todas as fichas técnicas que usam este item.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm text-muted-foreground mb-1 block">Nome *</label>
+            <Input value={name} onChange={e => setName(e.target.value)} autoFocus />
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground mb-1 block">Unidade</label>
+            <Input value={item?.unit || ''} disabled className="opacity-60" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Preço da embalagem (R$)</label>
+              <Input type="number" step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Qtde / embalagem</label>
+              <Input type="number" step="any" value={purchaseQty} onChange={e => setPurchaseQty(e.target.value)} />
+            </div>
+          </div>
+          {perUnit !== null && (
+            <p className="text-xs text-primary">Custo por {item?.unit} ≈ R$ {perUnit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</p>
+          )}
+          <Button className="w-full" onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}Salvar alterações
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function SheetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -84,6 +154,7 @@ export default function SheetDetailPage() {
   const [saving, setSaving] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [pendingSelectIdx, setPendingSelectIdx] = useState<number | null>(null);
+  const [editItem, setEditItem] = useState<StockItem | null>(null);
   const [eventCount, setEventCount] = useState(0);
 
   // Edit state
@@ -264,7 +335,18 @@ export default function SheetDetailPage() {
               const idx = formItems.indexOf(item);
               return (
                 <tr key={editing ? idx : item.item_id}>
-                  <td className="px-5 py-3">{editing ? <ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /> : <span className="text-foreground">{item.item_name}</span>}</td>
+                  <td className="px-5 py-3">
+                    {editing
+                      ? <div className="flex items-center gap-1">
+                          <div className="flex-1"><ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /></div>
+                          {item.item_id && (
+                            <button onClick={() => setEditItem(stockItems.find(s => s.id === item.item_id) || null)} className="text-muted-foreground hover:text-primary transition-colors" title="Editar insumo">
+                              <SquarePen className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      : <span className="text-foreground">{item.item_name}</span>}
+                  </td>
                   <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
                   <td className="px-3 py-3 text-center text-muted-foreground text-xs">
                     {editing ? (() => {
@@ -307,7 +389,18 @@ export default function SheetDetailPage() {
               const idx = formItems.indexOf(item);
               return (
                 <tr key={editing ? idx : item.item_id} style={{ background: 'hsl(38 80% 99%)' }}>
-                  <td className="px-5 py-3">{editing ? <ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /> : <span className="text-foreground">{item.item_name}</span>}</td>
+                  <td className="px-5 py-3">
+                    {editing
+                      ? <div className="flex items-center gap-1">
+                          <div className="flex-1"><ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /></div>
+                          {item.item_id && (
+                            <button onClick={() => setEditItem(stockItems.find(s => s.id === item.item_id) || null)} className="text-muted-foreground hover:text-primary transition-colors" title="Editar insumo">
+                              <SquarePen className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      : <span className="text-foreground">{item.item_name}</span>}
+                  </td>
                   <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
                   <td className="px-3 py-3 text-center text-muted-foreground text-xs">
                     {editing ? (() => {
@@ -335,6 +428,22 @@ export default function SheetDetailPage() {
           <p className="text-sm text-muted-foreground whitespace-pre-line">{sheet.instructions}</p>
         </div>
       )}
+
+      <QuickEditItemDialog
+        item={editItem}
+        onClose={() => setEditItem(null)}
+        onSaved={updated => {
+          // Atualiza lista de insumos
+          setStockItems(prev => prev.map(s => s.id === updated.id ? updated : s).sort((a, b) => a.name.localeCompare(b.name)));
+          // Recalcula custo nos formItems que usam esse insumo
+          const effCost = effectiveUnitCost(updated.unit_cost || 0, updated.purchase_qty);
+          setFormItems(prev => prev.map(fi => {
+            if (fi.item_id !== updated.id) return fi;
+            const newCost = calcRecipeUnitCost(effCost, updated.unit, fi.unit);
+            return { ...fi, item_name: updated.name, unit_cost: newCost };
+          }));
+        }}
+      />
 
       <QuickCreateItemDialog
         open={quickCreateOpen}
