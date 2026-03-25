@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fmtNum } from '@/lib/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -113,7 +114,7 @@ export default function NotificationsPage() {
                   <p className="text-sm font-medium text-foreground">{item.name}</p>
                   <p className="text-xs text-muted-foreground">{item.category} · Mín: {item.min_stock} {item.unit}</p>
                 </div>
-                <Badge className="bg-warning text-warning-foreground">{item.current_stock} {item.unit}</Badge>
+                <Badge className="bg-warning text-warning-foreground">{fmtNum(item.current_stock)} {item.unit}</Badge>
               </div>
             ))}
           </CardContent>

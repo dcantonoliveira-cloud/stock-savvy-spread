@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fmtNum, fmtCur } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -61,7 +62,7 @@ function ItemCombobox({ items, value, onChange }: { items: StockItem[]; value: s
                     <span className="ml-2 text-xs text-muted-foreground">{item.unit}</span>
                   </div>
                   <span className={`text-xs font-medium ml-2 ${item.current_stock <= item.min_stock && item.min_stock > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {item.current_stock}
+                    {fmtNum(item.current_stock)}
                   </span>
                 </CommandItem>
               ))}
@@ -239,7 +240,7 @@ function StockTab({ items, kitchens, onDone }: { items: StockItem[]; kitchens: K
       <div className="grid grid-cols-3 gap-2 text-center">
         {[
           { label: 'Itens', value: filtered.length },
-          { label: 'Valor', value: `R$ ${filtered.reduce((s, i) => s + i.current_stock * i.unit_cost, 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}` },
+          { label: 'Valor', value: fmtCur(filtered.reduce((s, i) => s + i.current_stock * i.unit_cost, 0)) },
           { label: 'Baixo', value: filtered.filter(i => i.current_stock <= i.min_stock && i.min_stock > 0).length, danger: true },
         ].map(({ label, value, danger }) => (
           <div key={label} className="bg-white rounded-xl border border-border p-3">
@@ -266,7 +267,7 @@ function StockTab({ items, kitchens, onDone }: { items: StockItem[]; kitchens: K
               </div>
               <div className="text-right flex-shrink-0">
                 <p className={`text-sm font-bold ${isLow ? 'text-destructive' : 'text-foreground'}`}>
-                  {item.current_stock.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                  {fmtNum(item.current_stock)}
                 </p>
                 <p className="text-[10px] text-muted-foreground">{item.unit}</p>
               </div>
@@ -425,7 +426,7 @@ function TransferDialog({ open, onClose, items, kitchens, onDone }: {
             <label className="text-sm font-medium">Item *</label>
             <ItemCombobox items={items} value={itemId} onChange={setItemId} />
             {selectedItem && (
-              <p className="text-xs text-muted-foreground px-1">Estoque: <strong>{selectedItem.current_stock} {selectedItem.unit}</strong></p>
+              <p className="text-xs text-muted-foreground px-1">Estoque: <strong>{fmtNum(selectedItem.current_stock)} {selectedItem.unit}</strong></p>
             )}
           </div>
 
@@ -516,7 +517,7 @@ function ItemDetailDialog({ item, onClose }: { item: StockItem | null; onClose: 
             {[
               { label: 'Estoque', value: `${item.current_stock} ${item.unit}`, highlight: isLow },
               { label: 'Mínimo', value: `${item.min_stock} ${item.unit}`, highlight: false },
-              { label: 'Custo', value: `R$ ${item.unit_cost.toFixed(2)}`, highlight: false },
+              { label: 'Custo', value: fmtCur(item.unit_cost), highlight: false },
             ].map(({ label, value, highlight }) => (
               <div key={label} className={`rounded-xl p-3 border ${highlight ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-muted/30'}`}>
                 <p className="text-[10px] text-muted-foreground">{label}</p>
@@ -622,7 +623,7 @@ function MovementTab({ items, kitchens, onDone }: { items: StockItem[]; kitchens
         <ItemCombobox items={items} value={itemId} onChange={setItemId} />
         {selectedItem && (
           <p className={`text-xs px-1 ${selectedItem.current_stock <= selectedItem.min_stock && selectedItem.min_stock > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-            Estoque atual: <strong>{selectedItem.current_stock} {selectedItem.unit}</strong>
+            Estoque atual: <strong>{fmtNum(selectedItem.current_stock)} {selectedItem.unit}</strong>
             {selectedItem.current_stock <= selectedItem.min_stock && selectedItem.min_stock > 0 && ' ⚠ Abaixo do mínimo'}
           </p>
         )}
@@ -857,7 +858,7 @@ function InventoryCounting({ items, countId, onDone, onCancel }: {
                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5 ${isLow ? 'bg-destructive' : 'bg-success'}`} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">Atual: {item.current_stock} {item.unit}</p>
+                  <p className="text-xs text-muted-foreground">Atual: {fmtNum(item.current_stock)} {item.unit}</p>
                 </div>
                 <input
                   type="number"

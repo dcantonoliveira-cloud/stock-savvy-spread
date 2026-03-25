@@ -12,8 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-
-const fmtCur = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { fmtNum } from '@/lib/format';
 
 // Supplier profile stored in localStorage
 type SupplierProfile = { phone: string; email: string; address: string; notes: string };

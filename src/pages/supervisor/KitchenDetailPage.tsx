@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Building2, Package, Loader2, Search, ArrowRightLeft } from 'lucide-react';
+import { fmtNum, fmtCur } from '@/lib/format';
 
 type Kitchen = { id: string; name: string; is_default: boolean };
 type LocationItem = {
@@ -88,7 +89,7 @@ export default function KitchenDetailPage() {
             <h1 className="text-3xl font-display font-bold gold-text">{kitchen.name}</h1>
             <p className="text-muted-foreground mt-0.5">
               {locationItems.length} iten{locationItems.length !== 1 ? 's' : ''} em estoque
-              {totalValue > 0 && <span> · Valor total: <strong>R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>}
+              {totalValue > 0 && <span> · Valor total: <strong>{fmtCur(totalValue)}</strong></span>}
             </p>
           </div>
         </div>
@@ -137,14 +138,14 @@ export default function KitchenDetailPage() {
                     >
                       <td className="px-5 py-3 font-medium text-foreground">{item.name}</td>
                       <td className="px-4 py-3 text-right font-medium">
-                        {item.current_stock.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}
+                        {fmtNum(item.current_stock)}
                       </td>
                       <td className="px-3 py-3 text-center text-muted-foreground">{item.unit}</td>
                       <td className="px-4 py-3 text-right text-muted-foreground">
-                        R$ {item.unit_cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {fmtCur(item.unit_cost)}
                       </td>
                       <td className="px-5 py-3 text-right font-semibold text-foreground">
-                        R$ {(item.current_stock * item.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {fmtCur(item.current_stock * item.unit_cost)}
                       </td>
                     </tr>
                   ))}
@@ -153,7 +154,7 @@ export default function KitchenDetailPage() {
                   <tr className="border-t-2 border-border bg-muted/20">
                     <td colSpan={4} className="px-5 py-2 text-right text-xs font-semibold text-muted-foreground">Total {category}:</td>
                     <td className="px-5 py-2 text-right font-bold text-primary text-sm">
-                      R$ {catItems.reduce((s, i) => s + i.current_stock * i.unit_cost, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {fmtCur(catItems.reduce((s, i) => s + i.current_stock * i.unit_cost, 0))}
                     </td>
                   </tr>
                 </tfoot>

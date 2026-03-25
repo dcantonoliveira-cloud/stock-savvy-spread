@@ -10,6 +10,7 @@ import {
   ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2, Star, StarOff, SlidersHorizontal
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fmtNum, fmtCur, fmtDate } from '@/lib/format';
 
 type StockItem = {
   id: string; name: string; category: string; unit: string;
@@ -220,8 +221,6 @@ export default function StockItemDetailPage() {
     ? Math.min(...suppliers.map(s => s.unit_price))
     : null;
 
-  const fmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   return (
     <div className="space-y-5 max-w-5xl mx-auto">
@@ -255,13 +254,13 @@ export default function StockItemDetailPage() {
             </div>
             <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
           </div>
-          <p className={`text-xl font-bold ${isLow ? 'text-destructive' : 'text-success'}`}>{item.current_stock} {item.unit}</p>
+          <p className={`text-xl font-bold ${isLow ? 'text-destructive' : 'text-success'}`}>{fmtNum(item.current_stock)} {item.unit}</p>
           <p className="text-[10px] text-muted-foreground/50 mt-0.5 group-hover:text-primary/60 transition-colors">clique para ajustar</p>
         </div>
         {[
-          { label: 'Custo Médio', value: `R$ ${fmt(avgCost)}`, icon: DollarSign, color: 'text-amber-600' },
-          { label: 'Total Entradas', value: `${fmt(totalEntries)} ${item.unit}`, icon: TrendingUp, color: 'text-success' },
-          { label: 'Total Saídas', value: `${fmt(totalOutputs)} ${item.unit}`, icon: TrendingDown, color: 'text-destructive' },
+          { label: 'Custo Médio', value: fmtCur(avgCost), icon: DollarSign, color: 'text-amber-600' },
+          { label: 'Total Entradas', value: `${fmtNum(totalEntries)} ${item.unit}`, icon: TrendingUp, color: 'text-success' },
+          { label: 'Total Saídas', value: `${fmtNum(totalOutputs)} ${item.unit}`, icon: TrendingDown, color: 'text-destructive' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white rounded-xl border border-border shadow-sm p-4">
             <div className="flex items-center gap-2 mb-1">
@@ -322,10 +321,10 @@ export default function StockItemDetailPage() {
                       : <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-semibold"><TrendingDown className="w-2.5 h-2.5" />Saída</span>}
                   </td>
                   <td className={`px-3 py-2.5 text-right font-semibold ${m.type === 'entrada' ? 'text-success' : 'text-destructive'}`}>
-                    {m.type === 'entrada' ? '+' : '-'}{fmt(m.qty)} {item.unit}
+                    {m.type === 'entrada' ? '+' : '-'}{fmtNum(m.qty)} {item.unit}
                   </td>
                   <td className="px-3 py-2.5 text-right text-muted-foreground text-xs">
-                    {m.cost != null ? `R$ ${fmt(m.cost)}` : '—'}
+                    {m.cost != null ? fmtCur(m.cost) : '—'}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.who || m.ref || '—'}</td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.notes || '—'}</td>
@@ -370,9 +369,9 @@ export default function StockItemDetailPage() {
               {priceHistory.map(e => (
                 <tr key={e.id} className="hover:bg-amber-50/40 transition-colors">
                   <td className="px-5 py-2.5 text-muted-foreground text-xs">{fmtDate(e.created_at)}</td>
-                  <td className="px-3 py-2.5 text-right">{fmt(e.quantity)} {item.unit}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-amber-700">R$ {fmt(e.unit_cost)}</td>
-                  <td className="px-3 py-2.5 text-right text-muted-foreground">R$ {fmt(e.quantity * e.unit_cost)}</td>
+                  <td className="px-3 py-2.5 text-right">{fmtNum(e.quantity)} {item.unit}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-amber-700">{fmtCur(e.unit_cost)}</td>
+                  <td className="px-3 py-2.5 text-right text-muted-foreground">{fmtCur(e.quantity * e.unit_cost)}</td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{e.supplier || '—'}</td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{e.invoice_number || '—'}</td>
                 </tr>
@@ -385,7 +384,7 @@ export default function StockItemDetailPage() {
               <tfoot>
                 <tr className="border-t-2 border-border bg-muted/20">
                   <td colSpan={2} className="px-5 py-2.5 text-xs font-semibold text-muted-foreground">Custo médio ponderado</td>
-                  <td className="px-3 py-2.5 text-right font-bold text-amber-700">R$ {fmt(avgCost)}</td>
+                  <td className="px-3 py-2.5 text-right font-bold text-amber-700">{fmtCur(avgCost)}</td>
                   <td colSpan={3} />
                 </tr>
               </tfoot>
@@ -509,7 +508,7 @@ export default function StockItemDetailPage() {
               {sheetUsages.map((u, i) => (
                 <tr key={i} className="hover:bg-amber-50/40 transition-colors">
                   <td className="px-5 py-3 font-medium text-foreground">{u.sheet_name}</td>
-                  <td className="px-3 py-3 text-right">{u.quantity} {u.unit}</td>
+                  <td className="px-3 py-3 text-right">{fmtNum(u.quantity)} {u.unit}</td>
                   <td className="px-3 py-3 text-center">
                     {u.section === 'decoracao'
                       ? <Badge variant="outline" className="text-[10px] border-purple-300 text-purple-700">Decoração</Badge>

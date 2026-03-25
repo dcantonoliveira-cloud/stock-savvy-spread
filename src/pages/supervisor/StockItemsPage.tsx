@@ -16,6 +16,7 @@ import { MaterialLabelPrint, type LabelItem } from '@/components/MaterialLabelPr
 import { UNITS } from '@/types/inventory';
 import * as XLSX from 'xlsx';
 import { ItemImage } from '@/components/ItemImage';
+import { fmtNum } from '@/lib/format';
 
 type Item = {
   id: string; name: string; category: string; unit: string;
@@ -422,7 +423,7 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
         </div>
         {parseFloat(purchaseQty) > 1 && parseFloat(unitCost) > 0 && (
           <p className="text-xs text-primary mt-1">
-            Custo por {unit} ≈ R$ {(parseFloat(unitCost) / parseFloat(purchaseQty)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+            Custo por {unit} ≈ R$ {fmtNum(parseFloat(unitCost) / parseFloat(purchaseQty))}
           </p>
         )}
       </div>
@@ -729,7 +730,7 @@ export default function StockItemsPage() {
           <p className="text-muted-foreground mt-1 text-sm">
             {filtered.length} itens · Valor total:{' '}
             <span className="text-foreground font-semibold">
-              R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {fmtNum(totalValue)}
             </span>
           </p>
         </div>
@@ -822,7 +823,7 @@ export default function StockItemsPage() {
                       ) : (
                         <span className={`cursor-pointer font-semibold transition-colors hover:text-primary ${isLow ? 'text-destructive' : 'text-foreground'}`}
                           onClick={() => startEdit(item.id, 'current_stock', item.current_stock)} title="Clique para editar">
-                          {item.current_stock}
+                          {fmtNum(item.current_stock)}
                           <span className="ml-1 text-xs font-normal text-muted-foreground">{item.unit}</span>
                         </span>
                       )}
@@ -851,7 +852,7 @@ export default function StockItemsPage() {
                       ) : (
                         <span className="cursor-pointer text-foreground transition-colors hover:text-primary"
                           onClick={() => startEdit(item.id, 'unit_cost', item.unit_cost)} title="Clique para editar">
-                          R$ {item.unit_cost.toFixed(2)}
+                          R$ {fmtNum(item.unit_cost)}
                         </span>
                       )}
                     </td>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { fmtNum, fmtCur } from '@/lib/format';
 import { Package, ArrowDownCircle, ArrowUpCircle, AlertTriangle, FileText, DollarSign, TrendingUp, Users, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -72,13 +73,13 @@ export default function SupervisorDashboard() {
   const recentActivity = [
     ...outputs.slice(0, 5).map(o => ({
       type: 'output' as const,
-      text: `${o.employee_name} retirou ${o.quantity} de ${items.find(i => i.id === o.item_id)?.name || '?'}`,
+      text: `${o.employee_name} retirou ${fmtNum(o.quantity)} de ${items.find(i => i.id === o.item_id)?.name || '?'}`,
       event: o.event_name,
       time: o.created_at,
     })),
     ...entries.slice(0, 5).map(e => ({
       type: 'entry' as const,
-      text: `Entrada de ${e.quantity} de ${items.find(i => i.id === e.item_id)?.name || '?'}`,
+      text: `Entrada de ${fmtNum(e.quantity)} de ${items.find(i => i.id === e.item_id)?.name || '?'}`,
       event: null,
       time: e.created_at,
     })),
@@ -99,7 +100,7 @@ export default function SupervisorDashboard() {
 
       {/* Stats Row 1 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <StatCard icon={DollarSign} label="Valor em Estoque" value={`R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} accent />
+        <StatCard icon={DollarSign} label="Valor em Estoque" value={fmtCur(totalValue)} accent />
         <StatCard icon={Package} label="Itens Cadastrados" value={items.length} />
         <StatCard icon={AlertTriangle} label="Estoque Baixo" value={lowStock.length} warn={lowStock.length > 0} />
         <StatCard icon={Users} label="Funcionários" value={employeeCount} />
@@ -151,7 +152,7 @@ export default function SupervisorDashboard() {
                   <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={40} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} strokeWidth={2} stroke="hsl(var(--background))">
                     {categoryData.map((_, idx) => <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }} />
+                  <Tooltip formatter={(v: number) => fmtCur(v)} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -181,7 +182,7 @@ export default function SupervisorDashboard() {
                     <p className="text-xs text-muted-foreground">{item.category}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-warning">{item.current_stock} {item.unit}</p>
+                    <p className="text-sm font-bold text-warning">{fmtNum(item.current_stock)} {item.unit}</p>
                     <p className="text-[11px] text-muted-foreground">Mín: {item.min_stock}</p>
                   </div>
                 </div>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building2, Plus, Pencil, Trash2, Lock, Loader2, ChevronRight, Package } from 'lucide-react';
+import { fmtNum } from '@/lib/format';
 import { toast } from 'sonner';
 
 type Kitchen = { id: string; name: string; is_default: boolean };
@@ -125,7 +126,7 @@ export default function KitchensPage() {
                   </td>
                   <td className="px-4 py-4 text-right font-medium">{itemCount}</td>
                   <td className="px-4 py-4 text-right text-muted-foreground">
-                    {totalUnits.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}
+                    {fmtNum(totalUnits)}
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>

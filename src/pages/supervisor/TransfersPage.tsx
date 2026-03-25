@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ArrowRightLeft, Plus, Loader2, Search, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { fmtNum } from '@/lib/format';
 
 type Kitchen = { id: string; name: string };
 type StockItem = { id: string; name: string; unit: string; current_stock: number };
@@ -159,7 +160,7 @@ export default function TransfersPage() {
                 <td className="px-4 py-3 font-medium text-foreground">{itemName(t.item_id)}</td>
                 <td className="px-4 py-3 text-right">
                   <Badge variant="outline" className="font-mono text-primary border-primary/30 bg-primary/5">
-                    {t.quantity.toLocaleString('pt-BR', { maximumFractionDigits: 3 })} {itemUnit(t.item_id)}
+                    {fmtNum(t.quantity)} {itemUnit(t.item_id)}
                   </Badge>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{kitchenName(t.from_kitchen_id)}</td>

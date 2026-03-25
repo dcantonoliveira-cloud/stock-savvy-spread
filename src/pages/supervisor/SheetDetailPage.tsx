@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib/units';
+import { fmtNum, fmtCur } from '@/lib/format';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
@@ -133,7 +134,7 @@ function QuickEditItemDialog({ item, onClose, onSaved }: { item: StockItem | nul
             </div>
           </div>
           {perUnit !== null && (
-            <p className="text-xs text-primary">Custo por {item?.unit} ≈ R$ {perUnit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</p>
+            <p className="text-xs text-primary">Custo por {item?.unit} ≈ {fmtCur(perUnit)}</p>
           )}
           <Button className="w-full" onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}Salvar alterações
@@ -306,7 +307,7 @@ export default function SheetDetailPage() {
                   </div>
                 : <Badge variant="outline">Rende {sheet.yield_quantity} {sheet.yield_unit}</Badge>
               }
-              <Badge className="bg-primary/10 text-primary border-primary/20">Custo: R$ {totalCost.toFixed(2)}</Badge>
+              <Badge className="bg-primary/10 text-primary border-primary/20">Custo: {fmtCur(totalCost)}</Badge>
             </div>
             {sheet.description && <p className="text-sm text-muted-foreground mt-2">{sheet.description}</p>}
           </div>
@@ -347,7 +348,7 @@ export default function SheetDetailPage() {
                         </div>
                       : <span className="text-foreground">{item.item_name}</span>}
                   </td>
-                  <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
+                  <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{fmtNum(parseQty(item.quantity))}</span>}</td>
                   <td className="px-3 py-3 text-center text-muted-foreground text-xs">
                     {editing ? (() => {
                       const compatUnits = item.item_id ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit) : [item.unit].filter(Boolean);
@@ -356,8 +357,8 @@ export default function SheetDetailPage() {
                         : <span>{item.unit}</span>;
                     })() : item.unit}
                   </td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(parseQty(item.quantity) * item.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">{fmtCur(item.unit_cost)}</td>
+                  <td className="px-5 py-3 text-right font-medium text-foreground">{fmtCur(parseQty(item.quantity) * item.unit_cost)}</td>
                   {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}
                 </tr>
               );
@@ -367,7 +368,7 @@ export default function SheetDetailPage() {
             <tfoot>
               <tr className="border-t-2 border-border" style={{ background: 'hsl(40 30% 97%)' }}>
                 <td colSpan={editing ? 4 : 4} className="px-5 py-3 text-right font-semibold text-foreground">Total receita:</td>
-                <td className="px-5 py-3 text-right font-bold text-primary">R$ {recipeItems.reduce((s, i) => s + parseQty(i.quantity) * i.unit_cost, 0).toFixed(2)}</td>
+                <td className="px-5 py-3 text-right font-bold text-primary">{fmtCur(recipeItems.reduce((s, i) => s + parseQty(i.quantity) * i.unit_cost, 0))}</td>
                 {editing && <td></td>}
               </tr>
             </tfoot>
@@ -401,7 +402,7 @@ export default function SheetDetailPage() {
                         </div>
                       : <span className="text-foreground">{item.item_name}</span>}
                   </td>
-                  <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{item.quantity}</span>}</td>
+                  <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{fmtNum(parseQty(item.quantity))}</span>}</td>
                   <td className="px-3 py-3 text-center text-muted-foreground text-xs">
                     {editing ? (() => {
                       const compatUnits = item.item_id ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit) : [item.unit].filter(Boolean);
@@ -410,8 +411,8 @@ export default function SheetDetailPage() {
                         : <span>{item.unit}</span>;
                     })() : item.unit}
                   </td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">R$ {item.unit_cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="px-5 py-3 text-right font-medium text-foreground">R$ {(parseQty(item.quantity) * item.unit_cost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">{fmtCur(item.unit_cost)}</td>
+                  <td className="px-5 py-3 text-right font-medium text-foreground">{fmtCur(parseQty(item.quantity) * item.unit_cost)}</td>
                   {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}
                 </tr>
               );

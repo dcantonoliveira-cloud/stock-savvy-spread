@@ -7,6 +7,7 @@ import {
   ArrowLeft, Package, DollarSign, TrendingUp, TrendingDown,
   AlertTriangle, ChevronLeft, ChevronRight, BarChart3
 } from 'lucide-react';
+import { fmtNum, fmtDate } from '@/lib/format';
 
 type Item = {
   id: string; name: string; unit: string;
@@ -76,8 +77,6 @@ export default function CategoryDetailPage() {
   const totalMovPages = Math.ceil(movements.length / PAGE_SIZE);
   const pagedMovements = movements.slice(movPage * PAGE_SIZE, (movPage + 1) * PAGE_SIZE);
 
-  const fmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   return (
     <div className="space-y-5 max-w-5xl mx-auto">
@@ -96,7 +95,7 @@ export default function CategoryDetailPage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
           { label: 'Itens', value: String(totalStock), icon: Package, color: 'text-foreground' },
-          { label: 'Valor em Estoque', value: `R$ ${fmt(totalValue)}`, icon: DollarSign, color: 'text-amber-600' },
+          { label: 'Valor em Estoque', value: `R$ ${fmtNum(totalValue)}`, icon: DollarSign, color: 'text-amber-600' },
           { label: 'Estoque Baixo', value: String(lowItems), icon: AlertTriangle, color: lowItems > 0 ? 'text-destructive' : 'text-muted-foreground' },
           { label: 'Total Entradas', value: String(movements.filter(m => m.type === 'entrada').length), icon: TrendingUp, color: 'text-success' },
           { label: 'Total Saídas', value: String(movements.filter(m => m.type === 'saida').length), icon: TrendingDown, color: 'text-destructive' },
@@ -148,10 +147,10 @@ export default function CategoryDetailPage() {
                     onClick={() => navigate(`/items/${item.id}`)}>
                     <td className="px-5 py-3 font-medium text-foreground">{item.name}</td>
                     <td className="px-3 py-3 text-center text-xs text-muted-foreground">{item.unit}</td>
-                    <td className={`px-3 py-3 text-right font-semibold ${isLow ? 'text-destructive' : 'text-foreground'}`}>{fmt(item.current_stock)}</td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">{fmt(item.min_stock)}</td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">R$ {fmt(item.unit_cost)}</td>
-                    <td className="px-3 py-3 text-right font-semibold text-amber-700">R$ {fmt(item.current_stock * item.unit_cost)}</td>
+                    <td className={`px-3 py-3 text-right font-semibold ${isLow ? 'text-destructive' : 'text-foreground'}`}>{fmtNum(item.current_stock)}</td>
+                    <td className="px-3 py-3 text-right text-muted-foreground">{fmtNum(item.min_stock)}</td>
+                    <td className="px-3 py-3 text-right text-muted-foreground">R$ {fmtNum(item.unit_cost)}</td>
+                    <td className="px-3 py-3 text-right font-semibold text-amber-700">R$ {fmtNum(item.current_stock * item.unit_cost)}</td>
                     <td className="px-3 py-3 text-center">
                       {isLow
                         ? <Badge variant="destructive" className="text-[10px]">Baixo</Badge>
@@ -168,7 +167,7 @@ export default function CategoryDetailPage() {
               <tfoot>
                 <tr className="border-t-2 border-border bg-muted/20">
                   <td colSpan={5} className="px-5 py-2.5 text-xs font-semibold text-muted-foreground text-right">Valor total em estoque:</td>
-                  <td className="px-3 py-2.5 text-right font-bold text-amber-700">R$ {fmt(totalValue)}</td>
+                  <td className="px-3 py-2.5 text-right font-bold text-amber-700">R$ {fmtNum(totalValue)}</td>
                   <td />
                 </tr>
               </tfoot>
@@ -211,7 +210,7 @@ export default function CategoryDetailPage() {
                       : <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-semibold"><TrendingDown className="w-2.5 h-2.5" />Saída</span>}
                   </td>
                   <td className={`px-3 py-2.5 text-right font-semibold ${m.type === 'entrada' ? 'text-success' : 'text-destructive'}`}>
-                    {m.type === 'entrada' ? '+' : '-'}{m.qty.toLocaleString('pt-BR', { maximumFractionDigits: 3 })}
+                    {m.type === 'entrada' ? '+' : '-'}{fmtNum(m.qty)}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.who || '—'}</td>
                 </tr>
