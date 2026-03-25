@@ -166,21 +166,25 @@ function SupplierDialog({ item, open, onClose, initialSuppliers = [] }: { item: 
                   className="h-8 text-sm w-full"
                   autoFocus
                 />
-                {showSuggestions && newName && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                    {existingNames
-                      .filter(n => n.toLowerCase().includes(newName.toLowerCase()) && n !== newName)
-                      .map(n => (
+                {showSuggestions && (() => {
+                  const filtered = existingNames.filter(n =>
+                    !newName || n.toLowerCase().includes(newName.toLowerCase())
+                  );
+                  return filtered.length > 0 ? (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {filtered.map(n => (
                         <button
                           key={n}
-                          className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted/60 transition-colors"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-muted/60 transition-colors flex items-center gap-2 ${n === newName ? 'bg-primary/10 text-primary font-medium' : ''}`}
                           onMouseDown={() => { setNewName(n); setShowSuggestions(false); }}
                         >
+                          <Store className="w-3 h-3 shrink-0 text-muted-foreground" />
                           {n}
                         </button>
                       ))}
-                  </div>
-                )}
+                    </div>
+                  ) : null;
+                })()}
               </div>
               <div className="flex items-center gap-2">
                 <Input type="number" step="0.01" placeholder="Preço unitário" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="flex-1 h-8 text-sm"
