@@ -779,19 +779,29 @@ export default function EventMenuDetailPage() {
     const stockData = (itemsRes.data || []) as unknown as StockItem[];
     setStockItems(stockData);
 
-    // Helper: fetch sheet items with tag info, falling back to basic query if tag columns don't exist yet
+    // Helper: fetch sheet items — always uses a reliable basic query, then enriches with tag info
     const fetchSheetItems = async (sheetId: string): Promise<any[]> => {
-      const { data, error } = await supabase
-        .from('technical_sheet_items')
-        .select('id, item_id, quantity, unit_cost, section, unit, tag_id, tags(id, name, color)')
-        .eq('sheet_id', sheetId);
-      if (!error && data) return data;
-      // Fallback: migration may not have been applied yet — query without tag columns
-      const { data: basic } = await supabase
+      // Basic query first — always works regardless of migration state
+      const { data: basic, error: basicErr } = await supabase
         .from('technical_sheet_items')
         .select('id, item_id, quantity, unit_cost, section, unit')
         .eq('sheet_id', sheetId);
-      return basic || [];
+      if (basicErr || !basic) return [];
+
+      // Try to enrich with tag info (requires migration — silently skips if not applied)
+      try {
+        const { data: tagData } = await supabase
+          .from('technical_sheet_items')
+          .select('id, tag_id, tags(id, name, color)')
+          .eq('sheet_id', sheetId);
+        if (tagData && tagData.length > 0) {
+          const tagMap: Record<string, any> = {};
+          (tagData as any[]).forEach((t: any) => { tagMap[t.id] = { tag_id: t.tag_id, tags: t.tags }; });
+          return basic.map((item: any) => ({ ...item, ...tagMap[item.id] }));
+        }
+      } catch { /* migration not applied yet — return basic items */ }
+
+      return basic;
     };
     const mapSheetItems = (raw: any[]): SheetItem[] =>
       raw.map((i: any) => {
