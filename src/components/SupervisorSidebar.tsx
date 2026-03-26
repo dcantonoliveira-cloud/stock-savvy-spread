@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText,
   Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
   ArrowRightLeft, ChevronDown, ChevronRight, Truck, ShoppingCart, Warehouse, ClipboardList,
-  AlertTriangle, BookMarked
+  AlertTriangle, BookMarked, Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -20,6 +20,7 @@ const navStructure: NavGroup[] = [
     label: 'Categorias', icon: FolderOpen,
     items: [
       { path: '/categories', label: 'Insumos', icon: Package },
+      { path: '/tags', label: 'Tags', icon: Tag },
       { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
     ]
   },

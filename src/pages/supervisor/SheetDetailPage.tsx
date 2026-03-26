@@ -18,7 +18,8 @@ import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib
 import { fmtNum, fmtCur } from '@/lib/format';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
-type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
+type TagItem = { id: string; name: string; color: string };
+type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'decoracao'; tagId?: string | null; tagName?: string | null; tagColor?: string | null };
 type Sheet = { id: string; name: string; servings: number; description: string | null; category: string | null; prep_time: number; yield_quantity: number; yield_unit: string; instructions: string | null; items: SheetItem[] };
 
 function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems: StockItem[]; value: string; onSelect: (id: string) => void; onCreateNew: (idx?: number) => void }) {
@@ -150,6 +151,7 @@ export default function SheetDetailPage() {
   const navigate = useNavigate();
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [tags, setTags] = useState<TagItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -157,6 +159,7 @@ export default function SheetDetailPage() {
   const [pendingSelectIdx, setPendingSelectIdx] = useState<number | null>(null);
   const [editItem, setEditItem] = useState<StockItem | null>(null);
   const [eventCount, setEventCount] = useState(0);
+  const [openTagPopover, setOpenTagPopover] = useState<number | null>(null);
 
   // Edit state
   const [name, setName] = useState('');
@@ -168,20 +171,25 @@ export default function SheetDetailPage() {
 
   const load = async () => {
     setLoading(true);
-    const [sheetRes, itemsRes, eventRes] = await Promise.all([
+    const [sheetRes, itemsRes, eventRes, tagsRes] = await Promise.all([
       supabase.from('technical_sheets').select('*').eq('id', id!).single(),
       supabase.from('stock_items').select('id, name, unit, unit_cost, purchase_qty').order('name'),
       supabase.from('event_menu_dishes').select('id', { count: 'exact', head: true }).eq('sheet_id', id!),
+      supabase.from('tags').select('id, name, color').order('name'),
     ]);
     setEventCount(eventRes.count || 0);
     if (!sheetRes.data) { navigate('/sheets'); return; }
     if (itemsRes.data) setStockItems(itemsRes.data as unknown as StockItem[]);
-    const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section').eq('sheet_id', id!);
+    if (tagsRes.data) setTags(tagsRes.data as TagItem[]);
+    const tagsMap: Record<string, TagItem> = {};
+    (tagsRes.data || []).forEach((t: any) => { tagsMap[t.id] = t; });
+    const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, tag_id').eq('sheet_id', id!);
     const items: SheetItem[] = (si || []).map((i: any) => {
       const item = (itemsRes.data as any[])?.find((x: any) => x.id === i.item_id);
       const itemUnit = item?.unit || '';
       const baseUnitCost = effectiveUnitCost(item?.unit_cost || 0, item?.purchase_qty);
-      return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: itemUnit, unit_cost: baseUnitCost, section: i.section || 'receita' };
+      const tag = i.tag_id ? tagsMap[i.tag_id] : null;
+      return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: itemUnit, unit_cost: baseUnitCost, section: i.section || 'receita', tagId: i.tag_id || null, tagName: tag?.name || null, tagColor: tag?.color || null };
     });
     const loaded = { ...(sheetRes.data as any), items } as Sheet;
     setSheet(loaded);
@@ -190,7 +198,7 @@ export default function SheetDetailPage() {
     setLoading(false);
   };
 
-  const addItem = (section: 'receita' | 'decoracao') => setFormItems(prev => [...prev, { item_id: '', item_name: '', quantity: 0, unit: '', unit_cost: 0, section }]);
+  const addItem = (section: 'receita' | 'decoracao') => setFormItems(prev => [...prev, { item_id: '', item_name: '', quantity: 0, unit: '', unit_cost: 0, section, tagId: null, tagName: null, tagColor: null }]);
   const updateItem = (idx: number, field: string, value: any) => setFormItems(prev => prev.map((it, i) => {
     if (i !== idx) return it;
     if (field === 'item_id') {
@@ -236,6 +244,7 @@ export default function SheetDetailPage() {
           quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
           unit_cost: i.unit_cost,
           section: i.section || 'receita',
+          tag_id: i.tagId || null,
         } as any).eq('id', i.id!);
         if (updErr) throw updErr;
       }
@@ -250,6 +259,7 @@ export default function SheetDetailPage() {
             quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
             unit_cost: i.unit_cost,
             section: i.section || 'receita',
+            tag_id: i.tagId || null,
           })) as any
         );
         if (insErr) throw insErr;
@@ -345,8 +355,40 @@ export default function SheetDetailPage() {
                               <SquarePen className="w-4 h-4" />
                             </button>
                           )}
+                          {/* Tag selector popover */}
+                          <Popover open={openTagPopover === idx} onOpenChange={o => setOpenTagPopover(o ? idx : null)}>
+                            <PopoverTrigger asChild>
+                              <button
+                                className="flex-shrink-0 transition-colors"
+                                title="Tag"
+                              >
+                                {item.tagId
+                                  ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: (item.tagColor || '#6366f1') + '20', color: item.tagColor || '#6366f1' }}>{item.tagName}</span>
+                                  : <span className="text-[10px] text-muted-foreground/60 hover:text-primary border border-dashed border-border rounded px-1.5 py-0.5">+tag</span>
+                                }
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-2" align="start">
+                              <div className="space-y-0.5">
+                                <button className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted/60 text-muted-foreground" onClick={() => { updateItem(idx, 'tagId', null); (formItems[idx] as any).tagName = null; (formItems[idx] as any).tagColor = null; setFormItems(prev => prev.map((fi, i) => i === idx ? { ...fi, tagId: null, tagName: null, tagColor: null } : fi)); setOpenTagPopover(null); }}>
+                                  Sem tag
+                                </button>
+                                {tags.map(t => (
+                                  <button key={t.id} className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted/60 flex items-center gap-2" onClick={() => { setFormItems(prev => prev.map((fi, i) => i === idx ? { ...fi, tagId: t.id, tagName: t.name, tagColor: t.color } : fi)); setOpenTagPopover(null); }}>
+                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: t.color }} />
+                                    <span style={{ color: t.color }} className="font-medium">{t.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
-                      : <span className="text-foreground">{item.item_name}</span>}
+                      : <div className="flex items-center gap-2">
+                          <span className="text-foreground">{item.item_name}</span>
+                          {item.tagId && item.tagColor && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: item.tagColor + '20', color: item.tagColor }}>{item.tagName}</span>
+                          )}
+                        </div>}
                   </td>
                   <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{fmtNum(parseQty(item.quantity))}</span>}</td>
                   <td className="px-3 py-3 text-center text-muted-foreground text-xs">
@@ -399,8 +441,36 @@ export default function SheetDetailPage() {
                               <SquarePen className="w-4 h-4" />
                             </button>
                           )}
+                          <Popover open={openTagPopover === idx} onOpenChange={o => setOpenTagPopover(o ? idx : null)}>
+                            <PopoverTrigger asChild>
+                              <button className="flex-shrink-0 transition-colors" title="Tag">
+                                {item.tagId
+                                  ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: (item.tagColor || '#6366f1') + '20', color: item.tagColor || '#6366f1' }}>{item.tagName}</span>
+                                  : <span className="text-[10px] text-muted-foreground/60 hover:text-primary border border-dashed border-border rounded px-1.5 py-0.5">+tag</span>
+                                }
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-2" align="start">
+                              <div className="space-y-0.5">
+                                <button className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted/60 text-muted-foreground" onClick={() => { setFormItems(prev => prev.map((fi, i) => i === idx ? { ...fi, tagId: null, tagName: null, tagColor: null } : fi)); setOpenTagPopover(null); }}>
+                                  Sem tag
+                                </button>
+                                {tags.map(t => (
+                                  <button key={t.id} className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted/60 flex items-center gap-2" onClick={() => { setFormItems(prev => prev.map((fi, i) => i === idx ? { ...fi, tagId: t.id, tagName: t.name, tagColor: t.color } : fi)); setOpenTagPopover(null); }}>
+                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: t.color }} />
+                                    <span style={{ color: t.color }} className="font-medium">{t.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
-                      : <span className="text-foreground">{item.item_name}</span>}
+                      : <div className="flex items-center gap-2">
+                          <span className="text-foreground">{item.item_name}</span>
+                          {item.tagId && item.tagColor && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: item.tagColor + '20', color: item.tagColor }}>{item.tagName}</span>
+                          )}
+                        </div>}
                   </td>
                   <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{fmtNum(parseQty(item.quantity))}</span>}</td>
                   <td className="px-3 py-3 text-center text-muted-foreground text-xs">

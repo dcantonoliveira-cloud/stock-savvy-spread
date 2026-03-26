@@ -892,17 +892,23 @@ function InventoryCounting({ items, countId, onDone, onCancel }: {
 }
 
 // ─── Tab: Cardápios ───────────────────────────────────────────────────────────
+type SeparationRow = { itemName: string; unit: string; needed: number; tagId: string | null; tagName: string | null; tagColor: string | null };
+
 function MenusTab({ menus }: { menus: EventMenu[] }) {
   const [selectedMenu, setSelectedMenu] = useState<EventMenu | null>(null);
   const [dishes, setDishes] = useState<MenuDish[]>([]);
   const [loadingDishes, setLoadingDishes] = useState(false);
+  const [separationView, setSeparationView] = useState(false);
+  const [separationRows, setSeparationRows] = useState<SeparationRow[]>([]);
 
   const openMenu = async (menu: EventMenu) => {
     setSelectedMenu(menu);
+    setSeparationView(false);
+    setSeparationRows([]);
     setLoadingDishes(true);
     const { data } = await supabase
       .from('event_menu_dishes')
-      .select('section_name, planned_quantity, planned_unit, technical_sheets(name)')
+      .select('section_name, planned_quantity, planned_unit, sheet_id, technical_sheets(name, yield_quantity)')
       .eq('menu_id', menu.id)
       .order('sort_order');
     const dishList: MenuDish[] = (data || []).map((d: any) => ({
@@ -912,6 +918,42 @@ function MenusTab({ menus }: { menus: EventMenu[] }) {
       section_name: d.section_name,
     })).filter((d: MenuDish) => d.sheet_name !== 'MANTIMENTOS');
     setDishes(dishList);
+
+    // Fetch ingredients with tags for separation view
+    const sheetIds = (data || []).map((d: any) => d.sheet_id).filter(Boolean);
+    if (sheetIds.length > 0) {
+      const [siRes, tagsRes] = await Promise.all([
+        supabase.from('technical_sheet_items').select('sheet_id, item_id, quantity, section, tag_id').in('sheet_id', sheetIds).in('section', ['receita', null as any]),
+        supabase.from('tags').select('id, name, color'),
+      ]);
+      const tagsMap: Record<string, { name: string; color: string }> = {};
+      (tagsRes.data || []).forEach((t: any) => { tagsMap[t.id] = { name: t.name, color: t.color }; });
+
+      // Get stock item names
+      const itemIds = [...new Set((siRes.data || []).map((i: any) => i.item_id).filter(Boolean))];
+      const { data: stockData } = await supabase.from('stock_items').select('id, name, unit').in('id', itemIds);
+      const stockMap: Record<string, { name: string; unit: string }> = {};
+      (stockData || []).forEach((s: any) => { stockMap[s.id] = { name: s.name, unit: s.unit }; });
+
+      // Build per-tag totals
+      const totals: Record<string, SeparationRow> = {};
+      (siRes.data || []).forEach((si: any) => {
+        if (si.section === 'decoracao') return;
+        const dishData = (data || []).find((d: any) => d.sheet_id === si.sheet_id);
+        if (!dishData) return;
+        const yieldQty = dishData.technical_sheets?.yield_quantity || 1;
+        const scale = dishData.planned_quantity / yieldQty;
+        const needed = (si.quantity || 0) * scale;
+        const tag = si.tag_id ? tagsMap[si.tag_id] : null;
+        const key = `${si.item_id}::${si.tag_id || ''}`;
+        const stock = stockMap[si.item_id];
+        if (!totals[key]) {
+          totals[key] = { itemName: stock?.name || si.item_id, unit: stock?.unit || 'un', needed: 0, tagId: si.tag_id || null, tagName: tag?.name || null, tagColor: tag?.color || null };
+        }
+        totals[key].needed += needed;
+      });
+      setSeparationRows(Object.values(totals).sort((a, b) => (a.tagName || 'Zzz').localeCompare(b.tagName || 'Zzz') || a.itemName.localeCompare(b.itemName)));
+    }
     setLoadingDishes(false);
   };
 
@@ -926,6 +968,14 @@ function MenusTab({ menus }: { menus: EventMenu[] }) {
     acc[sec].push(d);
     return acc;
   }, {} as Record<string, MenuDish[]>);
+
+  // Group separation rows by tag
+  const separationByTag = separationRows.reduce((acc, r) => {
+    const key = r.tagId || '__none__';
+    if (!acc[key]) acc[key] = { tagName: r.tagName, tagColor: r.tagColor, rows: [] };
+    acc[key].rows.push(r);
+    return acc;
+  }, {} as Record<string, { tagName: string | null; tagColor: string | null; rows: SeparationRow[] }>);
 
   return (
     <div className="p-4 space-y-3">
@@ -957,7 +1007,7 @@ function MenusTab({ menus }: { menus: EventMenu[] }) {
       ))}
 
       {/* Menu detail dialog */}
-      <Dialog open={selectedMenu !== null} onOpenChange={() => setSelectedMenu(null)}>
+      <Dialog open={selectedMenu !== null} onOpenChange={() => { setSelectedMenu(null); setSeparationView(false); }}>
         <DialogContent className="max-w-sm mx-4 max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-left text-base leading-snug pr-6">{selectedMenu?.name}</DialogTitle>
@@ -972,28 +1022,83 @@ function MenusTab({ menus }: { menus: EventMenu[] }) {
 
               {loadingDishes ? (
                 <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
-              ) : dishes.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-3">Nenhum prato cadastrado</p>
               ) : (
                 <>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{dishes.length} pratos</p>
-                  {Object.entries(sections).map(([section, sectionDishes]) => (
-                    <div key={section}>
-                      <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider mt-3 mb-1.5 flex items-center gap-1.5">
-                        <span className="flex-1 border-b border-amber-200 pb-0.5">{section}</span>
-                        <span className="text-muted-foreground font-normal normal-case tracking-normal">{sectionDishes.length} pratos</span>
-                      </p>
-                      <div className="space-y-0.5">
-                        {sectionDishes.map((d, i) => (
-                          <div key={i} className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
-                            <ChefHat className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                            <p className="text-sm text-foreground font-medium flex-1 truncate">{d.sheet_name}</p>
-                            <span className="text-xs text-muted-foreground flex-shrink-0">{d.planned_quantity} {d.planned_unit}</span>
+                  {/* Toggle buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSeparationView(false)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${!separationView ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                    >
+                      {dishes.length} Pratos
+                    </button>
+                    {separationRows.length > 0 && (
+                      <button
+                        onClick={() => setSeparationView(true)}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${separationView ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                      >
+                        Lista de Separação
+                      </button>
+                    )}
+                  </div>
+
+                  {!separationView ? (
+                    dishes.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-3">Nenhum prato cadastrado</p>
+                    ) : (
+                      Object.entries(sections).map(([section, sectionDishes]) => (
+                        <div key={section}>
+                          <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider mt-3 mb-1.5 flex items-center gap-1.5">
+                            <span className="flex-1 border-b border-amber-200 pb-0.5">{section}</span>
+                            <span className="text-muted-foreground font-normal normal-case tracking-normal">{sectionDishes.length} pratos</span>
+                          </p>
+                          <div className="space-y-0.5">
+                            {sectionDishes.map((d, i) => (
+                              <div key={i} className="flex items-center gap-3 py-2 border-b border-border/30 last:border-0">
+                                <ChefHat className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                                <p className="text-sm text-foreground font-medium flex-1 truncate">{d.sheet_name}</p>
+                                <span className="text-xs text-muted-foreground flex-shrink-0">{d.planned_quantity} {d.planned_unit}</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))
+                    )
+                  ) : (
+                    /* Separation view grouped by tag */
+                    <div className="space-y-3">
+                      {Object.entries(separationByTag)
+                        .sort(([a], [b]) => {
+                          if (a === '__none__') return 1;
+                          if (b === '__none__') return -1;
+                          return (separationByTag[a].tagName || '').localeCompare(separationByTag[b].tagName || '');
+                        })
+                        .map(([key, section]) => (
+                          <div key={key}>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              {section.tagColor ? (
+                                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: section.tagColor }}>
+                                  <span className="w-2 h-2 rounded-full" style={{ background: section.tagColor }} />
+                                  {section.tagName}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Sem tag</span>
+                              )}
+                            </div>
+                            <div className="space-y-0.5 pl-4">
+                              {section.rows.map((r, i) => (
+                                <div key={i} className="flex items-center gap-2 py-1.5 border-b border-border/20 last:border-0">
+                                  <span className="flex-1 text-sm text-foreground">{r.itemName}</span>
+                                  <span className="text-xs font-semibold text-foreground">{fmtNum(r.needed)}</span>
+                                  <span className="text-xs text-muted-foreground">{r.unit}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      }
                     </div>
-                  ))}
+                  )}
                 </>
               )}
             </div>

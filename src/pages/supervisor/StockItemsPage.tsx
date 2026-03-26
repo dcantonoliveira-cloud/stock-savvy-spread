@@ -23,6 +23,12 @@ type Item = {
   current_stock: number; min_stock: number; unit_cost: number;
   purchase_qty: number | null;
   image_url: string | null; barcode: string | null;
+  subcategory_id: string | null;
+  subcategory_name?: string;
+};
+
+type Subcategory = {
+  id: string; name: string; category_id: string;
 };
 
 type Supplier = {
@@ -328,13 +334,14 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
 }
 
 // ─── Item Form ───
-function ItemForm({ item, allCategories, onSave, onCancel }: {
-  item?: Item; allCategories: string[];
+function ItemForm({ item, allCategories, allSubcategories, onSave, onCancel }: {
+  item?: Item; allCategories: string[]; allSubcategories: Subcategory[];
   onSave: (i: Partial<Item> & { name: string; category: string; unit: string }) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(item?.name || '');
   const [category, setCategory] = useState(item?.category || 'Outros');
+  const [subcategoryId, setSubcategoryId] = useState(item?.subcategory_id || '');
   const [unit, setUnit] = useState(item?.unit || UNITS[0]);
   const [currentStock, setCurrentStock] = useState(item?.current_stock?.toString() || '0');
   const [minStock, setMinStock] = useState(item?.min_stock?.toString() || '0');
@@ -342,6 +349,11 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
   const [purchaseQty, setPurchaseQty] = useState(item?.purchase_qty?.toString() || '1');
   const [barcode, setBarcode] = useState(item?.barcode || '');
   const [imageUrl, setImageUrl] = useState(item?.image_url || null);
+
+  // Subcategories filtered by chosen category
+  // We need to know the category_id for the chosen category name
+  // Since we don't have it directly, filter subcats that have items in same category
+  const availableSubcats = allSubcategories; // will be filtered by category name in the display
 
   const handleSubmit = () => {
     if (!name.trim()) { toast.error('Nome é obrigatório'); return; }
@@ -354,7 +366,8 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
       purchase_qty: parseFloat(purchaseQty) || 1,
       barcode: barcode.trim() || null,
       image_url: imageUrl,
-    });
+      subcategory_id: subcategoryId || null,
+    } as any);
   };
 
   return (
@@ -380,7 +393,7 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
-          <Select value={category} onValueChange={setCategory}>
+          <Select value={category} onValueChange={v => { setCategory(v); setSubcategoryId(''); }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>{(allCategories.length > 0 ? allCategories : ['Outros']).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
           </Select>
@@ -393,6 +406,18 @@ function ItemForm({ item, allCategories, onSave, onCancel }: {
           </Select>
         </div>
       </div>
+      {availableSubcats.length > 0 && (
+        <div>
+          <label className="text-sm text-muted-foreground mb-1 block">Subcategoria</label>
+          <Select value={subcategoryId || 'none'} onValueChange={v => setSubcategoryId(v === 'none' ? '' : v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Nenhuma</SelectItem>
+              {availableSubcats.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-4">
         <div>
           <label className="text-sm text-muted-foreground mb-1 block">Estoque Atual</label>
@@ -444,8 +469,10 @@ export default function StockItemsPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
   const [suppliers, setSuppliers] = useState<Record<string, Supplier[]>>({});
+  const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterSubcategory, setFilterSubcategory] = useState('all');
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'current_stock' | 'min_stock' | 'unit_cost' } | null>(null);
   const [editingValue, setEditingValue] = useState('');
@@ -472,14 +499,24 @@ export default function StockItemsPage() {
   const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
 
   const load = async () => {
-    const [itemsRes, catsRes, suppRes] = await Promise.all([
+    const [itemsRes, catsRes, suppRes, subsRes] = await Promise.all([
       supabase.from('stock_items').select('*' as any).order('name'),
       supabase.from('categories').select('name').order('name'),
       supabase.from('item_suppliers').select('*' as any),
+      supabase.from('subcategories').select('id, name, category_id').order('name'),
     ]);
-    if (itemsRes.data) setItems(itemsRes.data as unknown as Item[]);
+    const subcats = (subsRes.data || []) as Subcategory[];
+    setAllSubcategories(subcats);
+    const subMap: Record<string, string> = {};
+    subcats.forEach(s => { subMap[s.id] = s.name; });
+    const rawItems = (itemsRes.data || []) as any[];
+    const mappedItems: Item[] = rawItems.map(i => ({
+      ...i,
+      subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined,
+    }));
+    setItems(mappedItems);
     const dbCats = (catsRes.data || []).map((c: any) => c.name);
-    const usedCats = itemsRes.data ? [...new Set((itemsRes.data as any[]).map(i => i.category))] : [];
+    const usedCats = rawItems.length > 0 ? [...new Set(rawItems.map(i => i.category))] : [];
     setAllCategories([...new Set([...dbCats, ...usedCats])].filter(c => c && c.trim() !== '' && c !== '_sistema_').sort());
     const suppMap: Record<string, Supplier[]> = {};
     for (const s of ((suppRes.data || []) as Supplier[])) {
@@ -718,7 +755,8 @@ export default function StockItemsPage() {
     .filter(i => {
       const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
       const matchCat = filterCategory === 'all' || i.category === filterCategory;
-      return matchSearch && matchCat;
+      const matchSub = filterSubcategory === 'all' || i.subcategory_id === filterSubcategory;
+      return matchSearch && matchCat && matchSub;
     })
     .sort((a, b) => {
       let va: any = a[sortField], vb: any = b[sortField];
@@ -758,12 +796,12 @@ export default function StockItemsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-4">
+      <div className="flex gap-3 mb-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9 h-9 bg-white" placeholder="Buscar item..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
+        <Select value={filterCategory} onValueChange={v => { setFilterCategory(v); setFilterSubcategory('all'); }}>
           <SelectTrigger className="w-48 h-9 bg-white"><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as categorias</SelectItem>
@@ -771,6 +809,34 @@ export default function StockItemsPage() {
           </SelectContent>
         </Select>
       </div>
+      {/* Subcategory filter chips */}
+      {filterCategory !== 'all' && (() => {
+        const catSubcats = allSubcategories.filter(s => {
+          const catItems = items.filter(i => i.category === filterCategory);
+          return catItems.some(i => i.subcategory_id === s.id);
+        });
+        if (catSubcats.length === 0) return null;
+        return (
+          <div className="flex gap-2 mb-4 flex-wrap">
+            <button
+              onClick={() => setFilterSubcategory('all')}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${filterSubcategory === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-white border-border text-muted-foreground hover:text-foreground'}`}
+            >
+              Todas
+            </button>
+            {catSubcats.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setFilterSubcategory(filterSubcategory === s.id ? 'all' : s.id)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${filterSubcategory === s.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-white border-border text-muted-foreground hover:text-foreground'}`}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+      {filterCategory === 'all' && <div className="mb-4" />}
 
       {/* Table */}
       <div className="rounded-xl border border-border overflow-hidden bg-white shadow-sm">
@@ -818,10 +884,15 @@ export default function StockItemsPage() {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         {isLow && <div className="w-1.5 h-1.5 rounded-full bg-destructive flex-shrink-0" title="Estoque abaixo do mínimo" />}
-                        <span
-                          className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
-                          onClick={() => navigate(`/items/${item.id}`)}
-                        >{item.name}</span>
+                        <div className="min-w-0">
+                          <span
+                            className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
+                            onClick={() => navigate(`/items/${item.id}`)}
+                          >{item.name}</span>
+                          {item.subcategory_name && (
+                            <span className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">{item.subcategory_name}</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
@@ -919,7 +990,7 @@ export default function StockItemsPage() {
             <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
             <DialogDescription>{editingItem ? 'Atualize os dados do item' : 'Preencha os dados do novo item'}</DialogDescription>
           </DialogHeader>
-          <ItemForm item={editingItem} allCategories={allCategories} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
+          <ItemForm item={editingItem} allCategories={allCategories} allSubcategories={allSubcategories} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
         </DialogContent>
       </Dialog>
 
