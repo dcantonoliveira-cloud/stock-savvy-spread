@@ -670,6 +670,11 @@ export default function EventMenuDetailPage() {
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [addSheetDefaultSection, setAddSheetDefaultSection] = useState<string | undefined>(undefined);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [sepDefaultEmp, setSepDefaultEmp] = useState('');
+  const [sepOverrides, setSepOverrides] = useState<Record<string, string>>({});
+  const [sepCurrentStock, setSepCurrentStock] = useState<Record<string, number>>({});
+  const [sepRefreshing, setSepRefreshing] = useState(false);
+  const [sepSaving, setSepSaving] = useState(false);
   const [renamingSectionName, setRenamingSectionName] = useState<string | null>(null);
   const [renamingSectionValue, setRenamingSectionValue] = useState('');
 
@@ -1337,6 +1342,84 @@ export default function EventMenuDetailPage() {
   const canAssign = menu.status === 'draft' || menu.status === 'assigned';
   const canReturn = menu.status === 'dispatched';
 
+  const buildSepGroups = () => {
+    type SepGroup = { key: string; label: string; color?: string; isTag: boolean; entries: { item: ShoppingItem; needed: number }[] };
+    const groupMap = new Map<string, SepGroup>();
+    const groupOrder: string[] = [];
+    const ensure = (key: string, label: string, isTag: boolean, color?: string) => {
+      if (!groupMap.has(key)) { groupMap.set(key, { key, label, color, isTag, entries: [] }); groupOrder.push(key); }
+    };
+    shoppingList.forEach(item => {
+      if (item.tagBreakdown && item.tagBreakdown.length > 0) {
+        item.tagBreakdown.forEach(tb => {
+          if (tb.tagId && tb.tagName) {
+            const gk = `tag::${tb.tagId}`;
+            ensure(gk, tb.tagName, true, tb.tagColor || undefined);
+            groupMap.get(gk)!.entries.push({ item, needed: tb.needed });
+          } else {
+            const gk = `cat::${item.category || 'Outros'}`;
+            ensure(gk, item.category || 'Outros', false);
+            groupMap.get(gk)!.entries.push({ item, needed: tb.needed });
+          }
+        });
+      } else {
+        const gk = `cat::${item.category || 'Outros'}`;
+        ensure(gk, item.category || 'Outros', false);
+        groupMap.get(gk)!.entries.push({ item, needed: item.needed });
+      }
+    });
+    return groupOrder.map(k => groupMap.get(k)!).sort((a, b) => {
+      if (a.isTag !== b.isTag) return a.isTag ? 1 : -1;
+      return a.label.localeCompare(b.label);
+    });
+  };
+
+  const handleSepRefreshStock = async () => {
+    setSepRefreshing(true);
+    const ids = [...new Set(shoppingList.map(i => i.id))];
+    const { data } = await supabase.from('stock_items').select('id, current_stock').in('id', ids);
+    if (data) {
+      const updated: Record<string, number> = {};
+      (data as any[]).forEach((d: any) => { updated[d.id] = d.current_stock; });
+      setSepCurrentStock(updated);
+      toast.success('Estoque atualizado!');
+    }
+    setSepRefreshing(false);
+  };
+
+  const handleSepAssign = async () => {
+    const groups = buildSepGroups();
+    const getEmpForGroup = (gk: string) => sepOverrides[gk] ?? sepDefaultEmp;
+    const anyAssigned = groups.some(g => getEmpForGroup(g.key));
+    if (!anyAssigned) { toast.error('Atribua ao menos um grupo a um funcionário'); return; }
+    setSepSaving(true);
+    try {
+      await supabase.from('event_separation_items').delete().eq('menu_id', id!);
+      const rows: any[] = [];
+      groups.forEach(group => {
+        const empId = getEmpForGroup(group.key) || null;
+        group.entries.forEach(({ item, needed }) => {
+          rows.push({ menu_id: id, item_id: item.id, planned_quantity: needed, status: 'pending', assigned_to: empId, category: group.label });
+        });
+      });
+      const { error: insertError } = await supabase.from('event_separation_items').insert(rows as any);
+      if (insertError) throw insertError;
+      const primaryEmp = sepDefaultEmp || Object.values(sepOverrides).find(Boolean) || '';
+      await supabase.from('event_menus').update({ assigned_to: primaryEmp || null, assigned_at: new Date().toISOString(), assigned_by: profile?.display_name || 'Supervisor', status: 'assigned' } as any).eq('id', id!);
+      const assignedEmps = [...new Set(groups.map(g => getEmpForGroup(g.key)).filter(Boolean))];
+      const names = assignedEmps.map(uid => employees.find(e => e.user_id === uid)?.display_name).filter(Boolean);
+      toast.success(`Separação atribuída para ${names.join(', ')}!`);
+      setSepOverrides({});
+      setSepDefaultEmp('');
+      await loadMenu();
+    } catch (err) {
+      toast.error('Erro ao atribuir separação');
+      console.error(err);
+    } finally {
+      setSepSaving(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto">
       <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-muted-foreground" onClick={() => navigate('/event-menus')}>
@@ -1753,84 +1836,24 @@ export default function EventMenuDetailPage() {
               )}
 
               {/* ── Category / Separation view ── */}
-              {shopGroupMode === 'category' && (() => {
-                // Build display groups: untagged items → category section, tagged items → tag section
-                type DispGroup = { key: string; label: string; color?: string; isTag: boolean; rows: { item: ShoppingItem; needed: number }[] };
-                const groupMap = new Map<string, DispGroup>();
-                const groupOrder: string[] = [];
-                const ensureGroup = (key: string, label: string, isTag: boolean, color?: string) => {
-                  if (!groupMap.has(key)) { groupMap.set(key, { key, label, color, isTag, rows: [] }); groupOrder.push(key); }
-                };
-                filteredShoppingList.forEach(item => {
-                  if (item.tagBreakdown && item.tagBreakdown.length > 0) {
-                    item.tagBreakdown.forEach(tb => {
-                      if (tb.tagId && tb.tagName) {
-                        const gk = `tag::${tb.tagId}`;
-                        ensureGroup(gk, tb.tagName, true, tb.tagColor || undefined);
-                        groupMap.get(gk)!.rows.push({ item, needed: tb.needed });
-                      } else {
-                        const gk = `cat::${item.category || 'Outros'}`;
-                        ensureGroup(gk, item.category || 'Outros', false);
-                        groupMap.get(gk)!.rows.push({ item, needed: tb.needed });
-                      }
-                    });
-                  } else {
-                    const gk = `cat::${item.category || 'Outros'}`;
-                    ensureGroup(gk, item.category || 'Outros', false);
-                    groupMap.get(gk)!.rows.push({ item, needed: item.needed });
-                  }
-                });
-                // Sort: categories first (alphabetical), then tags (alphabetical)
-                const sortedGroups = groupOrder
-                  .map(k => groupMap.get(k)!)
-                  .sort((a, b) => {
-                    if (a.isTag !== b.isTag) return a.isTag ? 1 : -1;
-                    return a.label.localeCompare(b.label);
-                  });
-
-                return (
-                  <div>
-                    <table className="w-full text-sm">
-                      <thead><tr className="border-b border-border text-xs" style={{ background: 'hsl(40 30% 97%)' }}><th className="text-left px-5 py-3 font-semibold text-muted-foreground">INSUMO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">NECESSÁRIO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">EM ESTOQUE</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">A COMPRAR</th><th className="text-right px-5 py-3 font-semibold text-muted-foreground">CUSTO EST.</th></tr></thead>
-                      <tbody>
-                        {filteredShoppingList.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm">Nenhum item neste filtro</td></tr>}
-                        {sortedGroups.map(group => (
-                          <React.Fragment key={group.key}>
-                            {/* Group header row */}
-                            <tr>
-                              <td colSpan={5} className="px-5 py-2.5 border-t border-border" style={{ background: group.isTag ? `${group.color}18` : 'hsl(40 30% 97%)' }}>
-                                <div className="flex items-center gap-2">
-                                  {group.isTag && group.color && (
-                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: group.color }} />
-                                  )}
-                                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                    {group.isTag ? `🏷 ${group.label}` : group.label}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground/60">({group.rows.length})</span>
-                                </div>
-                              </td>
-                            </tr>
-                            {/* Items in group */}
-                            {group.rows.map(({ item, needed }, ri) => {
-                              const rowToBuy = Math.max(0, needed - item.inStock);
-                              return (
-                                <tr key={`${item.id}::${group.key}::${ri}`} className={`divide-border/50 border-t border-border/30 ${rowToBuy > 0 ? 'bg-red-50/30' : ''}`}>
-                                  <td className="px-5 py-3"><div className="flex items-center gap-2">{rowToBuy > 0 ? <TrendingDown className="w-3.5 h-3.5 text-destructive flex-shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />}<span className={rowToBuy > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}>{item.name}</span>{item.supplier && <span className="text-[10px] text-muted-foreground/60 italic ml-1">({item.supplier})</span>}</div></td>
-                                  <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(needed)} {item.unit}</td>
-                                  <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(item.inStock)} {item.unit}</td>
-                                  <td className="px-4 py-3 text-right font-semibold">{rowToBuy > 0 ? <span className="text-destructive">{fmtNum(rowToBuy)} {item.unit}</span> : <span className="text-success text-xs">✓ ok</span>}</td>
-                                  <td className="px-5 py-3 text-right text-muted-foreground">{rowToBuy > 0 ? `R$ ${fmtCur(rowToBuy * item.unitCost)}` : '—'}</td>
-                                </tr>
-                              );
-                            })}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                      <tfoot><tr className="border-t-2 border-border" style={{ background: 'hsl(40 30% 97%)' }}><td colSpan={4} className="px-5 py-3 text-right font-semibold text-foreground">Total estimado para comprar:</td><td className="px-5 py-3 text-right font-bold text-lg gold-text">{fmtCur(totalToBuy)}</td></tr></tfoot>
-                    </table>
-                  </div>
-                );
-              })()}
+              {shopGroupMode === 'category' && (
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b border-border text-xs" style={{ background: 'hsl(40 30% 97%)' }}><th className="text-left px-5 py-3 font-semibold text-muted-foreground">INSUMO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">NECESSÁRIO</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">EM ESTOQUE</th><th className="text-right px-4 py-3 font-semibold text-muted-foreground">A COMPRAR</th><th className="text-right px-5 py-3 font-semibold text-muted-foreground">CUSTO EST.</th></tr></thead>
+                  <tbody className="divide-y divide-border/50">
+                    {filteredShoppingList.map(item => (
+                      <tr key={item.id} className={item.toBuy > 0 ? 'bg-red-50/30' : ''}>
+                        <td className="px-5 py-3"><div className="flex items-center gap-2">{item.toBuy > 0 ? <TrendingDown className="w-3.5 h-3.5 text-destructive flex-shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />}<span className={item.toBuy > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}>{item.name}</span>{item.supplier && <span className="text-[10px] text-muted-foreground/60 italic ml-1">({item.supplier})</span>}</div></td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(item.needed)} {item.unit}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(item.inStock)} {item.unit}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{item.toBuy > 0 ? <span className="text-destructive">{fmtNum(item.toBuy)} {item.unit}</span> : <span className="text-success text-xs">✓ ok</span>}</td>
+                        <td className="px-5 py-3 text-right text-muted-foreground">{item.toBuy > 0 ? `R$ ${fmtCur(item.toBuy * item.unitCost)}` : '—'}</td>
+                      </tr>
+                    ))}
+                    {filteredShoppingList.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm">Nenhum item neste filtro</td></tr>}
+                  </tbody>
+                  <tfoot><tr className="border-t-2 border-border" style={{ background: 'hsl(40 30% 97%)' }}><td colSpan={4} className="px-5 py-3 text-right font-semibold text-foreground">Total estimado para comprar:</td><td className="px-5 py-3 text-right font-bold text-lg gold-text">{fmtCur(totalToBuy)}</td></tr></tfoot>
+                </table>
+              )}
 
               {/* ── Supplier view ── */}
               {shopGroupMode === 'supplier' && (
@@ -2209,28 +2232,94 @@ export default function EventMenuDetailPage() {
           </div>
 
           {/* Action cards */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             {/* Assign card */}
-            <div className={`bg-white rounded-xl border shadow-sm p-5 ${canAssign ? 'border-primary/30' : 'border-border opacity-60'}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <UserCheck className={`w-5 h-5 ${canAssign ? 'text-primary' : 'text-muted-foreground'}`} />
-                <p className="font-semibold text-foreground">Atribuir Separação</p>
+            <div className={`bg-white rounded-xl border shadow-sm p-5 ${canAssign ? 'border-primary/30' : 'border-border'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <UserCheck className={`w-5 h-5 ${canAssign ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <p className="font-semibold text-foreground">Atribuir Separação</p>
+                  <span className="text-xs text-muted-foreground">({shoppingList.length} insumos · {buildSepGroups().length} grupos)</span>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleSepRefreshStock} disabled={sepRefreshing || !canAssign}>
+                  {sepRefreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                  Atualizar Estoque
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Distribua a separação por categoria entre funcionários. Cada um verá seus itens no app.
-              </p>
-              <div className="text-xs text-muted-foreground mb-4 space-y-1">
-                <p>• {shoppingList.length} insumos para separar</p>
-                {menu.status === 'assigned'
-                  ? <p>• <span className="text-primary font-medium">Separação já atribuída</span> — clique para reatribuir</p>
-                  : <p>• Nenhum funcionário designado ainda</p>
-                }
-                {insufficientCount > 0 && <p>• <span className="text-warning font-medium">{insufficientCount} itens com estoque insuficiente</span></p>}
-              </div>
-              <Button className="w-full" disabled={!canAssign} onClick={() => setAssignOpen(true)}>
-                <UserCheck className="w-4 h-4 mr-2" />
-                {menu.status === 'assigned' ? 'Reatribuir Separação' : menu.status === 'dispatched' || menu.status === 'completed' ? 'Separação concluída' : 'Atribuir Separação'}
-              </Button>
+
+              {!canAssign && (menu.status === 'dispatched' || menu.status === 'completed') ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">Separação concluída — evento já foi expedido.</p>
+              ) : (
+                <>
+                  {/* Default employee */}
+                  <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-muted/20 border border-border">
+                    <p className="text-xs font-medium text-muted-foreground flex-1">RESPONSÁVEL PADRÃO (todos os grupos)</p>
+                    <Select value={sepDefaultEmp || '__none__'} onValueChange={v => setSepDefaultEmp(v === '__none__' ? '' : v)}>
+                      <SelectTrigger className="h-8 text-xs w-48">
+                        <SelectValue placeholder="Selecionar padrão..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__"><span className="text-muted-foreground italic">Nenhum</span></SelectItem>
+                        {employees.map(e => <SelectItem key={e.user_id} value={e.user_id}>{e.display_name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Groups */}
+                  <div className="space-y-2 max-h-[480px] overflow-y-auto pr-0.5">
+                    {buildSepGroups().map(group => {
+                      const overrideEmpId = sepOverrides[group.key] ?? '';
+                      const effectiveEmpId = overrideEmpId || sepDefaultEmp;
+                      const effectiveEmpName = effectiveEmpId ? employees.find(e => e.user_id === effectiveEmpId)?.display_name : null;
+                      return (
+                        <div key={group.key} className="border border-border rounded-xl overflow-hidden">
+                          <div className="flex items-center justify-between px-3 py-2.5 gap-3" style={{ background: group.isTag ? `${group.color}18` : 'hsl(40 30% 97%)' }}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              {group.isTag && group.color && <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: group.color }} />}
+                              <span className="font-semibold text-sm text-foreground truncate">{group.isTag ? `🏷 ${group.label}` : group.label}</span>
+                              <span className="text-xs text-muted-foreground">({group.entries.length})</span>
+                              {overrideEmpId && <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">personalizado</Badge>}
+                              {!overrideEmpId && effectiveEmpName && <span className="text-xs text-muted-foreground italic truncate hidden sm:block">↑ {effectiveEmpName}</span>}
+                            </div>
+                            <Select value={overrideEmpId || '__none__'} onValueChange={v => setSepOverrides(prev => ({ ...prev, [group.key]: v === '__none__' ? '' : v }))}>
+                              <SelectTrigger className="h-7 text-xs w-40 flex-shrink-0">
+                                <SelectValue placeholder={effectiveEmpName ? `↑ ${effectiveEmpName}` : 'Atribuir...'} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__"><span className="text-muted-foreground italic">Padrão</span></SelectItem>
+                                {employees.map(e => <SelectItem key={e.user_id} value={e.user_id}>{e.display_name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <table className="w-full text-xs">
+                            <tbody className="divide-y divide-border/30">
+                              {group.entries.map(({ item, needed }, ri) => {
+                                const stock = sepCurrentStock[item.id] ?? item.inStock;
+                                const ok = stock >= needed;
+                                return (
+                                  <tr key={`${item.id}::${ri}`} className={!ok ? 'bg-destructive/5' : ''}>
+                                    <td className="py-1.5 px-3 font-medium text-foreground">{item.name} <span className="text-muted-foreground font-normal">({item.unit})</span></td>
+                                    <td className="py-1.5 px-3 text-right text-muted-foreground whitespace-nowrap">{fmtNum(needed)}</td>
+                                    <td className={`py-1.5 px-3 text-right font-semibold whitespace-nowrap ${ok ? 'text-success' : 'text-destructive'}`}>{fmtNum(stock)}</td>
+                                    <td className="py-1.5 px-3 text-center w-8">{ok ? <CheckCircle2 className="w-3.5 h-3.5 text-success mx-auto" /> : <AlertTriangle className="w-3.5 h-3.5 text-destructive mx-auto" />}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-4 flex justify-end">
+                    <Button onClick={handleSepAssign} disabled={sepSaving || !canAssign} className="gold-button gap-1.5">
+                      {sepSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                      {menu.status === 'assigned' ? 'Reatribuir Separação' : 'Atribuir Separação'}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Return card */}
