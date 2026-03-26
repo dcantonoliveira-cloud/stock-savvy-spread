@@ -779,11 +779,31 @@ export default function EventMenuDetailPage() {
     const stockData = (itemsRes.data || []) as unknown as StockItem[];
     setStockItems(stockData);
 
+    // Helper: fetch sheet items with tag info, falling back to basic query if tag columns don't exist yet
+    const fetchSheetItems = async (sheetId: string): Promise<any[]> => {
+      const { data, error } = await supabase
+        .from('technical_sheet_items')
+        .select('id, item_id, quantity, unit_cost, section, unit, tag_id, tags(id, name, color)')
+        .eq('sheet_id', sheetId);
+      if (!error && data) return data;
+      // Fallback: migration may not have been applied yet — query without tag columns
+      const { data: basic } = await supabase
+        .from('technical_sheet_items')
+        .select('id, item_id, quantity, unit_cost, section, unit')
+        .eq('sheet_id', sheetId);
+      return basic || [];
+    };
+    const mapSheetItems = (raw: any[]): SheetItem[] =>
+      raw.map((i: any) => {
+        const item = stockData.find(x => x.id === i.item_id);
+        const recipeUnit = i.unit || item?.unit || '';
+        return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: String(i.quantity), unit: recipeUnit, unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita', tagId: i.tag_id || null, tagName: i.tags?.name || null, tagColor: i.tags?.color || null };
+      });
+
     if (sheetsRes.data) {
       const loaded = await Promise.all((sheetsRes.data as any[]).map(async s => {
-        const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, unit, tag_id, tags(id, name, color)').eq('sheet_id', s.id);
-        const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); const recipeUnit = i.unit || item?.unit || ''; return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: String(i.quantity), unit: recipeUnit, unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita', tagId: i.tag_id || null, tagName: i.tags?.name || null, tagColor: i.tags?.color || null }; });
-        return { ...s, items } as Sheet;
+        const raw = await fetchSheetItems(s.id);
+        return { ...s, items: mapSheetItems(raw) } as Sheet;
       }));
       setAllSheets(loaded);
     }
@@ -792,8 +812,8 @@ export default function EventMenuDetailPage() {
     const enrichedDishes: MenuDish[] = await Promise.all((dishes || []).map(async (d: any) => {
       const sheet = (sheetsRes.data as any[])?.find(s => s.id === d.sheet_id);
       if (!sheet) return { id: d.id, sheet_id: d.sheet_id, sheet_name: '?', planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', notes: d.notes || null, decoration: d.decoration || null, section_name: d.section_name || null, sheet: null, expanded: false, isMantimentos: d.sheet_id === MANTIMENTOS_ID };
-      const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, unit, tag_id, tags(id, name, color)').eq('sheet_id', d.sheet_id);
-      const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); const recipeUnit = i.unit || item?.unit || ''; return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: String(i.quantity), unit: recipeUnit, unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita', tagId: i.tag_id || null, tagName: i.tags?.name || null, tagColor: i.tags?.color || null }; });
+      const raw = await fetchSheetItems(d.sheet_id);
+      const items = mapSheetItems(raw);
       return { id: d.id, sheet_id: d.sheet_id, sheet_name: sheet.name, planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', notes: d.notes || null, decoration: d.decoration || null, section_name: d.section_name || null, sheet: { ...sheet, items }, expanded: false, isMantimentos: d.sheet_id === MANTIMENTOS_ID };
     }));
 
