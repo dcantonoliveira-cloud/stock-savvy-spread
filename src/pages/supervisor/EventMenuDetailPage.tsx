@@ -779,27 +779,26 @@ export default function EventMenuDetailPage() {
     const stockData = (itemsRes.data || []) as unknown as StockItem[];
     setStockItems(stockData);
 
-    // Helper: fetch sheet items — always uses a reliable basic query, then enriches with tag info
+    // Helper: fetch sheet items — queries only guaranteed columns, enriches with optional columns
     const fetchSheetItems = async (sheetId: string): Promise<any[]> => {
-      // Basic query first — always works regardless of migration state
+      // Core columns that have always existed in the schema
       const { data: basic, error: basicErr } = await supabase
         .from('technical_sheet_items')
-        .select('id, item_id, quantity, unit_cost, section, unit')
+        .select('id, item_id, quantity, unit_cost')
         .eq('sheet_id', sheetId);
-      if (basicErr || !basic) return [];
+      if (basicErr || !basic || basic.length === 0) return basic || [];
 
-      // Try to enrich with tag info (requires migration — silently skips if not applied)
-      try {
-        const { data: tagData } = await supabase
-          .from('technical_sheet_items')
-          .select('id, tag_id, tags(id, name, color)')
-          .eq('sheet_id', sheetId);
-        if (tagData && tagData.length > 0) {
-          const tagMap: Record<string, any> = {};
-          (tagData as any[]).forEach((t: any) => { tagMap[t.id] = { tag_id: t.tag_id, tags: t.tags }; });
-          return basic.map((item: any) => ({ ...item, ...tagMap[item.id] }));
-        }
-      } catch { /* migration not applied yet — return basic items */ }
+      // Try to get optional columns added by later migrations (unit, section, tag_id, tags)
+      const { data: extra } = await supabase
+        .from('technical_sheet_items')
+        .select('id, unit, section, tag_id, tags(id, name, color)')
+        .eq('sheet_id', sheetId);
+
+      if (extra && extra.length > 0) {
+        const extraMap: Record<string, any> = {};
+        (extra as any[]).forEach((e: any) => { extraMap[e.id] = e; });
+        return basic.map((item: any) => ({ ...item, ...extraMap[item.id] }));
+      }
 
       return basic;
     };
