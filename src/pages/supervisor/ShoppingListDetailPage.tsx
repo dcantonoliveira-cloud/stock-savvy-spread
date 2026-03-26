@@ -14,11 +14,14 @@ import { fmtNum, fmtCur } from '@/lib/format';
 
 const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
 
+type TagBreakdownEntry = { tagId: string | null; tagName: string | null; tagColor: string | null; needed: number; toBuy: number };
 type ShoppingItem = {
   id: string; name: string; unit: string; category: string;
   needed: number; inStock: number; toBuy: number; unitCost: number;
   supplier?: string;
+  tagBreakdown?: TagBreakdownEntry[];
 };
+type TagRow = { id: string; name: string; color: string };
 type EventSummary = { id: string; name: string; event_date: string | null; guest_count: number };
 
 export default function ShoppingListDetailPage() {
@@ -32,7 +35,9 @@ export default function ShoppingListDetailPage() {
   const [loading, setLoading] = useState(false);
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [events, setEvents] = useState<EventSummary[]>([]);
-  const [shopGroupMode, setShopGroupMode] = useState<'category' | 'supplier'>('category');
+  const [allTags, setAllTags] = useState<TagRow[]>([]);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [shopGroupMode, setShopGroupMode] = useState<'category' | 'supplier' | 'tag'>('category');
   const [shopFilter, setShopFilter] = useState<'all' | 'ok' | 'buy'>('all');
   const [qtyOverrides, setQtyOverrides] = useState<Record<string, number | string>>({});
   const [copyingSupplier, setCopyingSupplier] = useState<string | null>(null);
@@ -67,12 +72,17 @@ export default function ShoppingListDetailPage() {
 
       const sheetIds = [...new Set((dishesData || []).map((d: any) => d.sheet_id).filter(Boolean))];
 
-      const [sheetsRes, sheetItemsRes] = await Promise.all([
+      const [sheetsRes, sheetItemsRes, tagsRes] = await Promise.all([
         supabase.from('technical_sheets').select('id, name, yield_quantity').in('id', sheetIds),
-        supabase.from('technical_sheet_items').select('id, sheet_id, item_id, quantity, section').in('sheet_id', sheetIds),
+        supabase.from('technical_sheet_items').select('id, sheet_id, item_id, quantity, section, tag_id').in('sheet_id', sheetIds),
+        supabase.from('tags').select('id, name, color').order('name'),
       ]);
       const sheetsData = sheetsRes.data || [];
       const sheetItemsData = sheetItemsRes.data || [];
+      const tagsData = (tagsRes.data || []) as TagRow[];
+      setAllTags(tagsData);
+      const tagsMap: Record<string, TagRow> = {};
+      tagsData.forEach(t => { tagsMap[t.id] = t; });
 
       const referencedItemIds = [...new Set(sheetItemsData.map((si: any) => si.item_id).filter(Boolean))];
       const { data: stockData } = await supabase
@@ -89,6 +99,8 @@ export default function ShoppingListDetailPage() {
       (menusData || []).forEach((m: any) => { menusMap[m.id] = m; });
 
       const map: Record<string, ShoppingItem> = {};
+      // tagMap keyed by `${item_id}::${tag_id||''}` → needed qty per tag
+      const tagMap: Record<string, { tagId: string | null; tagName: string | null; tagColor: string | null; needed: number }> = {};
       (dishesData || []).forEach((dish: any) => {
         const menu = menusMap[dish.menu_id];
         if (!menu) return;
@@ -109,11 +121,32 @@ export default function ShoppingListDetailPage() {
             map[si.item_id] = { id: si.item_id, name: s?.name || si.item_id, unit: itemUnit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: s?.unit_cost || 0 };
           }
           map[si.item_id].needed += needed;
+          // Tag breakdown
+          const tagId = si.tag_id || null;
+          const tag = tagId ? tagsMap[tagId] : null;
+          const tagKey = `${si.item_id}::${tagId || ''}`;
+          if (!tagMap[tagKey]) {
+            tagMap[tagKey] = { tagId, tagName: tag?.name || null, tagColor: tag?.color || null, needed: 0 };
+          }
+          tagMap[tagKey].needed += needed;
         });
       });
 
       const rawList = Object.values(map)
-        .map(i => ({ ...i, toBuy: Math.max(0, i.needed - i.inStock) }))
+        .map(i => {
+          const toBuy = Math.max(0, i.needed - i.inStock);
+          // Attach tag breakdown with toBuy proportional to needed
+          const breakdown: TagBreakdownEntry[] = Object.entries(tagMap)
+            .filter(([k]) => k.startsWith(i.id + '::'))
+            .map(([, v]) => ({
+              tagId: v.tagId,
+              tagName: v.tagName,
+              tagColor: v.tagColor,
+              needed: v.needed,
+              toBuy: i.needed > 0 ? (v.needed / i.needed) * toBuy : 0,
+            }));
+          return { ...i, toBuy, tagBreakdown: breakdown };
+        })
         .sort((a, b) => a.name.localeCompare(b.name));
 
       if (rawList.length > 0) {
@@ -146,6 +179,9 @@ export default function ShoppingListDetailPage() {
     if (shopFilter === 'ok') return i.toBuy === 0;
     if (shopFilter === 'buy') return i.toBuy > 0;
     return true;
+  }).filter(i => {
+    if (!tagFilter) return true;
+    return (i.tagBreakdown || []).some(t => t.tagId === tagFilter);
   });
 
   const suppliersInList = [...new Set(shoppingList.filter(i => i.toBuy > 0 && i.supplier).map(i => i.supplier!))].sort();
@@ -297,8 +333,8 @@ export default function ShoppingListDetailPage() {
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex gap-1 bg-border/40 rounded-lg p-0.5">
-                {([['category', 'Por Categoria'], ['supplier', 'Por Fornecedor']] as const).map(([v, l]) => (
-                  <button key={v} onClick={() => setShopGroupMode(v)}
+                {([['category', 'Por Categoria'], ['supplier', 'Por Fornecedor'], ['tag', 'Por Tag']] as const).map(([v, l]) => (
+                  <button key={v} onClick={() => setShopGroupMode(v as any)}
                     className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${shopGroupMode === v ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{l}</button>
                 ))}
               </div>
@@ -317,6 +353,29 @@ export default function ShoppingListDetailPage() {
             </div>
           </div>
 
+          {/* Tag filter pills (shown for category mode when tags exist) */}
+          {shopGroupMode === 'category' && allTags.length > 0 && (
+            <div className="flex gap-2 px-5 py-2.5 border-b border-border flex-wrap" style={{ background: 'hsl(40 30% 98%)' }}>
+              <button
+                onClick={() => setTagFilter(null)}
+                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all ${tagFilter === null ? 'bg-foreground text-background border-foreground' : 'bg-white border-border text-muted-foreground hover:text-foreground'}`}
+              >
+                Todas
+              </button>
+              {allTags.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setTagFilter(tagFilter === t.id ? null : t.id)}
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1 ${tagFilter === t.id ? 'text-white' : 'bg-white text-muted-foreground hover:text-foreground border-border'}`}
+                  style={tagFilter === t.id ? { background: t.color, borderColor: t.color } : {}}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: tagFilter === t.id ? '#fff' : t.color }} />
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Category view */}
           {shopGroupMode === 'category' && (
             <table className="w-full text-sm">
@@ -333,12 +392,25 @@ export default function ShoppingListDetailPage() {
                 {filteredList.map(item => (
                   <tr key={item.id} className={item.toBuy > 0 ? 'bg-red-50/30' : ''}>
                     <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        {item.toBuy > 0
-                          ? <TrendingDown className="w-3.5 h-3.5 text-destructive flex-shrink-0" />
-                          : <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />}
-                        <span className={item.toBuy > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}>{item.name}</span>
-                        {item.supplier && <span className="text-[10px] text-muted-foreground/60 italic ml-1">({item.supplier})</span>}
+                      <div className="flex items-start gap-2">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {item.toBuy > 0
+                            ? <TrendingDown className="w-3.5 h-3.5 text-destructive" />
+                            : <CheckCircle2 className="w-3.5 h-3.5 text-success" />}
+                        </div>
+                        <div className="min-w-0">
+                          <span className={item.toBuy > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}>{item.name}</span>
+                          {item.supplier && <span className="text-[10px] text-muted-foreground/60 italic ml-1">({item.supplier})</span>}
+                          {(item.tagBreakdown || []).length > 1 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(item.tagBreakdown || []).map((t, ti) => (
+                                <span key={ti} className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: (t.tagColor || '#6366f1') + '20', color: t.tagColor || '#6366f1' }}>
+                                  {t.tagName || 'Sem tag'} {fmtNum(t.needed)}{item.unit}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(item.needed)} {item.unit}</td>
@@ -365,6 +437,61 @@ export default function ShoppingListDetailPage() {
               </tfoot>
             </table>
           )}
+
+          {/* Tag view */}
+          {shopGroupMode === 'tag' && (() => {
+            // Build tag sections: for each tag, collect all items that have usage under that tag
+            const tagSections: Record<string, { tag: TagRow | null; rows: { item: ShoppingItem; needed: number; toBuy: number }[] }> = {};
+            shoppingList.filter(i => i.toBuy > 0).forEach(item => {
+              (item.tagBreakdown || []).filter(t => t.needed > 0).forEach(t => {
+                const key = t.tagId || '__none__';
+                if (!tagSections[key]) tagSections[key] = { tag: t.tagId ? allTags.find(x => x.id === t.tagId) || null : null, rows: [] };
+                tagSections[key].rows.push({ item, needed: t.needed, toBuy: t.toBuy });
+              });
+            });
+            const sortedKeys = Object.keys(tagSections).sort((a, b) => {
+              if (a === '__none__') return 1;
+              if (b === '__none__') return -1;
+              return (tagSections[a].tag?.name || '').localeCompare(tagSections[b].tag?.name || '');
+            });
+            return (
+              <div className="divide-y divide-border/50">
+                {sortedKeys.length === 0 && <p className="px-5 py-8 text-center text-muted-foreground text-sm">Nenhum item a comprar.</p>}
+                {sortedKeys.map(key => {
+                  const section = tagSections[key];
+                  const tag = section.tag;
+                  return (
+                    <div key={key}>
+                      <div className="flex items-center gap-3 px-5 py-3 bg-muted/20">
+                        {tag ? (
+                          <span className="flex items-center gap-1.5 font-semibold text-sm" style={{ color: tag.color }}>
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ background: tag.color }} />
+                            {tag.name}
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-muted-foreground text-sm">Sem tag</span>
+                        )}
+                        <span className="text-xs text-muted-foreground">({section.rows.length} item{section.rows.length !== 1 ? 's' : ''})</span>
+                      </div>
+                      <table className="w-full text-sm">
+                        <tbody className="divide-y divide-border/40">
+                          {section.rows.sort((a, b) => a.item.name.localeCompare(b.item.name)).map(({ item, needed, toBuy }) => (
+                            <tr key={item.id}>
+                              <td className="px-5 py-2.5 font-medium text-foreground">{item.name}</td>
+                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{item.unit}</td>
+                              <td className="px-4 py-2.5 text-right text-muted-foreground">{fmtNum(needed)}</td>
+                              <td className="px-4 py-2.5 text-right font-semibold text-destructive">{fmtNum(toBuy)}</td>
+                              <td className="px-5 py-2.5 text-right text-muted-foreground text-xs">R$ {fmtCur(toBuy * item.unitCost)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Supplier view */}
           {shopGroupMode === 'supplier' && (

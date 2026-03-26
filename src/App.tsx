@@ -21,6 +21,7 @@ import UsersPage from "./pages/supervisor/UsersPage";
 import NotificationsPage from "./pages/supervisor/NotificationsPage";
 import AIAnalysisPage from "./pages/supervisor/AIAnalysisPage";
 import CategoriesPage from "./pages/supervisor/CategoriesPage";
+import TagsPage from "./pages/supervisor/TagsPage";
 import CategoryDetailPage from "./pages/supervisor/CategoryDetailPage";
 import StockItemDetailPage from "./pages/supervisor/StockItemDetailPage";
 import InventoryPage from "./pages/supervisor/InventoryPage";
@@ -87,6 +88,7 @@ function AppRoutes() {
           <Route path="/" element={<SupervisorDashboard />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/categories/:name" element={<CategoryDetailPage />} />
+          <Route path="/tags" element={<TagsPage />} />
           <Route path="/items" element={<StockItemsPage />} />
           <Route path="/items/:id" element={<StockItemDetailPage />} />
           <Route path="/entries" element={<EntriesPage />} />
