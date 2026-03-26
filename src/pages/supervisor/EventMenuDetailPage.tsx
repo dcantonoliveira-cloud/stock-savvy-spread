@@ -28,7 +28,8 @@ import { fmtNum, fmtCur } from '@/lib/format';
 const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; current_stock: number; category: string };
-type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number; unit: string; unit_cost: number; section: 'receita' | 'decoracao' };
+type Tag = { id: string; name: string; color: string };
+type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'decoracao'; tagId?: string | null; tagName?: string | null; tagColor?: string | null };
 type Sheet = { id: string; name: string; yield_quantity: number; yield_unit: string; items: SheetItem[] };
 type MenuDish = {
   id: string; sheet_id: string; sheet_name: string;
@@ -128,28 +129,80 @@ function DishEditPanel({ dish, stockItems, onSave, onCancel }: {
   onSave: (items: SheetItem[], plannedQty: number, plannedUnit: string, notes: string) => void;
   onCancel: () => void;
 }) {
-  const [formItems, setFormItems] = useState<SheetItem[]>(dish.sheet?.items.map(i => ({ ...i })) || []);
+  const [formItems, setFormItems] = useState<SheetItem[]>(dish.sheet?.items.map(i => ({ ...i, quantity: String(i.quantity) })) || []);
   const [plannedQty, setPlannedQty] = useState(dish.planned_quantity.toString());
   const [plannedUnit, setPlannedUnit] = useState(dish.planned_unit);
   const [notes, setNotes] = useState(dish.notes || '');
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [localStock, setLocalStock] = useState<StockItem[]>(stockItems);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagPopoverIdx, setTagPopoverIdx] = useState<number | null>(null);
 
   useEffect(() => { setLocalStock(stockItems); }, [stockItems]);
+  useEffect(() => { supabase.from('tags').select('id, name, color').order('name').then(({ data }) => { if (data) setTags(data as Tag[]); }); }, []);
 
-  const addItem = (section: 'receita' | 'decoracao') => setFormItems(prev => [...prev, { item_id: '', item_name: '', quantity: 0, unit: '', unit_cost: 0, section }]);
-  const updateItem = (idx: number, field: string, value: any) => setFormItems(prev => prev.map((it, i) => { if (i !== idx) return it; if (field === 'item_id') { const si = localStock.find(s => s.id === value); return { ...it, item_id: value, item_name: si?.name || '', unit: si?.unit || '', unit_cost: si?.unit_cost || 0 }; } return { ...it, [field]: field === 'quantity' ? parseFloat(value) || 0 : value }; }));
+  const addItem = (section: 'receita' | 'decoracao') => setFormItems(prev => [...prev, { item_id: '', item_name: '', quantity: '', unit: '', unit_cost: 0, section, tagId: null, tagName: null, tagColor: null }]);
+  const updateItem = (idx: number, field: string, value: any) => setFormItems(prev => prev.map((it, i) => {
+    if (i !== idx) return it;
+    if (field === 'item_id') { const si = localStock.find(s => s.id === value); return { ...it, item_id: value, item_name: si?.name || '', unit: si?.unit || '', unit_cost: si?.unit_cost || 0 }; }
+    if (field === 'tag') { const t = tags.find(t => t.id === value); return { ...it, tagId: value || null, tagName: t?.name || null, tagColor: t?.color || null }; }
+    return { ...it, [field]: value }; // quantity stored as raw string
+  }));
   const removeItem = (idx: number) => setFormItems(prev => prev.filter((_, i) => i !== idx));
 
   const recipeItems = formItems.filter(i => i.section !== 'decoracao');
   const decoItems = formItems.filter(i => i.section === 'decoracao');
+
+  const renderRow = (item: SheetItem, idx: number, bg?: string) => (
+    <div key={idx} className="grid grid-cols-[1fr_72px_44px_auto_24px] gap-1 items-center mb-1" style={bg ? { background: bg } : {}}>
+      <ItemCombobox stockItems={localStock} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} />
+      <Input
+        type="text" inputMode="decimal" step="any"
+        className="h-8 text-xs text-right"
+        value={item.quantity}
+        onChange={e => updateItem(idx, 'quantity', e.target.value)}
+      />
+      <span className="text-xs text-muted-foreground text-center">{item.unit}</span>
+      {/* Tag selector */}
+      <Popover open={tagPopoverIdx === idx} onOpenChange={o => setTagPopoverIdx(o ? idx : null)}>
+        <PopoverTrigger asChild>
+          <button
+            className="h-7 px-1.5 rounded border text-[10px] font-medium transition-colors flex items-center gap-1 flex-shrink-0"
+            style={item.tagId ? { background: item.tagColor + '22', borderColor: item.tagColor + '66', color: item.tagColor } : { borderColor: '#e2e8f0', color: '#94a3b8' }}
+            title="Definir tag de destino"
+          >
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: item.tagId ? item.tagColor! : '#cbd5e1' }} />
+            {item.tagName || '＋'}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-44 p-1" align="start">
+          <button
+            className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted text-muted-foreground"
+            onClick={() => { updateItem(idx, 'tag', null); setTagPopoverIdx(null); }}
+          >Sem tag</button>
+          {tags.map(t => (
+            <button key={t.id}
+              className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2"
+              onClick={() => { updateItem(idx, 'tag', t.id); setTagPopoverIdx(null); }}
+            >
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: t.color }} />
+              {t.name}
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button>
+    </div>
+  );
+
+  const parseQty = (q: number | string) => parseFloat(String(q).replace(',', '.')) || 0;
 
   return (
     <>
       <div className="p-4 bg-white border border-primary/20 rounded-xl space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center gap-2">
-            <div><label className="text-xs text-muted-foreground mb-1 block">Quantidade planejada</label><Input type="number" value={plannedQty} onChange={e => setPlannedQty(e.target.value)} className="h-8 w-24 text-xs" /></div>
+            <div><label className="text-xs text-muted-foreground mb-1 block">Quantidade planejada</label><Input type="text" inputMode="decimal" value={plannedQty} onChange={e => setPlannedQty(e.target.value)} className="h-8 w-24 text-xs" /></div>
             <div><label className="text-xs text-muted-foreground mb-1 block">Unidade</label><Input value={plannedUnit} onChange={e => setPlannedUnit(e.target.value)} className="h-8 w-16 text-xs" /></div>
           </div>
           <div>
@@ -159,17 +212,25 @@ function DishEditPanel({ dish, stockItems, onSave, onCancel }: {
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-2"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Receita Principal</p><Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addItem('receita')}><Plus className="w-3 h-3 mr-1" />Add</Button></div>
-          {recipeItems.map((item) => { const idx = formItems.indexOf(item); return (<div key={idx} className="grid grid-cols-[1fr_80px_50px_28px] gap-1 items-center mb-1"><ItemCombobox stockItems={localStock} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /><Input type="number" step="any" className="h-8 text-xs" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /><span className="text-xs text-muted-foreground text-center">{item.unit}</span><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button></div>); })}
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Receita Principal</p>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addItem('receita')}><Plus className="w-3 h-3 mr-1" />Add</Button>
+          </div>
+          {recipeItems.map((item) => renderRow(item, formItems.indexOf(item)))}
         </div>
 
         <div className="border-t border-dashed border-amber-200 pt-3">
-          <div className="flex items-center justify-between mb-2"><p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">🎨 Decoração</p><Button variant="outline" size="sm" className="h-7 text-xs border-amber-200 text-amber-700" onClick={() => addItem('decoracao')}><Plus className="w-3 h-3 mr-1" />Add</Button></div>
-          {decoItems.map((item) => { const idx = formItems.indexOf(item); return (<div key={idx} className="grid grid-cols-[1fr_80px_50px_28px] gap-1 items-center mb-1" style={{ background: 'hsl(38 80% 99%)' }}><ItemCombobox stockItems={localStock} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => setQuickCreateOpen(true)} /><Input type="number" step="any" className="h-8 text-xs" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)} /><span className="text-xs text-muted-foreground text-center">{item.unit}</span><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-3.5 h-3.5" /></button></div>); })}
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">🎨 Decoração</p>
+            <Button variant="outline" size="sm" className="h-7 text-xs border-amber-200 text-amber-700" onClick={() => addItem('decoracao')}><Plus className="w-3 h-3 mr-1" />Add</Button>
+          </div>
+          {decoItems.map((item) => renderRow(item, formItems.indexOf(item), 'hsl(38 80% 99%)'))}
         </div>
 
         <div className="flex gap-2">
-          <Button size="sm" className="flex-1" onClick={() => onSave(formItems.filter(i => i.item_id), parseFloat(plannedQty) || 0, plannedUnit, notes)}><Check className="w-3.5 h-3.5 mr-1" />Salvar</Button>
+          <Button size="sm" className="flex-1" onClick={() => onSave(formItems.filter(i => i.item_id).map(i => ({ ...i, quantity: parseQty(i.quantity) })), parseFloat(plannedQty.replace(',', '.')) || 0, plannedUnit, notes)}>
+            <Check className="w-3.5 h-3.5 mr-1" />Salvar
+          </Button>
           <Button size="sm" variant="outline" onClick={onCancel}>Cancelar</Button>
         </div>
       </div>
@@ -719,8 +780,8 @@ export default function EventMenuDetailPage() {
 
     if (sheetsRes.data) {
       const loaded = await Promise.all((sheetsRes.data as any[]).map(async s => {
-        const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, unit').eq('sheet_id', s.id);
-        const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); const recipeUnit = i.unit || item?.unit || ''; return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: recipeUnit, unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita' }; });
+        const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, unit, tag_id, tags(id, name, color)').eq('sheet_id', s.id);
+        const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); const recipeUnit = i.unit || item?.unit || ''; return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: String(i.quantity), unit: recipeUnit, unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita', tagId: i.tag_id || null, tagName: i.tags?.name || null, tagColor: i.tags?.color || null }; });
         return { ...s, items } as Sheet;
       }));
       setAllSheets(loaded);
@@ -730,8 +791,8 @@ export default function EventMenuDetailPage() {
     const enrichedDishes: MenuDish[] = await Promise.all((dishes || []).map(async (d: any) => {
       const sheet = (sheetsRes.data as any[])?.find(s => s.id === d.sheet_id);
       if (!sheet) return { id: d.id, sheet_id: d.sheet_id, sheet_name: '?', planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', notes: d.notes || null, decoration: d.decoration || null, section_name: d.section_name || null, sheet: null, expanded: false, isMantimentos: d.sheet_id === MANTIMENTOS_ID };
-      const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section').eq('sheet_id', d.sheet_id);
-      const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: item?.unit || '', unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita' }; });
+      const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, unit, tag_id, tags(id, name, color)').eq('sheet_id', d.sheet_id);
+      const items: SheetItem[] = (si || []).map((i: any) => { const item = stockData.find(x => x.id === i.item_id); const recipeUnit = i.unit || item?.unit || ''; return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: String(i.quantity), unit: recipeUnit, unit_cost: i.unit_cost || item?.unit_cost || 0, section: i.section || 'receita', tagId: i.tag_id || null, tagName: i.tags?.name || null, tagColor: i.tags?.color || null }; });
       return { id: d.id, sheet_id: d.sheet_id, sheet_name: sheet.name, planned_quantity: d.planned_quantity, planned_unit: d.planned_unit || 'un', notes: d.notes || null, decoration: d.decoration || null, section_name: d.section_name || null, sheet: { ...sheet, items }, expanded: false, isMantimentos: d.sheet_id === MANTIMENTOS_ID };
     }));
 
@@ -861,7 +922,7 @@ export default function EventMenuDetailPage() {
     if (!dish) return;
     await supabase.from('event_menu_dishes').update({ planned_quantity: plannedQty, planned_unit: plannedUnit, notes: notes || null } as any).eq('id', dishId);
     await supabase.from('technical_sheet_items').delete().eq('sheet_id', dish.sheet_id);
-    if (items.length > 0) await supabase.from('technical_sheet_items').insert(items.map(i => ({ sheet_id: dish.sheet_id, item_id: i.item_id, quantity: i.quantity, unit_cost: i.unit_cost, unit: i.unit || null, section: i.section || 'receita' })) as any);
+    if (items.length > 0) await supabase.from('technical_sheet_items').insert(items.map(i => ({ sheet_id: dish.sheet_id, item_id: i.item_id, quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0, unit_cost: i.unit_cost, unit: i.unit || null, section: i.section || 'receita', tag_id: i.tagId || null })) as any);
     toast.success('Ficha atualizada!');
     setEditingDishId(null);
     await loadMenu();
