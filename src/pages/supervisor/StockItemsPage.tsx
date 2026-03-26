@@ -614,10 +614,23 @@ export default function StockItemsPage() {
 
   const handleSave = async (data: Partial<Item> & { name: string; category: string; unit: string }) => {
     if (data.id) {
-      await supabase.from('stock_items').update(data as any).eq('id', data.id);
+      const { error } = await supabase.from('stock_items').update(data as any).eq('id', data.id);
+      if (error) { toast.error('Erro ao atualizar: ' + error.message); console.error('[update]', error); return; }
       toast.success('Item atualizado!');
     } else {
-      await supabase.from('stock_items').insert(data as any);
+      const { id: _id, ...insertData } = data as any;
+      const { error } = await supabase.from('stock_items').insert(insertData as any);
+      if (error) {
+        // Se falhar por purchase_qty não existir, tenta sem ele
+        if (error.message?.includes('purchase_qty')) {
+          const { purchase_qty: _pq, ...fallback } = insertData;
+          const { error: e2 } = await supabase.from('stock_items').insert(fallback as any);
+          if (e2) { toast.error('Erro ao cadastrar: ' + e2.message); console.error('[insert fallback]', e2); return; }
+          toast.warning('Item salvo, mas "qtde por embalagem" não está disponível no banco. Execute a migration de purchase_qty no Supabase.');
+        } else {
+          toast.error('Erro ao cadastrar: ' + error.message); console.error('[insert]', error); return;
+        }
+      }
       toast.success('Item cadastrado!');
     }
     setDialogOpen(false);
