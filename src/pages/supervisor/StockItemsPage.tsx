@@ -656,25 +656,34 @@ export default function StockItemsPage() {
       toast.success('Item atualizado!');
     } else {
       const { id: _id, ...insertData } = data as any;
-      console.log('[insert] tentando com:', Object.keys(insertData));
-      const { error } = await supabase.from('stock_items').insert(insertData as any);
-      if (error) {
-        console.error('[insert] erro:', error.message, error);
-        // Tenta com apenas os campos essenciais (remove colunas opcionais que possam não existir)
+      // Tenta inserir com todos os campos primeiro
+      const { data: created, error } = await supabase
+        .from('stock_items')
+        .insert(insertData as any)
+        .select('id, name')
+        .single();
+      if (error || !created) {
+        console.error('[insert] erro:', error?.message, error);
+        // Fallback: tenta só com campos essenciais
         const { purchase_qty: _pq, subcategory_id: _sc, barcode: _bc, image_url: _iu, ...coreData } = insertData;
-        console.log('[insert fallback] tentando com campos básicos:', Object.keys(coreData));
-        const { error: e2 } = await supabase.from('stock_items').insert(coreData as any);
-        if (e2) {
-          console.error('[insert fallback] erro:', e2.message, e2);
-          toast.error('Erro ao cadastrar: ' + e2.message);
+        const { data: created2, error: e2 } = await supabase
+          .from('stock_items')
+          .insert(coreData as any)
+          .select('id, name')
+          .single();
+        if (e2 || !created2) {
+          console.error('[insert fallback] erro:', e2?.message, e2);
+          toast.error('Erro ao cadastrar: ' + (e2?.message || error?.message || 'Item não foi salvo no banco'));
           return;
         }
+        console.log('[insert fallback] criado:', created2);
         toast.success('Item cadastrado!');
         setDialogOpen(false);
         setEditingItem(undefined);
         load();
         return;
       }
+      console.log('[insert] criado:', created);
       toast.success('Item cadastrado!');
     }
     setDialogOpen(false);
