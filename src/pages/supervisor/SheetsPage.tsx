@@ -145,7 +145,8 @@ function QuickCreateItemDialog({ open, onClose, onCreated }: {
     } as any).select('id, name, unit, unit_cost').single();
 
     if (error || !data) {
-      toast.error('Erro ao criar insumo');
+      console.error('[QuickCreateItem] Supabase error:', error);
+      toast.error('Erro ao criar insumo: ' + (error?.message || 'Sem retorno do banco'));
       setSaving(false);
       return;
     }
