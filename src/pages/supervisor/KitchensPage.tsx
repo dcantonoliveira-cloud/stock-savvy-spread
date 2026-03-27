@@ -9,12 +9,14 @@ import { fmtNum } from '@/lib/format';
 import { toast } from 'sonner';
 
 type Kitchen = { id: string; name: string; is_default: boolean };
-type Location = { id: string; item_id: string; kitchen_id: string; current_stock: number };
+type Location = { id: string; item_id: string; kitchen_id: string };
+type StockRef = { id: string; current_stock: number; unit_cost: number };
 
 export default function KitchensPage() {
   const navigate = useNavigate();
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [stockItems, setStockItems] = useState<StockRef[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [dialog, setDialog] = useState(false);
@@ -24,12 +26,14 @@ export default function KitchensPage() {
 
   const load = async () => {
     setLoading(true);
-    const [k, l] = await Promise.all([
+    const [k, l, si] = await Promise.all([
       supabase.from('kitchens').select('id, name, is_default').order('name'),
-      supabase.from('stock_item_locations').select('id, item_id, kitchen_id, current_stock'),
+      supabase.from('stock_item_locations').select('id, item_id, kitchen_id'),
+      (supabase.from('stock_items') as any).select('id, current_stock, unit_cost').range(0, 9999),
     ]);
     if (k.data) setKitchens(k.data as Kitchen[]);
     if (l.data) setLocations(l.data as Location[]);
+    if (si.data) setStockItems(si.data as StockRef[]);
     setLoading(false);
   };
 
@@ -66,8 +70,19 @@ export default function KitchensPage() {
   };
 
   const getStats = (kitchenId: string) => {
-    const locs = locations.filter(l => l.kitchen_id === kitchenId && l.current_stock > 0);
-    return { itemCount: locs.length, totalUnits: locs.reduce((s, l) => s + l.current_stock, 0) };
+    const locs = locations.filter(l => l.kitchen_id === kitchenId);
+    const stockMap: Record<string, StockRef> = {};
+    stockItems.forEach(i => { stockMap[i.id] = i; });
+    let itemCount = 0;
+    let totalValue = 0;
+    for (const loc of locs) {
+      const si = stockMap[loc.item_id];
+      if (si && si.current_stock > 0) {
+        itemCount++;
+        totalValue += si.current_stock * si.unit_cost;
+      }
+    }
+    return { itemCount, totalValue };
   };
 
   return (
@@ -90,7 +105,7 @@ export default function KitchensPage() {
             <tr className="border-b border-border text-xs text-muted-foreground bg-muted/30">
               <th className="text-left px-5 py-3">Centro de Custo</th>
               <th className="text-right px-4 py-3">Itens em estoque</th>
-              <th className="text-right px-4 py-3">Total de unidades</th>
+              <th className="text-right px-4 py-3">Valor em estoque</th>
               <th className="w-24 px-4 py-3"></th>
             </tr>
           </thead>
@@ -105,7 +120,7 @@ export default function KitchensPage() {
                 Nenhum centro cadastrado
               </td></tr>
             ) : kitchens.map(kitchen => {
-              const { itemCount, totalUnits } = getStats(kitchen.id);
+              const { itemCount, totalValue } = getStats(kitchen.id);
               return (
                 <tr
                   key={kitchen.id}
@@ -126,7 +141,7 @@ export default function KitchensPage() {
                   </td>
                   <td className="px-4 py-4 text-right font-medium">{itemCount}</td>
                   <td className="px-4 py-4 text-right text-muted-foreground">
-                    {fmtNum(totalUnits)}
+                    {totalValue > 0 ? `R$ ${fmtNum(totalValue)}` : '—'}
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
