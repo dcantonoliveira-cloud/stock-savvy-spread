@@ -275,6 +275,7 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
         await Promise.all([
           supabase.from('item_suppliers').delete().in('item_id', dupIds as any),
           supabase.from('stock_item_locations').delete().in('item_id', dupIds as any),
+          supabase.from('event_separation_items').delete().in('item_id', dupIds as any),
         ]);
         await supabase.from('stock_items').delete().in('id', dupIds as any);
         count += dupIds.length;
@@ -689,7 +690,11 @@ export default function StockItemsPage() {
     if (sheetRefs.length === 0 && movCount === 0) {
       const itemName = items.find(i => i.id === id)?.name || 'este item';
       if (!confirm(`Remover "${itemName}"? Esta ação não pode ser desfeita.`)) return;
-      await supabase.from('item_suppliers').delete().eq('item_id', id);
+      await Promise.all([
+        supabase.from('item_suppliers').delete().eq('item_id', id),
+        supabase.from('stock_item_locations').delete().eq('item_id', id),
+        supabase.from('event_separation_items').delete().eq('item_id', id),
+      ]);
       const { error } = await supabase.from('stock_items').delete().eq('id', id);
       if (error) { toast.error('Erro ao remover: ' + error.message); return; }
       toast.success('Item removido!');
@@ -764,7 +769,11 @@ export default function StockItemsPage() {
       }
 
       // 3. Deletar item
-      await supabase.from('item_suppliers').delete().eq('item_id', id);
+      await Promise.all([
+        supabase.from('item_suppliers').delete().eq('item_id', id),
+        supabase.from('stock_item_locations').delete().eq('item_id', id),
+        supabase.from('event_separation_items').delete().eq('item_id', id),
+      ]);
       const { error } = await supabase.from('stock_items').delete().eq('id', id);
       if (error) throw error;
 
