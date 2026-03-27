@@ -213,29 +213,43 @@ function SupplierDialog({ item, open, onClose, initialSuppliers = [] }: { item: 
 }
 
 // ─── Duplicate Dialog ───
+const DUP_PAGE_SIZE = 50;
 function DuplicateReviewDialog({ open, onClose, items, onDone }: {
   open: boolean; onClose: () => void; items: Item[]; onDone: () => void;
 }) {
   const [step, setStep] = useState<'idle' | 'analyzing' | 'review' | 'merging' | 'done'>('idle');
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [expanded, setExpanded] = useState<Set<number>>(new Set([0]));
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [dupPage, setDupPage] = useState(0);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   const analyze = () => {
     setStep('analyzing');
-    setTimeout(() => { const result = findDuplicates(items); setGroups(result); setSelected(new Set(result.map((_, i) => i))); setExpanded(new Set([0])); setStep('review'); }, 600);
+    setTimeout(() => {
+      const result = findDuplicates(items);
+      setGroups(result);
+      setSelected(new Set(result.map((_, i) => i)));
+      setExpanded(new Set());
+      setDupPage(0);
+      setStep('review');
+    }, 600);
   };
-  const toggleGroup = (idx: number) => { setSelected(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; }); };
-  const toggleExpand = (idx: number) => { setExpanded(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; }); };
 
-  const merge = async () => {
-    if (selected.size === 0) return;
+  const toggleGroup = (idx: number) => setSelected(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
+  const toggleExpand = (idx: number) => setExpanded(prev => { const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n; });
+
+  const mergeGroups = async (groupIndices: number[]) => {
+    if (groupIndices.length === 0) return;
     setStep('merging');
     let count = 0;
-    for (const idx of selected) {
+    setProgress({ done: 0, total: groupIndices.length });
+    for (const idx of groupIndices) {
       const group = groups[idx];
-      for (const dup of group.duplicates) {
-        try {
+      const dupIds = group.duplicates.map(d => d.id);
+      try {
+        // Fix technical_sheet_items (needs per-dup logic for quantity merging)
+        for (const dup of group.duplicates) {
           const { data: sheetItems } = await supabase.from('technical_sheet_items').select('id, sheet_id, quantity').eq('item_id', dup.id as any);
           for (const si of (sheetItems || [])) {
             const { data: existing } = await supabase.from('technical_sheet_items').select('id, quantity').eq('sheet_id', si.sheet_id as any).eq('item_id', group.canonical.id as any).maybeSingle();
@@ -246,20 +260,32 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
               await supabase.from('technical_sheet_items').update({ item_id: group.canonical.id } as any).eq('id', si.id as any);
             }
           }
-          await supabase.from('stock_entries').update({ item_id: group.canonical.id } as any).eq('item_id', dup.id as any);
-          await supabase.from('stock_outputs').update({ item_id: group.canonical.id } as any).eq('item_id', dup.id as any);
-          if (dup.current_stock > 0) await supabase.from('stock_items').update({ current_stock: group.canonical.current_stock + dup.current_stock } as any).eq('id', group.canonical.id as any);
-          await supabase.from('stock_items').delete().eq('id', dup.id as any);
-          count++;
-        } catch (err) { console.error(err); }
-      }
+        }
+        // Batch update entries/outputs for all dups at once
+        await Promise.all([
+          supabase.from('stock_entries').update({ item_id: group.canonical.id } as any).in('item_id', dupIds as any),
+          supabase.from('stock_outputs').update({ item_id: group.canonical.id } as any).in('item_id', dupIds as any),
+        ]);
+        // Sum stock from all dups and add to canonical
+        const totalDupStock = group.duplicates.reduce((s, d) => s + (d.current_stock || 0), 0);
+        if (totalDupStock > 0) {
+          await supabase.from('stock_items').update({ current_stock: group.canonical.current_stock + totalDupStock } as any).eq('id', group.canonical.id as any);
+        }
+        // Delete all dups at once
+        await supabase.from('stock_items').delete().in('id', dupIds as any);
+        count += dupIds.length;
+      } catch (err) { console.error(err); }
+      setProgress(p => ({ ...p, done: p.done + 1 }));
     }
-    toast.success(`${count} itens unificados!`);
+    toast.success(`${count} itens removidos, ${groupIndices.length} grupos unificados!`);
     setStep('done');
     onDone();
   };
 
-  const reset = () => { setStep('idle'); setGroups([]); setSelected(new Set()); onClose(); };
+  const reset = () => { setStep('idle'); setGroups([]); setSelected(new Set()); setDupPage(0); onClose(); };
+
+  const pageGroups = groups.slice(dupPage * DUP_PAGE_SIZE, (dupPage + 1) * DUP_PAGE_SIZE);
+  const totalPages = Math.ceil(groups.length / DUP_PAGE_SIZE);
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) reset(); }}>
@@ -276,56 +302,87 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
               <Button onClick={analyze}><Sparkles className="w-4 h-4 mr-2" />Analisar Duplicatas</Button>
             </div>
           )}
-          {step === 'analyzing' && <div className="py-8 text-center"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" /><p className="text-sm text-muted-foreground">Analisando similaridade...</p></div>}
+          {step === 'analyzing' && <div className="py-8 text-center"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" /><p className="text-sm text-muted-foreground">Analisando {items.length} itens...</p></div>}
           {step === 'review' && (
             <div className="space-y-3 py-2">
               {groups.length === 0 ? (
                 <div className="py-8 text-center"><CheckCircle2 className="w-10 h-10 text-success mx-auto mb-3" /><p className="font-medium">Nenhuma duplicata encontrada!</p></div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between px-1 mb-2">
+                  <div className="flex items-center justify-between px-1 mb-2 flex-wrap gap-2">
                     <p className="text-sm text-muted-foreground">{groups.length} grupos · {selected.size} selecionados</p>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => setSelected(new Set(groups.map((_, i) => i)))}>Todos</Button>
                       <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>Limpar</Button>
                     </div>
                   </div>
-                  {groups.map((group, idx) => (
-                    <div key={idx} className={`rounded-xl border transition-all ${selected.has(idx) ? 'border-primary/50 bg-primary/5' : 'border-border bg-card'}`}>
-                      <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => toggleGroup(idx)}>
-                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selected.has(idx) ? 'bg-primary border-primary' : 'border-border'}`}>
-                          {selected.has(idx) && <CheckCircle2 className="w-3 h-3 text-primary-foreground" />}
+                  {pageGroups.map((group, localIdx) => {
+                    const idx = dupPage * DUP_PAGE_SIZE + localIdx;
+                    return (
+                      <div key={idx} className={`rounded-xl border transition-all ${selected.has(idx) ? 'border-primary/50 bg-primary/5' : 'border-border bg-card'}`}>
+                        <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => toggleGroup(idx)}>
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selected.has(idx) ? 'bg-primary border-primary' : 'border-border'}`}>
+                            {selected.has(idx) && <CheckCircle2 className="w-3 h-3 text-primary-foreground" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium text-sm">{group.canonical.name}</span>
+                            <Badge variant="outline" className="ml-2 text-[10px]">principal</Badge>
+                            <span className="ml-2 text-xs text-muted-foreground">{group.duplicates.length} duplicata{group.duplicates.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          <button onClick={e => { e.stopPropagation(); toggleExpand(idx); }}>{expanded.has(idx) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
                         </div>
-                        <div className="flex-1 min-w-0"><span className="font-medium text-sm">{group.canonical.name}</span><Badge variant="outline" className="ml-2 text-[10px]">principal</Badge></div>
-                        <button onClick={e => { e.stopPropagation(); toggleExpand(idx); }}>{expanded.has(idx) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
+                        {expanded.has(idx) && (
+                          <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
+                            {group.duplicates.map(dup => (
+                              <div key={dup.id} className="flex items-center gap-2 p-2 rounded-lg bg-destructive/5 border border-destructive/20">
+                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                <div className="flex-1"><p className="text-sm">{dup.name}</p><p className="text-xs text-muted-foreground">Estoque: {dup.current_stock} {dup.unit}</p></div>
+                                {dup.current_stock > 0 && <Badge variant="outline" className="text-[10px] text-success border-success/30">+{dup.current_stock} somado</Badge>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {expanded.has(idx) && (
-                        <div className="px-3 pb-3 space-y-2 border-t border-border/50 pt-2">
-                          {group.duplicates.map(dup => (
-                            <div key={dup.id} className="flex items-center gap-2 p-2 rounded-lg bg-destructive/5 border border-destructive/20">
-                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                              <div className="flex-1"><p className="text-sm">{dup.name}</p><p className="text-xs text-muted-foreground">Estoque: {dup.current_stock} {dup.unit}</p></div>
-                              {dup.current_stock > 0 && <Badge variant="outline" className="text-[10px] text-success border-success/30">+{dup.current_stock} somado</Badge>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    );
+                  })}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 px-1">
+                      <Button variant="outline" size="sm" disabled={dupPage === 0} onClick={() => setDupPage(p => p - 1)}>Anterior</Button>
+                      <span className="text-xs text-muted-foreground">Pág. {dupPage + 1} / {totalPages}</span>
+                      <Button variant="outline" size="sm" disabled={dupPage + 1 >= totalPages} onClick={() => setDupPage(p => p + 1)}>Próxima</Button>
                     </div>
-                  ))}
+                  )}
                 </>
               )}
             </div>
           )}
-          {step === 'merging' && <div className="py-8 text-center"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" /><p className="text-sm text-muted-foreground">Unificando itens...</p></div>}
+          {step === 'merging' && (
+            <div className="py-8 text-center space-y-4">
+              <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+              <p className="text-sm text-muted-foreground">Unificando grupo {progress.done} de {progress.total}...</p>
+              <div className="w-full bg-muted rounded-full h-2 max-w-xs mx-auto">
+                <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%` }} />
+              </div>
+            </div>
+          )}
           {step === 'done' && <div className="py-8 text-center space-y-4"><CheckCircle2 className="w-10 h-10 text-success mx-auto" /><p className="font-medium">Unificação concluída!</p><Button onClick={reset}>Fechar</Button></div>}
         </div>
         {step === 'review' && groups.length > 0 && (
-          <div className="border-t border-border pt-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground"><AlertTriangle className="w-3.5 h-3.5 text-warning" />Esta ação não pode ser desfeita</div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={reset}>Cancelar</Button>
-              <Button onClick={merge} disabled={selected.size === 0}><Merge className="w-4 h-4 mr-2" />Unificar {selected.size} grupo{selected.size !== 1 ? 's' : ''}</Button>
+          <div className="border-t border-border pt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><AlertTriangle className="w-3.5 h-3.5 text-warning" />Esta ação não pode ser desfeita</div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={reset}>Cancelar</Button>
+                <Button onClick={() => mergeGroups(Array.from(selected))} disabled={selected.size === 0}>
+                  <Merge className="w-4 h-4 mr-2" />Unificar {selected.size} grupo{selected.size !== 1 ? 's' : ''}
+                </Button>
+              </div>
             </div>
+            {groups.length > DUP_PAGE_SIZE && (
+              <Button variant="secondary" className="w-full" onClick={() => { setSelected(new Set(groups.map((_, i) => i))); mergeGroups(groups.map((_, i) => i)); }}>
+                <Sparkles className="w-4 h-4 mr-2" />Unificar todos os {groups.length} grupos de uma vez
+              </Button>
+            )}
           </div>
         )}
       </DialogContent>
