@@ -31,7 +31,7 @@ export default function KitchenDetailPage() {
     const [kRes, locRes] = await Promise.all([
       supabase.from('kitchens').select('id, name, is_default').eq('id', id!).single(),
       supabase.from('stock_item_locations')
-        .select('id, item_id, current_stock, stock_items(id, name, category, unit, unit_cost)')
+        .select('id, item_id, stock_items(id, name, category, unit, unit_cost, current_stock)')
         .eq('kitchen_id', id!),
     ]);
     if (!kRes.data) { navigate('/kitchens'); return; }
