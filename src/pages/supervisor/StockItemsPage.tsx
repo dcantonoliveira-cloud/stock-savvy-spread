@@ -55,7 +55,17 @@ function similarity(a: string, b: string): number {
 }
 
 function normalize(name: string): string {
-  return name.replace(/\s*\d+\s*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return name
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s*\d+\s*$/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+// Returns true if both names share the same first `n` words (2+ words required)
+function sharedPrefix(a: string, b: string, n = 2): boolean {
+  const wa = a.split(' ');
+  const wb = b.split(' ');
+  if (wa.length < 2 || wb.length < 2) return false;
+  return wa.slice(0, n).join(' ') === wb.slice(0, n).join(' ');
 }
 
 function findDuplicates(items: Item[]): DuplicateGroup[] {
@@ -67,7 +77,9 @@ function findDuplicates(items: Item[]): DuplicateGroup[] {
     const normI = normalize(items[i].name);
     for (let j = i + 1; j < items.length; j++) {
       if (used.has(items[j].id)) continue;
-      if (similarity(normI, normalize(items[j].name)) >= 0.82) { group.push(items[j]); used.add(items[j].id); }
+      const normJ = normalize(items[j].name);
+      const isSim = similarity(normI, normJ) >= 0.82 || sharedPrefix(normI, normJ);
+      if (isSim) { group.push(items[j]); used.add(items[j].id); }
     }
     if (group.length > 0) {
       used.add(items[i].id);
