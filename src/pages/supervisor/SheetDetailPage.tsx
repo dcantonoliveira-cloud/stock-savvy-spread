@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -24,23 +24,60 @@ type Sheet = { id: string; name: string; servings: number; description: string |
 
 function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems: StockItem[]; value: string; onSelect: (id: string) => void; onCreateNew: (idx?: number) => void }) {
   const [open, setOpen] = useState(false);
-  const selected = stockItems.find(s => s.id === value);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<StockItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (!value) { setSelectedItem(null); return; }
+    const found = stockItems.find(s => s.id === value);
+    if (found) { setSelectedItem(found); return; }
+    (supabase.from('stock_items') as any).select('id, name, unit, unit_cost, purchase_qty')
+      .eq('id', value).single().then(({ data }: any) => { if (data) setSelectedItem(data as StockItem); });
+  }, [value, stockItems]);
+
+  useEffect(() => {
+    if (!open) return;
+    clearTimeout(debounceRef.current);
+    const delay = query.trim() ? 250 : 0;
+    debounceRef.current = setTimeout(async () => {
+      let q = (supabase.from('stock_items') as any).select('id, name, unit, unit_cost, purchase_qty').order('name').limit(200);
+      if (query.trim()) q = q.ilike('name', `%${query.trim()}%`);
+      const { data } = await q;
+      setResults((data || []) as StockItem[]);
+    }, delay);
+    return () => clearTimeout(debounceRef.current);
+  }, [open, query]);
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setQuery(''); }}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="h-8 text-xs justify-between w-full font-normal">
-          <span className="truncate">{selected ? selected.name : 'Selecionar item...'}</span>
+          <span className="truncate">{selectedItem ? selectedItem.name : 'Selecionar item...'}</span>
           <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[280px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Buscar insumo..." className="h-9" />
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Buscar insumo..." className="h-9" value={query} onValueChange={setQuery} />
           <CommandList>
             <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
-            <CommandGroup>{stockItems.map(si => (<CommandItem key={si.id} value={si.name} onSelect={() => { onSelect(si.id); setOpen(false); }}><Check className={cn("mr-2 h-3 w-3", value === si.id ? "opacity-100" : "opacity-0")} /><span className="truncate">{si.name}</span><span className="ml-auto text-[10px] text-muted-foreground">{si.unit}</span></CommandItem>))}</CommandGroup>
+            <CommandGroup>
+              {results.map(si => (
+                <CommandItem key={si.id} value={si.id} onSelect={() => { onSelect(si.id); setOpen(false); setQuery(''); }}>
+                  <Check className={cn("mr-2 h-3 w-3", value === si.id ? "opacity-100" : "opacity-0")} />
+                  <span className="truncate">{si.name}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">{si.unit}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
             <CommandSeparator alwaysRender />
-            <CommandGroup forceMount><CommandItem forceMount onSelect={() => { setOpen(false); onCreateNew(); }} className="text-primary"><PackagePlus className="mr-2 h-3 w-3" />Criar novo insumo...</CommandItem></CommandGroup>
+            <CommandGroup forceMount>
+              <CommandItem forceMount onSelect={() => { setOpen(false); setQuery(''); onCreateNew(); }} className="text-primary">
+                <PackagePlus className="mr-2 h-3 w-3" />Criar novo insumo...
+              </CommandItem>
+            </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>
