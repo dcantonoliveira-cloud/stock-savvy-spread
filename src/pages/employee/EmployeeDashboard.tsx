@@ -55,7 +55,7 @@ export default function EmployeeDashboard() {
 
   const loadData = async () => {
     const [itemsRes, kitchensRes, locsRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, category, unit, current_stock, image_url, barcode' as any).order('name'),
+      supabase.from('stock_items').select('id, name, category, unit, current_stock, image_url, barcode' as any).order('name').range(0, 9999),
       supabase.from('kitchens').select('id, name').order('name'),
       supabase.from('stock_item_locations').select('id, item_id, kitchen_id, current_stock'),
     ]);

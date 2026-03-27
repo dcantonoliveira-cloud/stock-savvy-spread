@@ -57,7 +57,7 @@ export default function CategoriesPage() {
 
   const load = async () => {
     const [itemsRes, catsRes, subsRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost').order('name'),
+      supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost').order('name').range(0, 9999),
       supabase.from('categories').select('id, name, emoji').order('name'),
       supabase.from('subcategories').select('id, name, category_id').order('name'),
     ]);

@@ -47,7 +47,7 @@ export default function SupervisorOutputsPage() {
   const load = async () => {
     setLoading(true);
     const [itemsRes, outputsRes, kitchensRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, unit, current_stock').order('name'),
+      supabase.from('stock_items').select('id, name, unit, current_stock').order('name').range(0, 9999),
       supabase.from('stock_outputs').select('*').order('created_at', { ascending: false }),
       supabase.from('kitchens').select('id, name, is_default').order('name'),
     ]);

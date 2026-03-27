@@ -777,7 +777,7 @@ export default function EventMenuDetailPage() {
     setLoading(true);
     const [menuRes, itemsRes, sheetsRes] = await Promise.all([
       supabase.from('event_menus').select('*').eq('id', id!).single(),
-      supabase.from('stock_items').select('id, name, unit, unit_cost, current_stock, category').order('name'),
+      supabase.from('stock_items').select('id, name, unit, unit_cost, current_stock, category').order('name').range(0, 9999),
       supabase.from('technical_sheets').select('*').order('name'),
     ]);
     if (!menuRes.data) { navigate('/event-menus'); return; }
