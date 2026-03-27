@@ -38,7 +38,7 @@ export default function KitchenDetailPage() {
     setKitchen(kRes.data as Kitchen);
 
     const mapped: LocationItem[] = ((locRes.data || []) as any[])
-      .filter(loc => loc.current_stock > 0 && loc.stock_items)
+      .filter(loc => loc.stock_items && (loc.stock_items?.current_stock ?? 0) > 0)
       .map(loc => ({
         location_id: loc.id,
         item_id: loc.item_id,
@@ -46,7 +46,7 @@ export default function KitchenDetailPage() {
         category: loc.stock_items?.category || '—',
         unit: loc.stock_items?.unit || '',
         unit_cost: loc.stock_items?.unit_cost || 0,
-        current_stock: loc.current_stock,
+        current_stock: loc.stock_items?.current_stock || 0,
       }))
       .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
 
