@@ -905,10 +905,10 @@ export default function StockItemsPage() {
                           onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null); }}
                           className="w-20 text-right bg-amber-50 border border-amber-300 rounded px-2 py-0.5 text-sm outline-none" />
                       ) : (
-                        <span className={`cursor-pointer font-semibold transition-colors hover:text-primary ${isLow ? 'text-destructive' : 'text-foreground'}`}
+                        <span className={`cursor-pointer font-semibold transition-colors hover:text-primary ${isLow ? 'text-destructive' : item.current_stock === 0 ? 'text-muted-foreground' : 'text-foreground'}`}
                           onClick={() => startEdit(item.id, 'current_stock', item.current_stock)} title="Clique para editar">
-                          {fmtNum(item.current_stock)}
-                          <span className="ml-1 text-xs font-normal text-muted-foreground">{item.unit}</span>
+                          {item.current_stock === 0 ? '—' : fmtNum(item.current_stock)}
+                          {item.current_stock !== 0 && <span className="ml-1 text-xs font-normal text-muted-foreground">{item.unit}</span>}
                         </span>
                       )}
                     </td>
@@ -934,9 +934,9 @@ export default function StockItemsPage() {
                           onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditingCell(null); }}
                           className="w-24 text-right bg-amber-50 border border-amber-300 rounded px-2 py-0.5 text-sm outline-none" />
                       ) : (
-                        <span className="cursor-pointer text-foreground transition-colors hover:text-primary"
+                        <span className={`cursor-pointer transition-colors hover:text-primary ${item.unit_cost === 0 ? 'text-muted-foreground' : 'text-foreground'}`}
                           onClick={() => startEdit(item.id, 'unit_cost', item.unit_cost)} title="Clique para editar">
-                          R$ {fmtNum(item.unit_cost)}
+                          {item.unit_cost === 0 ? '—' : `R$ ${fmtNum(item.unit_cost)}`}
                         </span>
                       )}
                     </td>

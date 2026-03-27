@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
-import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDown, Check, PackagePlus, Download, Upload, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Eye, X, Copy, Pencil, Clock, Users, ChefHat, ChevronsUpDown, Check, PackagePlus, Download, Upload, Loader2, Archive, ArchiveRestore } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,7 @@ type Sheet = {
   instructions: string | null;
   items: SheetItem[];
   created_at: string;
+  is_active: boolean;
 };
 
 // Categories loaded dynamically from DB
@@ -208,6 +209,7 @@ export default function SupervisorSheetsPage() {
   const [viewingSheet, setViewingSheet] = useState<Sheet | null>(null);
   const [editingSheet, setEditingSheet] = useState<Sheet | null>(null);
   const [filterCategory, setFilterCategory] = useState('all');
+  const [filterStatus, setFilterStatus] = useState<'active' | 'inactive' | 'all'>('active');
   const [search, setSearch] = useState('');
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [sheetCategories, setSheetCategories] = useState<string[]>([]);
@@ -414,8 +416,16 @@ export default function SupervisorSheetsPage() {
   const filteredSheets = sheets.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase());
     const matchCat = filterCategory === 'all' || s.category === filterCategory;
-    return matchSearch && matchCat;
+    const matchStatus = filterStatus === 'all' || (filterStatus === 'active' ? s.is_active !== false : s.is_active === false);
+    return matchSearch && matchCat && matchStatus;
   });
+
+  const handleToggleActive = async (sheet: Sheet) => {
+    const newVal = !(sheet.is_active !== false);
+    await supabase.from('technical_sheets').update({ is_active: newVal } as any).eq('id', sheet.id);
+    setSheets(prev => prev.map(s => s.id === sheet.id ? { ...s, is_active: newVal } : s));
+    toast.success(newVal ? `"${sheet.name}" reativada` : `"${sheet.name}" arquivada`);
+  };
 
   const handleQuickItemCreated = (newItem: StockItem) => {
     setStockItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
@@ -911,6 +921,11 @@ export default function SupervisorSheetsPage() {
 
       {/* Filters + Excel buttons */}
       <div className="flex gap-3 mb-6 flex-wrap">
+        <div className="flex gap-1 bg-border/30 rounded-lg p-0.5 flex-shrink-0">
+          {([['active', 'Ativas'], ['inactive', 'Arquivadas'], ['all', 'Todas']] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setFilterStatus(v)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${filterStatus === v ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{l}</button>
+          ))}
+        </div>
         <div className="relative flex-1 min-w-[200px]">
           <Input placeholder="Buscar receita..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
@@ -1014,7 +1029,7 @@ export default function SupervisorSheetsPage() {
           </thead>
           <tbody className="divide-y divide-border/50">
             {filteredSheets.map((sheet, idx) => (
-              <tr key={sheet.id} className={cn("transition-colors group", updatedSheetIds.has(sheet.id) ? "bg-green-50 hover:bg-green-100" : "hover:bg-amber-50")}>
+              <tr key={sheet.id} className={cn("transition-colors group", updatedSheetIds.has(sheet.id) ? "bg-green-50 hover:bg-green-100" : sheet.is_active === false ? "opacity-50 hover:opacity-75 bg-muted/30" : "hover:bg-amber-50")}>
                 <td className="px-5 py-2.5 text-muted-foreground text-xs">{idx + 1}</td>
 
                 {/* RECEITA — inline editable */}
@@ -1138,6 +1153,11 @@ export default function SupervisorSheetsPage() {
                     </Button>
                     <Button variant="ghost" size="icon" className="w-7 h-7" title="Duplicar" onClick={() => openDuplicateDialog(sheet)}>
                       <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="w-7 h-7" title={sheet.is_active === false ? 'Reativar ficha' : 'Arquivar ficha'} onClick={() => handleToggleActive(sheet)}>
+                      {sheet.is_active === false
+                        ? <ArchiveRestore className="w-3.5 h-3.5 text-success" />
+                        : <Archive className="w-3.5 h-3.5 text-muted-foreground" />}
                     </Button>
                     <Button variant="ghost" size="icon" className="w-7 h-7" title="Remover" onClick={() => handleDelete(sheet.id)}>
                       <Trash2 className="w-3.5 h-3.5 text-destructive" />
