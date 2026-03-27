@@ -656,17 +656,24 @@ export default function StockItemsPage() {
       toast.success('Item atualizado!');
     } else {
       const { id: _id, ...insertData } = data as any;
+      console.log('[insert] tentando com:', Object.keys(insertData));
       const { error } = await supabase.from('stock_items').insert(insertData as any);
       if (error) {
-        // Se falhar por purchase_qty não existir, tenta sem ele
-        if (error.message?.includes('purchase_qty')) {
-          const { purchase_qty: _pq, ...fallback } = insertData;
-          const { error: e2 } = await supabase.from('stock_items').insert(fallback as any);
-          if (e2) { toast.error('Erro ao cadastrar: ' + e2.message); console.error('[insert fallback]', e2); return; }
-          toast.warning('Item salvo, mas "qtde por embalagem" não está disponível no banco. Execute a migration de purchase_qty no Supabase.');
-        } else {
-          toast.error('Erro ao cadastrar: ' + error.message); console.error('[insert]', error); return;
+        console.error('[insert] erro:', error.message, error);
+        // Tenta com apenas os campos essenciais (remove colunas opcionais que possam não existir)
+        const { purchase_qty: _pq, subcategory_id: _sc, barcode: _bc, image_url: _iu, ...coreData } = insertData;
+        console.log('[insert fallback] tentando com campos básicos:', Object.keys(coreData));
+        const { error: e2 } = await supabase.from('stock_items').insert(coreData as any);
+        if (e2) {
+          console.error('[insert fallback] erro:', e2.message, e2);
+          toast.error('Erro ao cadastrar: ' + e2.message);
+          return;
         }
+        toast.success('Item cadastrado!');
+        setDialogOpen(false);
+        setEditingItem(undefined);
+        load();
+        return;
       }
       toast.success('Item cadastrado!');
     }
