@@ -22,7 +22,7 @@ type TagItem = { id: string; name: string; color: string };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'decoracao'; tagId?: string | null; tagName?: string | null; tagColor?: string | null };
 type Sheet = { id: string; name: string; servings: number; description: string | null; category: string | null; prep_time: number; yield_quantity: number; yield_unit: string; instructions: string | null; items: SheetItem[] };
 
-function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems: StockItem[]; value: string; onSelect: (id: string) => void; onCreateNew: (idx?: number) => void }) {
+function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems: StockItem[]; value: string; onSelect: (id: string, item: StockItem) => void; onCreateNew: (idx?: number) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<StockItem[]>([]);
@@ -65,7 +65,7 @@ function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems
             <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
             <CommandGroup>
               {results.map(si => (
-                <CommandItem key={si.id} value={si.id} onSelect={() => { onSelect(si.id); setOpen(false); setQuery(''); }}>
+                <CommandItem key={si.id} value={si.id} onSelect={() => { onSelect(si.id, si); setOpen(false); setQuery(''); }}>
                   <Check className={cn("mr-2 h-3 w-3", value === si.id ? "opacity-100" : "opacity-0")} />
                   <span className="truncate">{si.name}</span>
                   <span className="ml-auto text-[10px] text-muted-foreground">{si.unit}</span>
@@ -236,10 +236,13 @@ export default function SheetDetailPage() {
   };
 
   const addItem = (section: 'receita' | 'decoracao') => setFormItems(prev => [...prev, { item_id: '', item_name: '', quantity: 0, unit: '', unit_cost: 0, section, tagId: null, tagName: null, tagColor: null }]);
-  const updateItem = (idx: number, field: string, value: any) => setFormItems(prev => prev.map((it, i) => {
+  const updateItem = (idx: number, field: string, value: any, resolvedItem?: StockItem) => setFormItems(prev => prev.map((it, i) => {
     if (i !== idx) return it;
     if (field === 'item_id') {
-      const si = stockItems.find(s => s.id === value);
+      const si = stockItems.find(s => s.id === value) || resolvedItem;
+      if (si && !stockItems.find(s => s.id === si.id)) {
+        setStockItems(p => [...p, si].sort((a, b) => a.name.localeCompare(b.name)));
+      }
       const effCost = si ? effectiveUnitCost(si.unit_cost || 0, si.purchase_qty) : 0;
       return { ...it, item_id: value, item_name: si?.name || '', unit: si?.unit || '', unit_cost: effCost };
     }
@@ -249,7 +252,7 @@ export default function SheetDetailPage() {
       const itemUnit = si?.unit || it.unit;
       return { ...it, unit: value, unit_cost: calcRecipeUnitCost(effCost, itemUnit, value) };
     }
-    return { ...it, [field]: value }; // quantity stored as raw string; parsed only on save
+    return { ...it, [field]: value };
   }));
   const removeItem = (idx: number) => setFormItems(prev => prev.filter((_, i) => i !== idx));
 
@@ -386,7 +389,7 @@ export default function SheetDetailPage() {
                   <td className="px-5 py-3">
                     {editing
                       ? <div className="flex items-center gap-1">
-                          <div className="flex-1"><ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /></div>
+                          <div className="flex-1"><ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={(id, si) => updateItem(idx, 'item_id', id, si)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /></div>
                           {item.item_id && (
                             <button onClick={() => setEditItem(stockItems.find(s => s.id === item.item_id) || null)} className="text-muted-foreground hover:text-primary transition-colors" title="Editar insumo">
                               <SquarePen className="w-4 h-4" />
@@ -421,7 +424,10 @@ export default function SheetDetailPage() {
                           </Popover>
                         </div>
                       : <div className="flex items-center gap-2">
-                          <span className="text-foreground">{item.item_name}</span>
+                          {item.item_name === '?' || !item.item_name
+                            ? <span className="text-xs text-destructive/80 italic">⚠ Insumo removido — edite para substituir</span>
+                            : <span className="text-foreground">{item.item_name}</span>
+                          }
                           {item.tagId && item.tagColor && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: item.tagColor + '20', color: item.tagColor }}>{item.tagName}</span>
                           )}
@@ -472,7 +478,7 @@ export default function SheetDetailPage() {
                   <td className="px-5 py-3">
                     {editing
                       ? <div className="flex items-center gap-1">
-                          <div className="flex-1"><ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={v => updateItem(idx, 'item_id', v)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /></div>
+                          <div className="flex-1"><ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={(id, si) => updateItem(idx, 'item_id', id, si)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /></div>
                           {item.item_id && (
                             <button onClick={() => setEditItem(stockItems.find(s => s.id === item.item_id) || null)} className="text-muted-foreground hover:text-primary transition-colors" title="Editar insumo">
                               <SquarePen className="w-4 h-4" />
@@ -503,7 +509,10 @@ export default function SheetDetailPage() {
                           </Popover>
                         </div>
                       : <div className="flex items-center gap-2">
-                          <span className="text-foreground">{item.item_name}</span>
+                          {item.item_name === '?' || !item.item_name
+                            ? <span className="text-xs text-destructive/80 italic">⚠ Insumo removido — edite para substituir</span>
+                            : <span className="text-foreground">{item.item_name}</span>
+                          }
                           {item.tagId && item.tagColor && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: item.tagColor + '20', color: item.tagColor }}>{item.tagName}</span>
                           )}
@@ -559,7 +568,10 @@ export default function SheetDetailPage() {
         onCreated={item => {
           setStockItems(prev => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)));
           if (pendingSelectIdx !== null) {
-            updateItem(pendingSelectIdx, 'item_id', item.id);
+            const effCost = effectiveUnitCost(item.unit_cost || 0, item.purchase_qty ?? null);
+            setFormItems(prev => prev.map((it, i) =>
+              i === pendingSelectIdx ? { ...it, item_id: item.id, item_name: item.name, unit: item.unit, unit_cost: effCost } : it
+            ));
             setPendingSelectIdx(null);
           }
         }}

@@ -646,12 +646,25 @@ export default function StockItemsPage() {
     doLoad(searchQuery, filterCategory, filterSubcategory, sortField, sortDir, page);
   }, [searchQuery, filterCategory, filterSubcategory, sortField, sortDir, page]);
 
-  // Lazy-load all items when duplicate dialog opens
+  // Lazy-load ALL items when duplicate dialog opens (paginated to bypass any server limit)
   useEffect(() => {
-    if (duplicateOpen) {
-      (supabase.from('stock_items') as any).select('*').neq('category', '_sistema_').order('name').range(0, 9999)
-        .then(({ data }: { data: any }) => setAllItemsForDialogs((data || []) as Item[]));
-    }
+    if (!duplicateOpen) return;
+    const fetchAll = async () => {
+      const BATCH = 1000;
+      let all: Item[] = [];
+      let offset = 0;
+      while (true) {
+        const { data } = await (supabase.from('stock_items') as any)
+          .select('*').neq('category', '_sistema_').order('name')
+          .range(offset, offset + BATCH - 1);
+        if (!data || data.length === 0) break;
+        all = [...all, ...data];
+        if (data.length < BATCH) break;
+        offset += BATCH;
+      }
+      setAllItemsForDialogs(all);
+    };
+    fetchAll();
   }, [duplicateOpen]);
 
   const startEdit = (id: string, field: 'current_stock' | 'min_stock' | 'unit_cost', value: number) => {
