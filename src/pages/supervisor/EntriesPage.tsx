@@ -143,7 +143,7 @@ export default function EntriesPage() {
 
   const load = async () => {
     const [itemsRes, entriesRes, kitchensRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, unit, current_stock, barcode').order('name'),
+      supabase.from('stock_items').select('id, name, unit, current_stock, barcode').order('name').range(0, 9999),
       supabase.from('stock_entries').select('*').order('created_at', { ascending: false }),
       supabase.from('kitchens').select('id, name, is_default').order('name'),
     ]);

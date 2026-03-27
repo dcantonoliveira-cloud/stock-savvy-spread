@@ -464,13 +464,19 @@ function ItemForm({ item, allCategories, allSubcategories, onSave, onCancel }: {
   );
 }
 
+const PAGE_SIZE = 50;
+
 // ─── Main Page ───
 export default function StockItemsPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
   const [suppliers, setSuppliers] = useState<Record<string, Supplier[]>>({});
   const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
+  const allSubcategoriesRef = useRef<Subcategory[]>([]);
   const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterSubcategory, setFilterSubcategory] = useState('all');
   const [allCategories, setAllCategories] = useState<string[]>([]);
@@ -481,6 +487,7 @@ export default function StockItemsPage() {
   const [supplierItem, setSupplierItem] = useState<Item | null>(null);
   const [labelItem, setLabelItem] = useState<LabelItem | null>(null);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [allItemsForDialogs, setAllItemsForDialogs] = useState<Item[]>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importRows, setImportRows] = useState<any[]>([]);
   const [importLoading, setImportLoading] = useState(false);
@@ -498,36 +505,80 @@ export default function StockItemsPage() {
   const [movReplaceId, setMovReplaceId] = useState('');
   const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
 
-  const load = async () => {
-    const [itemsRes, catsRes, suppRes, subsRes] = await Promise.all([
-      supabase.from('stock_items').select('*' as any).order('name'),
+  // Keep ref in sync with state so doLoad can read it without stale closures
+  useEffect(() => {
+    allSubcategoriesRef.current = allSubcategories;
+  }, [allSubcategories]);
+
+  // Debounce search → searchQuery, reset page
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearchQuery(search);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const loadMeta = async () => {
+    const [catsRes, subsRes] = await Promise.all([
       supabase.from('categories').select('name').order('name'),
-      supabase.from('item_suppliers').select('*' as any),
       supabase.from('subcategories').select('id, name, category_id').order('name'),
     ]);
     const subcats = (subsRes.data || []) as Subcategory[];
+    allSubcategoriesRef.current = subcats;
     setAllSubcategories(subcats);
+    const dbCats = (catsRes.data || []).map((c: any) => c.name as string);
+    setAllCategories(dbCats.filter(c => c && c.trim() !== '' && c !== '_sistema_').sort());
+  };
+
+  const doLoad = async (sq: string, cat: string, subcat: string, sf: typeof sortField, sd: typeof sortDir, p: number) => {
+    setLoading(true);
+    let q = (supabase.from('stock_items') as any).select('*', { count: 'exact' }).neq('category', '_sistema_');
+    if (sq) q = q.ilike('name', `%${sq}%`);
+    if (cat !== 'all') q = q.eq('category', cat);
+    if (subcat !== 'all') q = q.eq('subcategory_id', subcat);
+    q = q.order(sf, { ascending: sd === 'asc' }).range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
+    const { data, count } = await q;
     const subMap: Record<string, string> = {};
-    subcats.forEach(s => { subMap[s.id] = s.name; });
-    const rawItems = (itemsRes.data || []) as any[];
-    const mappedItems: Item[] = rawItems.map(i => ({
-      ...i,
-      subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined,
-    }));
-    setItems(mappedItems);
-    const dbCats = (catsRes.data || []).map((c: any) => c.name);
-    const usedCats = rawItems.length > 0 ? [...new Set(rawItems.map(i => i.category))] : [];
-    setAllCategories([...new Set([...dbCats, ...usedCats])].filter(c => c && c.trim() !== '' && c !== '_sistema_').sort());
+    allSubcategoriesRef.current.forEach(s => { subMap[s.id] = s.name; });
+    const mapped: Item[] = (data || []).map((i: any) => ({ ...i, subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined }));
+    const ids = mapped.map(i => i.id);
+    const { data: suppData } = ids.length > 0
+      ? await (supabase.from('item_suppliers') as any).select('*').in('item_id', ids)
+      : { data: [] };
     const suppMap: Record<string, Supplier[]> = {};
-    for (const s of ((suppRes.data || []) as Supplier[])) {
+    for (const s of (suppData || []) as Supplier[]) {
       if (!suppMap[s.item_id]) suppMap[s.item_id] = [];
       suppMap[s.item_id].push(s);
     }
+    setItems(mapped);
+    setTotalCount(count || 0);
     setSuppliers(suppMap);
+    // Merge categories from DB + categories used in current page
+    const usedCats = mapped.map(i => i.category).filter(c => c && c.trim() !== '' && c !== '_sistema_');
+    setAllCategories(prev => [...new Set([...prev, ...usedCats])].sort());
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  const load = () => {
+    doLoad(searchQuery, filterCategory, filterSubcategory, sortField, sortDir, page);
+  };
+
+  // Load metadata once on mount
+  useEffect(() => { loadMeta(); }, []);
+
+  // Reload items whenever query params change
+  useEffect(() => {
+    doLoad(searchQuery, filterCategory, filterSubcategory, sortField, sortDir, page);
+  }, [searchQuery, filterCategory, filterSubcategory, sortField, sortDir, page]);
+
+  // Lazy-load all items when duplicate dialog opens
+  useEffect(() => {
+    if (duplicateOpen) {
+      (supabase.from('stock_items') as any).select('*').neq('category', '_sistema_').order('name').range(0, 9999)
+        .then(({ data }: { data: any }) => setAllItemsForDialogs((data || []) as Item[]));
+    }
+  }, [duplicateOpen]);
 
   const startEdit = (id: string, field: 'current_stock' | 'min_stock' | 'unit_cost', value: number) => {
     setEditingCell({ id, field });
@@ -578,6 +629,11 @@ export default function StockItemsPage() {
     setSheetReplaceId('');
     setMovAction('');
     setMovReplaceId('');
+    // Lazy-load all items for the conflict replacement selectors
+    if (allItemsForDialogs.length === 0) {
+      (supabase.from('stock_items') as any).select('*').neq('category', '_sistema_').order('name').range(0, 9999)
+        .then(({ data }: { data: any }) => setAllItemsForDialogs((data || []) as Item[]));
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -739,9 +795,26 @@ export default function StockItemsPage() {
     load();
   };
 
-  const exportStock = () => {
-    const rows = items.map(i => {
-      const itemSupps = suppliers[i.id] || [];
+  const exportStock = async () => {
+    let q = (supabase.from('stock_items') as any).select('*').neq('category', '_sistema_');
+    if (searchQuery) q = q.ilike('name', `%${searchQuery}%`);
+    if (filterCategory !== 'all') q = q.eq('category', filterCategory);
+    if (filterSubcategory !== 'all') q = q.eq('subcategory_id', filterSubcategory);
+    q = q.order('name').range(0, 9999);
+    const { data } = await q;
+    const allData: Item[] = (data || []) as Item[];
+    // Load suppliers for all exported items
+    const ids = allData.map(i => i.id);
+    const { data: suppData } = ids.length > 0
+      ? await (supabase.from('item_suppliers') as any).select('*').in('item_id', ids)
+      : { data: [] };
+    const suppMap: Record<string, Supplier[]> = {};
+    for (const s of (suppData || []) as Supplier[]) {
+      if (!suppMap[s.item_id]) suppMap[s.item_id] = [];
+      suppMap[s.item_id].push(s);
+    }
+    const rows = allData.map(i => {
+      const itemSupps = suppMap[i.id] || [];
       const preferred = itemSupps.find(s => s.is_preferred);
       return {
         'Nome': i.name, 'Categoria': i.category, 'Unidade': i.unit,
@@ -759,6 +832,7 @@ export default function StockItemsPage() {
   const toggleSort = (field: typeof sortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('asc'); }
+    setPage(0);
   };
 
   const SortIcon = ({ field }: { field: typeof sortField }) =>
@@ -766,21 +840,7 @@ export default function StockItemsPage() {
       ? (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)
       : <ChevronUp className="w-3 h-3 opacity-20" />;
 
-  const filtered = items
-    .filter(i => i.category !== '_sistema_')
-    .filter(i => {
-      const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
-      const matchCat = filterCategory === 'all' || i.category === filterCategory;
-      const matchSub = filterSubcategory === 'all' || i.subcategory_id === filterSubcategory;
-      return matchSearch && matchCat && matchSub;
-    })
-    .sort((a, b) => {
-      let va: any = a[sortField], vb: any = b[sortField];
-      if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb as string).toLowerCase(); }
-      return sortDir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
-    });
-
-  const totalValue = filtered.reduce((s, i) => s + i.current_stock * i.unit_cost, 0);
+  const pageValue = items.reduce((s, i) => s + i.current_stock * i.unit_cost, 0);
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
@@ -795,9 +855,9 @@ export default function StockItemsPage() {
         <div>
           <h1 className="text-3xl font-display font-bold gold-text">Estoque</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {filtered.length} itens · Valor total:{' '}
+            {totalCount} itens · Valor (página):{' '}
             <span className="text-foreground font-semibold">
-              R$ {fmtNum(totalValue)}
+              R$ {fmtNum(pageValue)}
             </span>
           </p>
         </div>
@@ -817,7 +877,7 @@ export default function StockItemsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9 h-9 bg-white" placeholder="Buscar item..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filterCategory} onValueChange={v => { setFilterCategory(v); setFilterSubcategory('all'); }}>
+        <Select value={filterCategory} onValueChange={v => { setFilterCategory(v); setFilterSubcategory('all'); setPage(0); }}>
           <SelectTrigger className="w-48 h-9 bg-white"><SelectValue placeholder="Categoria" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as categorias</SelectItem>
@@ -827,15 +887,14 @@ export default function StockItemsPage() {
       </div>
       {/* Subcategory filter chips */}
       {filterCategory !== 'all' && (() => {
-        const catSubcats = allSubcategories.filter(s => {
-          const catItems = items.filter(i => i.category === filterCategory);
-          return catItems.some(i => i.subcategory_id === s.id);
-        });
+        // With server-side pagination we can't reliably check current page items,
+        // so show all subcategories and rely on the server filter.
+        const catSubcats = allSubcategories;
         if (catSubcats.length === 0) return null;
         return (
           <div className="flex gap-2 mb-4 flex-wrap">
             <button
-              onClick={() => setFilterSubcategory('all')}
+              onClick={() => { setFilterSubcategory('all'); setPage(0); }}
               className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${filterSubcategory === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-white border-border text-muted-foreground hover:text-foreground'}`}
             >
               Todas
@@ -843,7 +902,7 @@ export default function StockItemsPage() {
             {catSubcats.map(s => (
               <button
                 key={s.id}
-                onClick={() => setFilterSubcategory(filterSubcategory === s.id ? 'all' : s.id)}
+                onClick={() => { setFilterSubcategory(filterSubcategory === s.id ? 'all' : s.id); setPage(0); }}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${filterSubcategory === s.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-white border-border text-muted-foreground hover:text-foreground'}`}
               >
                 {s.name}
@@ -878,14 +937,14 @@ export default function StockItemsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {filtered.map((item, idx) => {
+              {items.map((item, idx) => {
                 const itemSupps = suppliers[item.id] || [];
                 const preferred = itemSupps.find(s => s.is_preferred) || itemSupps[0];
                 const isLow = item.current_stock <= item.min_stock && item.min_stock > 0;
 
                 return (
                   <tr key={item.id} className={`hover:bg-amber-50/40 transition-colors ${isLow ? 'bg-red-50/50' : ''}`}>
-                    <td className="px-3 py-2 text-muted-foreground text-xs">{idx + 1}</td>
+                    <td className="px-3 py-2 text-muted-foreground text-xs">{page * PAGE_SIZE + idx + 1}</td>
 
                     {/* Avatar com inicial */}
                     <td className="px-2 py-1.5">
@@ -992,9 +1051,25 @@ export default function StockItemsPage() {
             </tbody>
           </table>
         </div>
-        {filtered.length === 0 && (
+        {items.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
-            {items.length === 0 ? 'Nenhum item cadastrado.' : 'Nenhum item encontrado.'}
+            {totalCount === 0 && searchQuery === '' && filterCategory === 'all' ? 'Nenhum item cadastrado.' : 'Nenhum item encontrado com os filtros aplicados.'}
+          </div>
+        )}
+        {totalCount > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
+            <span className="text-sm text-muted-foreground">
+              {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} de {totalCount} itens
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+                Anterior
+              </Button>
+              <span className="text-sm px-2">Pág. {page + 1} / {Math.ceil(totalCount / PAGE_SIZE)}</span>
+              <Button variant="outline" size="sm" disabled={(page + 1) * PAGE_SIZE >= totalCount} onClick={() => setPage(p => p + 1)}>
+                Próxima
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -1027,7 +1102,7 @@ export default function StockItemsPage() {
       </Dialog>
 
       <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} initialSuppliers={supplierItem ? (suppliers[supplierItem.id] || []) : []} />
-      <DuplicateReviewDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} items={items} onDone={() => { setDuplicateOpen(false); load(); }} />
+      <DuplicateReviewDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} items={allItemsForDialogs} onDone={() => { setDuplicateOpen(false); load(); }} />
       <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
 
       {/* Delete conflict dialog */}
@@ -1060,7 +1135,7 @@ export default function StockItemsPage() {
                       <SelectValue placeholder="Selecione o item substituto..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {items.filter(i => i.id !== deleteConflict?.id && i.category !== '_sistema_').map(i => (
+                      {allItemsForDialogs.filter(i => i.id !== deleteConflict?.id && i.category !== '_sistema_').map(i => (
                         <SelectItem key={i.id} value={i.id}>{i.name} ({i.unit})</SelectItem>
                       ))}
                     </SelectContent>
@@ -1093,7 +1168,7 @@ export default function StockItemsPage() {
                             <SelectValue placeholder="Selecione o item substituto..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {items.filter(i => i.id !== deleteConflict?.id && i.category !== '_sistema_').map(i => (
+                            {allItemsForDialogs.filter(i => i.id !== deleteConflict?.id && i.category !== '_sistema_').map(i => (
                               <SelectItem key={i.id} value={i.id}>{i.name} ({i.unit})</SelectItem>
                             ))}
                           </SelectContent>

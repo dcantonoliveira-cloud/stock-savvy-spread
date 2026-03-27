@@ -85,7 +85,7 @@ export default function MobileSupervisorApp() {
   const load = useCallback(async () => {
     setLoading(true);
     const [itemsRes, menusRes, kitchensRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost').order('name'),
+      supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost').order('name').range(0, 9999),
       supabase.from('event_menus').select('id, name, event_date, guest_count, status, location').order('event_date', { ascending: false }),
       supabase.from('kitchens').select('id, name').order('name'),
     ]);

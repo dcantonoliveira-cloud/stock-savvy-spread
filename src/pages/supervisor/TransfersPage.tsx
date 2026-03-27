@@ -39,7 +39,7 @@ export default function TransfersPage() {
     setLoading(true);
     const [k, i, l, t] = await Promise.all([
       supabase.from('kitchens').select('id, name').order('name'),
-      supabase.from('stock_items').select('id, name, unit, current_stock').order('name'),
+      supabase.from('stock_items').select('id, name, unit, current_stock').order('name').range(0, 9999),
       supabase.from('stock_item_locations').select('*'),
       supabase.from('stock_transfers' as any).select('*').order('created_at', { ascending: false }).limit(200),
     ]);

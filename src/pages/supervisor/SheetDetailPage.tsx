@@ -173,7 +173,7 @@ export default function SheetDetailPage() {
     setLoading(true);
     const [sheetRes, itemsRes, eventRes, tagsRes] = await Promise.all([
       supabase.from('technical_sheets').select('*').eq('id', id!).single(),
-      supabase.from('stock_items').select('id, name, unit, unit_cost, purchase_qty').order('name'),
+      supabase.from('stock_items').select('id, name, unit, unit_cost, purchase_qty').order('name').range(0, 9999),
       supabase.from('event_menu_dishes').select('id', { count: 'exact', head: true }).eq('sheet_id', id!),
       supabase.from('tags').select('id, name, color').order('name'),
     ]);

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/douglascantondeoliveira/stock-savvy-spread && git add -A -- ':!.claude/' && git diff --cached --quiet || git commit -m \"chore: auto-commit $(date '+%Y-%m-%d %H:%M')\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\" && git push origin main 2>/dev/null || true",
+            "statusMessage": "Salvando alterações..."
+          }
+        ]
+      }
+    ]
+  }
+}

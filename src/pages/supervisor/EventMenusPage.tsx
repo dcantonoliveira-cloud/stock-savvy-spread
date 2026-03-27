@@ -286,7 +286,7 @@ export default function EventMenusPage() {
     const [menusRes, sheetsRes, itemsRes, aliasesRes] = await Promise.all([
       supabase.from('event_menus').select('*').order('created_at', { ascending: false }),
       supabase.from('technical_sheets').select('*').order('name'),
-      supabase.from('stock_items').select('id, name, unit, unit_cost, current_stock').order('name'),
+      supabase.from('stock_items').select('id, name, unit, unit_cost, current_stock').order('name').range(0, 9999),
       supabase.from('technical_sheet_aliases').select('sheet_id, alias'),
     ]);
     if (aliasesRes.data) setSheetAliases(aliasesRes.data as SheetAlias[]);

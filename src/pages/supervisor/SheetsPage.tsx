@@ -245,7 +245,7 @@ export default function SupervisorSheetsPage() {
   const load = async () => {
     setLoading(true);
     const [itemsRes, sheetsRes, catsRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, unit, unit_cost, purchase_qty').order('name'),
+      supabase.from('stock_items').select('id, name, unit, unit_cost, purchase_qty').order('name').range(0, 9999),
       supabase.from('technical_sheets').select('*').order('name'),
       supabase.from('sheet_categories').select('name, sort_order').order('sort_order'),
     ]);

@@ -92,7 +92,7 @@ export default function FornecedorDetailPage() {
   };
 
   const loadStockItems = async () => {
-    const { data } = await supabase.from('stock_items').select('id, name, unit').order('name');
+    const { data } = await supabase.from('stock_items').select('id, name, unit').order('name').range(0, 9999);
     setStockItems((data || []) as StockItemOption[]);
   };
 

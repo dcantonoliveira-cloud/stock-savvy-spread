@@ -158,7 +158,7 @@ export default function InvoicePage() {
 
   // Load stock items
   const loadStockItems = async () => {
-    const { data } = await supabase.from('stock_items').select('id, name, unit, unit_cost, category, current_stock').order('name');
+    const { data } = await supabase.from('stock_items').select('id, name, unit, unit_cost, category, current_stock').order('name').range(0, 9999);
     return (data || []) as StockItem[];
   };
 
