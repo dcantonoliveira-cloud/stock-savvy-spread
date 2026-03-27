@@ -271,7 +271,11 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
         if (totalDupStock > 0) {
           await supabase.from('stock_items').update({ current_stock: group.canonical.current_stock + totalDupStock } as any).eq('id', group.canonical.id as any);
         }
-        // Delete all dups at once
+        // Remove FK-dependent rows first, then delete dups
+        await Promise.all([
+          supabase.from('item_suppliers').delete().in('item_id', dupIds as any),
+          supabase.from('stock_item_locations').delete().in('item_id', dupIds as any),
+        ]);
         await supabase.from('stock_items').delete().in('id', dupIds as any);
         count += dupIds.length;
       } catch (err) { console.error(err); }
@@ -543,6 +547,7 @@ export default function StockItemsPage() {
   const [editingItem, setEditingItem] = useState<Item | undefined>();
   const [supplierItem, setSupplierItem] = useState<Item | null>(null);
   const [labelItem, setLabelItem] = useState<LabelItem | null>(null);
+  const [totalStockValue, setTotalStockValue] = useState(0);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [allItemsForDialogs, setAllItemsForDialogs] = useState<Item[]>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -576,6 +581,15 @@ export default function StockItemsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
+  const loadTotalValue = async () => {
+    const { data } = await (supabase.from('stock_items') as any)
+      .select('current_stock, unit_cost')
+      .neq('category', '_sistema_')
+      .range(0, 9999);
+    const v = (data || []).reduce((s: number, i: any) => s + (i.current_stock || 0) * (i.unit_cost || 0), 0);
+    setTotalStockValue(v);
+  };
+
   const loadMeta = async () => {
     const [catsRes, subsRes] = await Promise.all([
       supabase.from('categories').select('name').order('name'),
@@ -586,6 +600,7 @@ export default function StockItemsPage() {
     setAllSubcategories(subcats);
     const dbCats = (catsRes.data || []).map((c: any) => c.name as string);
     setAllCategories(dbCats.filter(c => c && c.trim() !== '' && c !== '_sistema_').sort());
+    loadTotalValue();
   };
 
   const doLoad = async (sq: string, cat: string, subcat: string, sf: typeof sortField, sd: typeof sortDir, p: number) => {
@@ -619,6 +634,7 @@ export default function StockItemsPage() {
 
   const load = () => {
     doLoad(searchQuery, filterCategory, filterSubcategory, sortField, sortDir, page);
+    loadTotalValue();
   };
 
   // Load metadata once on mount
@@ -897,7 +913,6 @@ export default function StockItemsPage() {
       ? (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)
       : <ChevronUp className="w-3 h-3 opacity-20" />;
 
-  const pageValue = items.reduce((s, i) => s + i.current_stock * i.unit_cost, 0);
 
   if (loading) return (
     <div className="flex items-center justify-center py-24">
@@ -912,9 +927,9 @@ export default function StockItemsPage() {
         <div>
           <h1 className="text-3xl font-display font-bold gold-text">Estoque</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {totalCount} itens · Valor (página):{' '}
+            {totalCount} itens · Valor em estoque:{' '}
             <span className="text-foreground font-semibold">
-              R$ {fmtNum(pageValue)}
+              R$ {fmtNum(totalStockValue)}
             </span>
           </p>
         </div>
