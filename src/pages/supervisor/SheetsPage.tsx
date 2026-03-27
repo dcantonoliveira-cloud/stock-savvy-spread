@@ -213,6 +213,7 @@ export default function SupervisorSheetsPage() {
   const [filterStatus, setFilterStatus] = useState<'active' | 'inactive' | 'all'>('active');
   const [search, setSearch] = useState('');
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [quickCreateTargetIdx, setQuickCreateTargetIdx] = useState<number | null>(null);
   const [sheetCategories, setSheetCategories] = useState<string[]>([]);
   const [newCatName, setNewCatName] = useState('');
   const [addingCat, setAddingCat] = useState(false);
@@ -430,6 +431,11 @@ export default function SupervisorSheetsPage() {
 
   const handleQuickItemCreated = (newItem: StockItem) => {
     setStockItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+    // Auto-seleciona o item criado na linha que abriu o dialog
+    if (quickCreateTargetIdx !== null) {
+      updateItem(quickCreateTargetIdx, 'item_id', newItem.id);
+      setQuickCreateTargetIdx(null);
+    }
   };
 
   // ─── Inline editing handlers ───
@@ -879,7 +885,7 @@ export default function SupervisorSheetsPage() {
                         stockItems={stockItems}
                         value={item.item_id}
                         onSelect={v => updateItem(idx, 'item_id', v)}
-                        onCreateNew={() => setQuickCreateOpen(true)}
+                        onCreateNew={() => { setQuickCreateTargetIdx(idx); setQuickCreateOpen(true); }}
                       />
                       <Input type="text" inputMode="decimal" className="h-8 text-xs" placeholder="Ex: 0.5" value={String(item.quantity)} onChange={e => updateItem(idx, 'quantity', e.target.value)} />
                       {compatUnits.length > 1 ? (
