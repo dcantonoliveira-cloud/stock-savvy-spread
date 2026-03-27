@@ -1149,6 +1149,27 @@ export default function EventMenuDetailPage() {
     setTimeout(() => w.print(), 400);
   };
 
+  const handlePrintSepGroup = (group: { label: string; isTag: boolean; color?: string; entries: { item: ShoppingItem; needed: number }[] }, empName: string | null | undefined) => {
+    const rows = group.entries.map(({ item, needed }) => {
+      const stock = sepCurrentStock[item.id] ?? item.inStock;
+      const ok = stock >= needed;
+      return `<tr>
+        <td>${item.name}</td>
+        <td class="right">${fmtNum(needed)}</td>
+        <td class="right">${item.unit}</td>
+        <td class="right ${ok ? 'badge-ok' : 'badge-buy'}">${fmtNum(stock)}</td>
+        <td class="center ${ok ? 'badge-ok' : 'badge-buy'}">${ok ? '✓' : '⚠'}</td>
+      </tr>`;
+    }).join('');
+    const body = `
+      <h2>${group.isTag ? '🏷 ' : ''}${group.label}${empName ? ` — ${empName}` : ''}</h2>
+      <table>
+        <thead><tr><th>INSUMO</th><th class="right">QTD</th><th class="right">UN</th><th class="right">ESTOQUE</th><th class="center">STATUS</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    printBase(`Separação — ${group.label}`, body);
+  };
+
   const handlePrintShoppingList = () => {
     const byCategory: Record<string, ShoppingItem[]> = {};
     shoppingList.forEach(i => {
@@ -2281,15 +2302,20 @@ export default function EventMenuDetailPage() {
                               {overrideEmpId && <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">personalizado</Badge>}
                               {!overrideEmpId && effectiveEmpName && <span className="text-xs text-muted-foreground italic truncate hidden sm:block">↑ {effectiveEmpName}</span>}
                             </div>
-                            <Select value={overrideEmpId || '__none__'} onValueChange={v => setSepOverrides(prev => ({ ...prev, [group.key]: v === '__none__' ? '' : v }))}>
-                              <SelectTrigger className="h-7 text-xs w-40 flex-shrink-0">
-                                <SelectValue placeholder={effectiveEmpName ? `↑ ${effectiveEmpName}` : 'Atribuir...'} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__"><span className="text-muted-foreground italic">Padrão</span></SelectItem>
-                                {employees.map(e => <SelectItem key={e.user_id} value={e.user_id}>{e.display_name}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <Button variant="outline" size="sm" className="h-7 w-7 p-0" title="Imprimir este grupo" onClick={() => handlePrintSepGroup(group, effectiveEmpName)}>
+                                <Printer className="w-3.5 h-3.5" />
+                              </Button>
+                              <Select value={overrideEmpId || '__none__'} onValueChange={v => setSepOverrides(prev => ({ ...prev, [group.key]: v === '__none__' ? '' : v }))}>
+                                <SelectTrigger className="h-7 text-xs w-40">
+                                  <SelectValue placeholder={effectiveEmpName ? `↑ ${effectiveEmpName}` : 'Atribuir...'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__"><span className="text-muted-foreground italic">Padrão</span></SelectItem>
+                                  {employees.map(e => <SelectItem key={e.user_id} value={e.user_id}>{e.display_name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                           <table className="w-full text-xs">
                             <tbody className="divide-y divide-border/30">
