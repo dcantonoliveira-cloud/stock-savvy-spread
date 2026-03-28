@@ -19,7 +19,7 @@ import { fmtNum, fmtCur } from '@/lib/format';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
 type TagItem = { id: string; name: string; color: string };
-type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'decoracao'; tagId?: string | null; tagName?: string | null; tagColor?: string | null };
+type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'complemento' | 'decoracao'; tagId?: string | null; tagName?: string | null; tagColor?: string | null };
 type Sheet = { id: string; name: string; servings: number; description: string | null; category: string | null; prep_time: number; yield_quantity: number; yield_unit: string; instructions: string | null; items: SheetItem[] };
 
 function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems: StockItem[]; value: string; onSelect: (id: string, item: StockItem) => void; onCreateNew: (idx?: number) => void }) {
@@ -235,7 +235,7 @@ export default function SheetDetailPage() {
     setLoading(false);
   };
 
-  const addItem = (section: 'receita' | 'decoracao') => setFormItems(prev => [...prev, { item_id: '', item_name: '', quantity: 0, unit: '', unit_cost: 0, section, tagId: null, tagName: null, tagColor: null }]);
+  const addItem = (section: 'receita' | 'complemento' | 'decoracao') => setFormItems(prev => [...prev, { item_id: '', item_name: '', quantity: 0, unit: '', unit_cost: 0, section, tagId: null, tagName: null, tagColor: null }]);
   const updateItem = (idx: number, field: string, value: any, resolvedItem?: StockItem) => setFormItems(prev => prev.map((it, i) => {
     if (i !== idx) return it;
     if (field === 'item_id') {
@@ -322,7 +322,8 @@ export default function SheetDetailPage() {
   if (!sheet) return null;
 
   const displayItems = editing ? formItems : sheet.items;
-  const recipeItems = displayItems.filter(i => i.section !== 'decoracao');
+  const recipeItems = displayItems.filter(i => i.section === 'receita');
+  const complementoItems = displayItems.filter(i => i.section === 'complemento');
   const decoItems = displayItems.filter(i => i.section === 'decoracao');
   const parseQty = (q: number | string) => parseFloat(String(q).replace(',', '.')) || 0;
   const totalCost = displayItems.reduce((s, i) => s + parseQty(i.quantity) * i.unit_cost, 0);
@@ -460,6 +461,92 @@ export default function SheetDetailPage() {
           )}
         </table>
         {recipeItems.length === 0 && <div className="text-center py-8 text-muted-foreground text-sm">Nenhum ingrediente cadastrado</div>}
+      </div>
+
+      {/* Complementos / Molhos */}
+      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden mb-4">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border" style={{ background: 'hsl(200 60% 97%)' }}>
+          <div>
+            <p className="text-sm font-semibold text-sky-700">🥣 Complementos / Molhos</p>
+            <p className="text-[11px] text-sky-600/70 mt-0.5">Insumos prontos ou molhos servidos junto ao prato — informar a quantidade exata por porção</p>
+          </div>
+          {editing && <Button variant="outline" size="sm" className="border-sky-200 text-sky-700 hover:bg-sky-50" onClick={() => addItem('complemento')}><Plus className="w-3.5 h-3.5 mr-1" />Adicionar complemento</Button>}
+        </div>
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-sky-100 text-xs text-muted-foreground" style={{ background: 'hsl(200 60% 98%)' }}><th className="text-left px-5 py-2">Insumo / Molho</th><th className="text-right px-4 py-2">Quantidade</th><th className="text-center px-3 py-2">Un.</th><th className="text-right px-4 py-2">Custo Unit.</th><th className="text-right px-5 py-2">Custo Total</th>{editing && <th className="w-10"></th>}</tr></thead>
+          <tbody className="divide-y divide-sky-50">
+            {complementoItems.map((item) => {
+              const idx = formItems.indexOf(item);
+              return (
+                <tr key={editing ? idx : item.item_id} style={{ background: 'hsl(200 60% 99%)' }}>
+                  <td className="px-5 py-3">
+                    {editing
+                      ? <div className="flex items-center gap-1">
+                          <div className="flex-1"><ItemCombobox stockItems={stockItems} value={item.item_id} onSelect={(id, si) => updateItem(idx, 'item_id', id, si)} onCreateNew={() => { setPendingSelectIdx(idx); setQuickCreateOpen(true); }} /></div>
+                          {item.item_id && (
+                            <button onClick={() => setEditItem(stockItems.find(s => s.id === item.item_id) || null)} className="text-muted-foreground hover:text-primary transition-colors" title="Editar insumo">
+                              <SquarePen className="w-4 h-4" />
+                            </button>
+                          )}
+                          <Popover open={openTagPopover === idx} onOpenChange={o => setOpenTagPopover(o ? idx : null)}>
+                            <PopoverTrigger asChild>
+                              <button className="flex-shrink-0 transition-colors" title="Tag">
+                                {item.tagId
+                                  ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: (item.tagColor || '#0ea5e9') + '20', color: item.tagColor || '#0ea5e9' }}>{item.tagName}</span>
+                                  : <span className="text-[10px] text-muted-foreground/60 hover:text-primary border border-dashed border-border rounded px-1.5 py-0.5">+tag</span>
+                                }
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-2" align="start">
+                              <div className="space-y-0.5">
+                                <button className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted/60 text-muted-foreground" onClick={() => { setFormItems(prev => prev.map((fi, i) => i === idx ? { ...fi, tagId: null, tagName: null, tagColor: null } : fi)); setOpenTagPopover(null); }}>Sem tag</button>
+                                {tags.map(t => (
+                                  <button key={t.id} className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted/60 flex items-center gap-2" onClick={() => { setFormItems(prev => prev.map((fi, i) => i === idx ? { ...fi, tagId: t.id, tagName: t.name, tagColor: t.color } : fi)); setOpenTagPopover(null); }}>
+                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: t.color }} />
+                                    <span style={{ color: t.color }} className="font-medium">{t.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      : <div className="flex items-center gap-2">
+                          {item.item_name === '?' || !item.item_name
+                            ? <span className="text-xs text-destructive/80 italic">⚠ Insumo removido — edite para substituir</span>
+                            : <span className="text-foreground">{item.item_name}</span>
+                          }
+                          {item.tagId && item.tagColor && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ background: item.tagColor + '20', color: item.tagColor }}>{item.tagName}</span>
+                          )}
+                        </div>}
+                  </td>
+                  <td className="px-4 py-3 text-right">{editing ? <Input type="text" inputMode="decimal" className="h-8 w-24 text-xs text-right ml-auto" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} /> : <span className="font-medium">{fmtNum(parseQty(item.quantity))}</span>}</td>
+                  <td className="px-3 py-3 text-center text-muted-foreground text-xs">
+                    {editing ? (() => {
+                      const compatUnits = item.item_id ? getCompatibleUnits(stockItems.find(s => s.id === item.item_id)?.unit || item.unit) : [item.unit].filter(Boolean);
+                      return compatUnits.length > 1
+                        ? <select className="text-xs border border-input rounded px-1 py-0.5 bg-background cursor-pointer" value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)}>{compatUnits.map(u => <option key={u} value={u}>{u}</option>)}</select>
+                        : <span>{item.unit}</span>;
+                    })() : item.unit}
+                  </td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">{fmtCur(item.unit_cost)}</td>
+                  <td className="px-5 py-3 text-right font-medium text-foreground">{fmtCur(parseQty(item.quantity) * item.unit_cost)}</td>
+                  {editing && <td className="pr-3 py-3"><button onClick={() => removeItem(idx)} className="text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button></td>}
+                </tr>
+              );
+            })}
+          </tbody>
+          {complementoItems.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-sky-100" style={{ background: 'hsl(200 60% 97%)' }}>
+                <td colSpan={4} className="px-5 py-3 text-right font-semibold text-sky-700">Total complementos:</td>
+                <td className="px-5 py-3 text-right font-bold text-sky-700">{fmtCur(complementoItems.reduce((s, i) => s + parseQty(i.quantity) * i.unit_cost, 0))}</td>
+                {editing && <td></td>}
+              </tr>
+            </tfoot>
+          )}
+        </table>
+        {complementoItems.length === 0 && <div className="text-center py-6 text-muted-foreground text-sm">Nenhum complemento cadastrado</div>}
       </div>
 
       {/* Decoração */}
