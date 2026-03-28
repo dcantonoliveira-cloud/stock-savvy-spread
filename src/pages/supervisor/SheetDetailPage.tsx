@@ -220,13 +220,15 @@ export default function SheetDetailPage() {
     if (tagsRes.data) setTags(tagsRes.data as TagItem[]);
     const tagsMap: Record<string, TagItem> = {};
     (tagsRes.data || []).forEach((t: any) => { tagsMap[t.id] = t; });
-    const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, quantity, unit_cost, section, tag_id').eq('sheet_id', id!);
+    const { data: si } = await supabase.from('technical_sheet_items').select('id, item_id, item_name, quantity, unit_cost, section, tag_id').eq('sheet_id', id!);
     const items: SheetItem[] = (si || []).map((i: any) => {
       const item = (itemsRes.data as any[])?.find((x: any) => x.id === i.item_id);
       const itemUnit = item?.unit || '';
       const baseUnitCost = effectiveUnitCost(item?.unit_cost || 0, item?.purchase_qty);
       const tag = i.tag_id ? tagsMap[i.tag_id] : null;
-      return { id: i.id, item_id: i.item_id, item_name: item?.name || '?', quantity: i.quantity, unit: itemUnit, unit_cost: baseUnitCost, section: i.section || 'receita', tagId: i.tag_id || null, tagName: tag?.name || null, tagColor: tag?.color || null };
+      // Se não achar pelo UUID, tenta fallback por nome salvo na coluna item_name (se existir)
+      const resolvedName = item?.name || i.item_name || '?';
+      return { id: i.id, item_id: i.item_id, item_name: resolvedName, quantity: i.quantity, unit: itemUnit, unit_cost: baseUnitCost, section: i.section || 'receita', tagId: i.tag_id || null, tagName: tag?.name || null, tagColor: tag?.color || null };
     });
     const loaded = { ...(sheetRes.data as any), items } as Sheet;
     setSheet(loaded);
@@ -281,6 +283,7 @@ export default function SheetDetailPage() {
       for (const i of valid.filter(i => i.id)) {
         const { error: updErr } = await supabase.from('technical_sheet_items').update({
           item_id: i.item_id,
+          item_name: i.item_name && i.item_name !== '?' ? i.item_name : undefined,
           quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
           unit_cost: i.unit_cost,
           section: i.section || 'receita',
@@ -296,6 +299,7 @@ export default function SheetDetailPage() {
           newItems.map(i => ({
             sheet_id: sheet.id,
             item_id: i.item_id,
+            item_name: i.item_name && i.item_name !== '?' ? i.item_name : undefined,
             quantity: parseFloat(String(i.quantity).replace(',', '.')) || 0,
             unit_cost: i.unit_cost,
             section: i.section || 'receita',
