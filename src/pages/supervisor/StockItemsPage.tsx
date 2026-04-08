@@ -541,11 +541,12 @@ function ItemForm({ item, allCategories, allSubcategories, onSave, onCancel }: {
 const PAGE_SIZE = 50;
 
 // ─── Main Page ───
+const SESSION_KEY = 'stock_items_page';
 export default function StockItemsPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(() => parseInt(sessionStorage.getItem(SESSION_KEY) || '0', 10) || 0);
   const [suppliers, setSuppliers] = useState<Record<string, Supplier[]>>({});
   const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const allSubcategoriesRef = useRef<Subcategory[]>([]);
@@ -585,12 +586,15 @@ export default function StockItemsPage() {
     allSubcategoriesRef.current = allSubcategories;
   }, [allSubcategories]);
 
+  // Persist page to sessionStorage
+  useEffect(() => { sessionStorage.setItem(SESSION_KEY, String(page)); }, [page]);
+
   // Debounce search → searchQuery, reset page
   useEffect(() => {
     const t = setTimeout(() => {
       setSearchQuery(search);
       setPage(0);
-    }, 300);
+    }, 350);
     return () => clearTimeout(t);
   }, [search]);
 
@@ -627,27 +631,30 @@ export default function StockItemsPage() {
     const subMap: Record<string, string> = {};
     allSubcategoriesRef.current.forEach(s => { subMap[s.id] = s.name; });
     const mapped: Item[] = (data || []).map((i: any) => ({ ...i, subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined }));
-    const ids = mapped.map(i => i.id);
-    const { data: suppData } = ids.length > 0
-      ? await (supabase.from('item_suppliers') as any).select('*').in('item_id', ids)
-      : { data: [] };
-    const suppMap: Record<string, Supplier[]> = {};
-    for (const s of (suppData || []) as Supplier[]) {
-      if (!suppMap[s.item_id]) suppMap[s.item_id] = [];
-      suppMap[s.item_id].push(s);
-    }
     setItems(mapped);
     setTotalCount(count || 0);
-    setSuppliers(suppMap);
     // Merge categories from DB + categories used in current page
     const usedCats = mapped.map(i => i.category).filter(c => c && c.trim() !== '' && c !== '_sistema_');
     setAllCategories(prev => [...new Set([...prev, ...usedCats])].sort());
-    setLoading(false);
+    setLoading(false); // mostra a lista imediatamente
+
+    // Carrega fornecedores em background sem bloquear a UI
+    if (mapped.length > 0) {
+      const ids = mapped.map(i => i.id);
+      (supabase.from('item_suppliers') as any).select('*').in('item_id', ids)
+        .then(({ data: suppData }: any) => {
+          const suppMap: Record<string, Supplier[]> = {};
+          for (const s of (suppData || []) as Supplier[]) {
+            if (!suppMap[s.item_id]) suppMap[s.item_id] = [];
+            suppMap[s.item_id].push(s);
+          }
+          setSuppliers(suppMap);
+        });
+    }
   };
 
   const load = () => {
     doLoad(searchQuery, filterCategory, filterSubcategory, sortField, sortDir, page);
-    loadTotalValue();
   };
 
   // Load metadata once on mount
@@ -1207,7 +1214,7 @@ export default function StockItemsPage() {
         </DialogContent>
       </Dialog>
 
-      <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} initialSuppliers={supplierItem ? (suppliers[supplierItem.id] || []) : []} />
+      <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} />
       <DuplicateReviewDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} items={allItemsForDialogs} onDone={() => { setDuplicateOpen(false); load(); }} />
       <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
 
