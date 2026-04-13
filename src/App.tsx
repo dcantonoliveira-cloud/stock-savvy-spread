@@ -48,6 +48,7 @@ import EmployeeEventsPage from "./pages/employee/EmployeeEventsPage";
 import EmployeeMateriaisPage from "./pages/employee/EmployeeMateriaisPage";
 
 import PublicInventoryPage from "./pages/public/PublicInventoryPage";
+import MenuSelectionPage from "./pages/public/MenuSelectionPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -143,6 +144,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/pub-inv" element={<PublicInventoryPage />} />
+          <Route path="/menu/:eventId" element={<MenuSelectionPage />} />
           <Route path="/*" element={
             <AuthProvider>
               <AppRoutes />

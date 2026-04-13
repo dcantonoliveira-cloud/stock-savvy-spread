@@ -17,10 +17,12 @@ import { cn } from '@/lib/utils';
 import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib/units';
 import { fmtNum, fmtCur } from '@/lib/format';
 
+const YIELD_UNITS = ['kg', 'g', 'L', 'ml', 'un', 'cx', 'pct', 'mç', 'vd', 'fatias', 'lt', 'fco', 'lata', 'garr', 'cumb', 'bj', 'pote', 'rolo', 'pés', 'forma'];
+
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
 type TagItem = { id: string; name: string; color: string };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; unit: string; unit_cost: number; section: 'receita' | 'complemento' | 'decoracao'; tagId?: string | null; tagName?: string | null; tagColor?: string | null };
-type Sheet = { id: string; name: string; servings: number; description: string | null; category: string | null; prep_time: number; yield_quantity: number; yield_unit: string; instructions: string | null; items: SheetItem[] };
+type Sheet = { id: string; name: string; servings: number; description: string | null; category: string | null; prep_time: number; yield_quantity: number; yield_unit: string; instructions: string | null; image_url: string | null; items: SheetItem[] };
 
 function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: { stockItems: StockItem[]; value: string; onSelect: (id: string, item: StockItem) => void; onCreateNew: (idx?: number) => void }) {
   const [open, setOpen] = useState(false);
@@ -202,6 +204,7 @@ export default function SheetDetailPage() {
   const [name, setName] = useState('');
   const [yieldQty, setYieldQty] = useState('1');
   const [yieldUnit, setYieldUnit] = useState('kg');
+  const [editImageUrl, setEditImageUrl] = useState('');
   const [formItems, setFormItems] = useState<SheetItem[]>([]);
 
   useEffect(() => { if (id) load(); }, [id]);
@@ -232,7 +235,7 @@ export default function SheetDetailPage() {
     });
     const loaded = { ...(sheetRes.data as any), items } as Sheet;
     setSheet(loaded);
-    setName(loaded.name); setYieldQty(loaded.yield_quantity?.toString() || '1'); setYieldUnit(loaded.yield_unit || 'kg');
+    setName(loaded.name); setYieldQty(loaded.yield_quantity?.toString() || '1'); setYieldUnit(loaded.yield_unit || 'kg'); setEditImageUrl(loaded.image_url || '');
     setFormItems(items.map(i => ({ ...i })));
     setLoading(false);
   };
@@ -264,7 +267,7 @@ export default function SheetDetailPage() {
     try {
       // 1. Atualiza nome / rendimento
       const { error: sheetErr } = await supabase.from('technical_sheets')
-        .update({ name: name.trim(), yield_quantity: parseFloat(yieldQty) || 1, yield_unit: yieldUnit } as any)
+        .update({ name: name.trim(), yield_quantity: parseFloat(yieldQty) || 1, yield_unit: yieldUnit, image_url: editImageUrl.trim() || null } as any)
         .eq('id', sheet.id);
       if (sheetErr) throw sheetErr;
 
@@ -320,7 +323,7 @@ export default function SheetDetailPage() {
     }
   };
 
-  const cancelEdit = () => { if (!sheet) return; setName(sheet.name); setYieldQty(sheet.yield_quantity?.toString() || '1'); setYieldUnit(sheet.yield_unit || 'kg'); setFormItems(sheet.items.map(i => ({ ...i }))); setEditing(false); };
+  const cancelEdit = () => { if (!sheet) return; setName(sheet.name); setYieldQty(sheet.yield_quantity?.toString() || '1'); setYieldUnit(sheet.yield_unit || 'kg'); setEditImageUrl(sheet.image_url || ''); setFormItems(sheet.items.map(i => ({ ...i }))); setEditing(false); };
 
   if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (!sheet) return null;
@@ -339,41 +342,57 @@ export default function SheetDetailPage() {
       </Button>
 
       {/* Header */}
-      <div className="bg-white rounded-xl border border-border p-6 mb-6 shadow-sm">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            {editing
-              ? <Input value={name} onChange={e => setName(e.target.value)} className="text-2xl font-bold h-10 mb-3" />
-              : <h1 className="text-2xl font-display font-bold text-foreground mb-2">{sheet.name}</h1>
-            }
-            <div className="flex flex-wrap gap-2">
-              {sheet.category && <Badge variant="secondary"><ChefHat className="w-3 h-3 mr-1" />{sheet.category}</Badge>}
-              {sheet.prep_time > 0 && <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />{sheet.prep_time} min</Badge>}
-              <Badge variant="outline"><Users className="w-3 h-3 mr-1" />{sheet.servings} porções</Badge>
-              <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5">
-                <CalendarDays className="w-3 h-3 mr-1" />
-                {eventCount === 0 ? 'Nunca usado em evento' : `${eventCount} evento${eventCount !== 1 ? 's' : ''}`}
-              </Badge>
+      <div className="bg-white rounded-xl border border-border mb-6 shadow-sm overflow-hidden">
+        {sheet.image_url && !editing && (
+          <img src={sheet.image_url} alt={sheet.name} className="w-full max-h-48 object-cover rounded-xl" />
+        )}
+        <div className="p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
               {editing
-                ? <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">Rende:</span>
-                    <Input type="number" value={yieldQty} onChange={e => setYieldQty(e.target.value)} className="h-7 w-16 text-xs" />
-                    <Input value={yieldUnit} onChange={e => setYieldUnit(e.target.value)} className="h-7 w-14 text-xs" />
-                  </div>
-                : <Badge variant="outline">Rende {sheet.yield_quantity} {sheet.yield_unit}</Badge>
+                ? <Input value={name} onChange={e => setName(e.target.value)} className="text-2xl font-bold h-10 mb-3" />
+                : <h1 className="text-2xl font-display font-bold text-foreground mb-2">{sheet.name}</h1>
               }
-              <Badge className="bg-primary/10 text-primary border-primary/20">Custo: {fmtCur(totalCost)}</Badge>
+              <div className="flex flex-wrap gap-2">
+                {sheet.category && <Badge variant="secondary"><ChefHat className="w-3 h-3 mr-1" />{sheet.category}</Badge>}
+                {sheet.prep_time > 0 && <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />{sheet.prep_time} min</Badge>}
+                <Badge variant="outline"><Users className="w-3 h-3 mr-1" />{sheet.servings} porções</Badge>
+                <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5">
+                  <CalendarDays className="w-3 h-3 mr-1" />
+                  {eventCount === 0 ? 'Nunca usado em evento' : `${eventCount} evento${eventCount !== 1 ? 's' : ''}`}
+                </Badge>
+                {editing
+                  ? <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground">Rende:</span>
+                      <Input type="number" value={yieldQty} onChange={e => setYieldQty(e.target.value)} className="h-7 w-16 text-xs" />
+                      <Select value={yieldUnit} onValueChange={setYieldUnit}>
+                        <SelectTrigger className="h-7 w-[90px] text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {[...new Set([yieldUnit, ...YIELD_UNITS])].map(u => <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  : <Badge variant="outline">Rende {sheet.yield_quantity} {sheet.yield_unit}</Badge>
+                }
+                <Badge className="bg-primary/10 text-primary border-primary/20">Custo: {fmtCur(totalCost)}</Badge>
+              </div>
+              {sheet.description && <p className="text-sm text-muted-foreground mt-2">{sheet.description}</p>}
+              {editing && (
+                <div className="mt-3">
+                  <label className="text-xs text-muted-foreground mb-1 block">URL da Foto</label>
+                  <Input value={editImageUrl} onChange={e => setEditImageUrl(e.target.value)} placeholder="https://exemplo.com/foto.jpg" className="h-8 text-sm" />
+                </div>
+              )}
             </div>
-            {sheet.description && <p className="text-sm text-muted-foreground mt-2">{sheet.description}</p>}
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            {!editing
-              ? <Button variant="outline" onClick={() => setEditing(true)}><Pencil className="w-4 h-4 mr-2" />Editar</Button>
-              : <>
-                  <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}Salvar</Button>
-                  <Button variant="outline" onClick={cancelEdit}>Cancelar</Button>
-                </>
-            }
+            <div className="flex gap-2 flex-shrink-0">
+              {!editing
+                ? <Button variant="outline" onClick={() => setEditing(true)}><Pencil className="w-4 h-4 mr-2" />Editar</Button>
+                : <>
+                    <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}Salvar</Button>
+                    <Button variant="outline" onClick={cancelEdit}>Cancelar</Button>
+                  </>
+              }
+            </div>
           </div>
         </div>
       </div>
