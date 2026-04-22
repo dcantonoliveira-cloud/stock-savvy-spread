@@ -15,8 +15,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    // Gera bundle legado para iPads/browsers antigos (Safari < 14, iOS < 14)
-    // O browser escolhe automaticamente qual bundle carregar via <script type="module"> / <script nomodule>
     legacy({
       targets: ["ios >= 12", "safari >= 12"],
     }),
@@ -25,6 +23,47 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // React core — carrega primeiro, muito cacheável
+          if (id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/react-router-dom/') ||
+              id.includes('node_modules/scheduler/')) {
+            return 'vendor-react';
+          }
+          // Supabase
+          if (id.includes('node_modules/@supabase/')) {
+            return 'vendor-supabase';
+          }
+          // XLSX (pesado, só usado em algumas páginas)
+          if (id.includes('node_modules/xlsx')) {
+            return 'vendor-xlsx';
+          }
+          // Recharts (gráficos)
+          if (id.includes('node_modules/recharts') ||
+              id.includes('node_modules/d3-') ||
+              id.includes('node_modules/victory-')) {
+            return 'vendor-charts';
+          }
+          // Radix UI + shadcn components
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'vendor-radix';
+          }
+          // Tanstack
+          if (id.includes('node_modules/@tanstack/')) {
+            return 'vendor-tanstack';
+          }
+          // Demais node_modules
+          if (id.includes('node_modules/')) {
+            return 'vendor-misc';
+          }
+        },
+      },
     },
   },
 }));
