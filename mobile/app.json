@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Rondello Buffet",
+    "slug": "rondello-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "rondello",
+    "splash": {
+      "backgroundColor": "#faf8f5",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "br.com.rondellobuffet.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#faf8f5"
+      },
+      "package": "br.com.rondellobuffet.mobile"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
