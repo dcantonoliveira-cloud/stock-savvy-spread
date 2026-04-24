@@ -34,7 +34,7 @@ export default function DashboardPage() {
     return d >= monthStart && d <= monthEnd;
   });
 
-  const fechados = events.filter((e) => e.Status?.toLowerCase() === 'fechado');
+  const fechados = events.filter((e) => e.Status === 'Fechado');
   const nextEvent = upcoming[0];
 
   const todayFull = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
