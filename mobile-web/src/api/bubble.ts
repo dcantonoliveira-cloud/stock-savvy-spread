@@ -43,11 +43,11 @@ export function fetchEventos(opts?: {
   if (opts?.cursor) params.cursor = String(opts.cursor);
   if (opts?.constraints?.length) params.constraints = JSON.stringify(opts.constraints);
 
-  return apiFetch<BubbleListResponse<BubbleEvento>>('Eventos', params);
+  return apiFetch<BubbleListResponse<BubbleEvento>>('eventos', params);
 }
 
 export function fetchEvento(id: string) {
-  return apiFetch<BubbleSingleResponse<BubbleEvento>>(`Eventos/${id}`);
+  return apiFetch<BubbleSingleResponse<BubbleEvento>>(`eventos/${id}`);
 }
 
 // ── Tastings ─────────────────────────────────────────────────────────────────
