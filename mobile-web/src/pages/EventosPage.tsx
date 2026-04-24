@@ -3,73 +3,78 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
 import { fetchEventos } from '../api/bubble';
 import { BubbleEvento } from '../types';
-import StatusBadge from '../components/StatusBadge';
-import { fmtCurrency } from '../lib/format';
 
-const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MONTHS      = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                     'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-const TYPE_COLORS: Record<string, string> = {
-  casamento:    'bg-pink-100 text-pink-700',
-  corporativo:  'bg-blue-100 text-blue-700',
-  aniversário:  'bg-violet-100 text-violet-700',
-  debutante:    'bg-rose-100 text-rose-700',
-  formatura:    'bg-emerald-100 text-emerald-700',
-};
-function typeColor(t?: string) {
-  return TYPE_COLORS[(t ?? '').toLowerCase()] ?? 'bg-stone-100 text-stone-600';
-}
+// ── Event row ────────────────────────────────────────────────────────────────
 
 function EventRow({ event }: { event: BubbleEvento }) {
-  const date = event.dataDoEvento ? new Date(event.dataDoEvento) : null;
-  const day  = date?.toLocaleDateString('pt-BR', { day: '2-digit' });
-  const weekday = date?.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+  const date    = event.dataDoEvento ? new Date(event.dataDoEvento) : null;
+  const isPast  = date ? date < new Date() : false;
+  const day     = date?.toLocaleDateString('pt-BR', { day: '2-digit' });
+  const weekday = date?.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase();
 
   return (
     <Link
       to={`/eventos/${event._id}`}
-      className="flex items-center gap-3 bg-white rounded-2xl border border-stone-200 p-3.5 active:bg-stone-50 transition-colors"
+      className={`flex items-center gap-3 rounded-2xl border p-3.5 transition-colors active:scale-[0.99] ${
+        isPast
+          ? 'bg-stone-50 border-stone-200 opacity-60'
+          : 'bg-white border-amber-200 shadow-sm shadow-amber-100'
+      }`}
     >
       {/* Date block */}
-      <div className="w-12 shrink-0 flex flex-col items-center bg-amber-50 rounded-xl py-2">
-        <span className="text-[10px] font-semibold text-amber-600 uppercase">{weekday}</span>
-        <span className="text-xl font-bold text-amber-900 leading-none">{day ?? '—'}</span>
+      <div className={`w-12 shrink-0 flex flex-col items-center rounded-xl py-2 ${
+        isPast ? 'bg-stone-200' : 'bg-amber-100'
+      }`}>
+        <span className={`text-[10px] font-bold ${isPast ? 'text-stone-500' : 'text-amber-600'}`}>
+          {weekday}
+        </span>
+        <span className={`text-xl font-extrabold leading-none ${isPast ? 'text-stone-600' : 'text-amber-900'}`}>
+          {day ?? '—'}
+        </span>
       </div>
 
-      {/* Main info */}
+      {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="font-bold text-stone-800 truncate text-[15px]">
-          {event.NomeDoContratante ?? '—'}
+        <p className={`font-bold truncate text-[15px] ${isPast ? 'text-stone-500' : 'text-stone-800'}`}>
+          {event.NomeDoContratante ?? event.NomeDoEvento ?? '—'}
         </p>
-        {event.LocalDoEvento && (
-          <p className="text-xs text-stone-400 flex items-center gap-1 mt-0.5 truncate">
-            <MapPin className="w-3 h-3 shrink-0" />
-            {event.LocalDoEvento}
-          </p>
+
+        {event.NomeDoEvento && event.NomeDoEvento !== event.NomeDoContratante && (
+          <p className="text-xs text-stone-400 truncate">{event.NomeDoEvento}</p>
         )}
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          {event.TipoDoEvento && (
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${typeColor(event.TipoDoEvento)}`}>
-              {event.TipoDoEvento}
+
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          {event.LocalDoEvento && (
+            <span className="flex items-center gap-1 text-xs text-stone-400 truncate max-w-[160px]">
+              <MapPin className="w-3 h-3 shrink-0" />
+              <span className="truncate">{event.LocalDoEvento}</span>
             </span>
           )}
           {event.QuantidadeDeConvidados != null && (
-            <span className="text-[11px] text-stone-400 flex items-center gap-0.5">
-              <Users className="w-3 h-3" />{event.QuantidadeDeConvidados}
-            </span>
-          )}
-          {event.Preco != null && (
-            <span className="text-[11px] font-semibold text-emerald-700">
-              {fmtCurrency(event.Preco)}
+            <span className="flex items-center gap-1 text-xs text-stone-400">
+              <Users className="w-3 h-3 shrink-0" />
+              {event.QuantidadeDeConvidados}
             </span>
           )}
         </div>
       </div>
 
-      {/* Status */}
-      <div className="shrink-0 flex flex-col items-end gap-1.5">
-        <StatusBadge status={event.Status} />
-        <ChevronRight className="w-4 h-4 text-stone-300" />
+      {/* Future indicator / arrow */}
+      <div className="shrink-0">
+        {isPast ? (
+          <ChevronRight className="w-4 h-4 text-stone-300" />
+        ) : (
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+              Próximo
+            </span>
+            <ChevronRight className="w-4 h-4 text-amber-400" />
+          </div>
+        )}
       </div>
     </Link>
   );
@@ -79,22 +84,34 @@ function Skeleton() {
   return <div className="h-20 bg-stone-100 rounded-2xl animate-pulse" />;
 }
 
+// ── Page ─────────────────────────────────────────────────────────────────────
+
 export default function EventosPage() {
   const now = new Date();
-  const [year, setYear]   = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth()); // 0-indexed
+  const [year, setYear]     = useState(now.getFullYear());
+  const [month, setMonth]   = useState(now.getMonth());
   const [events, setEvents] = useState<BubbleEvento[]>([]);
   const [loading, setLoading] = useState(true);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchEventos({ limit: 500 })
-      .then((r) => setEvents(r.response.results))
+    // Fetch only "Fechado" events from Bubble API
+    fetchEventos({
+      limit: 500,
+      sortOrder: 'asc',
+      constraints: [{ key: 'Status', constraint_type: 'equals', value: 'Fechado' }],
+    })
+      .then((r) => {
+        // Double-check on frontend (case-insensitive) in case Bubble ignores constraint
+        const fechados = r.response.results.filter(
+          (e) => e.Status?.toLowerCase() === 'fechado'
+        );
+        setEvents(fechados);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  // Count events per month for the current year
   const countsByMonth = useMemo(() => {
     const counts = Array(12).fill(0);
     events.forEach((e) => {
@@ -105,7 +122,6 @@ export default function EventosPage() {
     return counts;
   }, [events, year]);
 
-  // Events for selected month, sorted by date
   const monthEvents = useMemo(() =>
     events
       .filter((e) => {
@@ -117,7 +133,10 @@ export default function EventosPage() {
     [events, year, month]
   );
 
-  // Scroll active month tab into view
+  const upcoming = monthEvents.filter((e) => e.dataDoEvento && new Date(e.dataDoEvento) >= now);
+  const past     = monthEvents.filter((e) => e.dataDoEvento && new Date(e.dataDoEvento) <  now);
+
+  // Scroll active tab into view when month changes
   useEffect(() => {
     const el = tabsRef.current?.querySelector(`[data-month="${month}"]`) as HTMLElement | null;
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
@@ -125,24 +144,24 @@ export default function EventosPage() {
 
   return (
     <div className="pb-28 max-w-lg mx-auto">
-      {/* Header */}
+      {/* Sticky header */}
       <div className="sticky top-0 z-40 bg-white border-b border-stone-200">
         {/* Year selector */}
         <div className="flex items-center justify-between px-4 py-3">
           <button
-            onClick={() => setYear(y => y - 1)}
+            onClick={() => setYear((y) => y - 1)}
             className="w-8 h-8 rounded-lg bg-stone-100 flex items-center justify-center"
           >
             <ChevronLeft className="w-4 h-4 text-stone-600" />
           </button>
           <div className="text-center">
-            <p className="font-bold text-stone-800 text-lg">{year}</p>
-            <p className="text-xs text-stone-400">
-              {loading ? '…' : `${events.filter(e => new Date(e.dataDoEvento ?? '').getFullYear() === year).length} eventos`}
+            <p className="font-bold text-stone-800 text-lg leading-none">{year}</p>
+            <p className="text-xs text-stone-400 mt-0.5">
+              {loading ? '…' : `${events.filter((e) => new Date(e.dataDoEvento ?? '').getFullYear() === year).length} eventos fechados`}
             </p>
           </div>
           <button
-            onClick={() => setYear(y => y + 1)}
+            onClick={() => setYear((y) => y + 1)}
             className="w-8 h-8 rounded-lg bg-stone-100 flex items-center justify-center"
           >
             <ChevronRight className="w-4 h-4 text-stone-600" />
@@ -150,10 +169,7 @@ export default function EventosPage() {
         </div>
 
         {/* Month tabs */}
-        <div
-          ref={tabsRef}
-          className="flex gap-1.5 overflow-x-auto px-4 pb-3 scrollbar-none"
-        >
+        <div ref={tabsRef} className="flex gap-1.5 overflow-x-auto px-4 pb-3 scrollbar-none">
           {MONTHS.map((m, i) => {
             const active = i === month;
             const count  = countsByMonth[i];
@@ -163,10 +179,10 @@ export default function EventosPage() {
                 data-month={i}
                 onClick={() => setMonth(i)}
                 className={`shrink-0 flex flex-col items-center px-3 py-1.5 rounded-xl transition-colors ${
-                  active ? 'bg-amber-800 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                  active ? 'bg-amber-800 text-white' : 'bg-stone-100 text-stone-500'
                 }`}
               >
-                <span className={`text-[11px] font-semibold`}>{m}</span>
+                <span className="text-[11px] font-semibold">{m}</span>
                 {count > 0 && (
                   <span className={`text-[10px] font-bold mt-0.5 ${active ? 'text-amber-200' : 'text-amber-700'}`}>
                     {count}
@@ -178,28 +194,43 @@ export default function EventosPage() {
         </div>
       </div>
 
-      {/* Section title */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <h2 className="font-bold text-stone-800">{MONTHS_FULL[month]} {year}</h2>
-        <span className="text-sm text-stone-400">
-          {loading ? '' : `${monthEvents.length} evento${monthEvents.length !== 1 ? 's' : ''}`}
-        </span>
-      </div>
-
-      {/* Event list */}
-      <div className="px-4 space-y-2.5">
+      <div className="px-4 pt-4 space-y-5">
         {loading ? (
-          <>
+          <div className="space-y-2.5">
             <Skeleton /><Skeleton /><Skeleton />
-          </>
+          </div>
         ) : monthEvents.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-4xl mb-3">📅</p>
             <p className="text-stone-500 font-medium">Sem eventos em {MONTHS_FULL[month]}</p>
-            <p className="text-stone-400 text-sm mt-1">Selecione outro mês</p>
+            <p className="text-stone-400 text-sm mt-1">Selecione outro mês ou ano</p>
           </div>
         ) : (
-          monthEvents.map((e) => <EventRow key={e._id} event={e} />)
+          <>
+            {/* Upcoming events */}
+            {upcoming.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-2">
+                  Próximos · {upcoming.length}
+                </p>
+                <div className="space-y-2.5">
+                  {upcoming.map((e) => <EventRow key={e._id} event={e} />)}
+                </div>
+              </div>
+            )}
+
+            {/* Past events */}
+            {past.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">
+                  Realizados · {past.length}
+                </p>
+                <div className="space-y-2.5">
+                  {past.map((e) => <EventRow key={e._id} event={e} />)}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
