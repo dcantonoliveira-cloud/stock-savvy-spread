@@ -14,7 +14,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchEventos({ limit: 500, sortOrder: 'asc' })
+    fetchEventos({ limit: 500, sortOrder: 'desc' })
       .then((r) => setEvents(r.response.results))
       .catch(() => {})
       .finally(() => setLoading(false));
