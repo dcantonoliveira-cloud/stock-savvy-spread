@@ -1,34 +1,73 @@
 // ---------------------------------------------------------------------------
 // Bubble.io data types for Rondello Buffet management.
-// Adjust field names here to match your actual Bubble schema.
+// Field names follow Bubble's Portuguese naming convention.
+// Adjust any name that doesn't match your actual Bubble schema.
 // ---------------------------------------------------------------------------
 
 export interface BubbleEvento {
   _id: string;
-  // Core
+
+  // Core identification
   NomeDoEvento?: string;
   NomeDoContratante?: string;
-  dataDoEvento?: string;        // ISO date string
+  dataDoEvento?: string;        // ISO – note lowercase 'd' (confirmed from API)
   Status?: string;              // "Confirmado" | "Pendente" | "Cancelado" | "Realizado"
-  // Details
-  NumeroDeConvidados?: number;
-  Local?: string;
-  Valor?: number;
-  Descricao?: string;
+
+  // Event details (Ficha Técnica)
+  LocalDoEvento?: string;
+  TipoDoEvento?: string;        // "Casamento" | "Corporativo" | etc.
+  ProdutoEscolhido?: string;    // e.g. "Coquetel Prime com ilha e Jantar"
+  HorarioDaCerimonia?: string;
+  DuracaoDoEvento?: string;
+  Preco?: number;               // "Preço negociado"
+  QuantidadeDeConvidados?: number;
+  Criancas50?: number;          // "Crianças 50%"
+  NaoPagantes?: number;
+  HorasAdicionais?: number;
+  Observacoes?: string;
+
+  // Professionals / Team
+  QuantidadeDeProfissionais?: number;
+  ValorAlimentacaoProfissionais?: number;
+  AlimentacaoProfissionais?: string;  // "separada" | "junto" | etc.
+  Organizadora?: string;
+  Decorador?: string;
+  Confeiteiro?: string;
+  BandaDJ?: string;
+  FotoFilmagem?: string;
+  Bartender?: string;
+  OutrosProfissionais?: string;
+  AtracoesAParte?: string;
+
+  // Setup / Equipment
+  CoqueteilBoasVindas?: string; // "Sim" | "Não"
+  Vinho?: string;
+  Whisky?: string;
+  PortaGuardanapo?: string;
+  Toalha?: string;
+  Rechaud?: string;
+  Sousplat?: string;
+  Aparador?: string;
+  Taca?: string;
+  SalaDosNoivos?: string;
+  EspacoKids?: string;
+  QuantidadeDeMesas?: number;
+
+  // Client data (Dados do Cliente tab)
   ContatoDoContratante?: string;
   Telefone?: string;
-  // Relations
-  DataDaDegustacao?: string;    // tasting date if stored on event
-  Cardapio?: string;            // menu description or ID
+  Email?: string;
+  CPF?: string;
+  Endereco?: string;
 }
 
 export interface BubbleDegustacao {
   _id: string;
-  Evento?: string;              // reference to Evento._id
+  Evento?: string;
   NomeDoContratante?: string;
   DataDaDegustacao?: string;
   HorarioDaDegustacao?: string;
-  Status?: string;              // "Agendada" | "Realizada" | "Cancelada"
+  Status?: string;
   Observacoes?: string;
 }
 
