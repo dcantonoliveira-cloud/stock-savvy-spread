@@ -1,0 +1,10 @@
+{
+  "name": "Rondello Gestão",
+  "short_name": "Rondello",
+  "description": "Gestão do Buffet Rondello",
+  "theme_color": "#92400e",
+  "background_color": "#faf8f5",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/"
+}
