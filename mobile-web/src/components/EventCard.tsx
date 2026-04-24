@@ -36,16 +36,16 @@ export default function EventCard({ event, showRelative }: Props) {
               : fmtDate(event.dataDoEvento)}
           </span>
         )}
-        {event.Local && (
+        {event.LocalDoEvento && (
           <span className="flex items-center gap-1 truncate max-w-[140px]">
             <MapPin className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{event.Local}</span>
+            <span className="truncate">{event.LocalDoEvento}</span>
           </span>
         )}
-        {event.NumeroDeConvidados != null && (
+        {event.QuantidadeDeConvidados != null && (
           <span className="flex items-center gap-1">
             <Users className="w-3.5 h-3.5 shrink-0" />
-            {event.NumeroDeConvidados} conv.
+            {event.QuantidadeDeConvidados} conv.
           </span>
         )}
       </div>
