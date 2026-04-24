@@ -77,11 +77,15 @@ export default function EventosPage() {
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Fetching all events without status filter while we confirm
-    // the exact Status field value used in your Bubble app.
-    // Once confirmed, restore: constraints: [{ key: 'Status', ... }]
+    // Bubble option-set constraints are unreliable via Data API,
+    // so we fetch all events and filter client-side by Status === 'Fechado'.
     fetchEventos({ limit: 500, sortOrder: 'asc' })
-      .then((r) => setEvents(r.response.results))
+      .then((r) => {
+        const fechados = r.response.results.filter(
+          (e) => e.Status === 'Fechado'
+        );
+        setEvents(fechados);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
