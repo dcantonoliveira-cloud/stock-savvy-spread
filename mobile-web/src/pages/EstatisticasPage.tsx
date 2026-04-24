@@ -1,24 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchEventos } from '../api/bubble';
 import { BubbleEvento } from '../types';
-import PageHeader from '../components/PageHeader';
 import { fmtCurrency } from '../lib/format';
 
 const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-const STATUS_COLORS: Record<string, string> = {
-  confirmado: 'bg-emerald-500',
-  pendente:   'bg-amber-400',
-  realizado:  'bg-blue-500',
-  cancelado:  'bg-red-400',
-};
-
-function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function StatCard({
+  label, value, sub, accent = false,
+}: { label: string; value: string | number; sub?: string; accent?: boolean }) {
   return (
-    <div className="bg-white rounded-2xl border border-stone-200 p-4">
-      <p className="text-xs text-stone-400 font-medium mb-1">{label}</p>
-      <p className="text-2xl font-bold text-stone-800">{value}</p>
-      {sub && <p className="text-xs text-stone-400 mt-0.5">{sub}</p>}
+    <div className={`rounded-3xl p-5 shadow-sm ${accent ? 'bg-amber-900 shadow-amber-900/30' : 'bg-white'}`}>
+      <p className={`text-[11px] font-bold uppercase tracking-widest mb-2 ${accent ? 'text-amber-300' : 'text-gray-400'}`}>
+        {label}
+      </p>
+      <p className={`text-2xl font-black ${accent ? 'text-white' : 'text-gray-900'}`}>{value}</p>
+      {sub && (
+        <p className={`text-xs font-medium mt-0.5 capitalize ${accent ? 'text-amber-300/70' : 'text-gray-400'}`}>
+          {sub}
+        </p>
+      )}
     </div>
   );
 }
@@ -38,14 +38,12 @@ export default function EstatisticasPage() {
     const now = new Date();
     const currentYear = now.getFullYear();
 
-    // By status
     const byStatus: Record<string, number> = {};
     events.forEach((e) => {
-      const k = (e.Status ?? 'Pendente').toLowerCase();
+      const k = (e.Status ?? 'Pendente');
       byStatus[k] = (byStatus[k] ?? 0) + 1;
     });
 
-    // By month (current year)
     const byMonth: number[] = Array(12).fill(0);
     events.forEach((e) => {
       if (!e.dataDoEvento) return;
@@ -53,15 +51,13 @@ export default function EstatisticasPage() {
       if (d.getFullYear() === currentYear) byMonth[d.getMonth()]++;
     });
 
-    // Revenue
     const totalRevenue = events.reduce((s, e) => s + (e.Preco ?? 0), 0);
-    const confirmedRevenue = events
-      .filter((e) => e.Status?.toLowerCase() === 'confirmado')
+    const fechadosRevenue = events
+      .filter((e) => e.Status === 'Fechado')
       .reduce((s, e) => s + (e.Preco ?? 0), 0);
 
-    // This month
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const thisMonth = events.filter((e) => {
       if (!e.dataDoEvento) return false;
       const d = new Date(e.dataDoEvento);
@@ -69,62 +65,75 @@ export default function EstatisticasPage() {
     });
 
     const maxByMonth = Math.max(...byMonth, 1);
-
-    return { byStatus, byMonth, totalRevenue, confirmedRevenue, thisMonth, maxByMonth };
+    return { byStatus, byMonth, totalRevenue, fechadosRevenue, thisMonth, maxByMonth };
   }, [events]);
 
-  if (loading) {
-    return (
-      <div className="pb-28 max-w-lg mx-auto">
-        <PageHeader title="Estatísticas" />
-        <div className="p-4 grid grid-cols-2 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 bg-stone-100 rounded-2xl animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const currentMonthName = new Date().toLocaleDateString('pt-BR', { month: 'long' });
 
   return (
-    <div className="pb-28 max-w-lg mx-auto">
-      <PageHeader title="Estatísticas" subtitle={`${events.length} eventos no total`} />
+    <div className="pb-36 max-w-lg mx-auto">
 
-      <div className="px-4 pt-4 space-y-5">
-        {/* KPI grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Total de Eventos" value={events.length} />
-          <StatCard label="Este Mês" value={stats.thisMonth.length} sub={new Date().toLocaleDateString('pt-BR', { month: 'long' })} />
-          {stats.totalRevenue > 0 && (
-            <StatCard label="Receita Total" value={fmtCurrency(stats.totalRevenue)} />
-          )}
-          {stats.confirmedRevenue > 0 && (
-            <StatCard label="Confirmado" value={fmtCurrency(stats.confirmedRevenue)} />
+      {/* ── Hero header ──────────────────────────────────────────────── */}
+      <div className="relative bg-gradient-to-br from-amber-950 via-amber-900 to-amber-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
+        <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
+        <div className="absolute -bottom-8 -left-6  w-36 h-36 bg-white/5 rounded-full" />
+        <div className="relative">
+          <p className="text-amber-400/80 text-sm">Visão geral</p>
+          <h1 className="text-4xl font-black text-white tracking-tight mt-1 leading-none">Estatísticas</h1>
+          <p className="text-amber-400/70 text-sm font-medium mt-1">
+            {loading ? '…' : `${events.length} eventos no total`}
+          </p>
+        </div>
+      </div>
+
+      <div className="px-4 space-y-5">
+
+        {/* ── KPI grid ────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3 -mt-10">
+          {loading ? (
+            <>
+              {[1,2,3,4].map(i => (
+                <div key={i} className="h-24 bg-black/5 rounded-3xl animate-pulse" />
+              ))}
+            </>
+          ) : (
+            <>
+              <StatCard label="Total de Eventos" value={events.length} accent />
+              <StatCard
+                label="Este Mês"
+                value={stats.thisMonth.length}
+                sub={currentMonthName}
+              />
+              {stats.totalRevenue > 0 && (
+                <StatCard label="Receita Total" value={fmtCurrency(stats.totalRevenue)} />
+              )}
+              {stats.fechadosRevenue > 0 && (
+                <StatCard label="Fechados" value={fmtCurrency(stats.fechadosRevenue)} />
+              )}
+            </>
           )}
         </div>
 
-        {/* Status breakdown */}
-        {Object.keys(stats.byStatus).length > 0 && (
-          <div className="bg-white rounded-2xl border border-stone-200 p-4">
-            <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-4">
+        {/* ── Status breakdown ────────────────────────────────────────── */}
+        {!loading && Object.keys(stats.byStatus).length > 0 && (
+          <div className="bg-white rounded-3xl p-5 shadow-sm">
+            <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest mb-4">
               Por Status
             </p>
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               {Object.entries(stats.byStatus)
                 .sort(([, a], [, b]) => b - a)
                 .map(([status, count]) => {
                   const pct = Math.round((count / events.length) * 100);
-                  const barColor = STATUS_COLORS[status] ?? 'bg-stone-400';
-                  const label = status.charAt(0).toUpperCase() + status.slice(1);
                   return (
                     <div key={status}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-stone-700 font-medium">{label}</span>
-                        <span className="text-stone-400">{count} ({pct}%)</span>
+                      <div className="flex justify-between text-sm mb-1.5">
+                        <span className="font-semibold text-gray-800">{status}</span>
+                        <span className="text-gray-400 font-medium">{count} <span className="text-gray-300">({pct}%)</span></span>
                       </div>
-                      <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${barColor} transition-all duration-500`}
+                          className="h-full rounded-full bg-amber-800 transition-all duration-700"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -135,36 +144,38 @@ export default function EstatisticasPage() {
           </div>
         )}
 
-        {/* Monthly chart */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-4">
-          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-4">
-            Eventos por Mês — {new Date().getFullYear()}
-          </p>
-          <div className="flex items-end gap-1.5 h-28">
-            {stats.byMonth.map((count, i) => {
-              const height = stats.maxByMonth > 0 ? (count / stats.maxByMonth) * 100 : 0;
-              const isCurrentMonth = i === new Date().getMonth();
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-[10px] text-stone-400">{count > 0 ? count : ''}</span>
-                  <div className="w-full flex items-end" style={{ height: 80 }}>
-                    <div
-                      className={`w-full rounded-t-md transition-all duration-500 ${
-                        isCurrentMonth ? 'bg-amber-600' : 'bg-amber-200'
-                      }`}
-                      style={{ height: `${Math.max(height, count > 0 ? 8 : 0)}%` }}
-                    />
+        {/* ── Monthly bar chart ───────────────────────────────────────── */}
+        {!loading && (
+          <div className="bg-white rounded-3xl p-5 shadow-sm">
+            <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest mb-4">
+              Eventos por Mês — {new Date().getFullYear()}
+            </p>
+            <div className="flex items-end gap-1 h-28 mt-2">
+              {stats.byMonth.map((count, i) => {
+                const heightPct = stats.maxByMonth > 0 ? (count / stats.maxByMonth) * 100 : 0;
+                const isCurrent = i === new Date().getMonth();
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    {count > 0 && (
+                      <span className="text-[9px] font-bold text-gray-400">{count}</span>
+                    )}
+                    <div className="w-full flex items-end" style={{ height: 72 }}>
+                      <div
+                        className={`w-full rounded-t-xl transition-all duration-700 ${
+                          isCurrent ? 'bg-amber-800' : 'bg-amber-200'
+                        }`}
+                        style={{ height: `${Math.max(heightPct, count > 0 ? 8 : 2)}%` }}
+                      />
+                    </div>
+                    <span className={`text-[9px] font-bold ${isCurrent ? 'text-amber-800' : 'text-gray-400'}`}>
+                      {MONTHS_SHORT[i]}
+                    </span>
                   </div>
-                  <span
-                    className={`text-[10px] ${isCurrentMonth ? 'font-bold text-amber-700' : 'text-stone-400'}`}
-                  >
-                    {MONTHS_SHORT[i]}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

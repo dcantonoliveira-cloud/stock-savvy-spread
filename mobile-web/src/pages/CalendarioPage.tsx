@@ -1,33 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
 import { fetchEventos } from '../api/bubble';
 import { BubbleEvento } from '../types';
-import StatusBadge from '../components/StatusBadge';
-import PageHeader from '../components/PageHeader';
-import { fmtDate } from '../lib/format';
 
-const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const MONTHS = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
 
-const STATUS_DOT: Record<string, string> = {
-  confirmado: 'bg-emerald-500',
-  pendente:   'bg-amber-400',
-  cancelado:  'bg-red-400',
-  realizado:  'bg-blue-400',
-};
-
-function dotColor(status?: string) {
-  return STATUS_DOT[(status ?? '').toLowerCase()] ?? 'bg-stone-400';
-}
-
 export default function CalendarioPage() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth()); // 0-indexed
+  const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState<number | null>(today.getDate());
   const [events, setEvents] = useState<BubbleEvento[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,12 +25,11 @@ export default function CalendarioPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Map: "YYYY-MM-DD" → events on that day
   const byDate = useMemo(() => {
     const map = new Map<string, BubbleEvento[]>();
     events.forEach((e) => {
       if (!e.dataDoEvento) return;
-      const key = e.dataDoEvento.slice(0, 10); // "YYYY-MM-DD"
+      const key = e.dataDoEvento.slice(0, 10);
       const arr = map.get(key) ?? [];
       arr.push(e);
       map.set(key, arr);
@@ -52,7 +37,7 @@ export default function CalendarioPage() {
     return map;
   }, [events]);
 
-  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const prevMonth = () => {
@@ -69,54 +54,77 @@ export default function CalendarioPage() {
   const selectedKey = selected != null
     ? `${year}-${String(month + 1).padStart(2, '0')}-${String(selected).padStart(2, '0')}`
     : null;
-
   const selectedEvents = selectedKey ? (byDate.get(selectedKey) ?? []) : [];
+
+  const monthEventCount = events.filter((e) => {
+    if (!e.dataDoEvento) return false;
+    const d = new Date(e.dataDoEvento);
+    return d.getFullYear() === year && d.getMonth() === month;
+  }).length;
 
   const cells: (number | null)[] = [
     ...Array(firstDay).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  return (
-    <div className="pb-28 max-w-lg mx-auto">
-      <PageHeader title="Agenda" subtitle={`${MONTHS[month]} ${year}`} />
+  const selectedDayLabel = selected != null
+    ? new Date(year, month, selected).toLocaleDateString('pt-BR', {
+        weekday: 'long', day: 'numeric', month: 'long',
+      })
+    : '';
 
-      <div className="px-4 pt-4 space-y-4">
-        {/* Month navigator */}
-        <div className="flex items-center justify-between">
+  return (
+    <div className="pb-36 max-w-lg mx-auto">
+
+      {/* ── Hero header ──────────────────────────────────────────────── */}
+      <div className="relative bg-gradient-to-br from-amber-950 via-amber-900 to-amber-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
+        <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
+        <div className="absolute -bottom-8 -left-6  w-36 h-36 bg-white/5 rounded-full" />
+        <div className="relative">
+          <p className="text-amber-400/80 text-sm">Agenda</p>
+          <h1 className="text-4xl font-black text-white tracking-tight mt-1 leading-none">
+            {MONTHS[month]}
+          </h1>
+          <p className="text-amber-400/70 text-sm font-medium mt-1">
+            {loading ? '…' : `${monthEventCount} evento${monthEventCount !== 1 ? 's' : ''} · ${year}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="px-4 space-y-4">
+
+        {/* ── Month navigator ─────────────────────────────────────────── */}
+        <div className="flex items-center justify-between -mt-6 relative z-10">
           <button
             onClick={prevMonth}
-            className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center"
+            className="w-11 h-11 rounded-2xl bg-white shadow-xl shadow-black/10 flex items-center justify-center"
           >
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
+            <ChevronLeft className="w-5 h-5 text-gray-600" />
           </button>
-          <span className="font-bold text-stone-800">
+          <p className="font-black text-gray-900 text-base">
             {MONTHS[month]} {year}
-          </span>
+          </p>
           <button
             onClick={nextMonth}
-            className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center"
+            className="w-11 h-11 rounded-2xl bg-white shadow-xl shadow-black/10 flex items-center justify-center"
           >
-            <ChevronRight className="w-5 h-5 text-stone-600" />
+            <ChevronRight className="w-5 h-5 text-gray-600" />
           </button>
         </div>
 
-        {/* Calendar grid */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-3">
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 mb-1">
-            {WEEKDAYS.map((d) => (
-              <div key={d} className="text-center text-[11px] font-semibold text-stone-400 py-1">
+        {/* ── Calendar grid ───────────────────────────────────────────── */}
+        <div className="bg-white rounded-3xl p-4 shadow-sm">
+          <div className="grid grid-cols-7 mb-2">
+            {WEEKDAYS.map((d, i) => (
+              <div key={i} className="text-center text-[11px] font-black text-gray-300 py-1">
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Day cells */}
           <div className="grid grid-cols-7 gap-y-1">
             {cells.map((day, idx) => {
-              if (!day) return <div key={`empty-${idx}`} />;
-
+              if (!day) return <div key={`e-${idx}`} />;
               const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const dayEvents = byDate.get(key) ?? [];
               const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
@@ -126,29 +134,24 @@ export default function CalendarioPage() {
                 <button
                   key={key}
                   onClick={() => setSelected(day === selected ? null : day)}
-                  className={`flex flex-col items-center py-1 rounded-xl transition-colors ${
-                    isSelected
-                      ? 'bg-amber-800'
-                      : isToday
-                      ? 'bg-amber-100'
-                      : 'hover:bg-stone-50'
+                  className={`flex flex-col items-center py-1.5 rounded-2xl transition-all ${
+                    isSelected ? 'bg-amber-900 shadow-lg shadow-amber-900/30'
+                    : isToday  ? 'bg-amber-50'
+                    : ''
                   }`}
                 >
-                  <span
-                    className={`text-[13px] font-semibold ${
-                      isSelected ? 'text-white' : isToday ? 'text-amber-800' : 'text-stone-700'
-                    }`}
-                  >
+                  <span className={`text-[13px] font-bold leading-none ${
+                    isSelected ? 'text-white'
+                    : isToday  ? 'text-amber-900'
+                    : 'text-gray-800'
+                  }`}>
                     {day}
                   </span>
-                  {/* Event dots */}
-                  <div className="flex gap-0.5 mt-0.5 h-1.5">
+                  <div className="flex gap-0.5 mt-1 h-1.5">
                     {dayEvents.slice(0, 3).map((e) => (
                       <span
                         key={e._id}
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isSelected ? 'bg-white/70' : dotColor(e.Status)
-                        }`}
+                        className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white/60' : 'bg-amber-500'}`}
                       />
                     ))}
                   </div>
@@ -158,31 +161,44 @@ export default function CalendarioPage() {
           </div>
         </div>
 
-        {/* Events for selected day */}
+        {/* ── Selected day events ─────────────────────────────────────── */}
         {selected && (
           <div>
-            <p className="text-sm font-semibold text-stone-600 mb-2">
-              {selectedEvents.length === 0
-                ? 'Sem eventos neste dia'
-                : `${selectedEvents.length} evento${selectedEvents.length > 1 ? 's' : ''} — ${fmtDate(selectedKey!)}`}
+            <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest mb-3 capitalize">
+              {selectedDayLabel}
             </p>
-            {!loading && selectedEvents.length > 0 && (
-              <div className="space-y-2">
+            {!loading && selectedEvents.length === 0 ? (
+              <div className="bg-white rounded-3xl p-8 text-center">
+                <p className="text-3xl mb-2">📅</p>
+                <p className="text-gray-400 text-sm font-medium">Sem eventos neste dia</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
                 {selectedEvents.map((e) => (
                   <Link
                     key={e._id}
                     to={`/eventos/${e._id}`}
-                    className="flex items-start justify-between gap-2 bg-white rounded-xl border border-stone-200 p-3"
+                    className="flex items-center gap-4 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform"
                   >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-stone-800 truncate text-sm">
-                        {e.NomeDoContratante ?? '—'}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 truncate text-sm">
+                        {e.NomeDoEvento ?? e.NomeDoContratante ?? '—'}
                       </p>
-                      {e.NomeDoEvento && (
-                        <p className="text-xs text-stone-400 truncate">{e.NomeDoEvento}</p>
-                      )}
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        {e.LocalDoEvento && (
+                          <span className="flex items-center gap-1 text-xs text-gray-400 truncate">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            <span className="truncate max-w-[140px]">{e.LocalDoEvento}</span>
+                          </span>
+                        )}
+                        {e.QuantidadeDeConvidados != null && (
+                          <span className="flex items-center gap-1 text-xs text-gray-400">
+                            <Users className="w-3 h-3" />
+                            {e.QuantidadeDeConvidados}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <StatusBadge status={e.Status} />
                   </Link>
                 ))}
               </div>
