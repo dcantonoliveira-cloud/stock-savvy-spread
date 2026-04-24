@@ -54,10 +54,10 @@ export default function EstatisticasPage() {
     });
 
     // Revenue
-    const totalRevenue = events.reduce((s, e) => s + (e.Valor ?? 0), 0);
+    const totalRevenue = events.reduce((s, e) => s + (e.Preco ?? 0), 0);
     const confirmedRevenue = events
       .filter((e) => e.Status?.toLowerCase() === 'confirmado')
-      .reduce((s, e) => s + (e.Valor ?? 0), 0);
+      .reduce((s, e) => s + (e.Preco ?? 0), 0);
 
     // This month
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
