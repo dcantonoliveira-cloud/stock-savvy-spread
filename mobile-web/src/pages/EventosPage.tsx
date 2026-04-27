@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
-import { fetchEventos, fetchLocaisMap } from '../api/bubble';
+import { fetchAllEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento } from '../types';
 
 const MONTHS      = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -79,9 +79,8 @@ export default function EventosPage() {
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchEventos({ limit: 500, sortOrder: 'desc' })
-      .then((r) => {
-        const results = r.response.results;
+    fetchAllEventos({ sortOrder: 'desc' })
+      .then((results) => {
         setEvents(results);
         fetchLocaisMap(results).then(setLocaisMap);
       })

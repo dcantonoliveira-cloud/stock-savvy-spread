@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
-import { fetchEventos, fetchLocaisMap } from '../api/bubble';
+import { fetchAllEventos, fetchEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento } from '../types';
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -20,9 +20,8 @@ export default function CalendarioPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchEventos({ limit: 500 })
-      .then((r) => {
-        const results = r.response.results;
+    fetchAllEventos()
+      .then((results) => {
         setEvents(results);
         fetchLocaisMap(results).then(setLocaisMap);
       })

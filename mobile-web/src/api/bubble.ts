@@ -51,6 +51,27 @@ export function fetchEvento(id: string) {
   return apiFetch<BubbleSingleResponse<BubbleEvento>>(`eventos/${id}`);
 }
 
+// Bubble caps each response at 100 records. Paginate until remaining === 0.
+export async function fetchAllEventos(
+  opts?: { sortOrder?: 'asc' | 'desc' }
+): Promise<BubbleEvento[]> {
+  const all: BubbleEvento[] = [];
+  let cursor = 0;
+
+  while (true) {
+    const r = await fetchEventos({
+      limit: 100,
+      cursor: cursor > 0 ? cursor : undefined,
+      sortOrder: opts?.sortOrder ?? 'desc',
+    });
+    all.push(...r.response.results);
+    if (r.response.remaining === 0) break;
+    cursor += r.response.count;
+  }
+
+  return all;
+}
+
 // ── Locations ────────────────────────────────────────────────────────────────
 
 export function fetchLocal(id: string) {
