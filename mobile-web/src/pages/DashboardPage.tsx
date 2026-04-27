@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Download, MapPin } from 'lucide-react';
-import { fetchAllEventos, fetchDegustacoes, fetchLocaisMap } from '../api/bubble';
+import { fetchAllDegustacoes, fetchAllEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleDegustacao, BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
 import { isFechado } from '../lib/eventFilters';
@@ -92,10 +92,10 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([
       fetchAllEventos({ sortOrder: 'desc' }),
-      fetchDegustacoes(),
-    ]).then(([evts, deguRes]) => {
+      fetchAllDegustacoes(),
+    ]).then(([evts, degus]) => {
       setEvents(evts);
-      setDegustacoes(deguRes.response.results);
+      setDegustacoes(degus);
       fetchLocaisMap(evts).then(setLocaisMap);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
