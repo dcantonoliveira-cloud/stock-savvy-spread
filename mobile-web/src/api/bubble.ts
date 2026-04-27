@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type {
+  BubbleAssessoria,
   BubbleEvento,
   BubbleDegustacao,
   BubbleLocal,
@@ -90,6 +91,12 @@ export async function fetchLocaisMap(
     if (r.status === 'fulfilled') map[ids[i]] = r.value.response.Nome ?? '';
   });
   return map;
+}
+
+// ── Assessores ───────────────────────────────────────────────────────────────
+
+export function fetchAssessoria(id: string) {
+  return apiFetch<BubbleSingleResponse<BubbleAssessoria>>(`Assessores/${id}`);
 }
 
 // ── Tastings ─────────────────────────────────────────────────────────────────

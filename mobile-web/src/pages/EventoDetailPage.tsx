@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, CheckCircle2, Clock, MapPin, Users } from 'lucide-react';
-import { fetchEvento, fetchLocal, fetchPagamentosForEvento, fetchValoresAdicionaisForEvento } from '../api/bubble';
+import { fetchAssessoria, fetchEvento, fetchLocal, fetchPagamentosForEvento, fetchValoresAdicionaisForEvento } from '../api/bubble';
 import { BubbleEvento, BubblePagamento, BubbleValorAdicional } from '../types';
 import { fmtCurrency, fmtDate } from '../lib/format';
 
@@ -45,7 +45,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ── Tab: Ficha Técnica ────────────────────────────────────────────────────────
 
-function FichaTecnica({ e, localNome }: { e: BubbleEvento; localNome?: string }) {
+function FichaTecnica({ e, localNome, assessoriaNome }: { e: BubbleEvento; localNome?: string; assessoriaNome?: string }) {
   const duracao = e['duraçãoDoEvento'] ?? e['duração do evento'];
 
   return (
@@ -94,7 +94,7 @@ function FichaTecnica({ e, localNome }: { e: BubbleEvento; localNome?: string })
           <Field label="Bartender"            value={e.Bartender} />
           <Field label="Outros profissionais" value={e.OutrosProfissionais} />
           <Field label="Atrações à parte"     value={e.AtracoesAParte} />
-          <Field label="Assessoria"           value={e.Assessoria} />
+          <Field label="Assessoria"           value={assessoriaNome || undefined} />
         </FieldGrid>
       </div>
 
@@ -308,9 +308,10 @@ const TABS = [
 export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [evento, setEvento]     = useState<BubbleEvento | null>(null);
-  const [localNome, setLocalNome] = useState<string>('');
-  const [loading, setLoading]   = useState(true);
+  const [evento, setEvento]           = useState<BubbleEvento | null>(null);
+  const [localNome, setLocalNome]     = useState<string>('');
+  const [assessoriaNome, setAssessoriaNome] = useState<string>('');
+  const [loading, setLoading]         = useState(true);
   const [error, setError]       = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -324,6 +325,11 @@ export default function EventoDetailPage() {
         if (ev.LocalDoEvento) {
           fetchLocal(ev.LocalDoEvento)
             .then((lr) => setLocalNome(lr.response.Nome ?? ''))
+            .catch(() => {});
+        }
+        if (ev.Assessoria) {
+          fetchAssessoria(ev.Assessoria)
+            .then((ar) => setAssessoriaNome(ar.response.Nome ?? ''))
             .catch(() => {});
         }
       })
@@ -340,7 +346,7 @@ export default function EventoDetailPage() {
   function renderTab() {
     if (!evento) return null;
     switch (activeTab) {
-      case 0: return <FichaTecnica e={evento} localNome={localNome || undefined} />;
+      case 0: return <FichaTecnica e={evento} localNome={localNome || undefined} assessoriaNome={assessoriaNome || undefined} />;
       case 1: return <DadosCliente e={evento} />;
       case 2: return <CardapioTab e={evento} />;
       case 3: return <FinanceiroTab e={evento} />;
