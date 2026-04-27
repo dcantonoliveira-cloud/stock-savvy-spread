@@ -94,12 +94,29 @@ export async function fetchLocaisMap(
 
 // ── Tastings ─────────────────────────────────────────────────────────────────
 
-export function fetchDegustacoes() {
-  return apiFetch<BubbleListResponse<BubbleDegustacao>>('Degusta%C3%A7%C3%A3o', {
+export function fetchDegustacoes(opts?: { cursor?: number }) {
+  const params: Record<string, string> = {
     sort_field: 'data',
     sort_order: 'desc',
-    limit: '200',
-  });
+    limit: '100',
+  };
+  if (opts?.cursor) params.cursor = String(opts.cursor);
+  return apiFetch<BubbleListResponse<BubbleDegustacao>>('Degusta%C3%A7%C3%A3o', params);
+}
+
+// Bubble caps each response at 100 records. Paginate until remaining === 0.
+export async function fetchAllDegustacoes(): Promise<BubbleDegustacao[]> {
+  const all: BubbleDegustacao[] = [];
+  let cursor = 0;
+
+  while (true) {
+    const r = await fetchDegustacoes(cursor > 0 ? { cursor } : undefined);
+    all.push(...r.response.results);
+    if (r.response.remaining === 0) break;
+    cursor += r.response.count;
+  }
+
+  return all;
 }
 
 // ── Financeiro ───────────────────────────────────────────────────────────────

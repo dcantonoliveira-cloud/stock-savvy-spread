@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, MapPin, UtensilsCrossed, Users } from 'lucide-react';
-import { fetchAllEventos, fetchDegustacoes, fetchLocaisMap } from '../api/bubble';
+import { fetchAllDegustacoes, fetchAllEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento, BubbleDegustacao } from '../types';
 import { isFechado, isReserva } from '../lib/eventFilters';
 // fmtTime not needed — Degustação records have no time field
@@ -121,10 +121,10 @@ export default function CalendarioPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([fetchAllEventos(), fetchDegustacoes()])
-      .then(([evResults, deguRes]) => {
+    Promise.all([fetchAllEventos(), fetchAllDegustacoes()])
+      .then(([evResults, degus]) => {
         setEvents(evResults);
-        setDegustacoes(deguRes.response.results);
+        setDegustacoes(degus);
         fetchLocaisMap(evResults).then(setLocaisMap);
       })
       .catch(() => {})

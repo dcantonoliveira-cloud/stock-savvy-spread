@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar, Users, UtensilsCrossed } from 'lucide-react';
-import { fetchDegustacoes } from '../api/bubble';
+import { fetchAllDegustacoes } from '../api/bubble';
 import { BubbleDegustacao } from '../types';
 import { fmtDate } from '../lib/format';
 
@@ -17,8 +17,8 @@ export default function DegustacaoPage() {
   const [filter, setFilter] = useState('Todas');
 
   useEffect(() => {
-    fetchDegustacoes()
-      .then((r) => setItems(r.response.results))
+    fetchAllDegustacoes()
+      .then((all) => setItems(all))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
