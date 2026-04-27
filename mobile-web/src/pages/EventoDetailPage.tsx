@@ -1,9 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, MapPin, Users } from 'lucide-react';
-import { fetchEvento, fetchLocal } from '../api/bubble';
-import { BubbleEvento } from '../types';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, MapPin, Users } from 'lucide-react';
+import { fetchEvento, fetchLocal, fetchPagamentosForEvento, fetchValoresAdicionaisForEvento } from '../api/bubble';
+import { BubbleEvento, BubblePagamento, BubbleValorAdicional } from '../types';
 import { fmtCurrency, fmtDate } from '../lib/format';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Strip Bubble rich-text markup like [ml][ul][li ...] */
+function stripBubbleRichText(text: string): string {
+  return text
+    .replace(/\[([^\]]+)\]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 // ── Field components ─────────────────────────────────────────────────────────
 
@@ -33,11 +43,14 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Tab content ──────────────────────────────────────────────────────────────
+// ── Tab: Ficha Técnica ────────────────────────────────────────────────────────
 
 function FichaTecnica({ e, localNome }: { e: BubbleEvento; localNome?: string }) {
+  const duracao = e['duraçãoDoEvento'] ?? e['duração do evento'];
+
   return (
     <div className="space-y-4">
+
       <div>
         <SectionTitle>Evento</SectionTitle>
         <FieldGrid>
@@ -47,54 +60,61 @@ function FichaTecnica({ e, localNome }: { e: BubbleEvento; localNome?: string })
           <Field label="Data"              value={fmtDate(e.dataDoEvento)} />
           <Field label="Produto escolhido" value={e.ProdutoEscolhido} />
           <Field label="Horário cerimônia" value={e.HorarioCerimonia} />
-          <Field label="Duração"           value={e['duraçãoDoEvento'] != null ? String(e['duraçãoDoEvento']) + 'h' : null} />
+          <Field label="Duração"           value={duracao != null ? `${duracao}h` : null} />
           <Field label="Preço negociado"   value={e['PreçoCombinado'] != null ? fmtCurrency(e['PreçoCombinado']!) : null} />
+          <Field label="Valor total"       value={e.ValorTotalEvento != null ? fmtCurrency(e.ValorTotalEvento) : null} />
         </FieldGrid>
       </div>
 
       <div>
         <SectionTitle>Convidados</SectionTitle>
         <FieldGrid>
-          <Field label="Quantidade"        value={e.QtdConvidados} />
-          <Field label="Crianças 50%"      value={e.Criancas50} />
-          <Field label="Não pagantes"      value={e.NaoPagantes} />
-          <Field label="Horas adicionais"  value={e.HorasAdicionais} />
+          <Field label="Quantidade"           value={e.QtdConvidados} />
+          <Field label="Crianças 50%"         value={e['Crianças50%']} />
+          <Field label="Não pagantes"         value={e.CriançasNãoPagantes} />
+          <Field label="Horas adicionais"     value={e.QtdHorasAdicionais} />
+          <Field label="Convidados por mesa"  value={e.QuantidadeConvidadosPorMesa} />
+          <Field label="Qtd. de mesas"        value={e.QuantidadeDeMesas} />
+          <Field label="Local do bolo"        value={e['localizaçãoMesaBolo']} />
         </FieldGrid>
       </div>
 
       <div>
         <SectionTitle>Equipe & Profissionais</SectionTitle>
         <FieldGrid>
-          <Field label="Qtd. profissionais"    value={e.QuantidadeProfissionais} />
-          <Field label="Tipo alim. prof."      value={e.tipoAlimentProf} />
-          <Field label="Valor alim. prof."     value={e['AlimentaçãoProfissionais'] != null ? fmtCurrency(e['AlimentaçãoProfissionais']!) : null} />
-          <Field label="Organizador(a)"        value={e['Organizador(a) escolhido']} />
-          <Field label="Decorador"             value={e.Decorador} />
-          <Field label="Confeiteiro(a)"        value={e.Confeiteira} />
-          <Field label="Banda / DJ"            value={e['Banda/DjEscolhido']} />
-          <Field label="Foto / Filmagem"       value={e['Foto/Filmagem']} />
-          <Field label="Bartender"             value={e.Bartender} />
-          <Field label="Outros profissionais"  value={e.OutrosProfissionais} />
-          <Field label="Atrações à parte"      value={e.AtracoesAParte} />
-          <Field label="Assessoria"            value={e.Assessoria} />
+          <Field label="Qtd. profissionais"   value={e.QuantidadeProfissionais} />
+          <Field label="Tipo alim. prof."     value={e.tipoAlimentProf} />
+          <Field label="Valor alim. prof."    value={e['AlimentaçãoProfissionais'] != null ? fmtCurrency(e['AlimentaçãoProfissionais']!) : null} />
+          <Field label="Organizador(a)"       value={e['Organizador(a) escolhido']} />
+          <Field label="Decorador"            value={e.Decorador} />
+          <Field label="Confeiteiro(a)"       value={e.Confeiteira} />
+          <Field label="Banda / DJ"           value={e['Banda/DjEscolhido']} />
+          <Field label="Horário banda/DJ"     value={e.HorarioBanda} />
+          <Field label="Foto / Filmagem"      value={e['Foto/Filmagem']} />
+          <Field label="Bartender"            value={e.Bartender} />
+          <Field label="Outros profissionais" value={e.OutrosProfissionais} />
+          <Field label="Atrações à parte"     value={e.AtracoesAParte} />
+          <Field label="Assessoria"           value={e.Assessoria} />
         </FieldGrid>
       </div>
 
       <div>
         <SectionTitle>Setup</SectionTitle>
         <FieldGrid>
-          <Field label="Coquetel boas-vindas"  value={e.CoquetelDeBoasVindas} />
-          <Field label="Vinho"                 value={e.vinho} />
-          <Field label="Whisky"                value={e.whisky} />
-          <Field label="Porta guardanapo"      value={e.PortaGuardanapo} />
-          <Field label="Toalha"                value={e.Toalha} />
-          <Field label="Rechaud"               value={e.rechaud} />
-          <Field label="Sousplát"              value={e['Sousplát']} />
-          <Field label="Aparador"              value={e.Aparador} />
-          <Field label="Taça"                  value={e['taça']} />
-          <Field label="Sala dos noivos"       value={e.SalaDosNoivos} />
-          <Field label="Espaço kids"           value={e.EspacoKids} />
-          <Field label="Qtd. mesas"            value={e.QuantidadeDeMesas} />
+          <Field label="Coquetel boas-vindas" value={e.CoquetelDeBoasVindas} />
+          <Field label="Vinho"                value={e.vinho} />
+          <Field label="Whisky"               value={e.whisky} />
+          <Field label="Cerveja"              value={e.Cerveja} />
+          <Field label="Porta guardanapo"     value={e.PortaGuardanapo} />
+          <Field label="Toalha"               value={e.Toalha} />
+          <Field label="Rechaud"              value={e.rechaud} />
+          <Field label="Sousplát"             value={e['Sousplát']} />
+          <Field label="Aparador"             value={e.Aparador} />
+          <Field label="Qtd. aparadores"      value={e['Qtd aparadores']} />
+          <Field label="Tam. aparadores"      value={e['Tamanho dos aparadores']} />
+          <Field label="Taça"                 value={e['taça']} />
+          <Field label="Sala dos noivos"      value={e['sala dos noivos']} />
+          <Field label="Espaço kids"          value={e['espaço kids']} />
         </FieldGrid>
       </div>
 
@@ -102,13 +122,149 @@ function FichaTecnica({ e, localNome }: { e: BubbleEvento; localNome?: string })
         <div>
           <SectionTitle>Observações</SectionTitle>
           <div className="bg-white rounded-3xl p-5 shadow-sm">
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{e['Observações']}</p>
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+              {stripBubbleRichText(e['Observações'])}
+            </p>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+// ── Tab: Cardápio ─────────────────────────────────────────────────────────────
+
+function CardapioTab({ e }: { e: BubbleEvento }) {
+  const raw = e.CardapioEvento;
+  if (!raw) {
+    return (
+      <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
+        <p className="text-4xl mb-3">🍽️</p>
+        <p className="font-bold text-gray-700">Cardápio não definido</p>
+        <p className="text-sm text-gray-400 mt-1">O cardápio ainda não foi escolhido para este evento</p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white rounded-3xl p-5 shadow-sm">
+      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+        {stripBubbleRichText(raw)}
+      </p>
+    </div>
+  );
+}
+
+// ── Tab: Financeiro ───────────────────────────────────────────────────────────
+
+function FinanceiroTab({ e }: { e: BubbleEvento }) {
+  const [pagamentos, setPagamentos]   = useState<BubblePagamento[]>([]);
+  const [adicionais, setAdicionais]   = useState<BubbleValorAdicional[]>([]);
+  const [loading, setLoading]         = useState(true);
+
+  useEffect(() => {
+    Promise.allSettled([
+      fetchPagamentosForEvento(e._id),
+      fetchValoresAdicionaisForEvento(e._id),
+    ]).then(([pgRes, vaRes]) => {
+      if (pgRes.status === 'fulfilled') setPagamentos(pgRes.value.response.results);
+      if (vaRes.status === 'fulfilled') setAdicionais(vaRes.value.response.results);
+    }).finally(() => setLoading(false));
+  }, [e._id]);
+
+  const valorTotal  = e.ValorTotalEvento ?? 0;
+  const valorPago   = pagamentos.reduce((s, p) => s + (p.Valor ?? 0), 0);
+  const saldo       = valorTotal - valorPago;
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1,2,3].map(i => <div key={i} className="h-16 bg-black/5 rounded-2xl animate-pulse" />)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* Resumo */}
+      <div>
+        <SectionTitle>Resumo Financeiro</SectionTitle>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white rounded-3xl p-4 shadow-sm text-center">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total</p>
+            <p className="text-base font-black text-ron-900 leading-tight">
+              {valorTotal > 0 ? fmtCurrency(valorTotal) : '—'}
+            </p>
+          </div>
+          <div className="bg-white rounded-3xl p-4 shadow-sm text-center">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Pago</p>
+            <p className="text-base font-black text-emerald-600 leading-tight">
+              {valorPago > 0 ? fmtCurrency(valorPago) : '—'}
+            </p>
+          </div>
+          <div className={`rounded-3xl p-4 shadow-sm text-center ${saldo > 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Saldo</p>
+            <p className={`text-base font-black leading-tight ${saldo > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              {valorTotal > 0 ? fmtCurrency(Math.abs(saldo)) : '—'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Valores adicionais */}
+      {adicionais.length > 0 && (
+        <div>
+          <SectionTitle>Valores Adicionais</SectionTitle>
+          <div className="bg-white rounded-3xl shadow-sm divide-y divide-gray-100 overflow-hidden">
+            {adicionais.map((va) => (
+              <div key={va._id} className="flex items-center justify-between px-5 py-3.5">
+                <p className="text-sm text-gray-700 font-medium flex-1 truncate pr-4">
+                  {va['Descrição'] ?? '—'}
+                </p>
+                <p className="text-sm font-black text-ron-900 shrink-0">
+                  {va.valor != null ? fmtCurrency(va.valor) : '—'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pagamentos */}
+      <div>
+        <SectionTitle>Pagamentos</SectionTitle>
+        {pagamentos.length === 0 ? (
+          <div className="bg-white rounded-3xl p-8 text-center shadow-sm">
+            <p className="text-gray-400 text-sm font-medium">Nenhum pagamento registrado</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl shadow-sm divide-y divide-gray-100 overflow-hidden">
+            {pagamentos.map((pg) => (
+              <div key={pg._id} className="flex items-center gap-3 px-5 py-3.5">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-700 font-semibold">
+                      {pg.data ? fmtDate(pg.data) : '—'}
+                    </p>
+                    {pg.conferido && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    )}
+                  </div>
+                </div>
+                <p className="text-sm font-black text-ron-900 shrink-0">
+                  {pg.Valor != null ? fmtCurrency(pg.Valor) : '—'}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
+// ── Tab: Dados do Cliente ─────────────────────────────────────────────────────
 
 function DadosCliente({ e }: { e: BubbleEvento }) {
   return (
@@ -139,9 +295,9 @@ const TABS = [
   'Ficha Técnica',
   'Dados do Cliente',
   'Cardápio',
+  'Financeiro',
   'Checklist',
   'Cronograma',
-  'Financeiro',
   'Arquivos',
   'Equipe',
   'Outros',
@@ -152,10 +308,10 @@ const TABS = [
 export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [evento, setEvento] = useState<BubbleEvento | null>(null);
+  const [evento, setEvento]     = useState<BubbleEvento | null>(null);
   const [localNome, setLocalNome] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState(false);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const tabsRef = useRef<HTMLDivElement>(null);
 
@@ -186,6 +342,8 @@ export default function EventoDetailPage() {
     switch (activeTab) {
       case 0: return <FichaTecnica e={evento} localNome={localNome || undefined} />;
       case 1: return <DadosCliente e={evento} />;
+      case 2: return <CardapioTab e={evento} />;
+      case 3: return <FinanceiroTab e={evento} />;
       default: return <ComingSoon name={TABS[activeTab]} />;
     }
   }
@@ -223,16 +381,22 @@ export default function EventoDetailPage() {
                   {fmtDate(evento?.dataDoEvento)}
                 </span>
               )}
-              {localNome && (
+              {(localNome || evento?.['Local Do Evento_TXT']) && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <MapPin className="w-3.5 h-3.5" />
-                  {localNome}
+                  {localNome || evento?.['Local Do Evento_TXT']}
                 </span>
               )}
               {evento?.QtdConvidados != null && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <Users className="w-3.5 h-3.5" />
                   {evento.QtdConvidados} convidados
+                </span>
+              )}
+              {evento?.HorarioCerimonia && (
+                <span className="flex items-center gap-1.5 text-gold-300/70 text-sm font-medium">
+                  <Clock className="w-3.5 h-3.5" />
+                  {evento.HorarioCerimonia}
                 </span>
               )}
             </div>

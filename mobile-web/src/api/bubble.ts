@@ -1,12 +1,13 @@
 // ---------------------------------------------------------------------------
 // Bubble.io Data API client for Rondello Buffet management.
-// Adjust BASE_URL, TOKEN, and data-type names to match your Bubble app.
 // ---------------------------------------------------------------------------
 
 import type {
   BubbleEvento,
   BubbleDegustacao,
   BubbleLocal,
+  BubblePagamento,
+  BubbleValorAdicional,
   BubbleListResponse,
   BubbleSingleResponse,
 } from '../types';
@@ -36,7 +37,6 @@ export function fetchEventos(opts?: {
   constraints?: object[];
 }) {
   const params: Record<string, string> = {
-    // Field name for event date — adjust if your Bubble type differs
     sort_field: 'dataDoEvento',
     sort_order: opts?.sortOrder ?? 'desc',
     limit: String(opts?.limit ?? 100),
@@ -94,11 +94,28 @@ export async function fetchLocaisMap(
 
 // ── Tastings ─────────────────────────────────────────────────────────────────
 
-// Bubble type is "Degustação" (with ã). Sort by the actual date field "data".
 export function fetchDegustacoes() {
   return apiFetch<BubbleListResponse<BubbleDegustacao>>('Degusta%C3%A7%C3%A3o', {
     sort_field: 'data',
     sort_order: 'desc',
     limit: '200',
+  });
+}
+
+// ── Financeiro ───────────────────────────────────────────────────────────────
+
+export function fetchPagamentosForEvento(eventoId: string) {
+  return apiFetch<BubbleListResponse<BubblePagamento>>('Pagamentos', {
+    constraints: JSON.stringify([{ key: 'evento', constraint_type: 'equals', value: eventoId }]),
+    sort_field: 'data',
+    sort_order: 'asc',
+    limit: '50',
+  });
+}
+
+export function fetchValoresAdicionaisForEvento(eventoId: string) {
+  return apiFetch<BubbleListResponse<BubbleValorAdicional>>('ValoresAdicionaisEventos', {
+    constraints: JSON.stringify([{ key: 'evento', constraint_type: 'equals', value: eventoId }]),
+    limit: '50',
   });
 }
