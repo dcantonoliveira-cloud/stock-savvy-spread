@@ -4,6 +4,7 @@ import { ArrowRight, MapPin } from 'lucide-react';
 import { fetchAllEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
+import { isFechado } from '../lib/eventFilters';
 
 function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`bg-black/5 rounded-2xl animate-pulse ${className}`} />;
@@ -39,8 +40,8 @@ function EventRow({ e, locaisMap }: { e: BubbleEvento; locaisMap: Record<string,
             <span className="truncate">{local}</span>
           </span>
         ) : (
-          e.QuantidadeDeConvidados != null && (
-            <p className="text-xs text-gray-400 mt-0.5">{e.QuantidadeDeConvidados} convidados</p>
+          e.QtdConvidados != null && (
+            <p className="text-xs text-gray-400 mt-0.5">{e.QtdConvidados} convidados</p>
           )
         )}
       </div>
@@ -76,13 +77,15 @@ export default function DashboardPage() {
     (e) => e.dataDoEvento && new Date(e.dataDoEvento).getFullYear() === latestYear
   ).length;
 
-  const upcoming = events
+  const fechados = events.filter(isFechado);
+
+  const upcoming = fechados
     .filter((e) => e.dataDoEvento && new Date(e.dataDoEvento) >= now)
     .sort((a, b) => new Date(a.dataDoEvento!).getTime() - new Date(b.dataDoEvento!).getTime());
 
   const hasUpcoming     = upcoming.length > 0;
-  const highlightEvent  = hasUpcoming ? upcoming[0] : events[0];      // próximo OU último
-  const displayEvents   = hasUpcoming ? upcoming.slice(0, 5) : events.slice(0, 5);
+  const highlightEvent  = hasUpcoming ? upcoming[0] : fechados[0];    // próximo OU último fechado
+  const displayEvents   = hasUpcoming ? upcoming.slice(0, 5) : fechados.slice(0, 5);
   const sectionTitle    = hasUpcoming ? 'Próximos Eventos' : 'Eventos Recentes';
 
   const todayFull = now.toLocaleDateString('pt-BR', {
@@ -177,8 +180,8 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
                 <p className="text-white/50 text-sm font-semibold">
                   {fmtDate(highlightEvent.dataDoEvento)}
-                  {highlightEvent.QuantidadeDeConvidados != null &&
-                    ` · ${highlightEvent.QuantidadeDeConvidados} conv.`}
+                  {highlightEvent.QtdConvidados != null &&
+                    ` · ${highlightEvent.QtdConvidados} conv.`}
                 </p>
                 <div className="w-8 h-8 bg-white/15 rounded-xl flex items-center justify-center">
                   <ArrowRight className="w-4 h-4 text-white" />

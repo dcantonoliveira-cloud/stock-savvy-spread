@@ -42,20 +42,20 @@ function FichaTecnica({ e, localNome }: { e: BubbleEvento; localNome?: string })
         <SectionTitle>Evento</SectionTitle>
         <FieldGrid>
           <Field label="Nome do Evento"    value={e.NomeDoEvento} />
-          <Field label="Tipo"              value={e.TipoDoEvento} />
-          <Field label="Local"             value={localNome ?? e.LocalDoEvento} />
+          <Field label="Tipo"              value={e['Tipo_Do_Evento']} />
+          <Field label="Local"             value={localNome ?? e['Local Do Evento_TXT'] ?? e.LocalDoEvento} />
           <Field label="Data"              value={fmtDate(e.dataDoEvento)} />
           <Field label="Produto escolhido" value={e.ProdutoEscolhido} />
-          <Field label="Horário cerimônia" value={e.HorarioDaCerimonia} />
-          <Field label="Duração"           value={e.DuracaoDoEvento} />
-          <Field label="Preço negociado"   value={e.Preco != null ? fmtCurrency(e.Preco) : null} />
+          <Field label="Horário cerimônia" value={e.HorarioCerimonia} />
+          <Field label="Duração"           value={e['duraçãoDoEvento'] != null ? String(e['duraçãoDoEvento']) + 'h' : null} />
+          <Field label="Preço negociado"   value={e['PreçoCombinado'] != null ? fmtCurrency(e['PreçoCombinado']!) : null} />
         </FieldGrid>
       </div>
 
       <div>
         <SectionTitle>Convidados</SectionTitle>
         <FieldGrid>
-          <Field label="Quantidade"        value={e.QuantidadeDeConvidados} />
+          <Field label="Quantidade"        value={e.QtdConvidados} />
           <Field label="Crianças 50%"      value={e.Criancas50} />
           <Field label="Não pagantes"      value={e.NaoPagantes} />
           <Field label="Horas adicionais"  value={e.HorasAdicionais} />
@@ -65,43 +65,44 @@ function FichaTecnica({ e, localNome }: { e: BubbleEvento; localNome?: string })
       <div>
         <SectionTitle>Equipe & Profissionais</SectionTitle>
         <FieldGrid>
-          <Field label="Qtd. profissionais"    value={e.QuantidadeDeProfissionais} />
-          <Field label="Alimentação prof."     value={e.AlimentacaoProfissionais} />
-          <Field label="Valor alim. prof."     value={e.ValorAlimentacaoProfissionais != null ? fmtCurrency(e.ValorAlimentacaoProfissionais) : null} />
-          <Field label="Organizadora"          value={e.Organizadora} />
+          <Field label="Qtd. profissionais"    value={e.QuantidadeProfissionais} />
+          <Field label="Tipo alim. prof."      value={e.tipoAlimentProf} />
+          <Field label="Valor alim. prof."     value={e['AlimentaçãoProfissionais'] != null ? fmtCurrency(e['AlimentaçãoProfissionais']!) : null} />
+          <Field label="Organizador(a)"        value={e['Organizador(a) escolhido']} />
           <Field label="Decorador"             value={e.Decorador} />
-          <Field label="Confeiteiro(a)"        value={e.Confeiteiro} />
-          <Field label="Banda / DJ"            value={e.BandaDJ} />
-          <Field label="Foto / Filmagem"       value={e.FotoFilmagem} />
+          <Field label="Confeiteiro(a)"        value={e.Confeiteira} />
+          <Field label="Banda / DJ"            value={e['Banda/DjEscolhido']} />
+          <Field label="Foto / Filmagem"       value={e['Foto/Filmagem']} />
           <Field label="Bartender"             value={e.Bartender} />
           <Field label="Outros profissionais"  value={e.OutrosProfissionais} />
           <Field label="Atrações à parte"      value={e.AtracoesAParte} />
+          <Field label="Assessoria"            value={e.Assessoria} />
         </FieldGrid>
       </div>
 
       <div>
         <SectionTitle>Setup</SectionTitle>
         <FieldGrid>
-          <Field label="Coquetel boas-vindas"  value={e.CoqueteilBoasVindas} />
-          <Field label="Vinho"                 value={e.Vinho} />
-          <Field label="Whisky"                value={e.Whisky} />
+          <Field label="Coquetel boas-vindas"  value={e.CoquetelDeBoasVindas} />
+          <Field label="Vinho"                 value={e.vinho} />
+          <Field label="Whisky"                value={e.whisky} />
           <Field label="Porta guardanapo"      value={e.PortaGuardanapo} />
           <Field label="Toalha"                value={e.Toalha} />
-          <Field label="Rechaud"               value={e.Rechaud} />
-          <Field label="Sousplát"              value={e.Sousplat} />
+          <Field label="Rechaud"               value={e.rechaud} />
+          <Field label="Sousplát"              value={e['Sousplát']} />
           <Field label="Aparador"              value={e.Aparador} />
-          <Field label="Taça"                  value={e.Taca} />
+          <Field label="Taça"                  value={e['taça']} />
           <Field label="Sala dos noivos"       value={e.SalaDosNoivos} />
           <Field label="Espaço kids"           value={e.EspacoKids} />
           <Field label="Qtd. mesas"            value={e.QuantidadeDeMesas} />
         </FieldGrid>
       </div>
 
-      {e.Observacoes && (
+      {e['Observações'] && (
         <div>
           <SectionTitle>Observações</SectionTitle>
           <div className="bg-white rounded-3xl p-5 shadow-sm">
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{e.Observacoes}</p>
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{e['Observações']}</p>
           </div>
         </div>
       )}
@@ -213,7 +214,7 @@ export default function EventoDetailPage() {
         ) : (
           <>
             <h1 className="text-2xl font-black text-white leading-tight">
-              {evento?.NomeDoEvento ?? evento?.NomeDoContratante ?? 'Evento'}
+              {evento?.NomeDoEvento ?? 'Evento'}
             </h1>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
               {date && (
@@ -228,10 +229,10 @@ export default function EventoDetailPage() {
                   {localNome}
                 </span>
               )}
-              {evento?.QuantidadeDeConvidados != null && (
+              {evento?.QtdConvidados != null && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <Users className="w-3.5 h-3.5" />
-                  {evento.QuantidadeDeConvidados} convidados
+                  {evento.QtdConvidados} convidados
                 </span>
               )}
             </div>

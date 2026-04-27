@@ -24,7 +24,7 @@ export default function EventCard({ event, showRelative }: Props) {
             <p className="text-sm text-stone-500 truncate">{event.NomeDoEvento}</p>
           )}
         </div>
-        <StatusBadge status={event.Status} />
+        <StatusBadge status={event.status} />
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-400 mt-1">
@@ -42,10 +42,10 @@ export default function EventCard({ event, showRelative }: Props) {
             <span className="truncate">{event.LocalDoEvento}</span>
           </span>
         )}
-        {event.QuantidadeDeConvidados != null && (
+        {event.QtdConvidados != null && (
           <span className="flex items-center gap-1">
             <Users className="w-3.5 h-3.5 shrink-0" />
-            {event.QuantidadeDeConvidados} conv.
+            {event.QtdConvidados} conv.
           </span>
         )}
       </div>

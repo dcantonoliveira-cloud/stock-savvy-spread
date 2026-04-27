@@ -94,10 +94,10 @@ export async function fetchLocaisMap(
 
 // ── Tastings ─────────────────────────────────────────────────────────────────
 
-// Adjust data type name "Degustacao" if yours is different (e.g. "Degustacoes")
+// Bubble type is "Degustação" (with ã). Sort by the actual date field "data".
 export function fetchDegustacoes() {
-  return apiFetch<BubbleListResponse<BubbleDegustacao>>('Degustacao', {
-    sort_field: 'DataDaDegustacao',
+  return apiFetch<BubbleListResponse<BubbleDegustacao>>('Degusta%C3%A7%C3%A3o', {
+    sort_field: 'data',
     sort_order: 'desc',
     limit: '200',
   });

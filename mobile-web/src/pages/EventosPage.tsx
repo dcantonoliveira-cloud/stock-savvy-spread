@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
 import { fetchAllEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento } from '../types';
+import { isFechado } from '../lib/eventFilters';
 
 const MONTHS      = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -49,10 +50,10 @@ function EventCard({ event, past, locaisMap }: { event: BubbleEvento; past?: boo
               <span className="truncate">{localNome}</span>
             </span>
           )}
-          {event.QuantidadeDeConvidados != null && (
+          {event.QtdConvidados != null && (
             <span className="flex items-center gap-1 text-xs text-gray-400">
               <Users className="w-3 h-3" />
-              {event.QuantidadeDeConvidados}
+              {event.QtdConvidados}
             </span>
           )}
         </div>
@@ -81,8 +82,9 @@ export default function EventosPage() {
   useEffect(() => {
     fetchAllEventos({ sortOrder: 'desc' })
       .then((results) => {
-        setEvents(results);
-        fetchLocaisMap(results).then(setLocaisMap);
+        const fechados = results.filter(isFechado);
+        setEvents(fechados);
+        fetchLocaisMap(fechados).then(setLocaisMap);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
