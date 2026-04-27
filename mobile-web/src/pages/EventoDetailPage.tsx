@@ -353,6 +353,10 @@ export default function EventoDetailPage() {
   return (
     <div className="pb-36 max-w-lg mx-auto">
 
+      {loading && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
+      )}
+
       {/* ── Hero header ────────────────────────────────────────────── */}
       <div className="bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-12 pb-6 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-36 h-36 bg-white/5 rounded-full" />

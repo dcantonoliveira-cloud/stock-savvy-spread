@@ -1,12 +1,11 @@
-import { BarChart2, Calendar, Home, List, UtensilsCrossed } from 'lucide-react';
+import { Calendar, Home, List, UtensilsCrossed } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const TABS = [
-  { to: '/',             label: 'Início',   Icon: Home            },
-  { to: '/eventos',      label: 'Eventos',  Icon: List            },
-  { to: '/calendario',   label: 'Agenda',   Icon: Calendar        },
-  { to: '/degustacoes',  label: 'Degust.',  Icon: UtensilsCrossed },
-  { to: '/estatisticas', label: 'Stats',    Icon: BarChart2       },
+  { to: '/',            label: 'Início',  Icon: Home            },
+  { to: '/eventos',     label: 'Eventos', Icon: List            },
+  { to: '/calendario',  label: 'Agenda',  Icon: Calendar        },
+  { to: '/degustacoes', label: 'Degust.', Icon: UtensilsCrossed },
 ];
 
 export default function BottomNav() {

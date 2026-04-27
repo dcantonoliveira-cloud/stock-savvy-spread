@@ -87,7 +87,7 @@ export default function DashboardPage() {
   const [degustacoes, setDegustacoes] = useState<BubbleDegustacao[]>([]);
   const [locaisMap, setLocaisMap]   = useState<Record<string, string>>({});
   const [loading, setLoading]       = useState(true);
-  const { canInstall, install }     = usePWAInstall();
+  const { canInstall, install, showIOSGuide, setShowIOSGuide } = usePWAInstall();
 
   useEffect(() => {
     Promise.all([
@@ -142,6 +142,59 @@ export default function DashboardPage() {
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
+
+      {/* ── Top loading bar ──────────────────────────────────────────── */}
+      {loading && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
+      )}
+
+      {/* ── iOS Install guide ─────────────────────────────────────────── */}
+      {showIOSGuide && (
+        <div
+          className="fixed inset-0 z-[9998] flex items-end"
+          onClick={() => setShowIOSGuide(false)}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative w-full bg-white rounded-t-3xl px-6 pb-10 pt-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+            <p className="text-lg font-black text-gray-900 mb-1">Instalar no iPhone</p>
+            <p className="text-sm text-gray-400 mb-6">
+              Adicione o Rondello à tela de início para acesso rápido.
+            </p>
+            <div className="space-y-4 mb-6">
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-xl bg-ron-900 text-white flex items-center justify-center shrink-0 text-sm font-black">1</div>
+                <p className="text-sm text-gray-700 pt-1">
+                  Toque no botão <span className="font-bold">Compartilhar</span>{' '}
+                  <span className="text-base">⬆</span> na barra do Safari
+                </p>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-xl bg-ron-900 text-white flex items-center justify-center shrink-0 text-sm font-black">2</div>
+                <p className="text-sm text-gray-700 pt-1">
+                  Role e toque em{' '}
+                  <span className="font-bold">"Adicionar à Tela de Início"</span>
+                </p>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-xl bg-ron-900 text-white flex items-center justify-center shrink-0 text-sm font-black">3</div>
+                <p className="text-sm text-gray-700 pt-1">
+                  Toque em <span className="font-bold">Adicionar</span>
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowIOSGuide(false)}
+              className="w-full py-3.5 bg-ron-900 text-white font-bold rounded-2xl"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-8 pb-8 overflow-hidden">
