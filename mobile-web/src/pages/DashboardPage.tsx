@@ -93,20 +93,16 @@ export default function DashboardPage() {
     <div className="pb-36 max-w-lg mx-auto">
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-12 pb-24 overflow-hidden">
-        {/* decorative circles */}
-        <div className="absolute -top-16 -right-16 w-72 h-72 bg-white/5 rounded-full" />
-        <div className="absolute bottom-0 -left-10 w-40 h-40 bg-black/10 rounded-full" />
-        {/* gold dots */}
-        <div className="absolute top-8 right-8 w-2 h-2 bg-gold-400/50 rounded-full" />
-        <div className="absolute top-14 right-16 w-1 h-1 bg-gold-400/30 rounded-full" />
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-8 pb-8 overflow-hidden">
+        <div className="absolute -top-10 -right-10 w-56 h-56 bg-white/5 rounded-full" />
+        <div className="absolute top-6 right-8 w-2 h-2 bg-gold-400/50 rounded-full" />
+        <div className="absolute top-11 right-16 w-1 h-1 bg-gold-400/30 rounded-full" />
 
         <div className="relative">
-          <p className="text-gold-400/70 text-sm capitalize font-medium">{todayFull}</p>
-          <h1 className="text-5xl font-black text-white tracking-tight mt-1 leading-none">
+          <h1 className="text-4xl font-black text-white tracking-tight leading-none">
             Rondello
           </h1>
-          <p className="text-white/35 text-xs font-bold mt-2 uppercase tracking-[0.2em]">
+          <p className="text-white/35 text-xs font-bold mt-1.5 uppercase tracking-[0.2em]">
             Buffet · Gestão de Eventos
           </p>
         </div>
@@ -115,7 +111,7 @@ export default function DashboardPage() {
       <div className="px-4 space-y-4">
 
         {/* ── KPI cards ──────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 -mt-14">
+        <div className="grid grid-cols-2 gap-3 mt-4">
 
           {/* Total — grande */}
           <div className="bg-white rounded-3xl p-5 shadow-xl shadow-black/10 flex flex-col justify-between min-h-[120px]">
@@ -139,7 +135,7 @@ export default function DashboardPage() {
               <p className="text-3xl font-black text-white leading-none mt-1">
                 {loading ? '—' : eventosPorAno}
               </p>
-              <p className="text-[10px] text-white/40 mt-0.5">realizados</p>
+              <p className="text-[10px] text-white/40 mt-0.5">eventos</p>
             </div>
 
             <div className="bg-white rounded-3xl p-4 shadow-sm flex-1">
