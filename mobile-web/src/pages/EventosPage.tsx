@@ -126,6 +126,10 @@ export default function EventosPage() {
   return (
     <div className="pb-36 max-w-lg mx-auto">
 
+      {loading && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
+      )}
+
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-40 bg-[#f2f2f2]/95 backdrop-blur-xl pt-safe">
 

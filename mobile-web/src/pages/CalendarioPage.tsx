@@ -194,6 +194,10 @@ export default function CalendarioPage() {
   return (
     <div className="pb-36 max-w-lg mx-auto">
 
+      {loading && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
+      )}
+
       {/* ── Hero ──────────────────────────────────────────────────────── */}
       <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-8 pb-8 overflow-hidden">
         <div className="absolute -top-10 -right-10 w-56 h-56 bg-white/5 rounded-full" />
