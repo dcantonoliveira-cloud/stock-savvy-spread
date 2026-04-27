@@ -10,32 +10,42 @@ export interface BubbleEvento {
   NomeDoEvento?: string;
   dataDoEvento?: string;         // ISO date string
   status?: string;               // "Fechado" | "Cancelado" | "Não fechou" | "Negociando" | "1º Contato"
-  Data_reservada?: boolean;      // capital D – yes/no field in Bubble
+  Data_reservada?: boolean;
 
   // Location (reference ID to Locais_eventos)
   LocalDoEvento?: string;
-  'Local Do Evento_TXT'?: string; // pre-resolved text version stored on the record
+  'Local Do Evento_TXT'?: string;
 
-  // Event details (Ficha Técnica)
-  Tipo_Do_Evento?: string;       // "Casamento" | "Corporativo" | etc.
+  // Event details
+  Tipo_Do_Evento?: string;
   HorarioCerimonia?: string;
   'duraçãoDoEvento'?: number | string;
+  'duração do evento'?: number | string;
   ProdutoEscolhido?: string;
-  PreçoCombinado?: number;       // "Preço negociado"
+  PreçoCombinado?: number;
+  ValorTotalEvento?: number;     // Total do evento (base para Financeiro)
+  Quitado?: boolean;
+
+  // Guests
   QtdConvidados?: number;
-  Criancas50?: number;           // "Crianças 50%"
-  NaoPagantes?: number;
-  HorasAdicionais?: number;
+  'Crianças50%'?: number;
+  CriançasNãoPagantes?: number;
+  QtdHorasAdicionais?: number;
+  QuantidadeConvidadosPorMesa?: number;
+
+  // Observations & Cardápio
   'Observações'?: string;
+  CardapioEvento?: string;       // Cardápio escolhido (rich text)
 
   // Professionals / Team
   QuantidadeProfissionais?: number;
-  'AlimentaçãoProfissionais'?: number;  // value (R$) of professional food
-  tipoAlimentProf?: string;            // "Separada" | "Junto" | etc.
+  'AlimentaçãoProfissionais'?: number;
+  tipoAlimentProf?: string;
   'Organizador(a) escolhido'?: string;
   Decorador?: string;
   Confeiteira?: string;
   'Banda/DjEscolhido'?: string;
+  HorarioBanda?: string;
   'Foto/Filmagem'?: string;
   Bartender?: string;
   OutrosProfissionais?: string;
@@ -43,21 +53,30 @@ export interface BubbleEvento {
   Assessoria?: string;
 
   // Setup / Equipment
-  CoquetelDeBoasVindas?: string; // "Sim" | "Não tem" | etc.
+  CoquetelDeBoasVindas?: string;
   vinho?: string;
   whisky?: string;
+  Cerveja?: string;
   PortaGuardanapo?: string;
   Toalha?: string;
   rechaud?: string;
   'Sousplát'?: string;
   Aparador?: string;
+  'Qtd aparadores'?: string;
+  'Tamanho dos aparadores'?: string;
   'taça'?: string;
-  SalaDosNoivos?: string;
-  EspacoKids?: string;
+  'sala dos noivos'?: string;
+  'espaço kids'?: string;
   QuantidadeDeMesas?: number;
+  'localizaçãoMesaBolo'?: string;
 
-  // Client data (linked via Cliente reference — typically not on the evento record
-  // but kept here so pages can gracefully handle any partial data that may exist)
+  // Linked records (list of IDs)
+  pagamentos?: string[];
+  ValoresAdicionais?: string[];
+  'Degustações'?: string[];      // linked degustações — usado para filtro orçamentos
+  PagouDegustacao?: boolean;
+
+  // Client data (kept for future use, may not be directly on evento)
   NomeDoContratante?: string;
   ContatoDoContratante?: string;
   Telefone?: string;
@@ -69,17 +88,30 @@ export interface BubbleEvento {
 export interface BubbleLocal {
   _id: string;
   Nome?: string;
-  empresa?: string;
+}
+
+export interface BubblePagamento {
+  _id: string;
+  data?: string;
+  Valor?: number;
+  conferido?: boolean;
+  evento?: string;
+}
+
+export interface BubbleValorAdicional {
+  _id: string;
+  'Descrição'?: string;
+  valor?: number;
+  evento?: string;
 }
 
 export interface BubbleDegustacao {
   _id: string;
-  // Actual fields returned by Bubble for the "Degustação" type:
   data?: string;           // ISO date string (tasting date)
-  convidados?: number;     // number of guests
-  'Observações'?: string;  // notes
-  'Cardápio'?: string;     // menu text (can be long rich text)
-  tipo_degust?: string;    // reference to tasting type
+  convidados?: number;
+  'Observações'?: string;
+  'Cardápio'?: string;
+  tipo_degust?: string;
 }
 
 export interface BubbleListResponse<T> {

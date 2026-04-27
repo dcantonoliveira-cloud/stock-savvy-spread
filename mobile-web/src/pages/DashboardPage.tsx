@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, MapPin } from 'lucide-react';
-import { fetchAllEventos, fetchLocaisMap } from '../api/bubble';
-import { BubbleEvento } from '../types';
+import { ArrowRight, Download, MapPin } from 'lucide-react';
+import { fetchAllEventos, fetchDegustacoes, fetchLocaisMap } from '../api/bubble';
+import { BubbleDegustacao, BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
 import { isFechado } from '../lib/eventFilters';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`bg-black/5 rounded-2xl animate-pulse ${className}`} />;
@@ -50,47 +51,94 @@ function EventRow({ e, locaisMap }: { e: BubbleEvento; locaisMap: Record<string,
   );
 }
 
+function KpiCard({
+  label, value, sub, accent = false, color = 'ron',
+}: {
+  label: string; value: string | number; sub?: string;
+  accent?: boolean; color?: 'ron' | 'gold' | 'violet';
+}) {
+  const bg = accent
+    ? color === 'gold'   ? 'bg-gold-400 shadow-gold-400/30'
+    : color === 'violet' ? 'bg-violet-700 shadow-violet-700/30'
+    : 'bg-ron-900 shadow-ron-900/30'
+    : 'bg-white';
+
+  return (
+    <div className={`rounded-3xl p-5 shadow-xl flex flex-col justify-between min-h-[110px] ${bg}`}>
+      <p className={`text-[10px] font-black uppercase tracking-widest ${accent ? 'text-white/60' : 'text-gray-400'}`}>
+        {label}
+      </p>
+      <div>
+        <p className={`text-4xl font-black leading-none ${accent ? 'text-white' : 'text-ron-900'}`}>
+          {value}
+        </p>
+        {sub && (
+          <p className={`text-[10px] font-bold mt-0.5 uppercase tracking-wide ${accent ? 'text-white/50' : 'text-gray-400'}`}>
+            {sub}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
-  const [events, setEvents] = useState<BubbleEvento[]>([]);
-  const [locaisMap, setLocaisMap] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents]         = useState<BubbleEvento[]>([]);
+  const [degustacoes, setDegustacoes] = useState<BubbleDegustacao[]>([]);
+  const [locaisMap, setLocaisMap]   = useState<Record<string, string>>({});
+  const [loading, setLoading]       = useState(true);
+  const { canInstall, install }     = usePWAInstall();
 
   useEffect(() => {
-    fetchAllEventos({ sortOrder: 'desc' })
-      .then((results) => {
-        setEvents(results);
-        fetchLocaisMap(results).then(setLocaisMap);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetchAllEventos({ sortOrder: 'desc' }),
+      fetchDegustacoes(),
+    ]).then(([evts, deguRes]) => {
+      setEvents(evts);
+      setDegustacoes(deguRes.response.results);
+      fetchLocaisMap(evts).then(setLocaisMap);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const now = new Date();
-
-  // Most recent year with events (may differ from current calendar year)
-  const latestYear = events.reduce((best, e) => {
-    const y = e.dataDoEvento ? new Date(e.dataDoEvento).getFullYear() : 0;
-    return y > best ? y : best;
-  }, 0) || now.getFullYear();
-
-  const eventosPorAno = events.filter(
-    (e) => e.dataDoEvento && new Date(e.dataDoEvento).getFullYear() === latestYear
-  ).length;
+  const now        = new Date();
+  const thisMonth  = now.getMonth();
+  const thisYear   = now.getFullYear();
 
   const fechados = events.filter(isFechado);
 
-  const upcoming = fechados
+  // ── KPI 1: Eventos do mês (fechados)
+  const eventosMes = fechados.filter((e) => {
+    if (!e.dataDoEvento) return false;
+    const d = new Date(e.dataDoEvento);
+    return d.getFullYear() === thisYear && d.getMonth() === thisMonth;
+  }).length;
+
+  // ── KPI 2: Degustações do mês
+  const degustacoesMes = degustacoes.filter((d) => {
+    if (!d.data) return false;
+    const dt = new Date(d.data);
+    return dt.getFullYear() === thisYear && dt.getMonth() === thisMonth;
+  }).length;
+
+  // ── KPI 3: Orçamentos abertos pós degustação
+  // Status NOT IN [Fechado, Cancelado, Não fechou] AND tem Degustações vinculadas
+  const orcamentosAbertos = events.filter((e) => {
+    const EXCLUIDOS = new Set(['Fechado', 'Cancelado', 'Não fechou']);
+    if (EXCLUIDOS.has(e.status ?? '')) return false;
+    return (e['Degustações']?.length ?? 0) > 0;
+  }).length;
+
+  // ── Destaque e lista
+  const upcoming       = fechados
     .filter((e) => e.dataDoEvento && new Date(e.dataDoEvento) >= now)
     .sort((a, b) => new Date(a.dataDoEvento!).getTime() - new Date(b.dataDoEvento!).getTime());
 
-  const hasUpcoming     = upcoming.length > 0;
-  const highlightEvent  = hasUpcoming ? upcoming[0] : fechados[0];    // próximo OU último fechado
-  const displayEvents   = hasUpcoming ? upcoming.slice(0, 5) : fechados.slice(0, 5);
-  const sectionTitle    = hasUpcoming ? 'Próximos Eventos' : 'Eventos Recentes';
+  const hasUpcoming    = upcoming.length > 0;
+  const highlightEvent = hasUpcoming ? upcoming[0] : fechados[0];
+  const displayEvents  = hasUpcoming ? upcoming.slice(0, 5) : fechados.slice(0, 5);
+  const sectionTitle   = hasUpcoming ? 'Próximos Eventos' : 'Eventos Recentes';
 
-  const todayFull = now.toLocaleDateString('pt-BR', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  });
+  const mesLabel = now.toLocaleDateString('pt-BR', { month: 'long' });
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
@@ -101,57 +149,63 @@ export default function DashboardPage() {
         <div className="absolute top-6 right-8 w-2 h-2 bg-gold-400/50 rounded-full" />
         <div className="absolute top-11 right-16 w-1 h-1 bg-gold-400/30 rounded-full" />
 
-        <div className="relative">
-          <h1 className="text-4xl font-black text-white tracking-tight leading-none">
-            Rondello
-          </h1>
-          <p className="text-white/35 text-xs font-bold mt-1.5 uppercase tracking-[0.2em]">
-            Buffet · Gestão de Eventos
-          </p>
+        <div className="relative flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-black text-white tracking-tight leading-none">
+              Rondello
+            </h1>
+            <p className="text-white/35 text-xs font-bold mt-1.5 uppercase tracking-[0.2em]">
+              Buffet · Gestão de Eventos
+            </p>
+          </div>
+
+          {/* PWA Install button */}
+          {canInstall && (
+            <button
+              onClick={install}
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl px-3 py-2 mt-1"
+            >
+              <Download className="w-4 h-4 text-gold-300" />
+              <span className="text-xs font-bold text-white">Instalar</span>
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="px-4 space-y-4">
+      <div className="px-4 space-y-4 pt-4">
 
         {/* ── KPI cards ──────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 mt-4">
-
-          {/* Total — grande */}
-          <div className="bg-white rounded-3xl p-5 shadow-xl shadow-black/10 flex flex-col justify-between min-h-[120px]">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Total de Eventos
-            </p>
-            <div>
-              <p className="text-5xl font-black text-ron-900 leading-none">
-                {loading ? '—' : events.length}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">cadastrados</p>
-            </div>
+        {loading ? (
+          <div className="grid grid-cols-3 gap-3">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
           </div>
-
-          {/* Coluna direita: Ano + Próximos */}
-          <div className="flex flex-col gap-3">
-            <div className="bg-ron-900 rounded-3xl p-4 shadow-xl shadow-ron-900/25 flex-1">
-              <p className="text-[10px] font-black text-gold-400/70 uppercase tracking-widest">
-                {loading ? '—' : latestYear}
-              </p>
-              <p className="text-3xl font-black text-white leading-none mt-1">
-                {loading ? '—' : eventosPorAno}
-              </p>
-              <p className="text-[10px] text-white/40 mt-0.5">eventos</p>
-            </div>
-
-            <div className="bg-white rounded-3xl p-4 shadow-sm flex-1">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                Próximos
-              </p>
-              <p className={`text-3xl font-black leading-none mt-1 ${upcoming.length > 0 ? 'text-ron-900' : 'text-gray-300'}`}>
-                {loading ? '—' : upcoming.length}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">agendados</p>
-            </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            <KpiCard
+              label="Eventos"
+              value={eventosMes}
+              sub={mesLabel}
+              accent
+              color="ron"
+            />
+            <KpiCard
+              label="Degust."
+              value={degustacoesMes}
+              sub={mesLabel}
+              accent
+              color="gold"
+            />
+            <KpiCard
+              label="Orçam."
+              value={orcamentosAbertos}
+              sub="em aberto"
+              accent
+              color="violet"
+            />
           </div>
-        </div>
+        )}
 
         {/* ── Evento destaque ─────────────────────────────────────────── */}
         {!loading && highlightEvent && (
