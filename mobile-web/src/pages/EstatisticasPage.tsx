@@ -40,7 +40,7 @@ export default function EstatisticasPage() {
 
     const byStatus: Record<string, number> = {};
     events.forEach((e) => {
-      const k = (e.Status ?? 'Pendente');
+      const k = (e.status ?? 'Pendente');
       byStatus[k] = (byStatus[k] ?? 0) + 1;
     });
 
@@ -51,10 +51,10 @@ export default function EstatisticasPage() {
       if (d.getFullYear() === currentYear) byMonth[d.getMonth()]++;
     });
 
-    const totalRevenue = events.reduce((s, e) => s + (e.Preco ?? 0), 0);
+    const totalRevenue = events.reduce((s, e) => s + (e.PreçoCombinado ?? 0), 0);
     const fechadosRevenue = events
-      .filter((e) => e.Status === 'Fechado')
-      .reduce((s, e) => s + (e.Preco ?? 0), 0);
+      .filter((e) => e.status === 'Fechado')
+      .reduce((s, e) => s + (e.PreçoCombinado ?? 0), 0);
 
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
