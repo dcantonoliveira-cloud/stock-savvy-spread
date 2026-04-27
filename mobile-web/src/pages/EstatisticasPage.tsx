@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchEventos } from '../api/bubble';
+import { fetchAllEventos } from '../api/bubble';
 import { BubbleEvento } from '../types';
 import { fmtCurrency } from '../lib/format';
 
@@ -28,8 +28,8 @@ export default function EstatisticasPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchEventos({ limit: 500 })
-      .then((r) => setEvents(r.response.results))
+    fetchAllEventos()
+      .then((results) => setEvents(results))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
