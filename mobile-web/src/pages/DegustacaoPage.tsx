@@ -42,13 +42,13 @@ export default function DegustacaoPage() {
     <div className="pb-36 max-w-lg mx-auto">
 
       {/* ── Hero header ──────────────────────────────────────────────── */}
-      <div className="relative bg-gradient-to-br from-amber-950 via-amber-900 to-amber-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="absolute -bottom-8 -left-6  w-36 h-36 bg-white/5 rounded-full" />
         <div className="relative">
-          <p className="text-amber-400/80 text-sm">Menu de prova</p>
+          <p className="text-gold-400/80 text-sm">Menu de prova</p>
           <h1 className="text-4xl font-black text-white tracking-tight mt-1 leading-none">Degustações</h1>
-          <p className="text-amber-400/70 text-sm font-medium mt-1">
+          <p className="text-gold-400/70 text-sm font-medium mt-1">
             {loading ? '…' : `${upcoming} próxima${upcoming !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function DegustacaoPage() {
                 onClick={() => setTab(t)}
                 className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm ${
                   tab === t
-                    ? 'bg-amber-900 text-white shadow-lg shadow-amber-900/30'
+                    ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30'
                     : 'bg-white text-gray-500'
                 }`}
               >
@@ -119,13 +119,13 @@ export default function DegustacaoPage() {
                   <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                     {d.DataDaDegustacao && (
                       <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
-                        <Calendar className="w-3.5 h-3.5 text-amber-500" />
+                        <Calendar className="w-3.5 h-3.5 text-gold-400" />
                         {fmtDate(d.DataDaDegustacao)}
                       </span>
                     )}
                     {d.HorarioDaDegustacao && (
                       <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
-                        <Clock className="w-3.5 h-3.5 text-amber-500" />
+                        <Clock className="w-3.5 h-3.5 text-gold-400" />
                         {fmtTime(d.HorarioDaDegustacao)}
                       </span>
                     )}

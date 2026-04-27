@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
-import { fetchEventos } from '../api/bubble';
+import { fetchEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento } from '../types';
 
 const MONTHS      = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -10,7 +10,8 @@ const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
 
 // ── Event card ───────────────────────────────────────────────────────────────
 
-function EventCard({ event, past }: { event: BubbleEvento; past?: boolean }) {
+function EventCard({ event, past, locaisMap }: { event: BubbleEvento; past?: boolean; locaisMap: Record<string, string> }) {
+  const localNome = event.LocalDoEvento ? (locaisMap[event.LocalDoEvento] ?? '') : '';
   const date    = event.dataDoEvento ? new Date(event.dataDoEvento) : null;
   const day     = date?.toLocaleDateString('pt-BR', { day: '2-digit' });
   const weekday = date?.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','').toUpperCase();
@@ -26,12 +27,12 @@ function EventCard({ event, past }: { event: BubbleEvento; past?: boolean }) {
     >
       {/* Date block */}
       <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${
-        past ? 'bg-gray-100' : 'bg-amber-50'
+        past ? 'bg-gray-100' : 'bg-gold-50'
       }`}>
-        <span className={`text-[10px] font-bold ${past ? 'text-gray-400' : 'text-amber-500'}`}>
+        <span className={`text-[10px] font-bold ${past ? 'text-gray-400' : 'text-gold-400'}`}>
           {weekday}
         </span>
-        <span className={`text-2xl font-black leading-none ${past ? 'text-gray-500' : 'text-amber-900'}`}>
+        <span className={`text-2xl font-black leading-none ${past ? 'text-gray-500' : 'text-ron-900'}`}>
           {day ?? '—'}
         </span>
       </div>
@@ -42,10 +43,10 @@ function EventCard({ event, past }: { event: BubbleEvento; past?: boolean }) {
           {event.NomeDoEvento ?? event.NomeDoContratante ?? '—'}
         </p>
         <div className="flex items-center gap-3 mt-1 flex-wrap">
-          {event.LocalDoEvento && (
+          {localNome && (
             <span className="flex items-center gap-1 text-xs text-gray-400 truncate max-w-[150px]">
               <MapPin className="w-3 h-3 shrink-0" />
-              <span className="truncate">{event.LocalDoEvento}</span>
+              <span className="truncate">{localNome}</span>
             </span>
           )}
           {event.QuantidadeDeConvidados != null && (
@@ -73,18 +74,16 @@ export default function EventosPage() {
   const [year, setYear]     = useState(now.getFullYear());
   const [month, setMonth]   = useState(now.getMonth());
   const [events, setEvents] = useState<BubbleEvento[]>([]);
+  const [locaisMap, setLocaisMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Bubble option-set constraints are unreliable via Data API,
-    // so we fetch all events and filter client-side by Status === 'Fechado'.
-    fetchEventos({ limit: 500, sortOrder: 'asc' })
+    fetchEventos({ limit: 500, sortOrder: 'desc' })
       .then((r) => {
-        const fechados = r.response.results.filter(
-          (e) => e.Status === 'Fechado'
-        );
-        setEvents(fechados);
+        const results = r.response.results;
+        setEvents(results);
+        fetchLocaisMap(results).then(setLocaisMap);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -163,14 +162,14 @@ export default function EventosPage() {
                 onClick={() => setMonth(i)}
                 className={`shrink-0 flex flex-col items-center px-3.5 py-2 rounded-2xl transition-all ${
                   active
-                    ? 'bg-amber-900 shadow-lg shadow-amber-900/30'
+                    ? 'bg-ron-900 shadow-lg shadow-ron-900/30'
                     : 'bg-white shadow-sm'
                 }`}
               >
-                <span className={`text-[11px] font-bold ${active ? 'text-amber-200' : 'text-gray-500'}`}>
+                <span className={`text-[11px] font-bold ${active ? 'text-gold-200' : 'text-gray-500'}`}>
                   {m}
                 </span>
-                <span className={`text-base font-black leading-tight ${active ? 'text-white' : count > 0 ? 'text-amber-800' : 'text-gray-300'}`}>
+                <span className={`text-base font-black leading-tight ${active ? 'text-white' : count > 0 ? 'text-ron-800' : 'text-gray-300'}`}>
                   {count > 0 ? count : '·'}
                 </span>
               </button>
@@ -207,7 +206,7 @@ export default function EventosPage() {
                   </span>
                 </div>
                 <div className="space-y-2.5">
-                  {upcoming.map((e) => <EventCard key={e._id} event={e} />)}
+                  {upcoming.map((e) => <EventCard key={e._id} event={e} locaisMap={locaisMap} />)}
                 </div>
               </div>
             )}
@@ -225,7 +224,7 @@ export default function EventosPage() {
                   </span>
                 </div>
                 <div className="space-y-2.5">
-                  {past.map((e) => <EventCard key={e._id} event={e} past />)}
+                  {past.map((e) => <EventCard key={e._id} event={e} past locaisMap={locaisMap} />)}
                 </div>
               </div>
             )}

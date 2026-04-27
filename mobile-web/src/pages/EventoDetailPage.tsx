@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, MapPin, Users } from 'lucide-react';
-import { fetchEvento } from '../api/bubble';
+import { fetchEvento, fetchLocal } from '../api/bubble';
 import { BubbleEvento } from '../types';
 import { fmtCurrency, fmtDate } from '../lib/format';
 
@@ -27,7 +27,7 @@ function FieldGrid({ children }: { children: React.ReactNode }) {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest mb-3 mt-1">
+    <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-3 mt-1">
       {children}
     </p>
   );
@@ -35,7 +35,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ── Tab content ──────────────────────────────────────────────────────────────
 
-function FichaTecnica({ e }: { e: BubbleEvento }) {
+function FichaTecnica({ e, localNome }: { e: BubbleEvento; localNome?: string }) {
   return (
     <div className="space-y-4">
       <div>
@@ -43,7 +43,7 @@ function FichaTecnica({ e }: { e: BubbleEvento }) {
         <FieldGrid>
           <Field label="Nome do Evento"    value={e.NomeDoEvento} />
           <Field label="Tipo"              value={e.TipoDoEvento} />
-          <Field label="Local"             value={e.LocalDoEvento} />
+          <Field label="Local"             value={localNome ?? e.LocalDoEvento} />
           <Field label="Data"              value={fmtDate(e.dataDoEvento)} />
           <Field label="Produto escolhido" value={e.ProdutoEscolhido} />
           <Field label="Horário cerimônia" value={e.HorarioDaCerimonia} />
@@ -152,6 +152,7 @@ export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [evento, setEvento] = useState<BubbleEvento | null>(null);
+  const [localNome, setLocalNome] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -160,7 +161,15 @@ export default function EventoDetailPage() {
   useEffect(() => {
     if (!id) return;
     fetchEvento(id)
-      .then((r) => setEvento(r.response))
+      .then((r) => {
+        const ev = r.response;
+        setEvento(ev);
+        if (ev.LocalDoEvento) {
+          fetchLocal(ev.LocalDoEvento)
+            .then((lr) => setLocalNome(lr.response.Nome ?? ''))
+            .catch(() => {});
+        }
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [id]);
@@ -174,7 +183,7 @@ export default function EventoDetailPage() {
   function renderTab() {
     if (!evento) return null;
     switch (activeTab) {
-      case 0: return <FichaTecnica e={evento} />;
+      case 0: return <FichaTecnica e={evento} localNome={localNome || undefined} />;
       case 1: return <DadosCliente e={evento} />;
       default: return <ComingSoon name={TABS[activeTab]} />;
     }
@@ -186,7 +195,7 @@ export default function EventoDetailPage() {
     <div className="pb-36 max-w-lg mx-auto">
 
       {/* ── Hero header ────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-amber-950 via-amber-900 to-amber-800 px-5 pt-safe pt-12 pb-6 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-12 pb-6 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-36 h-36 bg-white/5 rounded-full" />
 
         <button
@@ -208,19 +217,19 @@ export default function EventoDetailPage() {
             </h1>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
               {date && (
-                <span className="flex items-center gap-1.5 text-amber-300 text-sm font-medium">
+                <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <Calendar className="w-3.5 h-3.5" />
                   {fmtDate(evento?.dataDoEvento)}
                 </span>
               )}
-              {evento?.LocalDoEvento && (
-                <span className="flex items-center gap-1.5 text-amber-300 text-sm font-medium">
+              {localNome && (
+                <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <MapPin className="w-3.5 h-3.5" />
-                  {evento.LocalDoEvento}
+                  {localNome}
                 </span>
               )}
               {evento?.QuantidadeDeConvidados != null && (
-                <span className="flex items-center gap-1.5 text-amber-300 text-sm font-medium">
+                <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <Users className="w-3.5 h-3.5" />
                   {evento.QuantidadeDeConvidados} convidados
                 </span>
@@ -243,7 +252,7 @@ export default function EventoDetailPage() {
               onClick={() => goToTab(i)}
               className={`shrink-0 px-4 py-2 rounded-2xl text-xs font-bold transition-all mr-1 ${
                 activeTab === i
-                  ? 'bg-amber-900 text-white shadow-lg shadow-amber-900/30'
+                  ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30'
                   : 'bg-white text-gray-400 shadow-sm'
               }`}
             >

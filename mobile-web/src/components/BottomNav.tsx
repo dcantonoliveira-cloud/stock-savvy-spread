@@ -23,7 +23,7 @@ export default function BottomNav() {
             >
               {({ isActive }) => (
                 <div className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-2xl transition-all ${
-                  isActive ? 'bg-amber-900' : ''
+                  isActive ? 'bg-ron-900' : ''
                 }`}>
                   <Icon className={`w-5 h-5 transition-all ${
                     isActive ? 'text-white stroke-[2.5]' : 'text-gray-400'
