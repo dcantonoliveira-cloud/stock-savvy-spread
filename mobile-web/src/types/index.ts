@@ -90,6 +90,11 @@ export interface BubbleLocal {
   Nome?: string;
 }
 
+export interface BubbleAssessoria {
+  _id: string;
+  Nome?: string;
+}
+
 export interface BubblePagamento {
   _id: string;
   data?: string;
