@@ -1,6 +1,6 @@
 const PALETTE: Record<string, string> = {
   confirmado: 'bg-emerald-100 text-emerald-800',
-  pendente:   'bg-amber-100 text-amber-800',
+  pendente:   'bg-gold-100 text-ron-800',
   cancelado:  'bg-red-100 text-red-700',
   realizado:  'bg-blue-100 text-blue-800',
   agendada:   'bg-violet-100 text-violet-800',
@@ -9,7 +9,7 @@ const PALETTE: Record<string, string> = {
 
 const DOT: Record<string, string> = {
   confirmado: 'bg-emerald-500',
-  pendente:   'bg-amber-400',
+  pendente:   'bg-gold-400',
   cancelado:  'bg-red-400',
   realizado:  'bg-blue-400',
   agendada:   'bg-violet-400',

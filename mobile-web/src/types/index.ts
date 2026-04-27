@@ -61,6 +61,12 @@ export interface BubbleEvento {
   Endereco?: string;
 }
 
+export interface BubbleLocal {
+  _id: string;
+  Nome?: string;
+  empresa?: string;
+}
+
 export interface BubbleDegustacao {
   _id: string;
   Evento?: string;

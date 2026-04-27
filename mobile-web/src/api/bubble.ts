@@ -6,6 +6,7 @@
 import type {
   BubbleEvento,
   BubbleDegustacao,
+  BubbleLocal,
   BubbleListResponse,
   BubbleSingleResponse,
 } from '../types';
@@ -48,6 +49,26 @@ export function fetchEventos(opts?: {
 
 export function fetchEvento(id: string) {
   return apiFetch<BubbleSingleResponse<BubbleEvento>>(`eventos/${id}`);
+}
+
+// ── Locations ────────────────────────────────────────────────────────────────
+
+export function fetchLocal(id: string) {
+  return apiFetch<BubbleSingleResponse<BubbleLocal>>(`Locais_eventos/${id}`);
+}
+
+export async function fetchLocaisMap(
+  eventos: Pick<BubbleEvento, 'LocalDoEvento'>[]
+): Promise<Record<string, string>> {
+  const ids = [
+    ...new Set(eventos.map((e) => e.LocalDoEvento).filter(Boolean) as string[]),
+  ];
+  const results = await Promise.allSettled(ids.map((id) => fetchLocal(id)));
+  const map: Record<string, string> = {};
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') map[ids[i]] = r.value.response.Nome ?? '';
+  });
+  return map;
 }
 
 // ── Tastings ─────────────────────────────────────────────────────────────────

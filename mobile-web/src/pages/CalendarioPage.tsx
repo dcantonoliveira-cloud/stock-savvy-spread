@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
-import { fetchEventos } from '../api/bubble';
+import { fetchEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento } from '../types';
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -16,11 +16,16 @@ export default function CalendarioPage() {
   const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState<number | null>(today.getDate());
   const [events, setEvents] = useState<BubbleEvento[]>([]);
+  const [locaisMap, setLocaisMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchEventos({ limit: 500 })
-      .then((r) => setEvents(r.response.results))
+      .then((r) => {
+        const results = r.response.results;
+        setEvents(results);
+        fetchLocaisMap(results).then(setLocaisMap);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -77,15 +82,15 @@ export default function CalendarioPage() {
     <div className="pb-36 max-w-lg mx-auto">
 
       {/* ── Hero header ──────────────────────────────────────────────── */}
-      <div className="relative bg-gradient-to-br from-amber-950 via-amber-900 to-amber-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="absolute -bottom-8 -left-6  w-36 h-36 bg-white/5 rounded-full" />
         <div className="relative">
-          <p className="text-amber-400/80 text-sm">Agenda</p>
+          <p className="text-gold-400/80 text-sm">Agenda</p>
           <h1 className="text-4xl font-black text-white tracking-tight mt-1 leading-none">
             {MONTHS[month]}
           </h1>
-          <p className="text-amber-400/70 text-sm font-medium mt-1">
+          <p className="text-gold-400/70 text-sm font-medium mt-1">
             {loading ? '…' : `${monthEventCount} evento${monthEventCount !== 1 ? 's' : ''} · ${year}`}
           </p>
         </div>
@@ -135,14 +140,14 @@ export default function CalendarioPage() {
                   key={key}
                   onClick={() => setSelected(day === selected ? null : day)}
                   className={`flex flex-col items-center py-1.5 rounded-2xl transition-all ${
-                    isSelected ? 'bg-amber-900 shadow-lg shadow-amber-900/30'
-                    : isToday  ? 'bg-amber-50'
+                    isSelected ? 'bg-ron-900 shadow-lg shadow-ron-900/30'
+                    : isToday  ? 'bg-gold-50'
                     : ''
                   }`}
                 >
                   <span className={`text-[13px] font-bold leading-none ${
                     isSelected ? 'text-white'
-                    : isToday  ? 'text-amber-900'
+                    : isToday  ? 'text-ron-900'
                     : 'text-gray-800'
                   }`}>
                     {day}
@@ -151,7 +156,7 @@ export default function CalendarioPage() {
                     {dayEvents.slice(0, 3).map((e) => (
                       <span
                         key={e._id}
-                        className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white/60' : 'bg-amber-500'}`}
+                        className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white/60' : 'bg-gold-400'}`}
                       />
                     ))}
                   </div>
@@ -164,7 +169,7 @@ export default function CalendarioPage() {
         {/* ── Selected day events ─────────────────────────────────────── */}
         {selected && (
           <div>
-            <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest mb-3 capitalize">
+            <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-3 capitalize">
               {selectedDayLabel}
             </p>
             {!loading && selectedEvents.length === 0 ? (
@@ -185,10 +190,10 @@ export default function CalendarioPage() {
                         {e.NomeDoEvento ?? e.NomeDoContratante ?? '—'}
                       </p>
                       <div className="flex items-center gap-3 mt-1 flex-wrap">
-                        {e.LocalDoEvento && (
+                        {e.LocalDoEvento && locaisMap[e.LocalDoEvento] && (
                           <span className="flex items-center gap-1 text-xs text-gray-400 truncate">
                             <MapPin className="w-3 h-3 shrink-0" />
-                            <span className="truncate max-w-[140px]">{e.LocalDoEvento}</span>
+                            <span className="truncate max-w-[140px]">{locaisMap[e.LocalDoEvento]}</span>
                           </span>
                         )}
                         {e.QuantidadeDeConvidados != null && (

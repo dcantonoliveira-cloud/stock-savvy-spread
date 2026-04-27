@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Calendar, TrendingUp, Users } from 'lucide-react';
-import { fetchEventos } from '../api/bubble';
+import { fetchEventos, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
 
@@ -11,11 +11,16 @@ function Skeleton({ className = '' }: { className?: string }) {
 
 export default function DashboardPage() {
   const [events, setEvents] = useState<BubbleEvento[]>([]);
+  const [locaisMap, setLocaisMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchEventos({ limit: 500, sortOrder: 'desc' })
-      .then((r) => setEvents(r.response.results))
+      .then((r) => {
+        const results = r.response.results;
+        setEvents(results);
+        fetchLocaisMap(results).then(setLocaisMap);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -43,13 +48,13 @@ export default function DashboardPage() {
     <div className="pb-36 max-w-lg mx-auto">
 
       {/* ── Hero header ──────────────────────────────────────────────── */}
-      <div className="relative bg-gradient-to-br from-amber-950 via-amber-900 to-amber-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="absolute -bottom-8 -left-6  w-36 h-36 bg-white/5 rounded-full" />
         <div className="relative">
-          <p className="text-amber-400/80 text-sm capitalize">{todayFull}</p>
+          <p className="text-gold-400/80 text-sm capitalize">{todayFull}</p>
           <h1 className="text-4xl font-black text-white tracking-tight mt-1 leading-none">Rondello</h1>
-          <p className="text-amber-400/70 text-sm font-medium mt-1">Gestão de Eventos</p>
+          <p className="text-gold-400/70 text-sm font-medium mt-1">Gestão de Eventos</p>
         </div>
       </div>
 
@@ -60,7 +65,7 @@ export default function DashboardPage() {
           {[
             { label: 'Total',     value: events.length,      Icon: Calendar,    color: 'text-blue-500',  bg: 'bg-blue-50'   },
             { label: 'Este mês',  value: thisMonth.length,   Icon: TrendingUp,  color: 'text-emerald-500', bg: 'bg-emerald-50' },
-            { label: 'Fechados',  value: fechados.length,    Icon: Users,       color: 'text-amber-600', bg: 'bg-amber-50'  },
+            { label: 'Fechados',  value: fechados.length,    Icon: Users,       color: 'text-gold-600', bg: 'bg-gold-50'  },
           ].map(({ label, value, Icon, color, bg }) => (
             <div key={label} className="bg-white rounded-3xl p-4 shadow-xl shadow-black/10 text-center">
               <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mx-auto mb-2`}>
@@ -76,20 +81,20 @@ export default function DashboardPage() {
         {!loading && nextEvent && (
           <Link
             to={`/eventos/${nextEvent._id}`}
-            className="block bg-amber-900 rounded-3xl p-5 shadow-xl shadow-amber-900/30 overflow-hidden relative"
+            className="block bg-ron-900 rounded-3xl p-5 shadow-xl shadow-ron-900/30 overflow-hidden relative"
           >
             <div className="absolute -top-6 -right-6 w-28 h-28 bg-white/5 rounded-full" />
-            <p className="text-amber-400 text-[11px] font-black uppercase tracking-widest mb-2">
+            <p className="text-gold-400 text-[11px] font-black uppercase tracking-widest mb-2">
               ● Próximo evento
             </p>
             <p className="text-white font-black text-xl leading-tight">
               {nextEvent.NomeDoEvento ?? nextEvent.NomeDoContratante ?? '—'}
             </p>
-            {nextEvent.LocalDoEvento && (
-              <p className="text-amber-300/80 text-sm mt-1">{nextEvent.LocalDoEvento}</p>
+            {nextEvent.LocalDoEvento && locaisMap[nextEvent.LocalDoEvento] && (
+              <p className="text-gold-300/80 text-sm mt-1">{locaisMap[nextEvent.LocalDoEvento]}</p>
             )}
             <div className="flex items-center justify-between mt-4">
-              <p className="text-amber-300 text-sm font-semibold">
+              <p className="text-gold-300 text-sm font-semibold">
                 {fmtDate(nextEvent.dataDoEvento)}
                 {nextEvent.QuantidadeDeConvidados != null && ` · ${nextEvent.QuantidadeDeConvidados} conv.`}
               </p>
@@ -104,7 +109,7 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="font-black text-gray-900 text-lg">Próximos Eventos</p>
-            <Link to="/eventos" className="flex items-center gap-1 text-sm font-semibold text-amber-800">
+            <Link to="/eventos" className="flex items-center gap-1 text-sm font-semibold text-ron-800">
               Ver todos <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -132,16 +137,16 @@ export default function DashboardPage() {
                     to={`/eventos/${e._id}`}
                     className="flex items-center gap-4 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform"
                   >
-                    <div className="w-14 h-14 rounded-2xl bg-amber-50 flex flex-col items-center justify-center shrink-0">
-                      <span className="text-[10px] font-bold text-amber-500">{weekday}</span>
-                      <span className="text-2xl font-black text-amber-900 leading-none">{day}</span>
+                    <div className="w-14 h-14 rounded-2xl bg-gold-50 flex flex-col items-center justify-center shrink-0">
+                      <span className="text-[10px] font-bold text-gold-400">{weekday}</span>
+                      <span className="text-2xl font-black text-ron-900 leading-none">{day}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-gray-900 truncate">
                         {e.NomeDoEvento ?? e.NomeDoContratante ?? '—'}
                       </p>
                       <p className="text-sm text-gray-400 truncate mt-0.5">
-                        {e.LocalDoEvento ?? '—'}
+                        {(e.LocalDoEvento && locaisMap[e.LocalDoEvento]) || '—'}
                         {e.QuantidadeDeConvidados != null && ` · ${e.QuantidadeDeConvidados} conv.`}
                       </p>
                     </div>
