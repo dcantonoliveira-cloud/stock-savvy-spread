@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 bun.lock
 bun.lockb
+.claude/worktrees/
