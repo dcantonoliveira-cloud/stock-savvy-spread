@@ -30,7 +30,9 @@
     var NAVY  = '#1B3A5C';
     var GOLD  = '#C9A87A';
     var LGOLD = '#F5EDD8';
+    var CREAM = '#FAF7F2';
     var GRAY  = '#6B7280';
+    var DGRAY = '#374151';
 
     var INCLUSO = [
       'Todo material necessário para a operação de buffet | materiais de cozinha e utensílios necessários para realizarmos nosso serviço.',
@@ -59,10 +61,10 @@
       return {
         table: { widths: ['*'], body: [[{ stack: stackContent, fillColor: fillColor }]] },
         layout: Object.assign({
-          paddingTop: function() { return 14; },
-          paddingBottom: function() { return 14; },
-          paddingLeft: function() { return 18; },
-          paddingRight: function() { return 18; },
+          paddingTop: function() { return 16; },
+          paddingBottom: function() { return 16; },
+          paddingLeft: function() { return 20; },
+          paddingRight: function() { return 20; },
           hLineWidth: function() { return 0; },
           vLineWidth: function() { return 0; }
         }, layoutOverride || {}),
@@ -70,284 +72,579 @@
       };
     }
 
-    /* Gold bullet (canvas) — works in any pdfmake font */
-    function bulletOk() {
-      return { canvas: [{ type: 'ellipse', x: 5, y: 5.5, r1: 4, r2: 4, color: GOLD }], width: 16, margin: [0, 1, 0, 0] };
-    }
-    /* Red ring (canvas) */
-    function bulletNo() {
-      return { canvas: [{ type: 'ellipse', x: 5, y: 5.5, r1: 4, r2: 4, color: '#FEE2E2', lineColor: '#EF4444', lineWidth: 1.5 }], width: 16, margin: [0, 1, 0, 0] };
+    /* Double gold rule ornament */
+    function doubleRule(width) {
+      width = width || 495;
+      return {
+        canvas: [
+          { type: 'line', x1: 0,   y1: 0, x2: width, y2: 0, lineWidth: 1.5, lineColor: GOLD },
+          { type: 'line', x1: 0,   y1: 4, x2: width, y2: 4, lineWidth: 0.4, lineColor: GOLD }
+        ],
+        margin: [0, 0, 0, 0]
+      };
     }
 
-    function buildHeader(logoB64, currentPage) {
-      if (currentPage === 1) {
-        return {
-          margin: [50, 22, 50, 0],
-          columns: [
-            { image: logoB64, width: 120 },
-            { text: 'PROPOSTA DE ORÇAMENTO', style: 'hTitle', alignment: 'right', margin: [0, 16, 0, 0] }
-          ]
-        };
-      }
+    /* Thin single hairline */
+    function hairline(width, color, marginArr) {
       return {
-        margin: [50, 18, 50, 0],
-        columns: [
-          { image: logoB64, width: 75 },
-          { text: 'PROPOSTA DE ORÇAMENTO', style: 'hTitleSm', alignment: 'right', margin: [0, 8, 0, 0] }
+        canvas: [{ type: 'line', x1: 0, y1: 0, x2: width || 495, y2: 0, lineWidth: 0.5, lineColor: color || GOLD }],
+        margin: marginArr || [0, 0, 0, 0]
+      };
+    }
+
+    /* Small decorative diamond (rotated square via polyline) */
+    function diamond(x, y, size, fillColor) {
+      size = size || 4;
+      return { type: 'polyline', points: [
+        { x: x,        y: y - size },
+        { x: x + size, y: y        },
+        { x: x,        y: y + size },
+        { x: x - size, y: y        }
+      ], closePath: true, color: fillColor || GOLD, lineColor: fillColor || GOLD, lineWidth: 0.5 };
+    }
+
+    /* Centered diamond ornament between sections */
+    function sectionDivider() {
+      var w = 495;
+      var cx = w / 2;
+      return {
+        canvas: [
+          { type: 'line', x1: 0,       y1: 6, x2: cx - 14, y2: 6, lineWidth: 0.4, lineColor: GOLD },
+          diamond(cx, 6, 4, GOLD),
+          { type: 'line', x1: cx + 14, y1: 6, x2: w,       y2: 6, lineWidth: 0.4, lineColor: GOLD }
+        ],
+        margin: [0, 16, 0, 16]
+      };
+    }
+
+    /* Gold filled bullet */
+    function bulletOk() {
+      return {
+        canvas: [
+          { type: 'ellipse', x: 5, y: 6, r1: 3.5, r2: 3.5, color: GOLD }
+        ],
+        width: 16, margin: [0, 1.5, 0, 0]
+      };
+    }
+
+    /* Navy ring bullet (not included) */
+    function bulletNo() {
+      return {
+        canvas: [
+          { type: 'ellipse', x: 5, y: 6, r1: 3.5, r2: 3.5, color: '#FDEAEA', lineColor: '#C0392B', lineWidth: 1 }
+        ],
+        width: 16, margin: [0, 1.5, 0, 0]
+      };
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    function buildHeader(logoB64, currentPage) {
+      var isFirst = currentPage === 1;
+      var logoW   = isFirst ? 110 : 72;
+      var topMarg = isFirst ? 20 : 16;
+
+      return {
+        margin: [50, topMarg, 50, 0],
+        stack: [
+          {
+            columns: [
+              { image: logoB64, width: logoW, margin: [0, 0, 0, 0] },
+              {
+                stack: [
+                  { text: 'PROPOSTA DE', fontSize: isFirst ? 7 : 6, color: GRAY, characterSpacing: 2.5, bold: false, alignment: 'right' },
+                  { text: 'ORÇAMENTO', fontSize: isFirst ? 11 : 8, color: NAVY, bold: true, characterSpacing: isFirst ? 3 : 2, alignment: 'right' }
+                ],
+                margin: [0, isFirst ? 10 : 6, 0, 0]
+              }
+            ]
+          },
+          {
+            canvas: [
+              { type: 'line', x1: 0, y1: 5, x2: 495, y2: 5, lineWidth: 1.2, lineColor: GOLD },
+              { type: 'line', x1: 0, y1: 8.5, x2: 495, y2: 8.5, lineWidth: 0.3, lineColor: GOLD }
+            ],
+            margin: [0, 4, 0, 0]
+          }
         ]
       };
     }
 
+    /* ── Footer ─────────────────────────────────────────────────────────── */
     function buildFooter(p, total) {
       return {
-        margin: [50, 0, 50, 14],
-        columns: [
-          { text: 'Rondello Buffet  |  www.rondellobuffet.com.br', style: 'footer', alignment: 'left' },
-          { text: p + ' / ' + total, style: 'footer', alignment: 'right' }
+        margin: [50, 0, 50, 10],
+        stack: [
+          {
+            canvas: [
+              { type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 0.4, lineColor: GOLD }
+            ],
+            margin: [0, 0, 0, 5]
+          },
+          {
+            columns: [
+              {
+                text: [
+                  { text: 'Rondello Buffet', bold: true, color: NAVY },
+                  { text: '  |  www.rondellobuffet.com.br', color: GRAY }
+                ],
+                fontSize: 7, characterSpacing: 0.3
+              },
+              { text: p + ' / ' + total, fontSize: 7, color: GRAY, characterSpacing: 0.5, alignment: 'right' }
+            ]
+          }
         ]
       };
     }
 
+    /* ── Cliente Block ───────────────────────────────────────────────────── */
     function buildClienteBlock(cliente) {
       var blocks = [];
 
-      /* Opening gold rule */
-      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 1.5, lineColor: GOLD }], margin: [0, 0, 0, 22] });
+      /* Top spacing after header rule */
+      blocks.push({ text: '', margin: [0, 6, 0, 0] });
 
+      /* "APRESENTAMOS A PROPOSTA PARA" label */
+      blocks.push({
+        text: 'APRESENTAMOS A PROPOSTA PARA',
+        fontSize: 7,
+        color: GRAY,
+        characterSpacing: 2.2,
+        alignment: 'center',
+        margin: [0, 0, 0, 10]
+      });
+
+      /* Client name — large, navy, wide spacing */
       if (cliente.nome) {
-        blocks.push({ text: cliente.nome, fontSize: 26, bold: true, color: NAVY, alignment: 'center', margin: [0, 0, 0, 9] });
+        blocks.push({
+          text: cliente.nome.toUpperCase(),
+          fontSize: 24,
+          bold: true,
+          color: NAVY,
+          alignment: 'center',
+          characterSpacing: 1.5,
+          lineHeight: 1.1,
+          margin: [0, 0, 0, 12]
+        });
       }
 
+      /* Gold diamond ornament between name and details */
+      blocks.push({
+        canvas: [
+          { type: 'line', x1: 160, y1: 5, x2: 222, y2: 5, lineWidth: 0.5, lineColor: GOLD },
+          diamond(247.5, 5, 4.5, GOLD),
+          { type: 'line', x1: 273, y1: 5, x2: 335, y2: 5, lineWidth: 0.5, lineColor: GOLD }
+        ],
+        margin: [0, 0, 0, 11]
+      });
+
+      /* Detail pills */
       var details = [];
-      if (cliente.data) details.push(cliente.data);
-      if (cliente.local) details.push(cliente.local);
-      if (cliente.tipo) details.push(cliente.tipo);
+      if (cliente.data)       details.push(cliente.data);
+      if (cliente.local)      details.push(cliente.local);
+      if (cliente.tipo)       details.push(cliente.tipo);
       if (cliente.convidados) details.push(cliente.convidados + ' convidados');
-      if (cliente.horas) details.push(cliente.horas + 'h de serviço');
+      if (cliente.horas)      details.push(cliente.horas + 'h de serviço');
 
       if (details.length) {
-        blocks.push({ text: details.join('  •  '), fontSize: 9, color: GOLD, alignment: 'center', characterSpacing: 0.4, margin: [0, 0, 0, 22] });
+        blocks.push({
+          text: details.join('     |     '),
+          fontSize: 8.5,
+          color: GOLD,
+          alignment: 'center',
+          characterSpacing: 0.6,
+          margin: [0, 0, 0, 18]
+        });
       }
 
-      /* Closing rule */
-      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 0.5, lineColor: GOLD }], margin: [0, 0, 0, 26] });
+      /* Closing double rule */
+      blocks.push(Object.assign(doubleRule(495), { margin: [0, 0, 0, 24] }));
 
       return blocks;
     }
 
+    /* ── Package name with gold highlight ───────────────────────────────── */
     function buildNomeParts(nome, destaque) {
       var n = (nome || '').toUpperCase();
       var d = (destaque || '').toUpperCase();
       if (!d || n.indexOf(d) === -1) {
-        return [{ text: n, color: '#fff', bold: true, fontSize: 12, characterSpacing: 0.5 }];
+        return [{ text: n, color: '#FFFFFF', bold: true, fontSize: 13, characterSpacing: 1.5, lineHeight: 1 }];
       }
       var idx = n.indexOf(d);
       var parts = [];
-      if (idx > 0) parts.push({ text: n.slice(0, idx), color: '#fff', bold: true, fontSize: 12, characterSpacing: 0.5 });
-      parts.push({ text: d, color: GOLD, bold: true, fontSize: 12, characterSpacing: 0.5 });
-      if (idx + d.length < n.length) parts.push({ text: n.slice(idx + d.length), color: '#fff', bold: true, fontSize: 12, characterSpacing: 0.5 });
+      if (idx > 0) parts.push({ text: n.slice(0, idx), color: '#FFFFFF', bold: true, fontSize: 13, characterSpacing: 1.5 });
+      parts.push({ text: d, color: GOLD, bold: true, fontSize: 13, characterSpacing: 1.5 });
+      if (idx + d.length < n.length) parts.push({ text: n.slice(idx + d.length), color: '#FFFFFF', bold: true, fontSize: 13, characterSpacing: 1.5 });
       return parts;
     }
 
+    /* ── Package Block ───────────────────────────────────────────────────── */
     function buildPacoteBlock(pacote, index, isLast) {
       var blocks = [];
       var inv = pacote.investimento || {};
-      var num = (index + 1 < 10 ? '0' : '') + (index + 1);
+      var num = String(index + 1).padStart(2, '0');
       var nomeParts = buildNomeParts(pacote.nome, pacote.palavraDestaque);
 
-      var headerText = [
-        { text: num + '  ', color: GOLD, bold: true, fontSize: 14 },
-        { text: 'PACOTE  ', color: '#C9A87A88', fontSize: 8, characterSpacing: 1.5, bold: true }
-      ].concat(nomeParts);
+      /* ── Package header: navy bar with subtle canvas ornament ── */
+      var headerStack = [
+        {
+          columns: [
+            /* Large decorative number */
+            {
+              stack: [
+                { text: num, fontSize: 30, bold: true, color: GOLD, opacity: 0.25, lineHeight: 0.9 }
+              ],
+              width: 42,
+              margin: [0, -4, 0, 0]
+            },
+            /* Vertical divider + package label + name */
+            {
+              stack: [
+                { text: 'PACOTE', fontSize: 7, color: GOLD, characterSpacing: 2.5, margin: [0, 0, 0, 2] },
+                { text: nomeParts }
+              ],
+              margin: [0, 2, 0, 0]
+            }
+          ]
+        }
+      ];
 
-      /* Package header — navy bar */
       blocks.push({
-        table: { widths: ['*'], body: [[{ text: headerText, fillColor: NAVY }]] },
+        table: { widths: ['*'], body: [[{ stack: headerStack, fillColor: NAVY }]] },
         layout: {
-          paddingTop: function() { return 13; }, paddingBottom: function() { return 13; },
-          paddingLeft: function() { return 20; }, paddingRight: function() { return 20; },
+          paddingTop: function() { return 14; }, paddingBottom: function() { return 14; },
+          paddingLeft: function() { return 16; }, paddingRight: function() { return 20; },
           hLineWidth: function() { return 0; }, vLineWidth: function() { return 0; }
         },
-        margin: [0, 14, 0, 0]
+        margin: [0, 0, 0, 0]
       });
 
-      /* Sections — alternating-row table */
+      /* Gold left-border accent row below header */
+      blocks.push({
+        canvas: [
+          { type: 'rect', x: 0, y: 0, w: 3, h: 4, color: GOLD }
+        ],
+        margin: [0, 0, 0, 0]
+      });
+
+      /* ── Section list ── */
       var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
       if (secoesAtivas.length) {
         var rows = secoesAtivas.map(function(secao, i) {
           var nome = (secao.nome || '').trim();
           if (!nome) return null;
-          var parts = [{ text: nome.toUpperCase(), bold: true, color: NAVY, fontSize: 9.5, characterSpacing: 0.8 }];
+
+          var nomePart = { text: nome.toUpperCase(), bold: true, color: NAVY, fontSize: 9, characterSpacing: 0.9, lineHeight: 1.3 };
+          var detParts = [];
           if (secao.detalhes && secao.detalhes.trim()) {
-            parts.push({ text: ' — ', color: GRAY, fontSize: 9 });
-            parts.push({ text: secao.detalhes.trim(), color: '#4B5563', fontSize: 9, italics: true });
+            detParts.push({ text: secao.detalhes.trim(), color: GRAY, fontSize: 8.5, italics: true, lineHeight: 1.35 });
           }
+
+          var isEven = i % 2 === 0;
+          var rowFill = isEven ? CREAM : '#FFFFFF';
+
           return [{
-            columns: [
-              { canvas: [{ type: 'ellipse', x: 3, y: 5, r1: 2.5, r2: 2.5, color: GOLD }], width: 14, margin: [4, 0, 0, 0] },
-              { text: parts }
-            ],
-            fillColor: i % 2 === 0 ? '#FAFAFA' : '#FFFFFF'
+            table: {
+              widths: [12, '*'],
+              body: [[
+                /* Bullet: gold dot on even, tiny diamond shape on odd */
+                {
+                  canvas: isEven
+                    ? [{ type: 'ellipse', x: 6, y: 8, r1: 2.5, r2: 2.5, color: GOLD }]
+                    : [diamond(6, 8, 3, GOLD)],
+                  border: [false, false, false, false]
+                },
+                {
+                  stack: detParts.length
+                    ? [nomePart, { stack: detParts }]
+                    : [nomePart],
+                  border: [false, false, false, false]
+                }
+              ]]
+            },
+            layout: {
+              paddingTop: function() { return 7; }, paddingBottom: function() { return 7; },
+              paddingLeft: function() { return 6; }, paddingRight: function() { return 10; },
+              hLineWidth: function() { return 0; }, vLineWidth: function() { return 0; }
+            },
+            fillColor: rowFill
           }];
         }).filter(Boolean);
 
         if (rows.length) {
+          /* Outer container: hairline top + bottom in gold */
           blocks.push({
             table: { widths: ['*'], body: rows },
             layout: {
-              paddingTop: function() { return 7; }, paddingBottom: function() { return 7; },
-              paddingLeft: function() { return 8; }, paddingRight: function() { return 8; },
-              hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 0 : 0.5; },
-              hLineColor: function() { return '#F0F0F0'; },
+              paddingTop: function() { return 0; }, paddingBottom: function() { return 0; },
+              paddingLeft: function() { return 0; }, paddingRight: function() { return 0; },
+              hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 0.5 : 0; },
+              hLineColor: function() { return GOLD; },
               vLineWidth: function() { return 0; }
             },
-            margin: [0, 2, 0, 0]
+            margin: [0, 0, 0, 0]
           });
         }
       }
 
-      /* Investment block — cream box with gold hairlines */
+      /* ── Investment block ── */
       var preco = inv.precoFinal || inv.precoOriginal;
       var temTaxa = inv.mostrarTaxa && inv.taxaValor;
       var temAdic = (inv.adicionais || []).some(function(a) { return a.desc || a.valor; });
+
       if (preco || temTaxa || temAdic) {
-        var invRows = [];
+        var invContent = [];
 
+        /* Main price row */
         if (inv.mostrarDesconto && inv.precoOriginal && inv.precoFinal) {
-          invRows.push([
-            { text: 'Valor por pessoa', style: 'vLabel' },
-            { stack: [
-              { text: [{ text: 'De  ' }, { text: fmtMoeda(inv.precoOriginal), decoration: 'lineThrough', color: GRAY, fontSize: 9 }], fontSize: 9, color: GRAY, alignment: 'right' },
-              { text: [{ text: 'Por  ' }, { text: fmtMoeda(inv.precoFinal), bold: true, color: NAVY, fontSize: 14 }], fontSize: 10, alignment: 'right' }
-            ]}
-          ]);
+          invContent.push({
+            columns: [
+              {
+                stack: [
+                  { text: 'INVESTIMENTO', fontSize: 7, color: GRAY, characterSpacing: 1.8, margin: [0, 0, 0, 2] },
+                  { text: 'valor por pessoa', fontSize: 8, color: GRAY, italics: true }
+                ]
+              },
+              {
+                stack: [
+                  {
+                    text: [
+                      { text: 'De  ' },
+                      { text: fmtMoeda(inv.precoOriginal), decoration: 'lineThrough', color: GRAY, fontSize: 8.5 }
+                    ],
+                    fontSize: 8.5, color: GRAY, alignment: 'right', margin: [0, 0, 0, 3]
+                  },
+                  {
+                    text: fmtMoeda(inv.precoFinal),
+                    fontSize: 22, bold: true, color: NAVY, alignment: 'right', lineHeight: 1
+                  }
+                ],
+                alignment: 'right'
+              }
+            ],
+            margin: [0, 0, 0, 0]
+          });
         } else if (preco) {
-          invRows.push([
-            { text: 'Valor por pessoa', style: 'vLabel' },
-            { text: fmtMoeda(preco), style: 'vNum', alignment: 'right' }
-          ]);
+          invContent.push({
+            columns: [
+              {
+                stack: [
+                  { text: 'INVESTIMENTO', fontSize: 7, color: GRAY, characterSpacing: 1.8, margin: [0, 0, 0, 2] },
+                  { text: 'valor por pessoa', fontSize: 8, color: GRAY, italics: true }
+                ]
+              },
+              {
+                text: fmtMoeda(preco),
+                fontSize: 22, bold: true, color: NAVY, alignment: 'right', lineHeight: 1
+              }
+            ]
+          });
         }
 
+        /* Taxa + Adicionais */
+        var extras = [];
         if (temTaxa) {
-          invRows.push([
-            { text: inv.taxaDesc || 'Taxa de deslocamento', style: 'vLabel', margin: [0, 5, 0, 0] },
-            { text: fmtMoeda(inv.taxaValor), style: 'vNumSm', alignment: 'right', margin: [0, 5, 0, 0] }
+          extras.push([
+            { text: inv.taxaDesc || 'Taxa de deslocamento', fontSize: 8.5, color: DGRAY },
+            { text: fmtMoeda(inv.taxaValor), fontSize: 9, color: NAVY, bold: true, alignment: 'right' }
           ]);
         }
-
         (inv.adicionais || []).filter(function(a) { return a.desc || a.valor; }).forEach(function(a) {
-          invRows.push([
-            { text: a.desc || 'Adicional', style: 'vLabel', margin: [0, 5, 0, 0] },
-            { text: fmtMoeda(a.valor), style: 'vNumSm', alignment: 'right', margin: [0, 5, 0, 0] }
+          extras.push([
+            { text: a.desc || 'Adicional', fontSize: 8.5, color: DGRAY },
+            { text: fmtMoeda(a.valor), fontSize: 9, color: NAVY, bold: true, alignment: 'right' }
           ]);
         });
 
-        var invContent = [
-          { table: { widths: ['*', 160], body: invRows }, layout: 'noBorders', margin: [0, 0, 0, 0] }
-        ];
+        if (extras.length) {
+          invContent.push(hairline(415, GOLD + '55', [0, 12, 0, 10]));
+          invContent.push({
+            table: { widths: ['*', 140], body: extras },
+            layout: 'noBorders',
+            margin: [0, 0, 0, 0]
+          });
+        }
 
+        /* Validade / Condições */
         if (inv.validade || inv.condicoes) {
-          invContent.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 415, y2: 0, lineWidth: 0.5, lineColor: GOLD + '66' }], margin: [0, 12, 0, 10] });
-          if (inv.validade) invContent.push({ text: 'Validade: ' + inv.validade, style: 'meta', margin: [0, 0, 0, 3] });
-          if (inv.condicoes) invContent.push({ text: 'Pagamento: ' + inv.condicoes, style: 'meta' });
+          invContent.push(hairline(415, GOLD + '44', [0, 12, 0, 10]));
+          var metaRows = [];
+          if (inv.validade) metaRows.push({ text: [{ text: 'Validade:  ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }], fontSize: 7.5, margin: [0, 0, 0, 3] });
+          if (inv.condicoes) metaRows.push({ text: [{ text: 'Pagamento:  ', bold: true, color: NAVY }, { text: inv.condicoes, color: GRAY }], fontSize: 7.5 });
+          metaRows.forEach(function(r) { invContent.push(r); });
         }
 
         blocks.push({
-          table: { widths: ['*'], body: [[{ stack: invContent, fillColor: '#F9F5EE' }]] },
+          table: { widths: ['*'], body: [[{ stack: invContent, fillColor: '#F7F2EA' }]] },
           layout: {
-            paddingTop: function() { return 16; }, paddingBottom: function() { return 16; },
-            paddingLeft: function() { return 20; }, paddingRight: function() { return 20; },
-            hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 0.5 : 0; },
+            paddingTop: function() { return 18; }, paddingBottom: function() { return 16; },
+            paddingLeft: function() { return 22; }, paddingRight: function() { return 22; },
+            hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 1 : 0; },
             hLineColor: function() { return GOLD; },
-            vLineWidth: function() { return 0; }
+            vLineWidth: function(i, node) { return (i === 0 || i === node.table.widths.length) ? 1 : 0; },
+            vLineColor: function() { return GOLD; }
           },
-          margin: [0, 10, 0, 0]
+          margin: [0, 0, 0, 0]
         });
       }
 
+      /* Inter-package divider */
       if (!isLast) {
-        blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 495, y2: 0, lineWidth: 0.5, lineColor: GOLD + '44' }], margin: [0, 22, 0, 22] });
+        blocks.push(sectionDivider());
       }
 
       return blocks;
     }
 
+    /* ── Page 2 section header with premium treatment ───────────────────── */
     function p2SectionHeader(title) {
       return [
-        { text: title, style: 'p2T', margin: [0, 0, 0, 3] },
-        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 455, y2: 0, lineWidth: 1, lineColor: GOLD }], margin: [0, 0, 0, 10] }
+        {
+          columns: [
+            {
+              canvas: [
+                { type: 'rect', x: 0, y: 2, w: 3, h: 14, color: GOLD }
+              ],
+              width: 10
+            },
+            { text: title, fontSize: 11, bold: true, color: NAVY, characterSpacing: 1.5, margin: [0, 0, 0, 0] }
+          ],
+          margin: [0, 0, 0, 8]
+        },
+        hairline(495, GOLD, [0, 0, 0, 12])
       ];
     }
 
+    /* ── Page 2 ─────────────────────────────────────────────────────────── */
     function buildPagina2(p2) {
       var blocks = [];
 
       /* O QUE ESTÁ INCLUSO */
       blocks = blocks.concat(p2SectionHeader('O QUE ESTÁ INCLUSO'));
       INCLUSO.forEach(function(item) {
-        blocks.push({ columns: [bulletOk(), { text: item, style: 'p2I' }], margin: [0, 3, 0, 4] });
+        blocks.push({ columns: [bulletOk(), { text: item, style: 'p2I' }], columnGap: 6, margin: [0, 0, 0, 6] });
       });
 
-      blocks.push({ text: '', margin: [0, 16, 0, 0] });
+      blocks.push(sectionDivider());
 
       /* O QUE NÃO ESTÁ INCLUSO */
       blocks = blocks.concat(p2SectionHeader('O QUE NÃO ESTÁ INCLUSO'));
       NAO_INCLUSO.forEach(function(item) {
-        blocks.push({ columns: [bulletNo(), { text: item, style: 'p2I' }], margin: [0, 3, 0, 4] });
+        blocks.push({ columns: [bulletNo(), { text: item, style: 'p2I' }], columnGap: 6, margin: [0, 0, 0, 6] });
       });
 
-      blocks.push({ text: '', margin: [0, 16, 0, 0] });
+      blocks.push({ text: '', margin: [0, 18, 0, 0] });
 
-      /* ALIMENTAÇÃO DE STAFF — cream box (via table cell) */
-      blocks.push(colorBox(
-        p2SectionHeader('ALIMENTAÇÃO DE STAFF').concat([
-          { text: 'Válido somente para staffs de outras empresas que estarão trabalhando durante o evento.', style: 'p2I', margin: [0, 0, 0, 6] },
-          { text: 'Caso seja necessário servirmos profissionais de outras empresas é preciso escolher uma das opções abaixo. Não podemos mesclar o tipo de alimentação — todos os profissionais do evento devem se enquadrar na mesma opção:', style: 'p2I', margin: [0, 0, 0, 8] },
-          { ol: [
-            { text: 'Mesmo menu dos convidados por 50% do valor por convidado.', style: 'p2I' },
-            { text: 'Buffet separado por R$ 110,00 (segue o mesmo padrão do jantar da festa).', style: 'p2I' }
-          ], margin: [12, 0, 0, 6] },
-          { text: 'Obs.: ainda existe a possibilidade de não nos responsabilizarmos pela alimentação dos profissionais terceiros.', style: 'obs', margin: [0, 4, 0, 0] }
-        ]),
-        LGOLD,
+      /* ALIMENTAÇÃO DE STAFF — elegant cream card */
+      var staffContent = p2SectionHeader('ALIMENTAÇÃO DE STAFF').concat([
+        { text: 'Válido somente para staffs de outras empresas que estarão trabalhando durante o evento.', style: 'p2I', margin: [0, 0, 0, 6] },
+        { text: 'Caso seja necessário servirmos profissionais de outras empresas é preciso escolher uma das opções abaixo. Não podemos mesclar o tipo de alimentação — todos os profissionais do evento devem se enquadrar na mesma opção:', style: 'p2I', margin: [0, 0, 0, 10] },
         {
-          hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 0.5 : 0; },
-          hLineColor: function() { return GOLD + '88'; }
-        }
-      ));
+          table: {
+            widths: [18, '*'],
+            body: [
+              [
+                { text: '1', fontSize: 8, bold: true, color: GOLD, alignment: 'center', border: [false,false,false,false] },
+                { text: 'Mesmo menu dos convidados por 50% do valor por convidado.', style: 'p2I', border: [false,false,false,false] }
+              ],
+              [
+                { text: '2', fontSize: 8, bold: true, color: GOLD, alignment: 'center', border: [false,false,false,false] },
+                { text: 'Buffet separado por R$ 110,00 (segue o mesmo padrão do jantar da festa).', style: 'p2I', border: [false,false,false,false] }
+              ]
+            ]
+          },
+          layout: {
+            paddingTop: function() { return 4; }, paddingBottom: function() { return 4; },
+            paddingLeft: function() { return 2; }, paddingRight: function() { return 4; },
+            hLineWidth: function() { return 0; }, vLineWidth: function() { return 0; }
+          },
+          margin: [0, 0, 0, 8]
+        },
+        { text: 'Obs.: ainda existe a possibilidade de não nos responsabilizarmos pela alimentação dos profissionais terceiros.', style: 'obs', italics: true, margin: [0, 4, 0, 0] }
+      ]);
 
-      /* QUEBRAS E PERDAS — light red box */
+      blocks.push(colorBox(staffContent, LGOLD, {
+        hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 0.8 : 0; },
+        hLineColor: function() { return GOLD + 'AA'; },
+        vLineWidth: function(i, node) { return (i === 0 || i === node.table.widths.length) ? 0.8 : 0; },
+        vLineColor: function() { return GOLD + 'AA'; }
+      }));
+
+      /* QUEBRAS E PERDAS — elegant rose card */
       if (p2 && p2.quebrasAtiva) {
-        blocks.push({ text: '', margin: [0, 16, 0, 0] });
-        var qStack = p2SectionHeader('QUEBRAS E PERDAS').concat([
+        blocks.push({ text: '', margin: [0, 18, 0, 0] });
+
+        var qTitle = [
+          {
+            columns: [
+              { canvas: [{ type: 'rect', x: 0, y: 2, w: 3, h: 14, color: '#C0392B' }], width: 10 },
+              { text: 'QUEBRAS E PERDAS', fontSize: 11, bold: true, color: '#7B1A1A', characterSpacing: 1.5 }
+            ],
+            margin: [0, 0, 0, 8]
+          },
+          hairline(455, '#C0392B55', [0, 0, 0, 12])
+        ];
+
+        var qStack = qTitle.concat([
           { text: 'Para eventos com self-service ou situações de alto risco operacional, aplicamos uma taxa de seguro sobre quebras e perdas de materiais.', style: 'p2I', margin: [0, 0, 0, 6] }
         ]);
-        if (p2.valorSeguro) qStack.push({ text: 'Taxa de seguro: ' + fmtMoeda(p2.valorSeguro) + ' por convidado.', style: 'p2I', margin: [0, 0, 0, 4] });
-        if (p2.valorStaff) qStack.push({ text: 'Alimentação de staff: ' + fmtMoeda(p2.valorStaff) + ' por profissional.', style: 'p2I' });
-        blocks.push(colorBox(qStack, '#FEF2F2', {
-          hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 0.5 : 0; },
-          hLineColor: function() { return '#EF444466'; }
+        if (p2.valorSeguro) qStack.push({ text: [{ text: 'Taxa de seguro: ', bold: true, color: '#7B1A1A' }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: DGRAY }], fontSize: 8.5, margin: [0, 0, 0, 4] });
+        if (p2.valorStaff)  qStack.push({ text: [{ text: 'Alimentação de staff: ', bold: true, color: '#7B1A1A' }, { text: fmtMoeda(p2.valorStaff) + ' por profissional.', color: DGRAY }], fontSize: 8.5 });
+
+        blocks.push(colorBox(qStack, '#FDF0EF', {
+          hLineWidth: function(i, node) { return (i === 0 || i === node.table.body.length) ? 0.8 : 0; },
+          hLineColor: function() { return '#C0392B77'; },
+          vLineWidth: function(i, node) { return (i === 0 || i === node.table.widths.length) ? 0.8 : 0; },
+          vLineColor: function() { return '#C0392B77'; }
         }));
       }
 
       return blocks;
     }
 
+    /* ── Cardápio ────────────────────────────────────────────────────────── */
     function buildCardapio(categorias) {
-      var blocks = [{ text: 'CARDÁPIO', style: 'p2T', margin: [0, 0, 0, 3] },
-        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 455, y2: 0, lineWidth: 1, lineColor: GOLD }], margin: [0, 0, 0, 14] }];
-      categorias.forEach(function(cat) {
+      var blocks = [];
+
+      /* Page title */
+      blocks.push({ text: 'CARDAPIO', fontSize: 7, color: GRAY, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 6] });
+      blocks.push({ text: 'Seleção Gastronômica', fontSize: 16, bold: true, color: NAVY, characterSpacing: 0.5, alignment: 'center', margin: [0, 0, 0, 4] });
+      blocks.push(Object.assign(doubleRule(495), { margin: [0, 6, 0, 22] }));
+
+      categorias.forEach(function(cat, ci) {
         if (!cat.categoria && (!cat.pratos || !cat.pratos.some(function(p) { return p.nome; }))) return;
-        blocks.push({ text: (cat.categoria || 'Categoria').toUpperCase(), style: 'catT', margin: [0, 10, 0, 6] });
-        (cat.pratos || []).filter(function(p) { return p.nome; }).forEach(function(prato) {
-          var s = [{ text: prato.nome, style: 'pratoN' }];
-          if (prato.desc) s.push({ text: prato.desc, style: 'pratoD' });
-          blocks.push({ stack: s, margin: [0, 2, 0, 6] });
+
+        /* Category header */
+        blocks.push({
+          columns: [
+            hairline(60, GOLD + '88', [0, 7, 0, 0]),
+            {
+              text: (cat.categoria || 'Categoria').toUpperCase(),
+              fontSize: 9, bold: true, color: NAVY, characterSpacing: 1.8, alignment: 'center',
+              margin: [8, 0, 8, 0]
+            },
+            hairline(60, GOLD + '88', [0, 7, 0, 0])
+          ],
+          columnGap: 0,
+          margin: [0, ci > 0 ? 18 : 0, 0, 10]
+        });
+
+        var pratos = (cat.pratos || []).filter(function(p) { return p.nome; });
+        pratos.forEach(function(prato, pi) {
+          var pratoStack = [{ text: prato.nome, fontSize: 10, bold: true, color: NAVY, lineHeight: 1.2 }];
+          if (prato.desc) pratoStack.push({ text: prato.desc, fontSize: 8.5, color: GRAY, italics: true, lineHeight: 1.35, margin: [0, 2, 0, 0] });
+
+          /* Thin separator between dishes (not after last) */
+          if (pi > 0) {
+            blocks.push(hairline(495, GOLD + '22', [0, 0, 0, 6]));
+          }
+          blocks.push({ stack: pratoStack, margin: [0, 0, 0, 6] });
         });
       });
+
       return blocks;
     }
 
+    /* ── Main entry ─────────────────────────────────────────────────────── */
     window.gerarPDF = function(dados) {
       var logo = window.LOGO_B64;
       var cliente = dados.cliente || {};
@@ -357,12 +654,23 @@
 
       var content = [];
       content = content.concat(buildClienteBlock(cliente));
-      pacotes.forEach(function(p, i) { content = content.concat(buildPacoteBlock(p, i, i === pacotes.length - 1)); });
-      if (observacoes) content.push({ text: observacoes, style: 'obs', margin: [0, 18, 0, 0] });
+      pacotes.forEach(function(p, i) {
+        content = content.concat(buildPacoteBlock(p, i, i === pacotes.length - 1));
+      });
 
+      if (observacoes) {
+        content.push(hairline(495, GOLD + '44', [0, 20, 0, 10]));
+        content.push({
+          text: observacoes,
+          fontSize: 8.5, color: GRAY, italics: true, lineHeight: 1.5
+        });
+      }
+
+      /* Page 2 */
       content.push({ text: '', pageBreak: 'before' });
       content = content.concat(buildPagina2(p2));
 
+      /* Cardápio pages */
       var temCard = dados.incluirCardapio && (dados.cardapio || []).some(function(c) {
         return c.categoria || (c.pratos && c.pratos.some(function(p) { return p.nome; }));
       });
@@ -373,29 +681,32 @@
 
       var docDef = {
         pageSize: 'A4',
-        pageMargins: [50, 100, 50, 60],
+        pageMargins: [50, 105, 50, 58],
         header: function(p) { return buildHeader(logo, p); },
         footer: function(p, n) { return buildFooter(p, n); },
         content: content,
         styles: {
-          hTitle:    { fontSize: 10, color: NAVY, bold: true, characterSpacing: 2 },
-          hTitleSm:  { fontSize: 7.5, color: NAVY, bold: true, characterSpacing: 1.5 },
-          vLabel:    { fontSize: 10, color: '#374151' },
-          vNum:      { fontSize: 13, color: NAVY, bold: true },
-          vNumSm:    { fontSize: 10.5, color: NAVY, bold: true },
-          meta:      { fontSize: 8, color: GRAY },
-          obs:       { fontSize: 8.5, color: GRAY, italics: true },
-          p2T:       { fontSize: 11, color: NAVY, bold: true, characterSpacing: 1.2 },
-          p2I:       { fontSize: 9, color: '#374151', lineHeight: 1.45 },
-          catT:      { fontSize: 10, color: NAVY, bold: true, characterSpacing: 0.8 },
+          hTitle:    { fontSize: 10.5, color: NAVY, bold: true, characterSpacing: 2.5 },
+          hTitleSm:  { fontSize: 7.5, color: NAVY, bold: true, characterSpacing: 1.8 },
+          vLabel:    { fontSize: 9, color: DGRAY, lineHeight: 1.3 },
+          vNum:      { fontSize: 22, color: NAVY, bold: true, lineHeight: 1 },
+          vNumSm:    { fontSize: 10, color: NAVY, bold: true },
+          meta:      { fontSize: 7.5, color: GRAY, lineHeight: 1.4 },
+          obs:       { fontSize: 8.5, color: GRAY },
+          p2T:       { fontSize: 11, color: NAVY, bold: true, characterSpacing: 1.5 },
+          p2I:       { fontSize: 8.5, color: DGRAY, lineHeight: 1.5 },
+          catT:      { fontSize: 9, color: NAVY, bold: true, characterSpacing: 1.8 },
           pratoN:    { fontSize: 10, color: NAVY, bold: true },
-          pratoD:    { fontSize: 8.5, color: GRAY, italics: true },
-          footer:    { fontSize: 7.5, color: GRAY }
+          pratoD:    { fontSize: 8.5, color: GRAY, italics: true, lineHeight: 1.35 },
+          footer:    { fontSize: 7, color: GRAY }
         },
         defaultStyle: { font: 'Roboto', fontSize: 9 }
       };
 
-      var nome = cliente.nome ? 'Rondello - Orcamento ' + cliente.nome + '.pdf' : 'Rondello - Orcamento.pdf';
+      var nome = cliente.nome
+        ? 'Rondello - Orcamento ' + cliente.nome + '.pdf'
+        : 'Rondello - Orcamento.pdf';
+
       pdfMake.createPdf(docDef).getBlob(function(blob) {
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
