@@ -196,68 +196,66 @@
       };
     }
 
-    /* ── Cliente Block ───────────────────────────────────────────────────── */
-    function buildClienteBlock(cliente) {
+    /* ── CAPA (Página 1 — fundo navy via background) ─────────────────────── */
+    function buildCover(cliente, fraseCapa) {
       var blocks = [];
+      var frase = fraseCapa || 'Uma experiência gastronômica criada exclusivamente para seu casamento.';
 
-      /* Top spacing after header rule */
-      blocks.push({ text: '', margin: [0, 6, 0, 0] });
+      /* Push content down toward visual center */
+      blocks.push({ text: '', margin: [0, 96, 0, 0] });
 
-      /* "APRESENTAMOS A PROPOSTA PARA" label */
+      /* Tiny eyebrow label */
       blocks.push({
-        text: 'APRESENTAMOS A PROPOSTA PARA',
-        fontSize: 7,
-        color: GRAY,
-        characterSpacing: 2.2,
-        alignment: 'center',
-        margin: [0, 0, 0, 10]
+        text: 'PROPOSTA EXCLUSIVA',
+        fontSize: 6.5, color: GOLD + 'BB', characterSpacing: 4, bold: true,
+        alignment: 'center', margin: [0, 0, 0, 34]
       });
 
-      /* Client name — large, navy, wide spacing */
+      /* Client name — dominant, white, wide */
       if (cliente.nome) {
         blocks.push({
           text: cliente.nome.toUpperCase(),
-          fontSize: 24,
-          bold: true,
-          color: NAVY,
-          alignment: 'center',
-          characterSpacing: 1.5,
-          lineHeight: 1.1,
-          margin: [0, 0, 0, 12]
+          fontSize: 34, bold: true, color: '#FFFFFF',
+          alignment: 'center', characterSpacing: 4, lineHeight: 1,
+          margin: [0, 0, 0, 20]
         });
       }
 
-      /* Gold diamond ornament between name and details */
+      /* Refined gold ornament */
       blocks.push({
         canvas: [
-          { type: 'line', x1: 160, y1: 5, x2: 222, y2: 5, lineWidth: 0.5, lineColor: GOLD },
-          diamond(247.5, 5, 4.5, GOLD),
-          { type: 'line', x1: 273, y1: 5, x2: 335, y2: 5, lineWidth: 0.5, lineColor: GOLD }
+          { type: 'line', x1: 177, y1: 5, x2: 228, y2: 5, lineWidth: 0.5, lineColor: GOLD + '77' },
+          diamond(247.5, 5, 3, GOLD),
+          { type: 'line', x1: 267, y1: 5, x2: 318, y2: 5, lineWidth: 0.5, lineColor: GOLD + '77' }
         ],
-        margin: [0, 0, 0, 11]
+        margin: [0, 0, 0, 20]
       });
 
-      /* Detail pills */
-      var details = [];
-      if (cliente.data)       details.push(cliente.data);
-      if (cliente.local)      details.push(cliente.local);
-      if (cliente.tipo)       details.push(cliente.tipo);
-      if (cliente.convidados) details.push(cliente.convidados + ' convidados');
-      if (cliente.horas)      details.push(cliente.horas + 'h de serviço');
-
-      if (details.length) {
+      /* Date — gold */
+      if (cliente.data) {
         blocks.push({
-          text: details.join('     |     '),
-          fontSize: 8.5,
-          color: GOLD,
-          alignment: 'center',
-          characterSpacing: 0.6,
-          margin: [0, 0, 0, 18]
+          text: cliente.data,
+          fontSize: 10.5, color: GOLD, characterSpacing: 1.5,
+          alignment: 'center', margin: [0, 0, 0, 8]
         });
       }
 
-      /* Closing double rule */
-      blocks.push(Object.assign(doubleRule(495), { margin: [0, 0, 0, 24] }));
+      /* Venue — muted cream */
+      if (cliente.local) {
+        blocks.push({
+          text: cliente.local.toUpperCase(),
+          fontSize: 7.5, color: '#FFFFFF44', characterSpacing: 2.5,
+          alignment: 'center', margin: [0, 0, 0, 60]
+        });
+      }
+
+      /* Tagline — elegant italic */
+      blocks.push({
+        text: frase,
+        fontSize: 10, color: '#FFFFFFAA', italics: true,
+        alignment: 'center', lineHeight: 1.75, characterSpacing: 0.3,
+        margin: [30, 0, 30, 0]
+      });
 
       return blocks;
     }
@@ -277,7 +275,169 @@
       return parts;
     }
 
-    /* ── Package Block ───────────────────────────────────────────────────── */
+    /* ── Página 2 — Experiência Gastronômica ────────────────────────────── */
+    function buildExperienciaGastronomica(pacotes) {
+      var blocks = [];
+
+      /* Page heading */
+      blocks.push({ text: 'EXPERIÊNCIA', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 5] });
+      blocks.push({ text: 'Gastronômica', fontSize: 28, bold: true, color: NAVY, alignment: 'center', characterSpacing: 0.5, margin: [0, 0, 0, 8] });
+      blocks.push({
+        canvas: [{ type: 'line', x1: 177, y1: 0, x2: 318, y2: 0, lineWidth: 0.6, lineColor: GOLD + '88' }],
+        margin: [0, 0, 0, 32]
+      });
+
+      pacotes.forEach(function(pacote, pi) {
+        if (pi > 0) { blocks.push(sectionDivider()); blocks.push({ text: '', margin: [0, 0, 0, 8] }); }
+
+        /* Package label (only when multiple packages) */
+        if (pacotes.length > 1 && pacote.nome) {
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 7, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 18] });
+        }
+
+        var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
+        secoesAtivas.forEach(function(secao, i) {
+          var nome = (secao.nome || '').trim();
+          if (!nome) return;
+          /* Section name — small uppercase label */
+          blocks.push({ text: nome.toUpperCase(), fontSize: 7.5, color: NAVY, bold: true, characterSpacing: 2, margin: [0, i > 0 ? 18 : 0, 0, 5] });
+          /* Narrative description */
+          if (secao.detalhes && secao.detalhes.trim()) {
+            blocks.push({ text: secao.detalhes.trim(), fontSize: 9.5, color: GRAY, lineHeight: 1.65 });
+          }
+        });
+      });
+
+      return blocks;
+    }
+
+    /* ── Página 3 — Investimento + Incluso ───────────────────────────────── */
+    function buildInvestimentoPage(pacotes, p2) {
+      var blocks = [];
+      var MGRAY = '#9CA3AF';
+
+      /* Page heading */
+      blocks.push({ text: 'INVESTIMENTO', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 32] });
+
+      pacotes.forEach(function(pacote, pi) {
+        var inv = pacote.investimento || {};
+        var preco = inv.precoFinal || inv.precoOriginal;
+
+        if (pi > 0) { blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: '#E5E7EB' }], margin: [0, 26, 0, 26] }); }
+
+        /* Package label (only when multiple) */
+        if (pacotes.length > 1 && pacote.nome) {
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 7, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 14] });
+        }
+
+        /* De / Por price */
+        if (inv.mostrarDesconto && inv.precoOriginal && inv.precoFinal) {
+          blocks.push({ text: [{ text: 'De  ' }, { text: fmtMoeda(inv.precoOriginal), decoration: 'lineThrough' }], fontSize: 9, color: GRAY, margin: [0, 0, 0, 4] });
+          blocks.push({ text: fmtMoeda(inv.precoFinal), fontSize: 40, bold: true, color: NAVY, lineHeight: 1, margin: [0, 0, 0, 4] });
+        } else if (preco) {
+          blocks.push({ text: fmtMoeda(preco), fontSize: 40, bold: true, color: NAVY, lineHeight: 1, margin: [0, 0, 0, 4] });
+        }
+        blocks.push({ text: 'por convidado', fontSize: 8, color: GRAY, italics: true, margin: [0, 0, 0, 18] });
+
+        /* Extras */
+        var extras = [];
+        if (inv.mostrarTaxa && inv.taxaValor) extras.push([inv.taxaDesc || 'Taxa de deslocamento', fmtMoeda(inv.taxaValor)]);
+        (inv.adicionais || []).filter(function(a) { return a.desc || a.valor; }).forEach(function(a) {
+          extras.push([a.desc || 'Adicional', fmtMoeda(a.valor)]);
+        });
+        extras.forEach(function(e) {
+          blocks.push({ columns: [{ text: e[0], fontSize: 8.5, color: GRAY }, { text: e[1], fontSize: 9, bold: true, color: NAVY, alignment: 'right' }], margin: [0, 0, 0, 5] });
+        });
+
+        /* Validade / Condições */
+        if (inv.validade || inv.condicoes) {
+          blocks.push({ text: '', margin: [0, 8, 0, 0] });
+          if (inv.validade) blocks.push({ text: [{ text: 'Validade:  ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }], fontSize: 7.5, margin: [0, 0, 0, 3] });
+          if (inv.condicoes) blocks.push({ text: [{ text: 'Pagamento:  ', bold: true, color: NAVY }, { text: inv.condicoes, color: GRAY }], fontSize: 7.5 });
+        }
+      });
+
+      /* ── Incluso / Não incluso ── */
+      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: '#E5E7EB' }], margin: [0, 28, 0, 24] });
+
+      function iRow(txt, col) {
+        return { columns: [{ canvas: [{ type: 'ellipse', x: 3, y: 5, r1: 1.8, r2: 1.8, color: col }], width: 10 }, { text: txt, fontSize: 8, color: GRAY, lineHeight: 1.45 }], columnGap: 5, margin: [0, 0, 0, 6] };
+      }
+      function iLabel(t, c) { return { text: t, fontSize: 6.5, color: c || GOLD, characterSpacing: 2, bold: true, margin: [0, 0, 0, 10] }; }
+
+      blocks.push({ columns: [{ stack: [iLabel('INCLUSO')].concat(INCLUSO.map(function(x) { return iRow(x, GOLD); })), width: '*' }, { stack: [iLabel('NÃO INCLUSO', MGRAY)].concat(NAO_INCLUSO.map(function(x) { return iRow(x, MGRAY); })), width: '*' }], columnGap: 28 });
+
+      /* ── Alimentação de Staff ── */
+      blocks.push({ text: '', margin: [0, 24, 0, 0] });
+      blocks.push({ columns: [{ canvas: [{ type: 'rect', x: 0, y: 2, w: 2, h: 8, color: GOLD }], width: 8 }, { text: 'ALIMENTAÇÃO DE STAFF', fontSize: 6.5, color: GOLD, characterSpacing: 2, bold: true }], margin: [0, 0, 0, 8] });
+      blocks.push({ text: 'Válido somente para staffs de outras empresas que estarão trabalhando durante o evento. Não podemos mesclar o tipo de alimentação — todos os profissionais do evento devem se enquadrar na mesma opção.', fontSize: 8, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 10] });
+      [
+        { n: '01', t: 'Mesmo menu dos convidados por 50% do valor por convidado.' },
+        { n: '02', t: 'Buffet separado por R$ 110,00 (segue o mesmo padrão do jantar da festa).' }
+      ].forEach(function(opt) {
+        blocks.push({ columns: [{ text: opt.n, fontSize: 7.5, bold: true, color: GOLD, width: 22 }, { text: opt.t, fontSize: 8, color: DGRAY, lineHeight: 1.4 }], margin: [0, 0, 0, 5] });
+      });
+      blocks.push({ text: 'Obs.: ainda existe a possibilidade de não nos responsabilizarmos pela alimentação dos profissionais terceiros.', fontSize: 7.5, color: GRAY, italics: true, margin: [0, 6, 0, 0] });
+      if (p2 && p2.valorSeguro) blocks.push({ text: [{ text: 'Taxa de seguro: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: GRAY }], fontSize: 8, margin: [0, 4, 0, 0] });
+      if (p2 && p2.valorStaff)  blocks.push({ text: [{ text: 'Alimentação de staff: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorStaff) + ' por profissional.', color: GRAY }], fontSize: 8, margin: [0, 4, 0, 0] });
+
+      /* Quebras e perdas */
+      if (p2 && p2.quebrasAtiva) {
+        blocks.push({ text: '', margin: [0, 20, 0, 0] });
+        blocks.push({ columns: [{ canvas: [{ type: 'rect', x: 0, y: 2, w: 2, h: 8, color: MGRAY }], width: 8 }, { text: 'QUEBRAS E PERDAS', fontSize: 6.5, color: MGRAY, characterSpacing: 2, bold: true }], margin: [0, 0, 0, 8] });
+        blocks.push({ text: 'Para eventos com self-service ou situações de alto risco operacional, aplicamos uma taxa de seguro sobre quebras e perdas de materiais.', fontSize: 8, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 6] });
+        if (p2.valorSeguro) blocks.push({ text: [{ text: 'Taxa: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: GRAY }], fontSize: 8, margin: [0, 0, 0, 3] });
+        if (p2.valorStaff)  blocks.push({ text: [{ text: 'Staff: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorStaff) + ' por profissional.', color: GRAY }], fontSize: 8 });
+      }
+
+      return blocks;
+    }
+
+    /* ── Página 4 — Autoridade + Encerramento ────────────────────────────── */
+    function buildAutoridade(sobreTexto) {
+      var blocks = [];
+
+      /* Heading */
+      blocks.push({ text: 'SOBRE O', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 5] });
+      blocks.push({ text: 'Rondello Buffet', fontSize: 28, bold: true, color: NAVY, alignment: 'center', characterSpacing: 0.5, margin: [0, 0, 0, 28] });
+
+      /* Brand story */
+      var texto = sobreTexto || 'Há quase 30 anos criando experiências gastronômicas inesquecíveis.\n\nCom gastronomia assinada por chef formado pela Le Cordon Bleu, o Rondello Buffet tornou-se referência em eventos de alto padrão na região.';
+      blocks.push({ text: texto, fontSize: 10, color: GRAY, lineHeight: 1.8, alignment: 'center', margin: [20, 0, 20, 32] });
+
+      /* Subtle divider */
+      blocks.push({ canvas: [{ type: 'line', x1: 187, y1: 0, x2: 308, y2: 0, lineWidth: 0.4, lineColor: GOLD + '55' }], margin: [0, 0, 0, 26] });
+
+      /* Próximos passos */
+      blocks.push({ text: 'PRÓXIMOS PASSOS', fontSize: 6.5, color: GOLD, characterSpacing: 3, bold: true, alignment: 'center', margin: [0, 0, 0, 22] });
+      [
+        { n: '01', t: 'Aprovação',      d: 'Avalie esta proposta com tranquilidade e compartilhe com quem precisar.' },
+        { n: '02', t: 'Assinatura',     d: 'Formalizamos o acordo com contrato e garantia de exclusividade da data.' },
+        { n: '03', t: 'Alinhamentos',   d: 'Reunião para afinar cada detalhe do menu, logística e experiência do evento.' },
+        { n: '04', t: 'Personalização', d: 'Adaptamos toda a experiência gastronômica ao estilo e desejo de vocês.' }
+      ].forEach(function(step, i) {
+        blocks.push({
+          columns: [
+            { text: step.n, fontSize: 7, bold: true, color: GOLD + 'AA', characterSpacing: 0.5, width: 28 },
+            { stack: [
+              { text: step.t.toUpperCase(), fontSize: 7.5, bold: true, color: NAVY, characterSpacing: 1.5, margin: [0, 0, 0, 3] },
+              { text: step.d, fontSize: 8.5, color: GRAY, lineHeight: 1.55 }
+            ]}
+          ],
+          margin: [0, 0, 0, i < 3 ? 16 : 0]
+        });
+      });
+
+      /* Signature */
+      blocks.push({ text: '', margin: [0, 36, 0, 0] });
+      blocks.push({ canvas: [{ type: 'line', x1: 192, y1: 0, x2: 303, y2: 0, lineWidth: 0.4, lineColor: GOLD + '55' }], margin: [0, 0, 0, 14] });
+      blocks.push({ text: 'Rondello Buffet', fontSize: 13, bold: true, color: NAVY, alignment: 'center', characterSpacing: 1, margin: [0, 0, 0, 5] });
+      blocks.push({ text: 'www.rondellobuffet.com.br', fontSize: 7.5, color: GRAY, alignment: 'center', characterSpacing: 0.5 });
+
+      return blocks;
+    }
+
+    /* ── Package Block (mantido para compatibilidade) ────────────────────── */
     function buildPacoteBlock(pacote, index, isLast) {
       var blocks = [];
       var inv = pacote.investimento || {};
@@ -396,87 +556,6 @@
       return blocks;
     }
 
-    /* ── Page 2 micro section label ─────────────────────────────────────── */
-    function p2Label(txt, color) {
-      return {
-        columns: [
-          { canvas: [{ type: 'rect', x: 0, y: 2, w: 2, h: 8, color: color || GOLD }], width: 8 },
-          { text: txt, fontSize: 6.5, color: color || GOLD, characterSpacing: 2, bold: true }
-        ],
-        margin: [0, 0, 0, 10]
-      };
-    }
-
-    /* ── Page 2 ─────────────────────────────────────────────────────────── */
-    function buildPagina2(p2) {
-      var blocks = [];
-      var MGRAY = '#9CA3AF';
-
-      /* Helper: item row with small dot */
-      function itemRow(txt, dotColor) {
-        return {
-          columns: [
-            { canvas: [{ type: 'ellipse', x: 3, y: 5, r1: 2, r2: 2, color: dotColor }], width: 10 },
-            { text: txt, fontSize: 8, color: GRAY, lineHeight: 1.45 }
-          ],
-          columnGap: 5,
-          margin: [0, 0, 0, 6]
-        };
-      }
-
-      /* Two-column: Incluso (left) | Não incluso (right) */
-      var colIncluso = [p2Label('INCLUSO')].concat(
-        INCLUSO.map(function(item) { return itemRow(item, GOLD); })
-      );
-      var colNao = [p2Label('NÃO INCLUSO', MGRAY)].concat(
-        NAO_INCLUSO.map(function(item) { return itemRow(item, MGRAY); })
-      );
-
-      blocks.push({
-        columns: [
-          { stack: colIncluso, width: '*' },
-          { stack: colNao, width: '*' }
-        ],
-        columnGap: 28
-      });
-
-      /* ALIMENTAÇÃO DE STAFF — plain typographic block, no box */
-      blocks.push({ text: '', margin: [0, 24, 0, 0] });
-      blocks.push(p2Label('ALIMENTAÇÃO DE STAFF'));
-      blocks.push({ text: 'Válido somente para staffs de outras empresas que estarão trabalhando durante o evento. Caso seja necessário servirmos profissionais de outras empresas, é preciso escolher uma das opções — não podemos mesclar o tipo de alimentação.', fontSize: 8, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 10] });
-      [
-        { n: '01', t: 'Mesmo menu dos convidados por 50% do valor por convidado.' },
-        { n: '02', t: 'Buffet separado por R$ 110,00 (segue o mesmo padrão do jantar da festa).' }
-      ].forEach(function(opt) {
-        blocks.push({
-          columns: [
-            { text: opt.n, fontSize: 7.5, bold: true, color: GOLD, width: 20 },
-            { text: opt.t, fontSize: 8, color: DGRAY, lineHeight: 1.4 }
-          ],
-          margin: [0, 0, 0, 5]
-        });
-      });
-      blocks.push({ text: 'Obs.: ainda existe a possibilidade de não nos responsabilizarmos pela alimentação dos profissionais terceiros.', fontSize: 7.5, color: GRAY, italics: true, margin: [0, 6, 0, 0] });
-
-      if (p2 && p2.valorSeguro) {
-        blocks.push({ text: [{ text: 'Taxa de seguro: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: GRAY }], fontSize: 8, margin: [0, 4, 0, 0] });
-      }
-      if (p2 && p2.valorStaff) {
-        blocks.push({ text: [{ text: 'Alimentação de staff: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorStaff) + ' por profissional.', color: GRAY }], fontSize: 8, margin: [0, 4, 0, 0] });
-      }
-
-      /* QUEBRAS E PERDAS — same clean treatment */
-      if (p2 && p2.quebrasAtiva) {
-        blocks.push({ text: '', margin: [0, 22, 0, 0] });
-        blocks.push(p2Label('QUEBRAS E PERDAS', MGRAY));
-        blocks.push({ text: 'Para eventos com self-service ou situações de alto risco operacional, aplicamos uma taxa de seguro sobre quebras e perdas de materiais.', fontSize: 8, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 6] });
-        if (p2.valorSeguro) blocks.push({ text: [{ text: 'Taxa de seguro: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: GRAY }], fontSize: 8, margin: [0, 0, 0, 3] });
-        if (p2.valorStaff) blocks.push({ text: [{ text: 'Alimentação de staff: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorStaff) + ' por profissional.', color: GRAY }], fontSize: 8 });
-      }
-
-      return blocks;
-    }
-
     /* ── Cardápio ────────────────────────────────────────────────────────── */
     function buildCardapio(categorias) {
       var blocks = [];
@@ -520,34 +599,33 @@
       return blocks;
     }
 
-    /* ── Main entry ─────────────────────────────────────────────────────── */
+    /* ── Main entry — 4 páginas premium ────────────────────────────────── */
     window.gerarPDF = function(dados) {
       var logo = window.LOGO_B64;
       var cliente = dados.cliente || {};
       var pacotes = dados.pacotes || [];
       var p2 = dados.pagina2 || {};
-      var observacoes = dados.observacoes || '';
+      var fraseCapa = dados.fraseCapa || 'Uma experiência gastronômica criada exclusivamente para seu casamento.';
+      var sobreTexto = dados.sobreTexto || '';
 
       var content = [];
-      content = content.concat(buildClienteBlock(cliente));
-      pacotes.forEach(function(p, i) {
-        content = content.concat(buildPacoteBlock(p, i, i === pacotes.length - 1));
-      });
 
-      /* Page 2 — observations appear at top of this page if present */
+      /* Página 1 — Capa emocional (fundo navy via background) */
+      content = content.concat(buildCover(cliente, fraseCapa));
+
+      /* Página 2 — Experiência Gastronômica */
       content.push({ text: '', pageBreak: 'before' });
-      if (observacoes) {
-        content.push({
-          text: observacoes,
-          fontSize: 9, color: NAVY, italics: true, lineHeight: 1.6,
-          alignment: 'center',
-          margin: [20, 0, 20, 26]
-        });
-        content.push(Object.assign(doubleRule(495), { margin: [0, 0, 0, 26] }));
-      }
-      content = content.concat(buildPagina2(p2));
+      content = content.concat(buildExperienciaGastronomica(pacotes));
 
-      /* Cardápio pages */
+      /* Página 3 — Investimento + Incluso */
+      content.push({ text: '', pageBreak: 'before' });
+      content = content.concat(buildInvestimentoPage(pacotes, p2));
+
+      /* Página 4 — Autoridade + Encerramento */
+      content.push({ text: '', pageBreak: 'before' });
+      content = content.concat(buildAutoridade(sobreTexto));
+
+      /* Cardápio (opcional) */
       var temCard = dados.incluirCardapio && (dados.cardapio || []).some(function(c) {
         return c.categoria || (c.pratos && c.pratos.some(function(p) { return p.nome; }));
       });
@@ -558,31 +636,54 @@
 
       var docDef = {
         pageSize: 'A4',
-        pageMargins: [50, 105, 50, 58],
-        header: function(p) { return buildHeader(logo, p); },
-        footer: function(p, n) { return buildFooter(p, n); },
+        pageMargins: [60, 90, 60, 55],
+
+        /* Fundo navy na página 1 */
+        background: function(currentPage, pageSize) {
+          if (currentPage === 1) {
+            return { canvas: [{ type: 'rect', x: 0, y: 0, w: pageSize.width, h: pageSize.height, color: NAVY }] };
+          }
+        },
+
+        header: function(currentPage) {
+          if (currentPage === 1) {
+            /* Header da capa: logo + nome da marca em dourado */
+            return {
+              margin: [60, 22, 60, 0],
+              stack: [
+                { columns: [
+                  { image: logo, width: 68 },
+                  { text: 'RONDELLO BUFFET', fontSize: 6.5, color: GOLD + 'AA', characterSpacing: 3, bold: true, alignment: 'right', margin: [0, 22, 0, 0] }
+                ]},
+                { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 475, y2: 5, lineWidth: 0.3, lineColor: GOLD + '33' }], margin: [0, 6, 0, 0] }
+              ]
+            };
+          }
+          return buildHeader(logo, currentPage);
+        },
+
+        footer: function(p, n) {
+          if (p === 1) {
+            return { margin: [60, 0, 60, 18], text: 'www.rondellobuffet.com.br', fontSize: 7, color: GOLD + '55', alignment: 'center', characterSpacing: 1 };
+          }
+          return buildFooter(p, n);
+        },
+
         content: content,
         styles: {
-          hTitle:    { fontSize: 10.5, color: NAVY, bold: true, characterSpacing: 2.5 },
-          hTitleSm:  { fontSize: 7.5, color: NAVY, bold: true, characterSpacing: 1.8 },
-          vLabel:    { fontSize: 9, color: DGRAY, lineHeight: 1.3 },
-          vNum:      { fontSize: 22, color: NAVY, bold: true, lineHeight: 1 },
-          vNumSm:    { fontSize: 10, color: NAVY, bold: true },
-          meta:      { fontSize: 7.5, color: GRAY, lineHeight: 1.4 },
-          obs:       { fontSize: 8.5, color: GRAY },
-          p2T:       { fontSize: 11, color: NAVY, bold: true, characterSpacing: 1.5 },
-          p2I:       { fontSize: 8.5, color: DGRAY, lineHeight: 1.5 },
-          catT:      { fontSize: 9, color: NAVY, bold: true, characterSpacing: 1.8 },
-          pratoN:    { fontSize: 10, color: NAVY, bold: true },
-          pratoD:    { fontSize: 8.5, color: GRAY, italics: true, lineHeight: 1.35 },
-          footer:    { fontSize: 7, color: GRAY }
+          p2I: { fontSize: 8.5, color: DGRAY, lineHeight: 1.5 },
+          obs: { fontSize: 8.5, color: GRAY },
+          catT: { fontSize: 9, color: NAVY, bold: true, characterSpacing: 1.8 },
+          pratoN: { fontSize: 10, color: NAVY, bold: true },
+          pratoD: { fontSize: 8.5, color: GRAY, italics: true, lineHeight: 1.35 },
+          footer: { fontSize: 7, color: GRAY }
         },
         defaultStyle: { font: 'Roboto', fontSize: 9 }
       };
 
       var nome = cliente.nome
-        ? 'Rondello - Orcamento ' + cliente.nome + '.pdf'
-        : 'Rondello - Orcamento.pdf';
+        ? 'Rondello - Proposta ' + cliente.nome + '.pdf'
+        : 'Rondello - Proposta.pdf';
 
       pdfMake.createPdf(docDef).getBlob(function(blob) {
         var url = URL.createObjectURL(blob);
@@ -926,7 +1027,8 @@
   /* ── App ───────────────────────────────────────────────────────────────── */
   function App() {
     const [cliente, setCliente] = React.useState({ nome:'', data:'', local:'', convidados:'', tipo:'', horas:'' });
-    const [observacoes, setObs] = React.useState('');
+    const [fraseCapa, setFraseCapa] = React.useState('');
+    const [sobreTexto, setSobreTexto] = React.useState('');
     const [pacotes, setPacotes] = React.useState([makePacote(1)]);
     const [pagina2, setP2] = React.useState({ quebrasAtiva:false, valorSeguro:'', valorStaff:'' });
     const [incluirCardapio, setCardapioToggle] = React.useState(false);
@@ -940,14 +1042,15 @@
     function loadModelo(dados) {
       if (!dados) return;
       if (dados.pacotes) setPacotes(dados.pacotes.map(hydratePacote));
-      if (dados.observacoes !== undefined) setObs(dados.observacoes);
+      if (dados.fraseCapa !== undefined) setFraseCapa(dados.fraseCapa);
+      if (dados.sobreTexto !== undefined) setSobreTexto(dados.sobreTexto);
       if (dados.pagina2) setP2(p => ({ ...p, ...dados.pagina2 }));
       if (dados.incluirCardapio !== undefined) setCardapioToggle(dados.incluirCardapio);
       if (dados.cardapio) setCardapio(dados.cardapio.map(c => ({ ...c, id:uid(), pratos:(c.pratos||[]).map(p => ({ ...p, id:uid() })) })));
     }
 
     function getSnapshot() {
-      return { pacotes: pacotes.map(p => ({ ...p, id:undefined, expandido:undefined })), observacoes, pagina2, incluirCardapio, cardapio: cardapio.map(c => ({ ...c, id:undefined, pratos:(c.pratos||[]).map(p => ({ ...p, id:undefined })) })) };
+      return { pacotes: pacotes.map(p => ({ ...p, id:undefined, expandido:undefined })), fraseCapa, sobreTexto, pagina2, incluirCardapio, cardapio: cardapio.map(c => ({ ...c, id:undefined, pratos:(c.pratos||[]).map(p => ({ ...p, id:undefined })) })) };
     }
 
     function handleSaveModelo(nome) {
@@ -998,7 +1101,7 @@
     const handleGerar = () => {
       setGerando(true);
       setTimeout(() => {
-        try { window.gerarPDF({ cliente, pacotes, pagina2, incluirCardapio, cardapio, observacoes }); }
+        try { window.gerarPDF({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio }); }
         catch(e) { alert('Erro ao gerar PDF:\n' + e.message); }
         setGerando(false);
       }, 100);
@@ -1057,15 +1160,22 @@
             ))}
           </div>
 
-          {/* Observações */}
+          {/* Frase da capa + Sobre */}
           <Card>
-            <SecHead>Observações Gerais</SecHead>
-            <Textarea value={observacoes} onChange={setObs} placeholder="Observações que aparecerão no rodapé da proposta..." rows={3} />
+            <SecHead>Textos da Proposta</SecHead>
+            <Field label="Frase da capa (Página 1)">
+              <Input value={fraseCapa} onChange={setFraseCapa} placeholder="Uma experiência gastronômica criada exclusivamente para seu casamento." />
+            </Field>
+            <div style={{ marginTop:14 }}>
+              <Field label="Sobre o Rondello (Página 4 — deixe em branco para usar o texto padrão)">
+                <Textarea value={sobreTexto} onChange={setSobreTexto} placeholder={'Há quase 30 anos criando experiências gastronômicas inesquecíveis.\n\nCom gastronomia assinada por chef formado pela Le Cordon Bleu, o Rondello Buffet tornou-se referência em eventos de alto padrão na região.'} rows={4} />
+              </Field>
+            </div>
           </Card>
 
-          {/* Página 2 */}
+          {/* Página 3 */}
           <Card>
-            <SecHead>Configurações — Página 2</SecHead>
+            <SecHead>Configurações — Página 3</SecHead>
             <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom: pagina2.quebrasAtiva ? 16 : 0 }}>
               <div style={{ marginTop:2 }}><Toggle checked={pagina2.quebrasAtiva} onChange={v => setP2(p => ({ ...p, quebrasAtiva:v }))} /></div>
               <div>
