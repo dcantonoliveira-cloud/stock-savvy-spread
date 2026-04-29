@@ -27,12 +27,13 @@
   <!-- ── PDF Generation ──────────────────────────────────────────────────── -->
   <script>
   (function() {
-    var NAVY  = '#1B3A5C';
-    var GOLD  = '#C9A87A';
-    var LGOLD = '#F5EDD8';
-    var CREAM = '#FAF7F2';
-    var GRAY  = '#6B7280';
-    var DGRAY = '#374151';
+    var DARK  = '#0F0D0A';   /* capa — quase-preto quente                  */
+    var NAVY  = '#1D1A14';   /* títulos — carvão quente (era azul frio)     */
+    var GOLD  = '#C4A87A';   /* champagne dourado                           */
+    var LGOLD = '#F5EDD8';   /* champagne claro                             */
+    var CREAM = '#EDE6DC';   /* off-white para texto sobre fundo escuro     */
+    var GRAY  = '#7A6B5A';   /* corpo — cinza quente (era cinza frio)       */
+    var DGRAY = '#3D3028';   /* secundário escuro quente                    */
 
     var INCLUSO = [
       'Todo material necessário para a operação de buffet | materiais de cozinha e utensílios necessários para realizarmos nosso serviço.',
@@ -196,74 +197,82 @@
       };
     }
 
-    /* ── CAPA (Página 1 — fundo navy via background) ─────────────────────── */
-    function buildCover(cliente, fraseCapa) {
+    /* ── CAPA — direção de arte premium ─────────────────────────────────── */
+    function buildCover(cliente, fraseCapa, logoB64) {
       var blocks = [];
-      var frase = fraseCapa || 'Uma experiência gastronômica criada exclusivamente para seu casamento.';
+      var frase = fraseCapa || 'Uma experiência gastronômica criada exclusivamente para o seu casamento.';
 
-      /* Push content down toward visual center */
-      blocks.push({ text: '', margin: [0, 70, 0, 0] });
+      /* ── espaço superior — empurra conteúdo para o centro visual ── */
+      blocks.push({ text: '', margin: [0, 44, 0, 0] });
 
-      /* Tiny eyebrow label */
+      /* ── Logo como herói — peça central de branding ── */
+      if (logoB64) {
+        blocks.push({ image: logoB64, width: 148, alignment: 'center', margin: [0, 0, 0, 38] });
+      }
+
+      /* ── Hairline champagne ── */
       blocks.push({
-        text: 'PROPOSTA EXCLUSIVA',
-        fontSize: 6.5, color: GOLD + 'CC', characterSpacing: 5, bold: true,
-        alignment: 'center', margin: [0, 0, 0, 26]
+        canvas: [{ type: 'line', x1: 172, y1: 0, x2: 303, y2: 0, lineWidth: 0.35, lineColor: GOLD + '66' }],
+        margin: [0, 0, 0, 26]
       });
 
-      /* Client name — dominant, white, wide */
+      /* ── Eyebrow label — muito sutil ── */
+      blocks.push({
+        text: 'PROPOSTA EXCLUSIVA',
+        fontSize: 6, color: GOLD, characterSpacing: 5.5,
+        alignment: 'center', margin: [0, 0, 0, 24]
+      });
+
+      /* ── Nome do cliente — dominante, cream, muito espaçado ── */
       if (cliente.nome) {
         blocks.push({
           text: cliente.nome.toUpperCase(),
-          fontSize: 38, bold: true, color: '#FFFFFF',
-          alignment: 'center', characterSpacing: 5, lineHeight: 1,
-          margin: [0, 0, 0, 14]
+          fontSize: 32, bold: true, color: CREAM,
+          alignment: 'center', characterSpacing: 7, lineHeight: 1,
+          margin: [0, 0, 0, 22]
         });
       }
 
-      /* Refined gold ornament */
-      blocks.push({
-        canvas: [
-          { type: 'line', x1: 167, y1: 5, x2: 228, y2: 5, lineWidth: 0.5, lineColor: GOLD + '66' },
-          diamond(247.5, 5, 3.2, GOLD),
-          { type: 'line', x1: 267, y1: 5, x2: 328, y2: 5, lineWidth: 0.5, lineColor: GOLD + '66' }
-        ],
-        margin: [0, 0, 0, 18]
-      });
-
-      /* Date + local — gold, same line */
+      /* ── Data e local na mesma linha — ouro ── */
       var detLine = [];
       if (cliente.data) detLine.push(cliente.data);
-      if (cliente.local) detLine.push(cliente.local.toUpperCase());
+      if (cliente.local) detLine.push(cliente.local);
       if (detLine.length) {
         blocks.push({
           text: detLine.join('   ·   '),
-          fontSize: 10, color: GOLD, characterSpacing: 1.5,
-          alignment: 'center', margin: [0, 0, 0, 8]
+          fontSize: 9, color: GOLD, characterSpacing: 1.5,
+          alignment: 'center', margin: [0, 0, 0, 7]
         });
       }
 
-      /* Convidados + tipo + horas — subtle white */
+      /* ── Convidados / tipo / horas — quase invisível, extremamente elegante ── */
       var infoLine = [];
-      if (cliente.convidados) infoLine.push(cliente.convidados + ' CONVIDADOS');
-      if (cliente.tipo) infoLine.push(cliente.tipo.toUpperCase());
-      if (cliente.horas) infoLine.push(cliente.horas + 'H DE EVENTO');
+      if (cliente.convidados) infoLine.push(cliente.convidados + ' convidados');
+      if (cliente.tipo) infoLine.push(cliente.tipo);
+      if (cliente.horas) infoLine.push(cliente.horas + 'h de evento');
       if (infoLine.length) {
         blocks.push({
-          text: infoLine.join('   ·   '),
-          fontSize: 7, color: '#FFFFFF55', characterSpacing: 2.5,
-          alignment: 'center', margin: [0, 0, 0, 52]
+          text: infoLine.join('   ·   ').toUpperCase(),
+          fontSize: 6, color: '#FFFFFF2E', characterSpacing: 3,
+          alignment: 'center', margin: [0, 0, 0, 0]
         });
-      } else {
-        blocks.push({ text: '', margin: [0, 0, 0, 52] });
       }
 
-      /* Tagline — elegant italic */
+      /* ── Grande espaço negro — respiração de luxo ── */
+      blocks.push({ text: '', margin: [0, 88, 0, 0] });
+
+      /* ── Hairline pré-tagline ── */
+      blocks.push({
+        canvas: [{ type: 'line', x1: 185, y1: 0, x2: 290, y2: 0, lineWidth: 0.22, lineColor: GOLD + '44' }],
+        margin: [0, 0, 0, 14]
+      });
+
+      /* ── Tagline — sussurro elegante ── */
       blocks.push({
         text: frase,
-        fontSize: 10, color: '#FFFFFFBB', italics: true,
-        alignment: 'center', lineHeight: 1.8, characterSpacing: 0.3,
-        margin: [20, 0, 20, 0]
+        fontSize: 8.5, color: '#B8A898', italics: true,
+        alignment: 'center', lineHeight: 1.85, characterSpacing: 0.4,
+        margin: [40, 0, 40, 0]
       });
 
       return blocks;
@@ -284,72 +293,102 @@
       return parts;
     }
 
-    /* ── Página 2 — Experiência Gastronômica + Investimento ─────────────── */
+    /* ── Página 2 — Experiência Editorial + Investimento Luxo ──────────── */
     function buildExperienciaGastronomica(pacotes, p2) {
       var blocks = [];
+      var secCounter = 0;
 
-      /* Page heading */
-      blocks.push({ text: 'EXPERIÊNCIA', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 5] });
+      /* ── Cabeçalho editorial — warm, centrado ── */
+      blocks.push({ text: 'A EXPERIÊNCIA', fontSize: 6, color: GRAY, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 5] });
       blocks.push({ text: 'Gastronômica', fontSize: 28, bold: true, color: NAVY, alignment: 'center', characterSpacing: 0.5, margin: [0, 0, 0, 8] });
       blocks.push({
-        canvas: [{ type: 'line', x1: 177, y1: 0, x2: 318, y2: 0, lineWidth: 0.6, lineColor: GOLD + '88' }],
-        margin: [0, 0, 0, 26]
+        canvas: [{ type: 'line', x1: 185, y1: 0, x2: 290, y2: 0, lineWidth: 0.35, lineColor: GOLD + '88' }],
+        margin: [0, 0, 0, 30]
       });
 
       pacotes.forEach(function(pacote, pi) {
-        if (pi > 0) { blocks.push(sectionDivider()); blocks.push({ text: '', margin: [0, 0, 0, 6] }); }
+        if (pi > 0) {
+          blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.22, lineColor: '#DDD6CD' }], margin: [0, 28, 0, 28] });
+        }
 
-        /* Package label (only when multiple packages) */
         if (pacotes.length > 1 && pacote.nome) {
-          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 7, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 12] });
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 6.5, color: GOLD, characterSpacing: 3, margin: [0, 0, 0, 14] });
         }
 
         var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
         secoesAtivas.forEach(function(secao, i) {
           var nome = (secao.nome || '').trim();
           if (!nome) return;
-          /* Section name — small uppercase label */
-          blocks.push({ text: nome.toUpperCase(), fontSize: 7.5, color: NAVY, bold: true, characterSpacing: 2, margin: [0, i > 0 ? 13 : 0, 0, 4] });
-          /* Narrative description */
-          if (secao.detalhes && secao.detalhes.trim()) {
-            blocks.push({ text: secao.detalhes.trim(), fontSize: 9, color: GRAY, lineHeight: 1.55 });
-          }
+          secCounter++;
+          var numStr = String(secCounter).padStart(2, '0');
+
+          /* Bloco numerado — editorial, cada seção respira */
+          blocks.push({
+            columns: [
+              /* Número sutil em dourado */
+              { text: numStr, fontSize: 6.5, color: GOLD + 'AA', characterSpacing: 0.5, width: 28, margin: [0, 1, 0, 0] },
+              /* Conteúdo */
+              { stack: [
+                { text: nome.toUpperCase(), fontSize: 7.5, bold: true, color: NAVY, characterSpacing: 2.5, margin: [0, 0, 0, 4] },
+                (secao.detalhes && secao.detalhes.trim())
+                  ? { text: secao.detalhes.trim(), fontSize: 9, color: GRAY, lineHeight: 1.6 }
+                  : { text: '' }
+              ]}
+            ],
+            margin: [0, i > 0 ? 20 : 0, 0, 0]
+          });
         });
       });
 
-      /* ── Investimento ── */
-      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: '#E5E7EB' }], margin: [0, 26, 0, 22] });
-      blocks.push({ text: 'INVESTIMENTO', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 20] });
+      /* ── INVESTIMENTO — tipografia de luxo ── */
+      blocks.push({
+        canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.22, lineColor: '#DDD6CD' }],
+        margin: [0, 34, 0, 0]
+      });
 
       pacotes.forEach(function(pacote, pi) {
         var inv = pacote.investimento || {};
         var preco = inv.precoFinal || inv.precoOriginal;
 
-        if (pi > 0) { blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: '#E5E7EB' }], margin: [0, 18, 0, 18] }); }
+        if (pi > 0) {
+          blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.22, lineColor: '#DDD6CD' }], margin: [0, 20, 0, 0] });
+        }
 
         if (pacotes.length > 1 && pacote.nome) {
-          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 7, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 12] });
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 6.5, color: GOLD, characterSpacing: 3, margin: [0, 20, 0, 14] });
         }
 
+        blocks.push({ text: '', margin: [0, 24, 0, 0] });
+
+        /* Preço — destaque tipográfico máximo */
         if (inv.mostrarDesconto && inv.precoOriginal && inv.precoFinal) {
-          blocks.push({ text: [{ text: 'De  ' }, { text: fmtMoeda(inv.precoOriginal), decoration: 'lineThrough' }], fontSize: 9, color: GRAY, margin: [0, 0, 0, 4] });
-          blocks.push({ text: fmtMoeda(inv.precoFinal), fontSize: 42, bold: true, color: NAVY, lineHeight: 1, margin: [0, 0, 0, 4] });
+          blocks.push({
+            text: [{ text: 'De  ' }, { text: fmtMoeda(inv.precoOriginal), decoration: 'lineThrough' }],
+            fontSize: 8.5, color: GRAY, margin: [0, 0, 0, 6]
+          });
+          blocks.push({ text: fmtMoeda(inv.precoFinal), fontSize: 48, bold: true, color: NAVY, lineHeight: 0.88, margin: [0, 0, 0, 4] });
         } else if (preco) {
-          blocks.push({ text: fmtMoeda(preco), fontSize: 42, bold: true, color: NAVY, lineHeight: 1, margin: [0, 0, 0, 4] });
+          blocks.push({ text: fmtMoeda(preco), fontSize: 48, bold: true, color: NAVY, lineHeight: 0.88, margin: [0, 0, 0, 4] });
         }
-        blocks.push({ text: 'por convidado', fontSize: 8, color: GRAY, italics: true, margin: [0, 0, 0, 14] });
 
+        blocks.push({ text: 'por convidado', fontSize: 8, color: GRAY, italics: true, characterSpacing: 0.5, margin: [0, 0, 0, 0] });
+
+        /* Extras */
         var extras = [];
         if (inv.mostrarTaxa && inv.taxaValor) extras.push([inv.taxaDesc || 'Taxa de deslocamento', fmtMoeda(inv.taxaValor)]);
         (inv.adicionais || []).filter(function(a) { return a.desc || a.valor; }).forEach(function(a) {
           extras.push([a.desc || 'Adicional', fmtMoeda(a.valor)]);
         });
-        extras.forEach(function(e) {
-          blocks.push({ columns: [{ text: e[0], fontSize: 8.5, color: GRAY }, { text: e[1], fontSize: 9, bold: true, color: NAVY, alignment: 'right' }], margin: [0, 0, 0, 5] });
-        });
+        if (extras.length) {
+          blocks.push({ text: '', margin: [0, 14, 0, 0] });
+          extras.forEach(function(e) {
+            blocks.push({ columns: [{ text: e[0], fontSize: 8.5, color: GRAY }, { text: e[1], fontSize: 9, bold: true, color: NAVY, alignment: 'right' }], margin: [0, 0, 0, 4] });
+          });
+        }
 
+        /* Validade e condições — linha discreta */
         if (inv.validade || inv.condicoes) {
-          blocks.push({ text: '', margin: [0, 8, 0, 0] });
+          blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.2, lineColor: '#DDD6CD' }], margin: [0, 16, 0, 10] });
           if (inv.validade) blocks.push({ text: [{ text: 'Validade:  ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }], fontSize: 7.5, margin: [0, 0, 0, 3] });
           if (inv.condicoes) blocks.push({ text: [{ text: 'Pagamento:  ', bold: true, color: NAVY }, { text: inv.condicoes, color: GRAY }], fontSize: 7.5 });
         }
@@ -361,13 +400,13 @@
     /* ── Página 3 — Incluso + Staff ──────────────────────────────────────── */
     function buildInclusoPage(p2) {
       var blocks = [];
-      var MGRAY = '#9CA3AF';
+      var MGRAY = '#9C8E82';   /* cinza-pedra quente (era cinza frio) */
 
       /* Page heading */
-      blocks.push({ text: 'O QUE ESTÁ', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 5] });
+      blocks.push({ text: 'O QUE ESTÁ', fontSize: 6, color: GRAY, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 5] });
       blocks.push({ text: 'Incluso & Não Incluso', fontSize: 26, bold: true, color: NAVY, alignment: 'center', characterSpacing: 0.5, margin: [0, 0, 0, 8] });
       blocks.push({
-        canvas: [{ type: 'line', x1: 177, y1: 0, x2: 318, y2: 0, lineWidth: 0.6, lineColor: GOLD + '88' }],
+        canvas: [{ type: 'line', x1: 185, y1: 0, x2: 290, y2: 0, lineWidth: 0.35, lineColor: GOLD + '88' }],
         margin: [0, 0, 0, 28]
       });
 
@@ -409,7 +448,7 @@
       var blocks = [];
 
       /* Heading */
-      blocks.push({ text: 'SOBRE O', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 5] });
+      blocks.push({ text: 'SOBRE O', fontSize: 6, color: GRAY, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 5] });
       blocks.push({ text: 'Rondello Buffet', fontSize: 28, bold: true, color: NAVY, alignment: 'center', characterSpacing: 0.5, margin: [0, 0, 0, 28] });
 
       /* Brand story */
@@ -621,8 +660,8 @@
 
       var content = [];
 
-      /* Página 1 — Capa emocional (fundo navy via background) */
-      content = content.concat(buildCover(cliente, fraseCapa));
+      /* Página 1 — Capa emocional (fundo quente via background) */
+      content = content.concat(buildCover(cliente, fraseCapa, logo));
 
       /* Página 2 — Experiência Gastronômica + Investimento */
       content.push({ text: '', pageBreak: 'before' });
@@ -649,28 +688,19 @@
         pageSize: 'A4',
         pageMargins: [60, 90, 60, 55],
 
-        /* Fundo azul-noturno profundo na página 1 */
+        /* Fundo quente — quase-preto editorial */
         background: function(currentPage, pageSize) {
           if (currentPage === 1) {
-            return { canvas: [{ type: 'rect', x: 0, y: 0, w: pageSize.width, h: pageSize.height, color: '#091524' }] };
+            return { canvas: [{ type: 'rect', x: 0, y: 0, w: pageSize.width, h: pageSize.height, color: DARK }] };
           }
         },
 
         header: function(currentPage) {
           if (currentPage === 1) {
-            /* Header da capa: logo grande + marca em branco/dourado */
+            /* Header capa: apenas linha champagne — logo está no corpo */
             return {
-              margin: [60, 18, 60, 0],
-              stack: [
-                { columns: [
-                  { image: logo, width: 92, margin: [0, 0, 0, 0] },
-                  { stack: [
-                    { text: 'RONDELLO BUFFET', fontSize: 10, color: '#FFFFFF', characterSpacing: 4, bold: true, alignment: 'right', margin: [0, 0, 0, 3] },
-                    { text: 'BUFFET DE ALTO PADRÃO', fontSize: 5.5, color: GOLD + 'BB', characterSpacing: 3, bold: true, alignment: 'right' }
-                  ], margin: [0, 14, 0, 0] }
-                ]},
-                { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 475, y2: 6, lineWidth: 0.35, lineColor: GOLD + '44' }], margin: [0, 8, 0, 0] }
-              ]
+              margin: [60, 26, 60, 0],
+              canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.25, lineColor: GOLD + '44' }]
             };
           }
           return buildHeader(logo, currentPage);
@@ -678,7 +708,11 @@
 
         footer: function(p, n) {
           if (p === 1) {
-            return { margin: [60, 0, 60, 18], text: 'www.rondellobuffet.com.br', fontSize: 7, color: GOLD + '55', alignment: 'center', characterSpacing: 1 };
+            return {
+              margin: [60, 0, 60, 20],
+              text: 'www.rondellobuffet.com.br',
+              fontSize: 6.5, color: '#8A7A66', alignment: 'center', characterSpacing: 1.5
+            };
           }
           return buildFooter(p, n);
         },
