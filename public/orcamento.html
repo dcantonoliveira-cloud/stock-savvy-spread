@@ -202,59 +202,68 @@
       var frase = fraseCapa || 'Uma experiência gastronômica criada exclusivamente para seu casamento.';
 
       /* Push content down toward visual center */
-      blocks.push({ text: '', margin: [0, 96, 0, 0] });
+      blocks.push({ text: '', margin: [0, 70, 0, 0] });
 
       /* Tiny eyebrow label */
       blocks.push({
         text: 'PROPOSTA EXCLUSIVA',
-        fontSize: 6.5, color: GOLD + 'BB', characterSpacing: 4, bold: true,
-        alignment: 'center', margin: [0, 0, 0, 34]
+        fontSize: 6.5, color: GOLD + 'CC', characterSpacing: 5, bold: true,
+        alignment: 'center', margin: [0, 0, 0, 26]
       });
 
       /* Client name — dominant, white, wide */
       if (cliente.nome) {
         blocks.push({
           text: cliente.nome.toUpperCase(),
-          fontSize: 34, bold: true, color: '#FFFFFF',
-          alignment: 'center', characterSpacing: 4, lineHeight: 1,
-          margin: [0, 0, 0, 20]
+          fontSize: 38, bold: true, color: '#FFFFFF',
+          alignment: 'center', characterSpacing: 5, lineHeight: 1,
+          margin: [0, 0, 0, 14]
         });
       }
 
       /* Refined gold ornament */
       blocks.push({
         canvas: [
-          { type: 'line', x1: 177, y1: 5, x2: 228, y2: 5, lineWidth: 0.5, lineColor: GOLD + '77' },
-          diamond(247.5, 5, 3, GOLD),
-          { type: 'line', x1: 267, y1: 5, x2: 318, y2: 5, lineWidth: 0.5, lineColor: GOLD + '77' }
+          { type: 'line', x1: 167, y1: 5, x2: 228, y2: 5, lineWidth: 0.5, lineColor: GOLD + '66' },
+          diamond(247.5, 5, 3.2, GOLD),
+          { type: 'line', x1: 267, y1: 5, x2: 328, y2: 5, lineWidth: 0.5, lineColor: GOLD + '66' }
         ],
-        margin: [0, 0, 0, 20]
+        margin: [0, 0, 0, 18]
       });
 
-      /* Date — gold */
-      if (cliente.data) {
+      /* Date + local — gold, same line */
+      var detLine = [];
+      if (cliente.data) detLine.push(cliente.data);
+      if (cliente.local) detLine.push(cliente.local.toUpperCase());
+      if (detLine.length) {
         blocks.push({
-          text: cliente.data,
-          fontSize: 10.5, color: GOLD, characterSpacing: 1.5,
+          text: detLine.join('   ·   '),
+          fontSize: 10, color: GOLD, characterSpacing: 1.5,
           alignment: 'center', margin: [0, 0, 0, 8]
         });
       }
 
-      /* Venue — muted cream */
-      if (cliente.local) {
+      /* Convidados + tipo + horas — subtle white */
+      var infoLine = [];
+      if (cliente.convidados) infoLine.push(cliente.convidados + ' CONVIDADOS');
+      if (cliente.tipo) infoLine.push(cliente.tipo.toUpperCase());
+      if (cliente.horas) infoLine.push(cliente.horas + 'H DE EVENTO');
+      if (infoLine.length) {
         blocks.push({
-          text: cliente.local.toUpperCase(),
-          fontSize: 7.5, color: '#FFFFFF44', characterSpacing: 2.5,
-          alignment: 'center', margin: [0, 0, 0, 60]
+          text: infoLine.join('   ·   '),
+          fontSize: 7, color: '#FFFFFF55', characterSpacing: 2.5,
+          alignment: 'center', margin: [0, 0, 0, 52]
         });
+      } else {
+        blocks.push({ text: '', margin: [0, 0, 0, 52] });
       }
 
       /* Tagline — elegant italic */
       blocks.push({
         text: frase,
-        fontSize: 10, color: '#FFFFFFAA', italics: true,
-        alignment: 'center', lineHeight: 1.75, characterSpacing: 0.3,
-        margin: [30, 0, 30, 0]
+        fontSize: 10, color: '#FFFFFFBB', italics: true,
+        alignment: 'center', lineHeight: 1.8, characterSpacing: 0.3,
+        margin: [20, 0, 20, 0]
       });
 
       return blocks;
@@ -275,8 +284,8 @@
       return parts;
     }
 
-    /* ── Página 2 — Experiência Gastronômica ────────────────────────────── */
-    function buildExperienciaGastronomica(pacotes) {
+    /* ── Página 2 — Experiência Gastronômica + Investimento ─────────────── */
+    function buildExperienciaGastronomica(pacotes, p2) {
       var blocks = [];
 
       /* Page heading */
@@ -284,15 +293,15 @@
       blocks.push({ text: 'Gastronômica', fontSize: 28, bold: true, color: NAVY, alignment: 'center', characterSpacing: 0.5, margin: [0, 0, 0, 8] });
       blocks.push({
         canvas: [{ type: 'line', x1: 177, y1: 0, x2: 318, y2: 0, lineWidth: 0.6, lineColor: GOLD + '88' }],
-        margin: [0, 0, 0, 32]
+        margin: [0, 0, 0, 26]
       });
 
       pacotes.forEach(function(pacote, pi) {
-        if (pi > 0) { blocks.push(sectionDivider()); blocks.push({ text: '', margin: [0, 0, 0, 8] }); }
+        if (pi > 0) { blocks.push(sectionDivider()); blocks.push({ text: '', margin: [0, 0, 0, 6] }); }
 
         /* Package label (only when multiple packages) */
         if (pacotes.length > 1 && pacote.nome) {
-          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 7, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 18] });
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 7, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 12] });
         }
 
         var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
@@ -300,46 +309,36 @@
           var nome = (secao.nome || '').trim();
           if (!nome) return;
           /* Section name — small uppercase label */
-          blocks.push({ text: nome.toUpperCase(), fontSize: 7.5, color: NAVY, bold: true, characterSpacing: 2, margin: [0, i > 0 ? 18 : 0, 0, 5] });
+          blocks.push({ text: nome.toUpperCase(), fontSize: 7.5, color: NAVY, bold: true, characterSpacing: 2, margin: [0, i > 0 ? 13 : 0, 0, 4] });
           /* Narrative description */
           if (secao.detalhes && secao.detalhes.trim()) {
-            blocks.push({ text: secao.detalhes.trim(), fontSize: 9.5, color: GRAY, lineHeight: 1.65 });
+            blocks.push({ text: secao.detalhes.trim(), fontSize: 9, color: GRAY, lineHeight: 1.55 });
           }
         });
       });
 
-      return blocks;
-    }
-
-    /* ── Página 3 — Investimento + Incluso ───────────────────────────────── */
-    function buildInvestimentoPage(pacotes, p2) {
-      var blocks = [];
-      var MGRAY = '#9CA3AF';
-
-      /* Page heading */
-      blocks.push({ text: 'INVESTIMENTO', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 32] });
+      /* ── Investimento ── */
+      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: '#E5E7EB' }], margin: [0, 26, 0, 22] });
+      blocks.push({ text: 'INVESTIMENTO', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 20] });
 
       pacotes.forEach(function(pacote, pi) {
         var inv = pacote.investimento || {};
         var preco = inv.precoFinal || inv.precoOriginal;
 
-        if (pi > 0) { blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: '#E5E7EB' }], margin: [0, 26, 0, 26] }); }
+        if (pi > 0) { blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: '#E5E7EB' }], margin: [0, 18, 0, 18] }); }
 
-        /* Package label (only when multiple) */
         if (pacotes.length > 1 && pacote.nome) {
-          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 7, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 14] });
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 7, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 12] });
         }
 
-        /* De / Por price */
         if (inv.mostrarDesconto && inv.precoOriginal && inv.precoFinal) {
           blocks.push({ text: [{ text: 'De  ' }, { text: fmtMoeda(inv.precoOriginal), decoration: 'lineThrough' }], fontSize: 9, color: GRAY, margin: [0, 0, 0, 4] });
-          blocks.push({ text: fmtMoeda(inv.precoFinal), fontSize: 40, bold: true, color: NAVY, lineHeight: 1, margin: [0, 0, 0, 4] });
+          blocks.push({ text: fmtMoeda(inv.precoFinal), fontSize: 42, bold: true, color: NAVY, lineHeight: 1, margin: [0, 0, 0, 4] });
         } else if (preco) {
-          blocks.push({ text: fmtMoeda(preco), fontSize: 40, bold: true, color: NAVY, lineHeight: 1, margin: [0, 0, 0, 4] });
+          blocks.push({ text: fmtMoeda(preco), fontSize: 42, bold: true, color: NAVY, lineHeight: 1, margin: [0, 0, 0, 4] });
         }
-        blocks.push({ text: 'por convidado', fontSize: 8, color: GRAY, italics: true, margin: [0, 0, 0, 18] });
+        blocks.push({ text: 'por convidado', fontSize: 8, color: GRAY, italics: true, margin: [0, 0, 0, 14] });
 
-        /* Extras */
         var extras = [];
         if (inv.mostrarTaxa && inv.taxaValor) extras.push([inv.taxaDesc || 'Taxa de deslocamento', fmtMoeda(inv.taxaValor)]);
         (inv.adicionais || []).filter(function(a) { return a.desc || a.valor; }).forEach(function(a) {
@@ -349,7 +348,6 @@
           blocks.push({ columns: [{ text: e[0], fontSize: 8.5, color: GRAY }, { text: e[1], fontSize: 9, bold: true, color: NAVY, alignment: 'right' }], margin: [0, 0, 0, 5] });
         });
 
-        /* Validade / Condições */
         if (inv.validade || inv.condicoes) {
           blocks.push({ text: '', margin: [0, 8, 0, 0] });
           if (inv.validade) blocks.push({ text: [{ text: 'Validade:  ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }], fontSize: 7.5, margin: [0, 0, 0, 3] });
@@ -357,8 +355,21 @@
         }
       });
 
-      /* ── Incluso / Não incluso ── */
-      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: '#E5E7EB' }], margin: [0, 28, 0, 24] });
+      return blocks;
+    }
+
+    /* ── Página 3 — Incluso + Staff ──────────────────────────────────────── */
+    function buildInclusoPage(p2) {
+      var blocks = [];
+      var MGRAY = '#9CA3AF';
+
+      /* Page heading */
+      blocks.push({ text: 'O QUE ESTÁ', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, bold: true, alignment: 'center', margin: [0, 0, 0, 5] });
+      blocks.push({ text: 'Incluso & Não Incluso', fontSize: 26, bold: true, color: NAVY, alignment: 'center', characterSpacing: 0.5, margin: [0, 0, 0, 8] });
+      blocks.push({
+        canvas: [{ type: 'line', x1: 177, y1: 0, x2: 318, y2: 0, lineWidth: 0.6, lineColor: GOLD + '88' }],
+        margin: [0, 0, 0, 28]
+      });
 
       function iRow(txt, col) {
         return { columns: [{ canvas: [{ type: 'ellipse', x: 3, y: 5, r1: 1.8, r2: 1.8, color: col }], width: 10 }, { text: txt, fontSize: 8, color: GRAY, lineHeight: 1.45 }], columnGap: 5, margin: [0, 0, 0, 6] };
@@ -368,7 +379,7 @@
       blocks.push({ columns: [{ stack: [iLabel('INCLUSO')].concat(INCLUSO.map(function(x) { return iRow(x, GOLD); })), width: '*' }, { stack: [iLabel('NÃO INCLUSO', MGRAY)].concat(NAO_INCLUSO.map(function(x) { return iRow(x, MGRAY); })), width: '*' }], columnGap: 28 });
 
       /* ── Alimentação de Staff ── */
-      blocks.push({ text: '', margin: [0, 24, 0, 0] });
+      blocks.push({ text: '', margin: [0, 26, 0, 0] });
       blocks.push({ columns: [{ canvas: [{ type: 'rect', x: 0, y: 2, w: 2, h: 8, color: GOLD }], width: 8 }, { text: 'ALIMENTAÇÃO DE STAFF', fontSize: 6.5, color: GOLD, characterSpacing: 2, bold: true }], margin: [0, 0, 0, 8] });
       blocks.push({ text: 'Válido somente para staffs de outras empresas que estarão trabalhando durante o evento. Não podemos mesclar o tipo de alimentação — todos os profissionais do evento devem se enquadrar na mesma opção.', fontSize: 8, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 10] });
       [
@@ -613,13 +624,13 @@
       /* Página 1 — Capa emocional (fundo navy via background) */
       content = content.concat(buildCover(cliente, fraseCapa));
 
-      /* Página 2 — Experiência Gastronômica */
+      /* Página 2 — Experiência Gastronômica + Investimento */
       content.push({ text: '', pageBreak: 'before' });
-      content = content.concat(buildExperienciaGastronomica(pacotes));
+      content = content.concat(buildExperienciaGastronomica(pacotes, p2));
 
-      /* Página 3 — Investimento + Incluso */
+      /* Página 3 — Incluso, Não Incluso + Staff */
       content.push({ text: '', pageBreak: 'before' });
-      content = content.concat(buildInvestimentoPage(pacotes, p2));
+      content = content.concat(buildInclusoPage(p2));
 
       /* Página 4 — Autoridade + Encerramento */
       content.push({ text: '', pageBreak: 'before' });
@@ -638,24 +649,27 @@
         pageSize: 'A4',
         pageMargins: [60, 90, 60, 55],
 
-        /* Fundo navy na página 1 */
+        /* Fundo azul-noturno profundo na página 1 */
         background: function(currentPage, pageSize) {
           if (currentPage === 1) {
-            return { canvas: [{ type: 'rect', x: 0, y: 0, w: pageSize.width, h: pageSize.height, color: NAVY }] };
+            return { canvas: [{ type: 'rect', x: 0, y: 0, w: pageSize.width, h: pageSize.height, color: '#091524' }] };
           }
         },
 
         header: function(currentPage) {
           if (currentPage === 1) {
-            /* Header da capa: logo + nome da marca em dourado */
+            /* Header da capa: logo grande + marca em branco/dourado */
             return {
-              margin: [60, 22, 60, 0],
+              margin: [60, 18, 60, 0],
               stack: [
                 { columns: [
-                  { image: logo, width: 68 },
-                  { text: 'RONDELLO BUFFET', fontSize: 6.5, color: GOLD + 'AA', characterSpacing: 3, bold: true, alignment: 'right', margin: [0, 22, 0, 0] }
+                  { image: logo, width: 92, margin: [0, 0, 0, 0] },
+                  { stack: [
+                    { text: 'RONDELLO BUFFET', fontSize: 10, color: '#FFFFFF', characterSpacing: 4, bold: true, alignment: 'right', margin: [0, 0, 0, 3] },
+                    { text: 'BUFFET DE ALTO PADRÃO', fontSize: 5.5, color: GOLD + 'BB', characterSpacing: 3, bold: true, alignment: 'right' }
+                  ], margin: [0, 14, 0, 0] }
                 ]},
-                { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 475, y2: 5, lineWidth: 0.3, lineColor: GOLD + '33' }], margin: [0, 6, 0, 0] }
+                { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 475, y2: 6, lineWidth: 0.35, lineColor: GOLD + '44' }], margin: [0, 8, 0, 0] }
               ]
             };
           }
