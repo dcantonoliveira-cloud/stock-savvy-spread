@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, MapPin, Users } from 'lucide-react';
-import { fetchAssessoria, fetchEvento, fetchLocal, fetchPagamentosForEvento, fetchValoresAdicionaisForEvento } from '../api/bubble';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, Download, FileText, MapPin, Users } from 'lucide-react';
+import {
+  fetchAssessoria, fetchEvento, fetchLocal,
+  fetchPagamentosForEvento, fetchProduto, fetchValoresAdicionaisForEvento,
+} from '../api/bubble';
 import { BubbleEvento, BubblePagamento, BubbleValorAdicional } from '../types';
 import { fmtCurrency, fmtDate } from '../lib/format';
 
@@ -13,6 +16,16 @@ function stripBubbleRichText(text: string): string {
     .replace(/\[([^\]]+)\]/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/** Extract a display filename from a Bubble file URL */
+function fileNameFromUrl(url: string): string {
+  try {
+    const parts = decodeURIComponent(url).split('/');
+    return parts[parts.length - 1] || 'Arquivo';
+  } catch {
+    return 'Arquivo';
+  }
 }
 
 // ── Field components ─────────────────────────────────────────────────────────
@@ -45,7 +58,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // ── Tab: Ficha Técnica ────────────────────────────────────────────────────────
 
-function FichaTecnica({ e, localNome, assessoriaNome }: { e: BubbleEvento; localNome?: string; assessoriaNome?: string }) {
+function FichaTecnica({
+  e, localNome, assessoriaNome, produtoNome,
+}: {
+  e: BubbleEvento; localNome?: string; assessoriaNome?: string; produtoNome?: string;
+}) {
   const duracao = e['duraçãoDoEvento'] ?? e['duração do evento'];
 
   return (
@@ -58,7 +75,7 @@ function FichaTecnica({ e, localNome, assessoriaNome }: { e: BubbleEvento; local
           <Field label="Tipo"              value={e['Tipo_Do_Evento']} />
           <Field label="Local"             value={localNome ?? e['Local Do Evento_TXT'] ?? e.LocalDoEvento} />
           <Field label="Data"              value={fmtDate(e.dataDoEvento)} />
-          <Field label="Produto escolhido" value={e.ProdutoEscolhido} />
+          <Field label="Produto escolhido" value={produtoNome || undefined} />
           <Field label="Horário cerimônia" value={e.HorarioCerimonia} />
           <Field label="Duração"           value={duracao != null ? `${duracao}h` : null} />
           <Field label="Preço negociado"   value={e['PreçoCombinado'] != null ? fmtCurrency(e['PreçoCombinado']!) : null} />
@@ -264,56 +281,67 @@ function FinanceiroTab({ e }: { e: BubbleEvento }) {
   );
 }
 
-// ── Tab: Dados do Cliente ─────────────────────────────────────────────────────
+// ── Tab: Arquivos ─────────────────────────────────────────────────────────────
 
-function DadosCliente({ e }: { e: BubbleEvento }) {
-  return (
-    <FieldGrid>
-      <Field label="Nome"        value={e.NomeDoContratante} />
-      <Field label="Contato"     value={e.ContatoDoContratante} />
-      <Field label="Telefone"    value={e.Telefone} />
-      <Field label="Email"       value={e.Email} />
-      <Field label="CPF / CNPJ"  value={e.CPF} />
-      <Field label="Endereço"    value={e.Endereco} />
-    </FieldGrid>
-  );
-}
+function ArquivosTab({ e }: { e: BubbleEvento }) {
+  const arquivos = e.Arquivos_Internos ?? [];
 
-function ComingSoon({ name }: { name: string }) {
+  if (arquivos.length === 0) {
+    return (
+      <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
+        <p className="text-4xl mb-3">📁</p>
+        <p className="font-bold text-gray-700">Nenhum arquivo</p>
+        <p className="text-sm text-gray-400 mt-1">Não há contratos ou propostas anexados</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
-      <p className="text-5xl mb-3">🚧</p>
-      <p className="font-bold text-gray-700">{name}</p>
-      <p className="text-sm text-gray-400 mt-1">Em breve</p>
+    <div className="bg-white rounded-3xl shadow-sm divide-y divide-gray-100 overflow-hidden">
+      {arquivos.map((url, i) => {
+        const isUrl = url.startsWith('http');
+        const name  = isUrl ? fileNameFromUrl(url) : `Arquivo ${i + 1}`;
+        const ext   = name.split('.').pop()?.toUpperCase() ?? 'FILE';
+
+        return (
+          <a
+            key={i}
+            href={isUrl ? url : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`flex items-center gap-4 px-5 py-4 transition-colors ${isUrl ? 'active:bg-gray-50' : 'opacity-50'}`}
+          >
+            <div className="w-10 h-10 rounded-2xl bg-ron-50 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 text-ron-700" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{ext}</p>
+            </div>
+            {isUrl && <Download className="w-4 h-4 text-gray-300 shrink-0" />}
+          </a>
+        );
+      })}
     </div>
   );
 }
 
 // ── Tabs config ───────────────────────────────────────────────────────────────
 
-const TABS = [
-  'Ficha Técnica',
-  'Dados do Cliente',
-  'Cardápio',
-  'Financeiro',
-  'Checklist',
-  'Cronograma',
-  'Arquivos',
-  'Equipe',
-  'Outros',
-];
+const TABS = ['Ficha Técnica', 'Cardápio', 'Financeiro', 'Arquivos'];
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [evento, setEvento]           = useState<BubbleEvento | null>(null);
-  const [localNome, setLocalNome]     = useState<string>('');
-  const [assessoriaNome, setAssessoriaNome] = useState<string>('');
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]       = useState(false);
-  const [activeTab, setActiveTab] = useState(0);
+  const [evento, setEvento]                   = useState<BubbleEvento | null>(null);
+  const [localNome, setLocalNome]             = useState<string>('');
+  const [assessoriaNome, setAssessoriaNome]   = useState<string>('');
+  const [produtoNome, setProdutoNome]         = useState<string>('');
+  const [loading, setLoading]                 = useState(true);
+  const [error, setError]                     = useState(false);
+  const [activeTab, setActiveTab]             = useState(0);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -332,6 +360,11 @@ export default function EventoDetailPage() {
             .then((ar) => setAssessoriaNome(ar.response.Nome ?? ''))
             .catch(() => {});
         }
+        if (ev.ProdutoEscolhido) {
+          fetchProduto(ev.ProdutoEscolhido)
+            .then((pr) => setProdutoNome(pr.response.Nome ?? ''))
+            .catch(() => {});
+        }
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
@@ -346,11 +379,11 @@ export default function EventoDetailPage() {
   function renderTab() {
     if (!evento) return null;
     switch (activeTab) {
-      case 0: return <FichaTecnica e={evento} localNome={localNome || undefined} assessoriaNome={assessoriaNome || undefined} />;
-      case 1: return <DadosCliente e={evento} />;
-      case 2: return <CardapioTab e={evento} />;
-      case 3: return <FinanceiroTab e={evento} />;
-      default: return <ComingSoon name={TABS[activeTab]} />;
+      case 0: return <FichaTecnica e={evento} localNome={localNome || undefined} assessoriaNome={assessoriaNome || undefined} produtoNome={produtoNome || undefined} />;
+      case 1: return <CardapioTab e={evento} />;
+      case 2: return <FinanceiroTab e={evento} />;
+      case 3: return <ArquivosTab e={evento} />;
+      default: return null;
     }
   }
 
