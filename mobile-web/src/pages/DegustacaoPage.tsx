@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Users, UtensilsCrossed } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, Calendar, Users, UtensilsCrossed } from 'lucide-react';
 import { fetchAllDegustacoes } from '../api/bubble';
 import { BubbleDegustacao } from '../types';
 import { fmtDate } from '../lib/format';
@@ -11,6 +12,7 @@ function Skeleton() {
 }
 
 export default function DegustacaoPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<BubbleDegustacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -112,9 +114,10 @@ export default function DegustacaoPage() {
             {sorted.map((d) => {
               const isPast = d.data ? new Date(d.data) < now : false;
               return (
-                <div
+                <button
                   key={d._id}
-                  className={`flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm ${isPast ? 'opacity-60' : ''}`}
+                  onClick={() => navigate(`/degustacoes/${d._id}`)}
+                  className={`w-full text-left flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform ${isPast ? 'opacity-60' : ''}`}
                 >
                   {/* color bar */}
                   <div className={`w-1 self-stretch rounded-full shrink-0 ${isPast ? 'bg-gray-300' : 'bg-violet-400'}`} />
@@ -152,7 +155,9 @@ export default function DegustacaoPage() {
                       </p>
                     )}
                   </div>
-                </div>
+
+                  <ArrowRight className="w-4 h-4 text-gray-200 shrink-0 mt-0.5" />
+                </button>
               );
             })}
           </div>

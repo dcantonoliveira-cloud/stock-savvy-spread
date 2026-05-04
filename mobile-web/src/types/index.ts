@@ -74,6 +74,7 @@ export interface BubbleEvento {
   pagamentos?: string[];
   ValoresAdicionais?: string[];
   'Degustações'?: string[];      // linked degustações — usado para filtro orçamentos
+  Arquivos_Internos?: string[];  // file attachments (contracts, proposals)
   PagouDegustacao?: boolean;
 
   // Client data (kept for future use, may not be directly on evento)
@@ -91,6 +92,11 @@ export interface BubbleLocal {
 }
 
 export interface BubbleAssessoria {
+  _id: string;
+  Nome?: string;
+}
+
+export interface BubbleProduto {
   _id: string;
   Nome?: string;
 }
@@ -114,9 +120,12 @@ export interface BubbleDegustacao {
   _id: string;
   data?: string;           // ISO date string (tasting date)
   convidados?: number;
+  QtdEventos?: number;     // number of events linked to this tasting
   'Observações'?: string;
   'Cardápio'?: string;
   tipo_degust?: string;
+  evento?: string;         // linked event ID (if single)
+  Eventos?: string[];      // linked event IDs (if multiple)
 }
 
 export interface BubbleListResponse<T> {
