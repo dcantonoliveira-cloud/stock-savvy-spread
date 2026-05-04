@@ -8,6 +8,7 @@ import type {
   BubbleDegustacao,
   BubbleLocal,
   BubblePagamento,
+  BubbleProduto,
   BubbleValorAdicional,
   BubbleListResponse,
   BubbleSingleResponse,
@@ -99,7 +100,17 @@ export function fetchAssessoria(id: string) {
   return apiFetch<BubbleSingleResponse<BubbleAssessoria>>(`Assessores/${id}`);
 }
 
+// ── Produtos ─────────────────────────────────────────────────────────────────
+
+export function fetchProduto(id: string) {
+  return apiFetch<BubbleSingleResponse<BubbleProduto>>(`ProdutoRondello/${id}`);
+}
+
 // ── Tastings ─────────────────────────────────────────────────────────────────
+
+export function fetchDegustacao(id: string) {
+  return apiFetch<BubbleSingleResponse<BubbleDegustacao>>(`Degusta%C3%A7%C3%A3o/${id}`);
+}
 
 export function fetchDegustacoes(opts?: { cursor?: number }) {
   const params: Record<string, string> = {
