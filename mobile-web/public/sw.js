@@ -1,8 +1,7 @@
-const CACHE = 'rondello-v1';
-const ASSETS = ['/', '/index.html'];
+// Cache name — bump to invalidate all cached assets
+const CACHE = 'rondello-v2';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
@@ -16,11 +15,36 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Only cache same-origin navigation requests; pass API calls through
-  if (e.request.url.includes('bubbleapps') || e.request.url.includes('rondellobuffet')) {
-    return; // Always fetch API calls live
+  const url = e.request.url;
+
+  // Pass API calls straight through — never cache
+  if (url.includes('bubbleapps') || url.includes('rondellobuffet')) return;
+
+  // Immutable hashed assets (/assets/xxx-HASH.js|css) — cache-first forever
+  if (url.includes('/assets/')) {
+    e.respondWith(
+      caches.open(CACHE).then((cache) =>
+        cache.match(e.request).then(
+          (cached) =>
+            cached ||
+            fetch(e.request).then((res) => {
+              cache.put(e.request, res.clone());
+              return res;
+            })
+        )
+      )
+    );
+    return;
   }
+
+  // HTML / navigation — network-first so new deploys are picked up immediately
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request))
+    fetch(e.request)
+      .then((res) => {
+        const clone = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
