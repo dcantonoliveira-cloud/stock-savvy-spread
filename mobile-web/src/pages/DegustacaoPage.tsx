@@ -23,8 +23,9 @@ function DegCard({
   const now    = new Date();
   const isPast = d.data ? new Date(d.data) < now : false;
 
-  // events linked to this degustação
-  const linked   = eventos.filter((e) => e['Degustações']?.includes(d._id));
+  // events linked to this degustação via the "eventos" field on the degustação
+  const eventIds = [...(d.eventos ?? []), ...(d.Eventos ?? [])];
+  const linked   = eventIds.map((id) => eventos.find((e) => e._id === id)).filter(Boolean) as typeof eventos;
   const fechados  = linked.filter((e) => e.status === 'Fechado').length;
   const novos     = linked.filter((e) => e.status !== 'Fechado').length;
   const convidados = d.convidados ?? 0;
@@ -80,11 +81,6 @@ function DegCard({
           )}
         </div>
 
-        {d['Observações'] && (
-          <p className="mt-2 text-xs text-gray-500 leading-relaxed line-clamp-2 border-t border-gray-50 pt-2">
-            {d['Observações']}
-          </p>
-        )}
       </div>
 
       <ArrowRight className="w-4 h-4 text-gray-200 shrink-0 mt-0.5" />
@@ -134,9 +130,10 @@ export default function DegustacaoPage() {
 
   // ── Header stats (upcoming degustações) ──────────────────────────────────
   const upcoming     = items.filter((d) => d.data && new Date(d.data) >= now);
-  const upcomingEvts = eventos.filter((e) =>
-    upcoming.some((d) => e['Degustações']?.includes(d._id))
+  const upcomingEventIds = new Set(
+    upcoming.flatMap((d) => [...(d.eventos ?? []), ...(d.Eventos ?? [])])
   );
+  const upcomingEvts = eventos.filter((e) => upcomingEventIds.has(e._id));
   const totalFechados   = upcomingEvts.filter((e) => e.status === 'Fechado').length;
   const totalNovos      = upcomingEvts.filter((e) => e.status !== 'Fechado').length;
   const totalConvidados = upcoming.reduce((s, d) => s + (d.convidados ?? 0), 0);

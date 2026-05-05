@@ -5,30 +5,36 @@ import {
   fetchAssessoria,
   fetchConvidadosDegForDeg,
   fetchDegustacao,
-  fetchEventosByDegId,
+  fetchEvento,
 } from '../api/bubble';
 import { BubbleConvidadoDeg, BubbleDegustacao, BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
 
 type Tab = 'convidados' | 'informacoes';
 
+/** Strip Bubble rich-text tags like [highlight=rgb(...)], [b], etc. */
+function stripRichText(text: string): string {
+  return text.replace(/\[\/?\w[^\]]*\]/g, '').trim();
+}
+
 function situacao(evento: BubbleEvento): string {
   return evento.status === 'Fechado' ? 'Fechado / 2º deg.' : 'Cliente Novo';
 }
 
 function SituacaoBadge({ evento }: { evento: BubbleEvento }) {
-  const s = situacao(evento);
-  const isFechado = s === 'Fechado / 2º deg.';
+  const isFechado = evento.status === 'Fechado';
   return (
     <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
       isFechado ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-50 text-blue-600'
     }`}>
-      {s}
+      {isFechado ? 'Fechado / 2º deg.' : 'Cliente Novo'}
     </span>
   );
 }
 
-function StatPill({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
+function StatPill({
+  label, value, accent,
+}: { label: string; value: string | number; accent?: string }) {
   return (
     <div className={`flex-1 rounded-2xl px-3 py-2.5 ${accent ?? 'bg-white/10'}`}>
       <p className="text-white/50 text-[9px] font-black uppercase tracking-widest">{label}</p>
@@ -38,25 +44,21 @@ function StatPill({ label, value, accent }: { label: string; value: string | num
 }
 
 function EventoRow({
-  evento,
-  assessoriaMap,
-  qtdConvidados,
+  evento, assessoriaMap, qtdConvidados,
 }: {
   evento: BubbleEvento;
   assessoriaMap: Record<string, string>;
   qtdConvidados: number | null;
 }) {
-  const navigate = useNavigate();
+  const navigate     = useNavigate();
+  const isFechado    = evento.status === 'Fechado';
   const assessorNome = evento.Assessoria ? (assessoriaMap[evento.Assessoria] ?? '—') : '—';
-  const s = situacao(evento);
-  const isFechado = s === 'Fechado / 2º deg.';
 
   return (
     <button
       onClick={() => navigate(`/eventos/${evento._id}`)}
       className="w-full flex items-center gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform text-left"
     >
-      {/* situação color bar */}
       <div className={`w-1 self-stretch rounded-full shrink-0 ${isFechado ? 'bg-emerald-400' : 'bg-blue-300'}`} />
 
       <div className="flex-1 min-w-0">
@@ -93,8 +95,8 @@ function EventoRow({
 }
 
 export default function DegustacaoDetailPage() {
-  const { id }     = useParams<{ id: string }>();
-  const navigate   = useNavigate();
+  const { id }   = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   const [degu, setDegu]                   = useState<BubbleDegustacao | null>(null);
   const [eventos, setEventos]             = useState<BubbleEvento[]>([]);
@@ -107,24 +109,36 @@ export default function DegustacaoDetailPage() {
   useEffect(() => {
     if (!id) return;
 
-    Promise.all([
-      fetchDegustacao(id),
-      fetchEventosByDegId(id),
-      fetchConvidadosDegForDeg(id),
-    ])
-      .then(async ([deguRes, evtRes, convRes]) => {
-        setDegu(deguRes.response);
+    fetchDegustacao(id)
+      .then(async (r) => {
+        const d = r.response;
+        setDegu(d);
 
-        const evts = evtRes.response.results;
+        // Field is lowercase "eventos" in Bubble (Parent group's Degustação's eventos)
+        const eventIds: string[] = [
+          ...(d.eventos ?? []),
+          ...(d.Eventos ?? []),
+          ...(d.evento ? [d.evento] : []),
+        ].filter((v, i, arr) => arr.indexOf(v) === i); // dedupe
+
+        // Fetch events + ConvidadosDeg in parallel
+        const [evtResults, convRes] = await Promise.all([
+          Promise.allSettled(eventIds.map((eid) => fetchEvento(eid).then((res) => res.response))),
+          fetchConvidadosDegForDeg(id).catch(() => ({ response: { results: [] } })),
+        ]);
+
+        const evts = evtResults
+          .filter((r): r is PromiseFulfilledResult<BubbleEvento> => r.status === 'fulfilled')
+          .map((r) => r.value);
         setEventos(evts);
-        setConvidadosDeg(convRes.response.results);
+        setConvidadosDeg((convRes as any).response.results ?? []);
 
-        // fetch assessoria names
+        // Assessoria names
         const aIds = [...new Set(evts.map((e) => e.Assessoria).filter(Boolean) as string[])];
         const aResults = await Promise.allSettled(aIds.map((aid) => fetchAssessoria(aid)));
         const aMap: Record<string, string> = {};
-        aResults.forEach((r, i) => {
-          if (r.status === 'fulfilled') aMap[aIds[i]] = r.value.response.Nome ?? '';
+        aResults.forEach((res, i) => {
+          if (res.status === 'fulfilled') aMap[aIds[i]] = res.value.response.Nome ?? '';
         });
         setAssessoriaMap(aMap);
       })
@@ -132,15 +146,16 @@ export default function DegustacaoDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // ── Stats ────────────────────────────────────────────────────────────────
-  const fechados       = eventos.filter((e) => e.status === 'Fechado').length;
-  const novos          = eventos.filter((e) => e.status !== 'Fechado').length;
-  const totalConvidados = convidadosDeg.reduce((sum, c) => sum + (c.qtd ?? 0), 0);
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const fechados        = eventos.filter((e) => e.status === 'Fechado').length;
+  const novos           = eventos.filter((e) => e.status !== 'Fechado').length;
+  const totalConvidados = (convidadosDeg as BubbleConvidadoDeg[]).reduce(
+    (sum, c) => sum + (c.qtd ?? 0), 0
+  ) || (degu?.convidados ?? 0);
 
-  // qtd map: evento._id → qtd de convidados nessa degustação
   const qtdMap: Record<string, number> = {};
-  convidadosDeg.forEach((c) => {
-    if (c.evento) qtdMap[c.evento] = (c.qtd ?? 0);
+  (convidadosDeg as BubbleConvidadoDeg[]).forEach((c) => {
+    if (c.evento) qtdMap[c.evento] = c.qtd ?? 0;
   });
 
   const dateLabel = degu?.data
@@ -184,11 +199,10 @@ export default function DegustacaoDetailPage() {
               <p className="text-white/50 text-sm font-medium mt-0.5">{degu.tipo_degust}</p>
             )}
 
-            {/* ── Stats pills ── */}
             <div className="flex gap-2 mt-4">
-              <StatPill label="Fechados" value={fechados} accent="bg-emerald-600/30" />
-              <StatPill label="Novos"    value={novos}    accent="bg-blue-500/20" />
-              <StatPill label="Convidados" value={totalConvidados || (degu?.convidados ?? 0)} />
+              <StatPill label="Fechados"   value={fechados}        accent="bg-emerald-600/30" />
+              <StatPill label="Novos"      value={novos}           accent="bg-blue-500/20" />
+              <StatPill label="Convidados" value={totalConvidados} />
             </div>
           </>
         )}
@@ -252,7 +266,7 @@ export default function DegustacaoDetailPage() {
               </p>
               {degu?.['Observações'] ? (
                 <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                  {degu['Observações']}
+                  {stripRichText(degu['Observações'])}
                 </p>
               ) : (
                 <p className="text-sm text-gray-400">Sem observações.</p>
