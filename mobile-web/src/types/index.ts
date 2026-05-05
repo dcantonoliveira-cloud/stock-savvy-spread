@@ -128,6 +128,13 @@ export interface BubbleDegustacao {
   Eventos?: string[];      // linked event IDs (if multiple)
 }
 
+export interface BubbleConvidadoDeg {
+  _id: string;
+  qtd?: number;
+  evento?: string;       // event ID reference
+  'Degustação'?: string; // degustação ID reference
+}
+
 export interface BubbleListResponse<T> {
   status: string;
   response: {

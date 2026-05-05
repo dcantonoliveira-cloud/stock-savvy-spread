@@ -1,73 +1,87 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Calendar, MapPin, Users } from 'lucide-react';
-import { fetchAssessoria, fetchDegustacao, fetchEvento } from '../api/bubble';
-import { BubbleDegustacao, BubbleEvento } from '../types';
+import { ArrowLeft, ArrowRight, Calendar, Users } from 'lucide-react';
+import {
+  fetchAssessoria,
+  fetchConvidadosDegForDeg,
+  fetchDegustacao,
+  fetchEventosByDegId,
+} from '../api/bubble';
+import { BubbleConvidadoDeg, BubbleDegustacao, BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
 
 type Tab = 'convidados' | 'informacoes';
 
-function StatusBadge({ status }: { status?: string }) {
-  if (!status) return null;
-  const colors: Record<string, string> = {
-    'Fechado':     'bg-emerald-100 text-emerald-700',
-    'Cancelado':   'bg-red-100 text-red-600',
-    'Não fechou':  'bg-gray-100 text-gray-500',
-    'Negociando':  'bg-amber-100 text-amber-700',
-    '1º Contato':  'bg-blue-100 text-blue-600',
-  };
-  const cls = colors[status] ?? 'bg-gray-100 text-gray-500';
+function situacao(evento: BubbleEvento): string {
+  return evento.status === 'Fechado' ? 'Fechado / 2º deg.' : 'Cliente Novo';
+}
+
+function SituacaoBadge({ evento }: { evento: BubbleEvento }) {
+  const s = situacao(evento);
+  const isFechado = s === 'Fechado / 2º deg.';
   return (
-    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${cls}`}>
-      {status}
+    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+      isFechado ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-50 text-blue-600'
+    }`}>
+      {s}
     </span>
   );
 }
 
-function EventoRow({ evento, assessoriaMap }: {
+function StatPill({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
+  return (
+    <div className={`flex-1 rounded-2xl px-3 py-2.5 ${accent ?? 'bg-white/10'}`}>
+      <p className="text-white/50 text-[9px] font-black uppercase tracking-widest">{label}</p>
+      <p className="text-white font-black text-xl leading-none mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function EventoRow({
+  evento,
+  assessoriaMap,
+  qtdConvidados,
+}: {
   evento: BubbleEvento;
   assessoriaMap: Record<string, string>;
+  qtdConvidados: number | null;
 }) {
   const navigate = useNavigate();
-  const date = evento.dataDoEvento ? new Date(evento.dataDoEvento) : null;
-  const day  = date?.toLocaleDateString('pt-BR', { day: '2-digit' });
-  const mon  = date?.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase();
-  const isPast = date ? date < new Date() : false;
   const assessorNome = evento.Assessoria ? (assessoriaMap[evento.Assessoria] ?? '—') : '—';
+  const s = situacao(evento);
+  const isFechado = s === 'Fechado / 2º deg.';
 
   return (
     <button
       onClick={() => navigate(`/eventos/${evento._id}`)}
       className="w-full flex items-center gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform text-left"
     >
-      <div className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 ${
-        isPast ? 'bg-gray-50' : 'bg-ron-900'
-      }`}>
-        <span className={`text-[9px] font-bold ${isPast ? 'text-gray-400' : 'text-gold-300'}`}>{mon}</span>
-        <span className={`text-xl font-black leading-none ${isPast ? 'text-gray-500' : 'text-white'}`}>
-          {day ?? '—'}
-        </span>
-      </div>
+      {/* situação color bar */}
+      <div className={`w-1 self-stretch rounded-full shrink-0 ${isFechado ? 'bg-emerald-400' : 'bg-blue-300'}`} />
 
       <div className="flex-1 min-w-0">
         <p className="font-bold text-gray-900 truncate text-sm">
           {evento.NomeDoEvento ?? evento.NomeDoContratante ?? '—'}
         </p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <StatusBadge status={evento.status} />
+
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <SituacaoBadge evento={evento} />
           {assessorNome !== '—' && (
             <span className="text-[10px] text-gray-400 font-medium">{assessorNome}</span>
           )}
         </div>
-        <div className="flex items-center gap-3 mt-1">
-          {evento.QtdConvidados != null && (
+
+        <div className="flex items-center gap-3 mt-1.5">
+          {evento.dataDoEvento && (
             <span className="flex items-center gap-1 text-[10px] text-gray-400">
-              <Users className="w-3 h-3" />{evento.QtdConvidados} conv.
+              <Calendar className="w-3 h-3" />
+              {fmtDate(evento.dataDoEvento)}
             </span>
           )}
-          {date && (
+          {qtdConvidados != null && (
             <span className="flex items-center gap-1 text-[10px] text-gray-400">
-              <Calendar className="w-3 h-3" />{fmtDate(evento.dataDoEvento)}
+              <Users className="w-3 h-3" />
+              {qtdConvidados} conv.
             </span>
           )}
         </div>
@@ -79,52 +93,55 @@ function EventoRow({ evento, assessoriaMap }: {
 }
 
 export default function DegustacaoDetailPage() {
-  const { id }       = useParams<{ id: string }>();
-  const navigate     = useNavigate();
-  const [degu, setDegu]             = useState<BubbleDegustacao | null>(null);
-  const [eventos, setEventos]       = useState<BubbleEvento[]>([]);
+  const { id }     = useParams<{ id: string }>();
+  const navigate   = useNavigate();
+
+  const [degu, setDegu]                   = useState<BubbleDegustacao | null>(null);
+  const [eventos, setEventos]             = useState<BubbleEvento[]>([]);
+  const [convidadosDeg, setConvidadosDeg] = useState<BubbleConvidadoDeg[]>([]);
   const [assessoriaMap, setAssessoriaMap] = useState<Record<string, string>>({});
-  const [loading, setLoading]       = useState(true);
-  const [loadingEventos, setLoadingEventos] = useState(false);
-  const [error, setError]           = useState(false);
-  const [activeTab, setActiveTab]   = useState<Tab>('convidados');
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState(false);
+  const [activeTab, setActiveTab]         = useState<Tab>('convidados');
 
   useEffect(() => {
     if (!id) return;
-    fetchDegustacao(id)
-      .then(async (r) => {
-        const d = r.response;
-        setDegu(d);
 
-        const eventIds: string[] = [
-          ...(d.Eventos ?? []),
-          ...(d.evento ? [d.evento] : []),
-        ];
+    Promise.all([
+      fetchDegustacao(id),
+      fetchEventosByDegId(id),
+      fetchConvidadosDegForDeg(id),
+    ])
+      .then(async ([deguRes, evtRes, convRes]) => {
+        setDegu(deguRes.response);
 
-        if (eventIds.length > 0) {
-          setLoadingEventos(true);
-          const evtResults = await Promise.allSettled(
-            eventIds.map((eid) => fetchEvento(eid).then((res) => res.response))
-          );
-          const evts = evtResults
-            .filter((r): r is PromiseFulfilledResult<BubbleEvento> => r.status === 'fulfilled')
-            .map((r) => r.value);
-          setEventos(evts);
+        const evts = evtRes.response.results;
+        setEventos(evts);
+        setConvidadosDeg(convRes.response.results);
 
-          // fetch assessoria names
-          const aIds = [...new Set(evts.map((e) => e.Assessoria).filter(Boolean) as string[])];
-          const aResults = await Promise.allSettled(aIds.map((aid) => fetchAssessoria(aid)));
-          const aMap: Record<string, string> = {};
-          aResults.forEach((r, i) => {
-            if (r.status === 'fulfilled') aMap[aIds[i]] = r.value.response.Nome ?? '';
-          });
-          setAssessoriaMap(aMap);
-          setLoadingEventos(false);
-        }
+        // fetch assessoria names
+        const aIds = [...new Set(evts.map((e) => e.Assessoria).filter(Boolean) as string[])];
+        const aResults = await Promise.allSettled(aIds.map((aid) => fetchAssessoria(aid)));
+        const aMap: Record<string, string> = {};
+        aResults.forEach((r, i) => {
+          if (r.status === 'fulfilled') aMap[aIds[i]] = r.value.response.Nome ?? '';
+        });
+        setAssessoriaMap(aMap);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // ── Stats ────────────────────────────────────────────────────────────────
+  const fechados       = eventos.filter((e) => e.status === 'Fechado').length;
+  const novos          = eventos.filter((e) => e.status !== 'Fechado').length;
+  const totalConvidados = convidadosDeg.reduce((sum, c) => sum + (c.qtd ?? 0), 0);
+
+  // qtd map: evento._id → qtd de convidados nessa degustação
+  const qtdMap: Record<string, number> = {};
+  convidadosDeg.forEach((c) => {
+    if (c.evento) qtdMap[c.evento] = (c.qtd ?? 0);
+  });
 
   const dateLabel = degu?.data
     ? new Date(degu.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
@@ -156,6 +173,7 @@ export default function DegustacaoDetailPage() {
           <div className="space-y-2">
             <div className="h-7 w-48 bg-white/20 rounded-xl animate-pulse" />
             <div className="h-4 w-28 bg-white/10 rounded-xl animate-pulse" />
+            <div className="h-14 bg-white/10 rounded-2xl animate-pulse mt-4" />
           </div>
         ) : (
           <>
@@ -163,14 +181,15 @@ export default function DegustacaoDetailPage() {
               {dateLabel ? `Degustação dia ${dateLabel}` : 'Degustação'}
             </h1>
             {degu?.tipo_degust && (
-              <p className="text-white/50 text-sm font-medium mt-1">{degu.tipo_degust}</p>
+              <p className="text-white/50 text-sm font-medium mt-0.5">{degu.tipo_degust}</p>
             )}
-            {degu?.data && (
-              <span className="flex items-center gap-1.5 text-gold-300/80 text-xs font-medium mt-2">
-                <MapPin className="w-3 h-3" />
-                {fmtDate(degu.data)}
-              </span>
-            )}
+
+            {/* ── Stats pills ── */}
+            <div className="flex gap-2 mt-4">
+              <StatPill label="Fechados" value={fechados} accent="bg-emerald-600/30" />
+              <StatPill label="Novos"    value={novos}    accent="bg-blue-500/20" />
+              <StatPill label="Convidados" value={totalConvidados || (degu?.convidados ?? 0)} />
+            </div>
           </>
         )}
       </div>
@@ -194,28 +213,30 @@ export default function DegustacaoDetailPage() {
 
       {/* ── Content ───────────────────────────────────────────────────── */}
       <div className="px-4 pt-4 space-y-3">
-
         {error || (!loading && !degu) ? (
           <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
             <p className="text-4xl mb-3">⚠️</p>
             <p className="text-gray-500">Erro ao carregar degustação.</p>
           </div>
         ) : activeTab === 'convidados' ? (
-          <>
-            {loadingEventos ? (
-              [1, 2, 3].map((i) => (
-                <div key={i} className="h-20 bg-black/5 rounded-3xl animate-pulse" />
-              ))
-            ) : eventos.length === 0 ? (
-              <div className="bg-white rounded-3xl p-8 text-center shadow-sm">
-                <p className="text-gray-400 text-sm">Nenhum evento vinculado.</p>
-              </div>
-            ) : (
-              eventos.map((e) => (
-                <EventoRow key={e._id} evento={e} assessoriaMap={assessoriaMap} />
-              ))
-            )}
-          </>
+          loading ? (
+            [1, 2, 3].map((i) => (
+              <div key={i} className="h-24 bg-black/5 rounded-3xl animate-pulse" />
+            ))
+          ) : eventos.length === 0 ? (
+            <div className="bg-white rounded-3xl p-8 text-center shadow-sm">
+              <p className="text-gray-400 text-sm">Nenhum evento vinculado.</p>
+            </div>
+          ) : (
+            eventos.map((e) => (
+              <EventoRow
+                key={e._id}
+                evento={e}
+                assessoriaMap={assessoriaMap}
+                qtdConvidados={qtdMap[e._id] ?? null}
+              />
+            ))
+          )
         ) : (
           /* ── Informações ── */
           <>
@@ -225,7 +246,6 @@ export default function DegustacaoDetailPage() {
                 <p className="text-sm text-gray-700 leading-relaxed">{degu['Cardápio']}</p>
               </div>
             )}
-
             <div className="bg-white rounded-3xl p-5 shadow-sm">
               <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-3">
                 Informações importantes
@@ -238,16 +258,6 @@ export default function DegustacaoDetailPage() {
                 <p className="text-sm text-gray-400">Sem observações.</p>
               )}
             </div>
-
-            {degu?.convidados != null && (
-              <div className="bg-white rounded-3xl p-5 shadow-sm flex items-center gap-3">
-                <Users className="w-5 h-5 text-gold-400" />
-                <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total de convidados</p>
-                  <p className="text-2xl font-black text-ron-900 leading-none mt-0.5">{degu.convidados}</p>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

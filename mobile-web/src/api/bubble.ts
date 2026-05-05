@@ -4,6 +4,7 @@
 
 import type {
   BubbleAssessoria,
+  BubbleConvidadoDeg,
   BubbleEvento,
   BubbleDegustacao,
   BubbleLocal,
@@ -135,6 +136,28 @@ export async function fetchAllDegustacoes(): Promise<BubbleDegustacao[]> {
   }
 
   return all;
+}
+
+// ── ConvidadosDeg ────────────────────────────────────────────────────────────
+
+/** All guest records linked to a specific degustação */
+export function fetchConvidadosDegForDeg(degId: string) {
+  return apiFetch<BubbleListResponse<BubbleConvidadoDeg>>('ConvidadosDeg', {
+    constraints: JSON.stringify([
+      { key: 'Degustação', constraint_type: 'equals', value: degId },
+    ]),
+    limit: '100',
+  });
+}
+
+/** Eventos that have a specific degustação in their Degustações list */
+export function fetchEventosByDegId(degId: string) {
+  return apiFetch<BubbleListResponse<BubbleEvento>>('eventos', {
+    constraints: JSON.stringify([
+      { key: 'Degustações', constraint_type: 'contains', value: degId },
+    ]),
+    limit: '100',
+  });
 }
 
 // ── Financeiro ───────────────────────────────────────────────────────────────
