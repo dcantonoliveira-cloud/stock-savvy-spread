@@ -61,7 +61,7 @@ export default function DegustacaoPage() {
       )}
 
       {/* ── Hero header ──────────────────────────────────────────────── */}
-      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-8 pb-8 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-8 overflow-hidden">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="relative">
           <p className="text-gold-400/70 text-xs font-bold uppercase tracking-widest">Menu de prova</p>

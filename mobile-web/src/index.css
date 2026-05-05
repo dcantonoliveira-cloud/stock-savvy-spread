@@ -15,8 +15,11 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
-.pb-safe  { padding-bottom: env(safe-area-inset-bottom, 16px); }
-.pt-safe  { padding-top:    env(safe-area-inset-top,    0px);  }
+.pb-safe   { padding-bottom: env(safe-area-inset-bottom, 16px); }
+.pt-safe   { padding-top:   env(safe-area-inset-top,    0px);  }
+/* Hero top — safe-area + extra breathing room */
+.pt-hero   { padding-top: calc(env(safe-area-inset-top, 0px) + 3rem); }
+.pt-hero-sm{ padding-top: calc(env(safe-area-inset-top, 0px) + 2rem); }
 
 /* hide scrollbars but keep scroll */
 .scrollbar-none::-webkit-scrollbar { display: none; }

@@ -74,7 +74,7 @@ export default function EstatisticasPage() {
     <div className="pb-36 max-w-lg mx-auto">
 
       {/* ── Hero header ──────────────────────────────────────────────── */}
-      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-12 pb-20 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-20 overflow-hidden">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="absolute -bottom-8 -left-6  w-36 h-36 bg-white/5 rounded-full" />
         <div className="relative">
