@@ -340,28 +340,28 @@
 
         /* Título do cardápio — herói */
         if (pacote.nome) {
-          blocks.push({ text: 'CARDÁPIO', fontSize: 7, bold: true, color: GOLD, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 7] });
-          blocks.push({ text: (pacote.nome || '').toUpperCase(), font: 'Cormorant', fontSize: 22, bold: true, color: NAVY, characterSpacing: 2, alignment: 'center', lineHeight: 1, margin: [0, 0, 0, 10] });
-          blocks.push({ canvas: [{ type: 'line', x1: 150, y1: 0, x2: 325, y2: 0, lineWidth: 0.5, lineColor: GOLD }], margin: [0, 0, 0, 18] });
+          blocks.push({ text: 'CARDÁPIO', fontSize: 7, bold: true, color: GOLD, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 4] });
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), font: 'Cormorant', fontSize: 22, bold: true, color: NAVY, characterSpacing: 2, alignment: 'center', lineHeight: 1, margin: [0, 0, 0, 6] });
+          blocks.push({ canvas: [{ type: 'line', x1: 150, y1: 0, x2: 325, y2: 0, lineWidth: 0.5, lineColor: GOLD }], margin: [0, 0, 0, 10] });
         }
 
         var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
         secoesAtivas.forEach(function(secao, si) {
           if (si > 0) {
-            blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.12, lineColor: '#EAE4DC' }], margin: [0, 6, 0, 8] });
+            blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.12, lineColor: '#EAE4DC' }], margin: [0, 4, 0, 5] });
           }
           var nome    = (secao.nome || '').trim();
           var hasDesc = !!(secao.detalhes && secao.detalhes.trim());
           blocks.push({
             columns: [
-              { canvas: [{ type: 'rect', x: 0, y: 2, w: 2.5, h: hasDesc ? 32 : 12, color: GOLD }], width: 14 },
+              { canvas: [{ type: 'rect', x: 0, y: 2, w: 2.5, h: hasDesc ? 28 : 10, color: GOLD }], width: 14 },
               {
                 stack: [
-                  { text: nome.toUpperCase(), fontSize: 9, bold: true, color: NAVY, characterSpacing: 1.2, margin: [0, 2, 0, hasDesc ? 5 : 0] }
-                ].concat(hasDesc ? [{ text: secao.detalhes.trim(), fontSize: 10, color: GRAY, lineHeight: 1.55 }] : []),
+                  { text: nome.toUpperCase(), fontSize: 9, bold: true, color: NAVY, characterSpacing: 1.2, margin: [0, 1, 0, hasDesc ? 3 : 0] }
+                ].concat(hasDesc ? [{ text: secao.detalhes.trim(), fontSize: 9, color: GRAY, lineHeight: 1.35 }] : []),
                 width: '*'
               }
-            ], columnGap: 12, margin: [0, 2, 0, 6]
+            ], columnGap: 12, margin: [0, 0, 0, 3]
           });
         });
       });
@@ -489,13 +489,8 @@
       });
 
       /* Alimentação de Staff */
-      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 14, 0, 12] });
-      blocks.push({
-        columns: [
-          { canvas: [{ type: 'rect', x: 0, y: 1, w: 2, h: 10, color: GOLD }], width: 10 },
-          { text: 'ALIMENTAÇÃO DE STAFF', font: 'Cormorant', fontSize: 13, bold: true, color: GOLD, characterSpacing: 0.8, margin: [0, 2, 0, 0] }
-        ], margin: [0, 0, 0, 8]
-      });
+      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 24, 0, 12] });
+      blocks.push({ text: 'ALIMENTAÇÃO DE STAFF', font: 'Cormorant', fontSize: 13, bold: true, color: GOLD, characterSpacing: 0.8, margin: [0, 0, 0, 8] });
       blocks.push({ text: 'Válido somente para equipes de terceiros. Todos os profissionais devem optar pela mesma modalidade.', fontSize: 9, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 10] });
 
       blocks.push({
@@ -523,13 +518,8 @@
 
       /* Seguro e Quebras */
       if (p2 && p2.quebrasAtiva) {
-        blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 12, 0, 10] });
-        blocks.push({
-          columns: [
-            { canvas: [{ type: 'rect', x: 0, y: 1, w: 2, h: 10, color: MGRAY }], width: 10 },
-            { text: 'SEGURO E QUEBRAS', font: 'Cormorant', fontSize: 13, bold: true, color: MGRAY, characterSpacing: 0.8, margin: [0, 2, 0, 0] }
-          ], margin: [0, 0, 0, 8]
-        });
+        blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 22, 0, 12] });
+        blocks.push({ text: 'SEGURO E QUEBRAS', font: 'Cormorant', fontSize: 13, bold: true, color: MGRAY, characterSpacing: 0.8, margin: [0, 0, 0, 8] });
         blocks.push({ text: 'Em caso de quebras e perdas de utensílios, oferecemos 2 opções:', fontSize: 9, color: GRAY, lineHeight: 1.45, margin: [0, 0, 0, 6] });
         blocks.push({
           ol: [
@@ -1032,12 +1022,12 @@
   /* ── SecaoCard ─────────────────────────────────────────────────────────── */
   function SecaoCard({ secao, onChange, onDelete }) {
     return (
-      <div style={{ borderRadius:8, marginBottom:6, border:`1.5px solid ${secao.ativa ? GOLD : '#E5E7EB'}`, background: secao.ativa ? '#FFFBF5' : '#FAFAFA', overflow:'hidden', transition:'border-color .2s' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px' }}>
+      <div style={{ borderRadius:6, marginBottom:3, border:`1.5px solid ${secao.ativa ? GOLD : '#E5E7EB'}`, background: secao.ativa ? '#FFFBF5' : '#FAFAFA', overflow:'hidden', transition:'border-color .2s' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 12px' }}>
           <Toggle checked={secao.ativa} onChange={v => onChange({ ...secao, ativa: v })} />
           {secao.custom
-            ? <input value={secao.nome} onChange={e => onChange({ ...secao, nome: e.target.value })} placeholder="Nome da seção" style={{ flex:1, border:'none', background:'transparent', fontSize:13, fontWeight:600, color:NAVY, outline:'none' }} />
-            : <div style={{ fontSize:13, fontWeight:600, color: secao.ativa ? NAVY : '#9CA3AF', flex:1 }}>{secao.nome}</div>
+            ? <input value={secao.nome} onChange={e => onChange({ ...secao, nome: e.target.value })} placeholder="Nome da seção" style={{ flex:1, border:'none', background:'transparent', fontSize:12, fontWeight:600, color:NAVY, outline:'none' }} />
+            : <div style={{ fontSize:12, fontWeight:600, color: secao.ativa ? NAVY : '#9CA3AF', flex:1 }}>{secao.nome}</div>
           }
           {secao.custom && <IconBtn onClick={onDelete} title="Remover" style={{ color:'#FCA5A5' }}>✕</IconBtn>}
         </div>
