@@ -225,16 +225,14 @@
       var tagCol   = '#B8A898';
       var mute     = '#7A90A8';
 
-      blocks.push({ text: '', margin: [0, 58, 0, 0] });
-
       if (logoB64) {
         /* Wrap logo in table cell so fillColor paints navy behind transparent pixels */
         blocks.push({
           table: {
             widths: ['*'],
             body: [[{
-              image: logoB64, width: 210, alignment: 'center',
-              margin: [0, 20, 0, 20],
+              image: logoB64, width: 252, alignment: 'center',
+              margin: [0, 0, 0, 0],
               fillColor: '#0D1526',
               border: [false, false, false, false]
             }]]
@@ -248,7 +246,7 @@
             paddingTop: function() { return 0; },
             paddingBottom: function() { return 0; }
           },
-          margin: [0, 0, 0, 16]
+          margin: [0, 0, 0, 90]
         });
       }
 
