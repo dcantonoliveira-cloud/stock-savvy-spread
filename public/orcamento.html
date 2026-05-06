@@ -457,7 +457,7 @@
         return {
           stack: [
             { text: txt, font: 'Cormorant', fontSize: 13, bold: true, color: c || GOLD, characterSpacing: 0.8 },
-            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 218, y2: 0, lineWidth: 0.3, lineColor: c || GOLD }], margin: [0, 2, 0, 5] }
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 218, y2: 0, lineWidth: 0.3, lineColor: c || GOLD }], margin: [0, 2, 0, 7] }
           ]
         };
       }
@@ -472,11 +472,11 @@
             {
               columns: [
                 { canvas: [{ type: 'rect', x: 0, y: 3, w: 2, h: 9, color: barColor }], width: 10 },
-                { text: main, fontSize: 9, color: NAVY, lineHeight: 1.2 }
+                { text: main, fontSize: 9, color: NAVY, lineHeight: 1.3 }
               ], columnGap: 6
             }
-          ].concat(sub ? [{ text: sub, fontSize: 7, color: GRAY, italics: true, lineHeight: 1.2, margin: [16, 0, 0, 0] }] : []),
-          margin: [0, 0, 0, 2]
+          ].concat(sub ? [{ text: sub, fontSize: 7, color: GRAY, italics: true, lineHeight: 1.25, margin: [16, 0, 0, 0] }] : []),
+          margin: [0, 0, 0, 5]
         };
       }
 
@@ -530,8 +530,18 @@
             { text: 'SEGURO E QUEBRAS', font: 'Cormorant', fontSize: 13, bold: true, color: MGRAY, characterSpacing: 0.8, margin: [0, 2, 0, 0] }
           ], margin: [0, 0, 0, 8]
         });
-        blocks.push({ text: 'Para eventos self-service ou com alto risco operacional, pode ser aplicada uma taxa sobre quebras e perdas de materiais. O valor é definido caso a caso e informado previamente.', fontSize: 9, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 4] });
-        if (p2.valorSeguro) blocks.push({ fontSize: 8.5, margin: [0, 0, 0, 2], text: [{ text: 'Taxa de seguro: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: GRAY }] });
+        blocks.push({ text: 'Em caso de quebras e perdas de utensílios, oferecemos 2 opções:', fontSize: 9, color: GRAY, lineHeight: 1.45, margin: [0, 0, 0, 6] });
+        blocks.push({
+          ol: [
+            { text: [
+                { text: 'Seguro quebra por ', color: GRAY, fontSize: 9 },
+                { text: p2.valorSeguro ? fmtMoeda(p2.valorSeguro) + ' por convidado' : 'R$ 6,00 por convidado', bold: true, color: NAVY, fontSize: 9 }
+              ], margin: [0, 0, 0, 4]
+            },
+            { text: 'Envio da contagem após o evento, com a possibilidade de acerto via transferência ou fornecimento dos mesmos materiais.', color: GRAY, fontSize: 9, lineHeight: 1.35 }
+          ],
+          fontSize: 9, color: GRAY, margin: [4, 0, 0, 2]
+        });
       }
 
       return blocks;
