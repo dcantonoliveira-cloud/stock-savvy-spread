@@ -18,6 +18,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/vfs_fonts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
   <script>
       /* ── Cormorant Garamond — fonte serifada premium ── */
   (function() {
@@ -227,7 +228,28 @@
       blocks.push({ text: '', margin: [0, 58, 0, 0] });
 
       if (logoB64) {
-        blocks.push({ image: logoB64, width: 210, alignment: 'center', margin: [0, 0, 0, 28] });
+        /* Wrap logo in table cell so fillColor paints navy behind transparent pixels */
+        blocks.push({
+          table: {
+            widths: ['*'],
+            body: [[{
+              image: logoB64, width: 210, alignment: 'center',
+              margin: [0, 20, 0, 20],
+              fillColor: '#0D1526',
+              border: [false, false, false, false]
+            }]]
+          },
+          layout: {
+            fillColor: function() { return '#0D1526'; },
+            hLineWidth: function() { return 0; },
+            vLineWidth: function() { return 0; },
+            paddingLeft: function() { return 0; },
+            paddingRight: function() { return 0; },
+            paddingTop: function() { return 0; },
+            paddingBottom: function() { return 0; }
+          },
+          margin: [0, 0, 0, 16]
+        });
       }
 
       blocks.push({ canvas: [{ type: 'line', x1: 192, y1: 0, x2: 283, y2: 0, lineWidth: 0.3, lineColor: goldSoft }], margin: [0, 0, 0, 14] });
@@ -1077,7 +1099,7 @@
   }
 
   /* ── PacoteCard ────────────────────────────────────────────────────────── */
-  function PacoteCard({ pacote, index, total, onChange, onDelete, onMoveUp, onMoveDown }) {
+  function PacoteCard({ pacote, index, total, onChange, onDelete, onDuplicate, onMoveUp, onMoveDown }) {
     const set = (k, v) => onChange({ ...pacote, [k]: v });
     const setSecao = (i, s) => { const c = [...pacote.secoes]; c[i] = s; onChange({ ...pacote, secoes: c }); };
     const addCustom = () => onChange({ ...pacote, secoes: [...pacote.secoes, makeSecao('', true)] });
@@ -1101,6 +1123,7 @@
           <div style={{ display:'flex', gap:2, alignItems:'center' }}>
             {total > 1 && index > 0 && <IconBtn onClick={onMoveUp} title="Mover acima" style={{ color:`${GOLD}88`, fontSize:12 }}>▲</IconBtn>}
             {total > 1 && index < total - 1 && <IconBtn onClick={onMoveDown} title="Mover abaixo" style={{ color:`${GOLD}88`, fontSize:12 }}>▼</IconBtn>}
+            <IconBtn onClick={onDuplicate} title="Duplicar pacote" style={{ color:`${GOLD}BB`, fontSize:13 }}>⧉</IconBtn>
             {total > 1 && <IconBtn onClick={onDelete} title="Remover pacote" style={{ color:'#FCA5A5' }}>✕</IconBtn>}
             <IconBtn onClick={() => set('expandido', !pacote.expandido)} title={pacote.expandido ? 'Recolher' : 'Expandir'} style={{ color:`${GOLD}BB`, fontSize:13 }}>
               {pacote.expandido ? '▲' : '▼'}
@@ -1221,6 +1244,142 @@
     );
   }
 
+  /* ── gerarPPT ─────────────────────────────────────────────────────────── */
+  window.gerarPPT = function(dados) {
+    var pptx = new PptxGenJS();
+    pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches
+
+    var NAVY    = '1D1A14';
+    var CVRBG   = '0D1526';
+    var GOLD_H  = 'C4A87A';
+    var CREAM_H = 'EDE6DC';
+    var GRAY_H  = '7A6B5A';
+
+    var cliente = dados.cliente || {};
+    var pacotes = dados.pacotes || [];
+    var frase   = dados.fraseCapa || '';
+    var sobre   = dados.sobreTexto || '';
+
+    function fmtMoeda(v) {
+      var n = parseFloat(v);
+      if (isNaN(n)) return '';
+      return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    /* ── SLIDE 1: Capa ─────────────────────────────────────── */
+    var s1 = pptx.addSlide();
+    s1.background = { color: CVRBG };
+
+    s1.addText('RONDELLO', { x:0, y:2.0, w:13.33, h:0.9, align:'center', fontSize:48, bold:true, color:'FFFFFF', fontFace:'Calibri', charSpacing:10 });
+    s1.addText('buffet',   { x:0, y:3.0, w:13.33, h:0.55, align:'center', fontSize:22, italic:true, color:GOLD_H, fontFace:'Georgia' });
+    s1.addShape(pptx.ShapeType.line, { x:4.17, y:3.75, w:5, h:0, line:{ color:GOLD_H, width:0.8 } });
+
+    var nomeCliente = (cliente.nome || '').toUpperCase();
+    if (nomeCliente) s1.addText(nomeCliente, { x:0.5, y:4.0, w:12.33, h:0.7, align:'center', fontSize:26, bold:true, color:CREAM_H, fontFace:'Calibri' });
+
+    var infoParts = [];
+    if (cliente.data)       infoParts.push(cliente.data);
+    if (cliente.local)      infoParts.push(cliente.local);
+    if (cliente.convidados) infoParts.push(cliente.convidados + ' convidados');
+    if (cliente.tipo)       infoParts.push(cliente.tipo);
+    if (cliente.horas)      infoParts.push(cliente.horas + 'h');
+    if (infoParts.length) s1.addText(infoParts.join('  ·  '), { x:0.5, y:4.8, w:12.33, h:0.35, align:'center', fontSize:11, color:'9C8E82', fontFace:'Calibri' });
+
+    if (frase) s1.addText(frase, { x:1.5, y:5.3, w:10.33, h:1.1, align:'center', fontSize:13, italic:true, color:CREAM_H, fontFace:'Georgia', wrap:true });
+    s1.addText('Sorocaba  ·  SP', { x:0, y:7.05, w:13.33, h:0.3, align:'center', fontSize:8, color:GRAY_H, fontFace:'Calibri', charSpacing:4 });
+
+    /* ── SLIDES por pacote ─────────────────────────────────── */
+    pacotes.forEach(function(pacote) {
+      var sp = pptx.addSlide();
+      sp.background = { color: 'FAF8F4' };
+
+      sp.addShape(pptx.ShapeType.rect, { x:0, y:0, w:13.33, h:0.06, fill:{ color:GOLD_H }, line:{ color:GOLD_H } });
+      sp.addText('CARDÁPIO', { x:0, y:0.18, w:13.33, h:0.28, align:'center', fontSize:7.5, bold:true, color:GOLD_H, fontFace:'Calibri', charSpacing:5 });
+      sp.addText((pacote.nome || '').toUpperCase(), { x:0, y:0.5, w:13.33, h:0.75, align:'center', fontSize:34, bold:true, color:NAVY, fontFace:'Georgia', charSpacing:2 });
+      sp.addShape(pptx.ShapeType.line, { x:3.67, y:1.35, w:6, h:0, line:{ color:GOLD_H, width:0.6 } });
+
+      /* Seções (coluna esquerda) */
+      var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
+      var colX = 0.4; var colW = 6.5;
+
+      if (secoesAtivas.length > 0) {
+        sp.addText('O QUE VOCÊ RECEBE', { x:colX, y:1.55, w:colW, h:0.35, fontSize:9.5, bold:true, color:GOLD_H, fontFace:'Calibri', charSpacing:1 });
+        sp.addShape(pptx.ShapeType.line, { x:colX, y:1.93, w:colW, h:0, line:{ color:GOLD_H, width:0.25 } });
+
+        var ly = 2.05;
+        secoesAtivas.forEach(function(sec) {
+          if (ly > 6.9) return;
+          if (sec.nome) {
+            sp.addText(sec.nome, { x:colX, y:ly, w:colW, h:0.28, fontSize:10.5, bold:true, color:NAVY, fontFace:'Calibri' });
+            ly += 0.3;
+          }
+          (sec.itens || []).filter(function(it){ return it.incluso && it.nome; }).forEach(function(it) {
+            if (ly > 6.9) return;
+            sp.addText('  ✓  ' + it.nome + (it.sub ? '  —  ' + it.sub : ''), { x:colX, y:ly, w:colW, h:0.22, fontSize:9, color:'4A3F35', fontFace:'Calibri' });
+            ly += 0.22;
+          });
+          (sec.itens || []).filter(function(it){ return !it.incluso && it.nome; }).forEach(function(it) {
+            if (ly > 6.9) return;
+            sp.addText('  ✗  ' + it.nome, { x:colX, y:ly, w:colW, h:0.22, fontSize:8.5, italic:true, color:GRAY_H, fontFace:'Calibri' });
+            ly += 0.22;
+          });
+          ly += 0.08;
+        });
+      }
+
+      /* Investimento (coluna direita) */
+      var inv = pacote.investimento || {};
+      var faixas = inv.faixas || [];
+      var invX = 7.3; var invW = 5.63;
+
+      if (faixas.length > 0) {
+        sp.addText('INVESTIMENTO', { x:invX, y:1.55, w:invW, h:0.35, fontSize:9.5, bold:true, color:GOLD_H, fontFace:'Calibri', charSpacing:1 });
+        sp.addText('por convidado', { x:invX, y:1.56, w:invW, h:0.3, align:'right', fontSize:8.5, italic:true, color:GRAY_H, fontFace:'Georgia' });
+        sp.addShape(pptx.ShapeType.line, { x:invX, y:1.93, w:invW, h:0, line:{ color:GOLD_H, width:0.25 } });
+
+        var rows = [];
+        faixas.forEach(function(f) {
+          rows.push([
+            { text: f.horas ? f.horas + 'h de serviço' : '', options:{ fontSize:10, color:'3D3028', fontFace:'Calibri' } },
+            { text: fmtMoeda(f.valor) + '/pessoa', options:{ fontSize:11, bold:true, color:NAVY, fontFace:'Calibri', align:'right' } }
+          ]);
+        });
+        sp.addTable(rows, { x:invX, y:2.08, w:invW, rowH:0.42, border:{ pt:0.3, color:'DDD6CD' }, fill:{ color:'FFFFFF' }, colW:[2.8, 2.83] });
+
+        var ty = 2.08 + rows.length * 0.42 + 0.18;
+        if (inv.validade) { sp.addText('Validade: ' + inv.validade, { x:invX, y:ty, w:invW, h:0.25, fontSize:8.5, italic:true, color:GRAY_H, fontFace:'Calibri' }); ty += 0.28; }
+        if (inv.condicoes) sp.addText(inv.condicoes, { x:invX, y:ty, w:invW, h:1.5, fontSize:8, color:GRAY_H, fontFace:'Calibri', wrap:true });
+      }
+
+      sp.addShape(pptx.ShapeType.line, { x:0, y:7.3, w:13.33, h:0, line:{ color:GOLD_H, width:0.25 } });
+      sp.addText('RONDELLO BUFFET  ·  Sorocaba SP', { x:0, y:7.33, w:13.33, h:0.22, align:'center', fontSize:7.5, color:GRAY_H, fontFace:'Calibri', charSpacing:3 });
+    });
+
+    /* ── SLIDE FINAL: Contato ──────────────────────────────── */
+    var sc = pptx.addSlide();
+    sc.background = { color: CVRBG };
+
+    if (sobre) sc.addText(sobre, { x:1, y:0.5, w:11.33, h:2.2, align:'center', fontSize:12, italic:true, color:CREAM_H, fontFace:'Georgia', wrap:true });
+    sc.addShape(pptx.ShapeType.line, { x:4.17, y:2.9, w:5, h:0, line:{ color:GOLD_H, width:0.6 } });
+    sc.addText('RONDELLO', { x:0, y:3.1, w:13.33, h:0.75, align:'center', fontSize:38, bold:true, color:'FFFFFF', fontFace:'Calibri', charSpacing:10 });
+    sc.addText('buffet',   { x:0, y:3.9, w:13.33, h:0.5,  align:'center', fontSize:20, italic:true, color:GOLD_H, fontFace:'Georgia' });
+    sc.addShape(pptx.ShapeType.line, { x:4.17, y:4.6, w:5, h:0, line:{ color:GOLD_H, width:0.6 } });
+
+    sc.addText([
+      { text:'(15) 99765-0209',          options:{ color:CREAM_H } },
+      { text:'  ·  ',                    options:{ color:GRAY_H } },
+      { text:'@rondellobuffet',           options:{ color:GOLD_H } },
+      { text:'  ·  ',                    options:{ color:GRAY_H } },
+      { text:'contato@rondellobuffet.com.br', options:{ color:CREAM_H } }
+    ], { x:0, y:4.85, w:13.33, h:0.4, align:'center', fontSize:11, fontFace:'Calibri' });
+
+    sc.addText('www.rondellobuffet.com.br', { x:0, y:5.35, w:13.33, h:0.3, align:'center', fontSize:9, color:GRAY_H, fontFace:'Calibri', charSpacing:2 });
+    sc.addText('Sorocaba  ·  SP',           { x:0, y:7.05, w:13.33, h:0.3, align:'center', fontSize:8, color:GRAY_H, fontFace:'Calibri', charSpacing:4 });
+
+    var arqNome = 'Rondello_' + ((cliente.nome || 'Proposta').replace(/[^a-zA-Z0-9]/g, '_')) + '.pptx';
+    pptx.writeFile({ fileName: arqNome });
+  };
+
   /* ── App ───────────────────────────────────────────────────────────────── */
   function App() {
     const [cliente, setCliente] = React.useState({ nome:'', data:'', local:'', convidados:'', tipo:'', horas:'' });
@@ -1231,6 +1390,7 @@
     const [incluirCardapio, setCardapioToggle] = React.useState(false);
     const [cardapio, setCardapio] = React.useState([{ id:uid(), categoria:'', pratos:[{ id:uid(), nome:'', desc:'' }] }]);
     const [gerando, setGerando] = React.useState(false);
+    const [gerandoPPT, setGerandoPPT] = React.useState(false);
     const [modelos, setModelos] = React.useState([]);
 
     const setC = (k, v) => setCliente(c => ({ ...c, [k]: v }));
@@ -1316,6 +1476,25 @@
       [c[i], c[t]] = [c[t], c[i]]; setPacotes(c);
     };
 
+    const dupPacote = (i) => setPacotes(ps => {
+      const orig = ps[i];
+      const clone = JSON.parse(JSON.stringify(orig));
+      clone.id = 'p' + Date.now();
+      clone.nome = orig.nome + ' (cópia)';
+      clone.secoes = (clone.secoes || []).map(s => ({ ...s, id: 's' + Math.random().toString(36).slice(2) }));
+      clone.expandido = true;
+      return [...ps.slice(0, i + 1), clone, ...ps.slice(i + 1)];
+    });
+
+    const handleGerarPPT = () => {
+      setGerandoPPT(true);
+      setTimeout(() => {
+        try { window.gerarPPT({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio }); }
+        catch(e) { alert('Erro ao gerar PPT:\n' + e.message); }
+        setGerandoPPT(false);
+      }, 100);
+    };
+
     const handleGerar = () => {
       setGerando(true);
       setTimeout(() => {
@@ -1336,9 +1515,14 @@
               <div style={{ fontSize:10, color:`${GOLD}CC`, letterSpacing:'0.08em', textTransform:'uppercase' }}>Gerador de Orçamento</div>
             </div>
           </div>
-          <Btn onClick={handleGerar} loading={gerando} variant="gold" style={{ minWidth:150, fontSize:13 }}>
-            {gerando ? '⏳ Gerando...' : '⬇ Gerar PDF'}
-          </Btn>
+          <div style={{ display:'flex', gap:8 }}>
+            <Btn onClick={handleGerarPPT} loading={gerandoPPT} variant="ghost" style={{ fontSize:12, color:'#fff', borderColor:'rgba(255,255,255,.3)' }}>
+              {gerandoPPT ? '⏳...' : '📊 PPT'}
+            </Btn>
+            <Btn onClick={handleGerar} loading={gerando} variant="gold" style={{ minWidth:150, fontSize:13 }}>
+              {gerando ? '⏳ Gerando...' : '⬇ Gerar PDF'}
+            </Btn>
+          </div>
         </div>
 
         <div style={{ maxWidth:820, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
@@ -1373,6 +1557,7 @@
             {pacotes.map((p,i) => (
               <PacoteCard key={p.id} pacote={p} index={i} total={pacotes.length}
                 onChange={u => setPacote(i, u)} onDelete={() => remPacote(i)}
+                onDuplicate={() => dupPacote(i)}
                 onMoveUp={() => movePacote(i,-1)} onMoveDown={() => movePacote(i,1)}
               />
             ))}
@@ -1422,7 +1607,10 @@
           </Card>
 
           {/* Bottom generate */}
-          <div style={{ display:'flex', justifyContent:'center', marginTop:8 }}>
+          <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8 }}>
+            <Btn onClick={handleGerarPPT} loading={gerandoPPT} variant="ghost" style={{ fontSize:13, padding:'12px 22px' }}>
+              {gerandoPPT ? '⏳ Gerando PPT...' : '📊 Gerar PPT'}
+            </Btn>
             <Btn onClick={handleGerar} loading={gerando} variant="gold" style={{ minWidth:230, fontSize:14, padding:'12px 28px' }}>
               {gerando ? '⏳ Gerando PDF...' : '⬇ Gerar PDF'}
             </Btn>
