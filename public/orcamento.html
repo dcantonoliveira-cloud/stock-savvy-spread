@@ -214,7 +214,7 @@
       };
     }
 
-    /* ── CAPA — azul marinho, logo em evidência, dados do casal ────────── */
+    /* ── CAPA — azul marinho, logo herói 180px, grid evento completo ──────── */
     function buildCover(cliente, fraseCapa, logoB64) {
       var blocks   = [];
       var frase    = fraseCapa || 'Uma experiência gastronômica criada exclusivamente para o seu casamento.';
@@ -223,95 +223,68 @@
       var tagCol   = '#B8A898';
       var mute     = '#7A90A8';
 
-      /* Espaço superior — posiciona logo no terço superior da página */
-      blocks.push({ text: '', margin: [0, 68, 0, 0] });
+      blocks.push({ text: '', margin: [0, 58, 0, 0] });
 
-      /* Logo — herói da capa, grande e centralizado */
       if (logoB64) {
-        blocks.push({ image: logoB64, width: 148, alignment: 'center', margin: [0, 0, 0, 34] });
+        blocks.push({ image: logoB64, width: 180, alignment: 'center', margin: [0, 0, 0, 30] });
       }
 
-      /* Ornamento: hairline gold */
-      blocks.push({
-        canvas: [{ type: 'line', x1: 192, y1: 0, x2: 283, y2: 0, lineWidth: 0.3, lineColor: goldSoft }],
-        margin: [0, 0, 0, 14]
-      });
+      blocks.push({ canvas: [{ type: 'line', x1: 192, y1: 0, x2: 283, y2: 0, lineWidth: 0.3, lineColor: goldSoft }], margin: [0, 0, 0, 14] });
+      blocks.push({ text: 'PROPOSTA EXCLUSIVA', fontSize: 9, color: goldSoft, characterSpacing: 3.5, alignment: 'center', margin: [0, 0, 0, 22] });
 
-      /* Eyebrow */
-      blocks.push({
-        text: 'PROPOSTA EXCLUSIVA',
-        fontSize: 6.5, color: goldSoft, characterSpacing: 5.5,
-        alignment: 'center', margin: [0, 0, 0, 28]
-      });
-
-      /* Nome do casal — herói tipográfico */
       if (cliente.nome) {
-        blocks.push({
-          text: cliente.nome,
-          font: 'Cormorant', fontSize: 56, bold: true,
-          color: cream, alignment: 'center',
-          lineHeight: 0.92, margin: [0, 0, 0, 34]
-        });
+        blocks.push({ text: cliente.nome, font: 'Cormorant', fontSize: 56, bold: true, color: cream, alignment: 'center', lineHeight: 0.92, margin: [0, 0, 0, 28] });
       }
 
-      /* DATA / LOCAL — labeled 2-colunas */
+      /* Grid DATA + LOCAL */
       var hasData  = !!(cliente.data  && ('' + cliente.data).trim());
       var hasLocal = !!(cliente.local && ('' + cliente.local).trim());
       if (hasData || hasLocal) {
-        var infoCols = [];
+        var row1 = [];
         if (hasData) {
-          infoCols.push({
-            stack: [
-              { text: 'DATA', fontSize: 5.5, color: goldSoft, characterSpacing: 3.5, alignment: 'center', margin: [0, 0, 0, 5] },
-              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 0.2, lineColor: '#3A5070' }], margin: [0, 0, 0, 7] },
-              { text: cliente.data, font: 'Cormorant', fontSize: 14, italics: true, color: cream, alignment: 'center' }
-            ],
-            width: '*'
-          });
+          row1.push({ stack: [
+            { text: 'DATA', fontSize: 7, color: goldSoft, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 5] },
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 0.2, lineColor: '#3A5070' }], margin: [0, 0, 0, 7] },
+            { text: cliente.data, font: 'Cormorant', fontSize: 17, italics: true, color: cream, alignment: 'center' }
+          ], width: '*' });
         }
         if (hasData && hasLocal) {
-          infoCols.push({
-            canvas: [{ type: 'line', x1: 0, y1: 0, x2: 0, y2: 48, lineWidth: 0.3, lineColor: '#2A4060' }],
-            width: 1
-          });
+          row1.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 0, y2: 52, lineWidth: 0.3, lineColor: '#2A4060' }], width: 1 });
         }
         if (hasLocal) {
-          infoCols.push({
-            stack: [
-              { text: 'LOCAL', fontSize: 5.5, color: goldSoft, characterSpacing: 3.5, alignment: 'center', margin: [0, 0, 0, 5] },
-              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 0.2, lineColor: '#3A5070' }], margin: [0, 0, 0, 7] },
-              { text: cliente.local, font: 'Cormorant', fontSize: 14, italics: true, color: cream, alignment: 'center' }
-            ],
-            width: '*'
-          });
+          row1.push({ stack: [
+            { text: 'LOCAL', fontSize: 7, color: goldSoft, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 5] },
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 80, y2: 0, lineWidth: 0.2, lineColor: '#3A5070' }], margin: [0, 0, 0, 7] },
+            { text: cliente.local, font: 'Cormorant', fontSize: 17, italics: true, color: cream, alignment: 'center' }
+          ], width: '*' });
         }
-        blocks.push({ columns: infoCols, columnGap: 24, margin: [80, 0, 80, 0] });
+        blocks.push({ columns: row1, columnGap: 24, margin: [70, 0, 70, 0] });
+      }
+
+      /* Segunda linha: convidados · tipo · duração */
+      var detalhesCols = [];
+      if (cliente.convidados) detalhesCols.push({ label: 'CONVIDADOS', val: '' + cliente.convidados });
+      if (cliente.tipo)       detalhesCols.push({ label: 'TIPO',       val: cliente.tipo });
+      if (cliente.horas)      detalhesCols.push({ label: 'DURAÇÃO',    val: cliente.horas + 'h' });
+
+      if (detalhesCols.length) {
+        blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.12, lineColor: '#1E3050' }], margin: [0, 18, 0, 14] });
+        var dCols = [];
+        detalhesCols.forEach(function(d, di) {
+          if (di > 0) dCols.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 0, y2: 34, lineWidth: 0.25, lineColor: '#2A4060' }], width: 1 });
+          dCols.push({ stack: [
+            { text: d.label, fontSize: 5.5, color: mute, characterSpacing: 2.5, alignment: 'center', margin: [0, 0, 0, 4] },
+            { text: d.val, fontSize: 11, color: cream, alignment: 'center' }
+          ], width: '*' });
+        });
+        blocks.push({ columns: dCols, columnGap: 16 });
+        blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.12, lineColor: '#1E3050' }], margin: [0, 14, 0, 0] });
       }
 
       /* Tagline */
-      blocks.push({ text: '', margin: [0, 26, 0, 0] });
-      blocks.push({
-        canvas: [{ type: 'line', x1: 200, y1: 0, x2: 275, y2: 0, lineWidth: 0.18, lineColor: goldSoft }],
-        margin: [0, 0, 0, 13]
-      });
-      blocks.push({
-        text: frase, font: 'Cormorant', fontSize: 10.5, italics: true,
-        color: tagCol, alignment: 'center', lineHeight: 1.65,
-        characterSpacing: 0.2, margin: [60, 0, 60, 0]
-      });
-
-      /* Convidados / tipo / horas — sutil */
-      var infoLine = [];
-      if (cliente.convidados) infoLine.push(cliente.convidados + ' convidados');
-      if (cliente.tipo)       infoLine.push(cliente.tipo);
-      if (cliente.horas)      infoLine.push(cliente.horas + 'h de evento');
-      if (infoLine.length) {
-        blocks.push({ text: '', margin: [0, 16, 0, 0] });
-        blocks.push({
-          text: infoLine.join('   ·   ').toUpperCase(),
-          fontSize: 5.5, color: mute, characterSpacing: 3, alignment: 'center'
-        });
-      }
+      blocks.push({ text: '', margin: [0, 20, 0, 0] });
+      blocks.push({ canvas: [{ type: 'line', x1: 200, y1: 0, x2: 275, y2: 0, lineWidth: 0.18, lineColor: goldSoft }], margin: [0, 0, 0, 12] });
+      blocks.push({ text: frase, font: 'Cormorant', fontSize: 13, italics: true, color: tagCol, alignment: 'center', lineHeight: 1.65, characterSpacing: 0.2, margin: [50, 0, 50, 0] });
 
       return blocks;
     }
@@ -331,108 +304,84 @@
       return parts;
     }
 
-    /* ── Página 2 — Experiência Gastronômica — layout vertical puro ──────────── */
+    /* ── Página 2 — Experiência Gastronômica — vertical, faixas de preço ─────── */
     function buildExperienciaGastronomica(pacotes, p2) {
       var blocks = [];
 
-      /* ── Cabeçalho — flanking lines ── */
       blocks.push({
         columns: [
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 130, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 130 },
           { text: 'A EXPERIÊNCIA GASTRONÔMICA', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, alignment: 'center', margin: [0, 2, 0, 0] },
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 130, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 130 }
         ],
-        columnGap: 10,
-        margin: [0, 0, 0, 26]
+        columnGap: 10, margin: [0, 0, 0, 14]
       });
 
       pacotes.forEach(function(pacote, pi) {
         if (pi > 0) {
-          blocks.push({
-            canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }],
-            margin: [0, 16, 0, 16]
-          });
+          blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 12, 0, 12] });
         }
 
-        if (pacotes.length > 1 && pacote.nome) {
-          blocks.push({
-            text: (pacote.nome || '').toUpperCase(),
-            fontSize: 6.5, color: GOLD, characterSpacing: 3.5, margin: [0, 0, 0, 14]
-          });
+        /* Título do cardápio — sempre visível */
+        if (pacote.nome) {
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 8.5, bold: true, color: NAVY, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 14] });
         }
 
         var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
-
-        /* ── Vertical puro: cada seção = 1 linha ── */
         secoesAtivas.forEach(function(secao, si) {
           if (si > 0) {
-            blocks.push({
-              canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.12, lineColor: '#EAE4DC' }],
-              margin: [0, 9, 0, 9]
-            });
+            blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.12, lineColor: '#EAE4DC' }], margin: [0, 7, 0, 7] });
           }
-          var nome   = (secao.nome || '').trim();
+          var nome    = (secao.nome || '').trim();
           var hasDesc = !!(secao.detalhes && secao.detalhes.trim());
           blocks.push({
             columns: [
-              /* Barra gold lateral */
-              {
-                canvas: [{ type: 'rect', x: 0, y: 0, w: 2.5, h: hasDesc ? 36 : 14, color: GOLD }],
-                width: 14
-              },
-              /* Nome + descrição */
+              { canvas: [{ type: 'rect', x: 0, y: 0, w: 2.5, h: hasDesc ? 34 : 14, color: GOLD }], width: 14 },
               {
                 stack: [
                   { text: nome.toUpperCase(), fontSize: 7.5, bold: true, color: NAVY, characterSpacing: 1.8, margin: [0, 0, 0, hasDesc ? 3 : 0] }
-                ].concat(
-                  hasDesc
-                    ? [{ text: secao.detalhes.trim(), fontSize: 8.5, color: GRAY, lineHeight: 1.5 }]
-                    : []
-                ),
+                ].concat(hasDesc ? [{ text: secao.detalhes.trim(), fontSize: 8.5, color: GRAY, lineHeight: 1.5 }] : []),
                 width: '*'
               }
-            ],
-            columnGap: 12
+            ], columnGap: 12
           });
         });
       });
 
-      /* ── INVESTIMENTO — vertical puro ── */
-      blocks.push({
-        canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.25, lineColor: '#D4C09A' }],
-        margin: [0, 22, 0, 0]
-      });
+      /* INVESTIMENTO */
+      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.25, lineColor: '#D4C09A' }], margin: [0, 18, 0, 0] });
 
       pacotes.forEach(function(pacote, pi) {
-        var inv   = pacote.investimento || {};
-        var preco = inv.precoFinal || inv.precoOriginal;
-        if (!preco) return;
+        var inv    = pacote.investimento || {};
+        var faixas = (inv.faixas || []).filter(function(f) { return f.valor; });
+        var preco  = inv.precoFinal || inv.precoOriginal;
+        if (!faixas.length && !preco) return;
 
         if (pi > 0) {
-          blocks.push({
-            canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }],
-            margin: [0, 18, 0, 0]
-          });
-        }
-        if (pacotes.length > 1 && pacote.nome) {
-          blocks.push({ text: (pacote.nome || '').toUpperCase(), fontSize: 6.5, color: GOLD, characterSpacing: 3.5, margin: [0, 18, 0, 8] });
+          blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 14, 0, 0] });
         }
 
-        var precoFinal = fmtMoeda(inv.precoFinal && inv.mostrarDesconto ? inv.precoFinal : preco);
+        /* Header: label + por convidado na mesma linha */
+        blocks.push({
+          columns: [
+            { text: 'INVESTIMENTO', fontSize: 6.5, color: GRAY, characterSpacing: 4.5 },
+            { text: 'por convidado', font: 'Cormorant', fontSize: 10.5, italics: true, color: GRAY, alignment: 'right' }
+          ], margin: [0, 16, 0, 6]
+        });
+        blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.5, lineColor: GOLD }], margin: [0, 0, 0, 10] });
 
-        /* Label */
-        blocks.push({ text: 'INVESTIMENTO', fontSize: 6.5, color: GRAY, characterSpacing: 4.5, margin: [0, 20, 0, 4] });
-        /* Preço monumental */
-        blocks.push({ text: precoFinal, font: 'Cormorant', fontSize: 52, bold: true, color: NAVY, lineHeight: 0.88 });
-        /* por convidado */
-        blocks.push({ text: 'por convidado', font: 'Cormorant', fontSize: 11.5, italics: true, color: GRAY, margin: [0, 6, 0, 0] });
-
-        /* Proposta especial */
-        if (inv.mostrarDesconto && inv.precoOriginal && inv.precoFinal) {
-          blocks.push({
-            text: '* Proposta especial — referência ' + fmtMoeda(inv.precoOriginal) + '/pessoa',
-            fontSize: 7, italics: true, color: GRAY, margin: [0, 4, 0, 0]
+        if (faixas.length > 0) {
+          faixas.forEach(function(f, fi) {
+            var horasLabel = f.horas ? (f.horas + (isNaN(parseFloat(('' + f.horas).replace(',','.'))) ? '' : 'h de evento')) : '';
+            blocks.push({
+              columns: [
+                { text: fmtMoeda(f.valor), font: 'Cormorant', fontSize: 30, bold: true, color: NAVY, width: 'auto', lineHeight: 0.9 },
+                { text: horasLabel, fontSize: 9, color: GRAY, margin: [12, 11, 0, 0], width: '*' }
+              ], margin: [0, 0, 0, fi < faixas.length - 1 ? 4 : 0]
+            });
           });
+        } else {
+          blocks.push({ text: fmtMoeda(preco), font: 'Cormorant', fontSize: 38, bold: true, color: NAVY, lineHeight: 0.88 });
         }
 
         /* Extras */
@@ -442,161 +391,121 @@
           extras.push([a.desc || 'Adicional', fmtMoeda(a.valor)]);
         });
 
-        var hasExtras = extras.length > 0;
-        var hasVCond  = inv.validade || inv.condicoes;
-
-        if (hasExtras || hasVCond) {
-          blocks.push({
-            canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }],
-            margin: [0, 10, 0, 8]
-          });
+        if (extras.length || inv.validade || inv.condicoes) {
+          blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 10, 0, 8] });
         }
-
         extras.forEach(function(e) {
-          blocks.push({
-            columns: [
-              { text: e[0], fontSize: 8.5, color: GRAY },
-              { text: e[1], fontSize: 9, bold: true, color: NAVY, alignment: 'right' }
-            ],
-            margin: [0, 0, 0, 3]
-          });
+          blocks.push({ columns: [{ text: e[0], fontSize: 8.5, color: GRAY }, { text: e[1], fontSize: 9, bold: true, color: NAVY, alignment: 'right' }], margin: [0, 0, 0, 3] });
         });
-
-        if (hasVCond) {
-          if (inv.validade) blocks.push({ fontSize: 7.5, margin: [0, 0, 0, 3], text: [{ text: 'Validade: ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }] });
-          if (inv.condicoes) blocks.push({ fontSize: 7.5, margin: [0, 0, 0, 3], text: [{ text: 'Pagamento: ', bold: true, color: NAVY }, { text: inv.condicoes, color: GRAY }] });
+        if (inv.validade) {
+          blocks.push({ fontSize: 8, margin: [0, 0, 0, 3], text: [{ text: 'Validade: ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }] });
+        }
+        if (inv.condicoes) {
+          inv.condicoes.split('\n').forEach(function(line) {
+            if (line.trim()) blocks.push({ text: line.trim(), fontSize: 8, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 1] });
+          });
         }
       });
 
       return blocks;
     }
 
-    /* ── Página 3 — O Que Está Incluso — layout horizontal moderno ─────────── */
+    /* ── Página 3 — O Que Você Recebe — visual, estratégico ─────────────────── */
     function buildInclusoPage(p2) {
       var blocks = [];
       var MGRAY  = '#9C8E82';
-      var LGOLD  = '#D4B98A';
 
-      /* ── Cabeçalho — flanking lines + label ── */
       blocks.push({
         columns: [
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 120, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 120 },
-          { text: 'O QUE ESTÁ INCLUSO', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, alignment: 'center', margin: [0, 2, 0, 0] },
+          { text: 'O QUE VOCÊ RECEBE', fontSize: 6.5, color: GRAY, characterSpacing: 3.5, alignment: 'center', margin: [0, 2, 0, 0] },
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 120, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 120 }
         ],
         columnGap: 10, margin: [0, 0, 0, 10]
       });
+      blocks.push({ canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.35, lineColor: GOLD }], margin: [0, 0, 0, 22] });
 
-      /* Título moderno — Roboto bold em vez de Cormorant pesado */
-      blocks.push({
-        text: 'INCLUSO & NÃO INCLUSO',
-        fontSize: 14, bold: true, color: NAVY,
-        characterSpacing: 1, alignment: 'center', margin: [0, 0, 0, 6]
-      });
-      blocks.push({
-        canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.35, lineColor: GOLD }],
-        margin: [0, 0, 0, 22]
-      });
-
-      /* ── Colunas: incluso / não incluso ── */
-      function colLabel(t, c) {
+      /* Rótulos das colunas */
+      function colLabel(txt, c) {
         return {
           stack: [
-            { text: t, fontSize: 6, color: c || GOLD, characterSpacing: 4, bold: true },
-            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 218, y2: 0, lineWidth: 0.3, lineColor: c || GOLD }], margin: [0, 5, 0, 14] }
+            { text: txt, fontSize: 6.5, color: c || GOLD, characterSpacing: 3, bold: true },
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 218, y2: 0, lineWidth: 0.3, lineColor: c || GOLD }], margin: [0, 5, 0, 12] }
           ]
         };
       }
 
-      function iRow(txt, col, mark) {
+      /* Item visual: barra lateral + texto principal + detalhe (split no |) */
+      function iRow(txt, barColor) {
+        var parts = txt.split('|');
+        var main  = parts[0].trim();
+        var sub   = parts.length > 1 ? parts[1].trim() : null;
         return {
-          columns: [
-            { text: mark, fontSize: 7, color: col, bold: true, width: 12 },
-            { text: txt, fontSize: 8.5, color: DGRAY, lineHeight: 1.5 }
-          ],
-          columnGap: 6, margin: [0, 0, 0, 7]
+          stack: [
+            {
+              columns: [
+                { canvas: [{ type: 'rect', x: 0, y: 3, w: 2, h: 9, color: barColor }], width: 10 },
+                { text: main, fontSize: 9, color: NAVY, lineHeight: 1.4 }
+              ], columnGap: 6
+            }
+          ].concat(sub ? [{ text: sub, fontSize: 7.5, color: GRAY, italics: true, lineHeight: 1.35, margin: [16, 1, 0, 0] }] : []),
+          margin: [0, 0, 0, 9]
         };
       }
 
-      /* Duas colunas lado a lado */
       blocks.push({
         columns: [
-          {
-            stack: [colLabel('INCLUSO')].concat(
-              INCLUSO.map(function(x) { return iRow(x, GOLD, '+'); })
-            ),
-            width: '*'
-          },
-          {
-            stack: [colLabel('NÃO INCLUSO', MGRAY)].concat(
-              NAO_INCLUSO.map(function(x) { return iRow(x, MGRAY, '–'); })
-            ),
-            width: '*'
-          }
+          { stack: [colLabel('O QUE ENTREGAMOS')].concat(INCLUSO.map(function(x){ return iRow(x, GOLD); })), width: '*' },
+          { stack: [colLabel('FORA DO PACOTE', MGRAY)].concat(NAO_INCLUSO.map(function(x){ return iRow(x, MGRAY); })), width: '*' }
         ],
-        columnGap: 30
+        columnGap: 28
       });
 
-      /* ── Alimentação de Staff ── */
-      blocks.push({
-        canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }],
-        margin: [0, 22, 0, 18]
-      });
-
+      /* Alimentação de Staff */
+      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 18, 0, 16] });
       blocks.push({
         columns: [
           { canvas: [{ type: 'rect', x: 0, y: 1, w: 2, h: 10, color: GOLD }], width: 10 },
           { text: 'ALIMENTAÇÃO DE STAFF', fontSize: 6.5, color: GOLD, characterSpacing: 2.5, bold: true, margin: [0, 2, 0, 0] }
-        ],
-        margin: [0, 0, 0, 10]
+        ], margin: [0, 0, 0, 8]
       });
+      blocks.push({ text: 'Válido somente para equipes de terceiros. Todos os profissionais devem optar pela mesma modalidade.', fontSize: 9, color: GRAY, lineHeight: 1.55, margin: [0, 0, 0, 14] });
 
-      blocks.push({
-        text: 'Válido somente para equipes de terceiros que trabalharão durante o evento. Todos os profissionais devem optar pela mesma modalidade.',
-        fontSize: 8.5, color: GRAY, lineHeight: 1.6, margin: [0, 0, 0, 14]
-      });
-
-      /* Dois cartões horizontais de opções de staff */
       blocks.push({
         columns: [
           {
             stack: [
-              { text: '01', font: 'Cormorant', fontSize: 18, bold: true, color: '#C9AC7C', margin: [0, 0, 0, 4] },
-              { text: 'Mesmo menu dos convidados por 50% do valor por pessoa.', fontSize: 8, color: DGRAY, lineHeight: 1.5 }
-            ],
-            width: '*'
+              { text: '01', font: 'Cormorant', fontSize: 18, bold: true, color: '#C9AC7C', margin: [0, 0, 0, 5] },
+              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 210, y2: 0, lineWidth: 0.3, lineColor: '#E6DCC2' }], margin: [0, 0, 0, 8] },
+              { text: 'Mesmo menu dos convidados', fontSize: 9, color: NAVY, bold: true, margin: [0, 0, 0, 2] },
+              { text: '50% do valor por pessoa', fontSize: 8.5, color: DGRAY, lineHeight: 1.5 }
+            ], width: '*'
           },
           {
             stack: [
-              { text: '02', font: 'Cormorant', fontSize: 18, bold: true, color: '#C9AC7C', margin: [0, 0, 0, 4] },
-              { text: 'Buffet separado por R$ 110,00 — mesmo padrão do jantar.', fontSize: 8, color: DGRAY, lineHeight: 1.5 }
-            ],
-            width: '*'
+              { text: '02', font: 'Cormorant', fontSize: 18, bold: true, color: '#C9AC7C', margin: [0, 0, 0, 5] },
+              { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 210, y2: 0, lineWidth: 0.3, lineColor: '#E6DCC2' }], margin: [0, 0, 0, 8] },
+              { text: 'Buffet de jantar e bebidas', fontSize: 9, color: NAVY, bold: true, margin: [0, 0, 0, 2] },
+              { text: 'R$ 120,00 por profissional — exceto alcoólicas', fontSize: 8.5, color: DGRAY, lineHeight: 1.5 }
+            ], width: '*'
           }
-        ],
-        columnGap: 24
+        ], columnGap: 24
       });
+      blocks.push({ text: 'Obs.: é possível não incluirmos a alimentação de terceiros na proposta, mediante alinhamento prévio.', fontSize: 8, italics: true, color: GRAY, lineHeight: 1.5, margin: [0, 10, 0, 0] });
 
-      blocks.push({
-        text: 'Obs.: é possível não incluirmos a alimentação de terceiros na proposta, mediante alinhamento prévio.',
-        fontSize: 7.5, italics: true, color: GRAY, lineHeight: 1.5, margin: [0, 10, 0, 0]
-      });
+      if (p2 && p2.valorStaff) blocks.push({ fontSize: 8.5, margin: [0, 4, 0, 0], text: [{ text: 'Valor de referência: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorStaff) + ' por profissional.', color: GRAY }] });
 
-      if (p2 && p2.valorSeguro) blocks.push({ text: [{ text: 'Taxa de seguro: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: GRAY }], fontSize: 8, margin: [0, 6, 0, 0] });
-      if (p2 && p2.valorStaff)  blocks.push({ text: [{ text: 'Alimentação de staff: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorStaff) + ' por profissional.', color: GRAY }], fontSize: 8, margin: [0, 3, 0, 0] });
-
+      /* Seguro e Quebras */
       if (p2 && p2.quebrasAtiva) {
-        blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 18, 0, 14] });
+        blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 16, 0, 14] });
         blocks.push({
           columns: [
             { canvas: [{ type: 'rect', x: 0, y: 1, w: 2, h: 10, color: MGRAY }], width: 10 },
-            { text: 'QUEBRAS E PERDAS', fontSize: 6.5, color: MGRAY, characterSpacing: 2.5, bold: true, margin: [0, 2, 0, 0] }
-          ],
-          margin: [0, 0, 0, 10]
+            { text: 'SEGURO E QUEBRAS', fontSize: 6.5, color: MGRAY, characterSpacing: 2.5, bold: true, margin: [0, 2, 0, 0] }
+          ], margin: [0, 0, 0, 8]
         });
-        blocks.push({ text: 'Para eventos com modalidade self-service ou alto risco operacional, aplicamos uma taxa sobre quebras e perdas de materiais.', fontSize: 8.5, color: GRAY, lineHeight: 1.6, margin: [0, 0, 0, 6] });
-        if (p2.valorSeguro) blocks.push({ text: [{ text: 'Taxa: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: GRAY }], fontSize: 8, margin: [0, 0, 0, 3] });
-        if (p2.valorStaff)  blocks.push({ text: [{ text: 'Staff: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorStaff) + ' por profissional.', color: GRAY }], fontSize: 8 });
+        blocks.push({ text: 'Para eventos self-service ou com alto risco operacional, pode ser aplicada uma taxa sobre quebras e perdas de materiais. O valor é definido caso a caso e informado previamente.', fontSize: 9, color: GRAY, lineHeight: 1.55, margin: [0, 0, 0, 4] });
+        if (p2.valorSeguro) blocks.push({ fontSize: 8.5, margin: [0, 0, 0, 2], text: [{ text: 'Taxa de seguro: ', bold: true, color: NAVY }, { text: fmtMoeda(p2.valorSeguro) + ' por convidado.', color: GRAY }] });
       }
 
       return blocks;
@@ -606,94 +515,54 @@
     function buildAutoridade(sobreTexto) {
       var blocks = [];
 
-      /* ── Cabeçalho — mixed: serif display + clean underline ── */
       blocks.push({ text: 'SOBRE O', fontSize: 6.5, color: GRAY, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 4] });
-      blocks.push({
-        text: 'Rondello Buffet',
-        font: 'Cormorant', fontSize: 34, bold: true, color: NAVY,
-        alignment: 'center', margin: [0, 0, 0, 4]
-      });
-      blocks.push({
-        canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.35, lineColor: GOLD }],
-        margin: [0, 0, 0, 22]
-      });
+      blocks.push({ text: 'Rondello Buffet', font: 'Cormorant', fontSize: 34, bold: true, color: NAVY, alignment: 'center', margin: [0, 0, 0, 4] });
+      blocks.push({ canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.35, lineColor: GOLD }], margin: [0, 0, 0, 22] });
 
-      /* ── Brand story — 2 colunas de texto, moderno e clean ── */
-      var defaultTexto = sobreTexto || '';
+      /* Brand story — copywriter humano */
+      var paraA = 'Desde 1997, fazemos isso com uma convicção simples: casamento bom é aquele em que ninguém precisa se preocupar com nada — só sentir. Três décadas afinando cada detalhe nos ensinaram que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.';
+      var paraB = 'Nossa cozinha carrega assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo — presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que faz o seu dia durar para sempre na memória dos seus convidados.';
 
-      /* Layout: 2 parágrafos em colunas = mais moderno que bloco centralizado */
-      var paraA = 'Há quase 30 anos, o Rondello Buffet existe com uma única promessa: fazer do seu grande dia uma experiência que seus convidados nunca esquecerão. Cada prato, cada detalhe, cada momento pensado para vocês.';
-      var paraB = 'Nossa gastronomia é assinada por chefs com formação internacional — mas nossa alma é sorocabana. Feita de atenção ao detalhe, hospitalidade genuína e paixão por criar memórias que duram para sempre.';
-      var paraC = 'Não somos um buffet. Somos os arquitetos da experiência mais importante da sua vida.';
-
-      if (defaultTexto) {
-        blocks.push({ text: defaultTexto, fontSize: 9.5, color: DGRAY, lineHeight: 1.8, margin: [0, 0, 0, 6] });
+      if (sobreTexto) {
+        blocks.push({ text: sobreTexto, fontSize: 9.5, color: DGRAY, lineHeight: 1.8, margin: [0, 0, 0, 20] });
       } else {
         blocks.push({
           columns: [
             { text: paraA, fontSize: 9.5, color: DGRAY, lineHeight: 1.8 },
             { text: paraB, fontSize: 9.5, color: DGRAY, lineHeight: 1.8 }
           ],
-          columnGap: 28, margin: [0, 0, 0, 16]
-        });
-        blocks.push({
-          text: paraC,
-          font: 'Cormorant', fontSize: 13, italics: true,
-          color: NAVY, alignment: 'center', margin: [30, 0, 30, 0]
+          columnGap: 28, margin: [0, 0, 0, 20]
         });
       }
 
-      /* ── Divider ── */
-      blocks.push({ canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.3, lineColor: '#D8C9A8' }], margin: [0, 0, 0, 20] });
+      blocks.push({ canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.3, lineColor: '#D8C9A8' }], margin: [0, 0, 0, 18] });
 
-      /* ── Próximos passos — eyebrow ── */
+      /* Próximos passos */
       blocks.push({ text: 'PRÓXIMOS PASSOS', fontSize: 6.5, color: GOLD, characterSpacing: 4, bold: true, alignment: 'center', margin: [0, 0, 0, 18] });
-
-      /* ── Timeline horizontal — 4 colunas ── */
       var steps = [
-        { n: '01', t: 'Aprovação',      d: 'Avalie com calma e compartilhe com quem precisar.' },
-        { n: '02', t: 'Assinatura',     d: 'Formalizamos com contrato e garantia de exclusividade.' },
-        { n: '03', t: 'Alinhamentos',   d: 'Reunião para afinar menu, logística e cada detalhe.' },
-        { n: '04', t: 'O Grande Dia',   d: 'Nós cuidamos de tudo. Vocês aproveitam cada momento.' }
+        { n: '01', t: 'Aprovação',    d: 'Avalie com calma e compartilhe com quem precisar.' },
+        { n: '02', t: 'Assinatura',   d: 'Formalizamos o contrato e reservamos a data exclusivamente para vocês.' },
+        { n: '03', t: 'Alinhamentos', d: 'Reunião para afinar menu, logística e cada detalhe.' },
+        { n: '04', t: 'O Grande Dia', d: 'Nós cuidamos de tudo. Vocês aproveitam cada momento.' }
       ];
-
       blocks.push({
-        columns: steps.map(function(step, i) {
+        columns: steps.map(function(s) {
           return {
             stack: [
-              /* Número em Cormorant grande */
-              { text: step.n, font: 'Cormorant', fontSize: 24, color: '#C9AC7C', margin: [0, 0, 0, 4] },
-              /* Linha conectora horizontal */
+              { text: s.n, font: 'Cormorant', fontSize: 24, color: '#C9AC7C', margin: [0, 0, 0, 4] },
               { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 95, y2: 0, lineWidth: 0.3, lineColor: '#E6DCC2' }], margin: [0, 0, 0, 8] },
-              /* Título */
-              { text: step.t, font: 'Cormorant', fontSize: 11, bold: true, color: NAVY, margin: [0, 0, 0, 5] },
-              /* Descrição */
-              { text: step.d, fontSize: 7.5, color: GRAY, lineHeight: 1.55 }
-            ],
-            width: '*'
+              { text: s.t, font: 'Cormorant', fontSize: 11, bold: true, color: NAVY, margin: [0, 0, 0, 5] },
+              { text: s.d, fontSize: 7.5, color: GRAY, lineHeight: 1.55 }
+            ], width: '*'
           };
         }),
         columnGap: 14
       });
 
-      /* ── Encerramento + bloco de contato com ícones ── */
-      blocks.push({ text: '', margin: [0, 26, 0, 0] });
-      blocks.push({
-        canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.3, lineColor: '#D8C9A8' }],
-        margin: [0, 0, 0, 18]
-      });
-
-      /* Tagline de fechamento */
-      blocks.push({
-        text: '“Criando experiências memoráveis desde 1997.”',
-        font: 'Cormorant', fontSize: 12, italics: true,
-        color: GRAY, alignment: 'center', margin: [0, 0, 0, 26]
-      });
-
-      /* ── Bloco de contato moderno — 3 colunas com ícones geométricos ── */
+      /* Contato — sem quote desnecessária, redistribuído */
+      blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 20, 0, 20] });
       blocks.push({
         columns: [
-          /* Telefone */
           {
             stack: [
               { canvas: [
@@ -701,17 +570,11 @@
                 { type: 'rect', x: 6, y: 2.5, w: 6, h: 1.5, color: GOLD },
                 { type: 'ellipse', x: 9, y: 18.5, r1: 2, r2: 2, color: GOLD }
               ], width: 18, height: 24, margin: [0, 0, 0, 9] },
-              { text: 'TELEFONE', fontSize: 5.5, color: GRAY, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 3] },
-              { text: '(15) 3332-2990', fontSize: 8.5, color: NAVY }
-            ],
-            width: '*'
+              { text: 'TELEFONE', fontSize: 6, color: GRAY, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 3] },
+              { text: '(15) 3332-2990', fontSize: 9, color: NAVY, bold: true }
+            ], width: '*'
           },
-          /* Separador */
-          {
-            canvas: [{ type: 'line', x1: 0, y1: 4, x2: 0, y2: 56, lineWidth: 0.35, lineColor: '#DDD6CC' }],
-            width: 1
-          },
-          /* E-mail */
+          { canvas: [{ type: 'line', x1: 0, y1: 4, x2: 0, y2: 56, lineWidth: 0.35, lineColor: '#DDD6CC' }], width: 1 },
           {
             stack: [
               { canvas: [
@@ -719,17 +582,11 @@
                 { type: 'line', x1: 0, y1: 4, x2: 9, y2: 13, lineWidth: 1.2, lineColor: GOLD },
                 { type: 'line', x1: 18, y1: 4, x2: 9, y2: 13, lineWidth: 1.2, lineColor: GOLD }
               ], width: 20, height: 22, margin: [0, 0, 0, 9] },
-              { text: 'E-MAIL', fontSize: 5.5, color: GRAY, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 3] },
-              { text: 'contato@rondellobuffet.com.br', fontSize: 7.5, color: NAVY }
-            ],
-            width: '*'
+              { text: 'E-MAIL', fontSize: 6, color: GRAY, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 3] },
+              { text: 'contato@rondellobuffet.com.br', fontSize: 8, color: NAVY }
+            ], width: '*'
           },
-          /* Separador */
-          {
-            canvas: [{ type: 'line', x1: 0, y1: 4, x2: 0, y2: 56, lineWidth: 0.35, lineColor: '#DDD6CC' }],
-            width: 1
-          },
-          /* Instagram */
+          { canvas: [{ type: 'line', x1: 0, y1: 4, x2: 0, y2: 56, lineWidth: 0.35, lineColor: '#DDD6CC' }], width: 1 },
           {
             stack: [
               { canvas: [
@@ -737,15 +594,14 @@
                 { type: 'ellipse', x: 9, y: 8, r1: 3.5, r2: 3.5, lineColor: GOLD, lineWidth: 1.2, color: '#FAF8F4' },
                 { type: 'ellipse', x: 13.5, y: 4, r1: 1.5, r2: 1.5, color: GOLD }
               ], width: 18, height: 20, margin: [0, 0, 0, 9] },
-              { text: 'INSTAGRAM', fontSize: 5.5, color: GRAY, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 3] },
-              { text: '@rondellobuffet', fontSize: 8.5, color: NAVY }
-            ],
-            width: '*'
+              { text: 'INSTAGRAM', fontSize: 6, color: GRAY, characterSpacing: 2.5, bold: true, margin: [0, 0, 0, 3] },
+              { text: '@rondellobuffet', fontSize: 9, color: NAVY, bold: true }
+            ], width: '*'
           }
         ],
-        columnGap: 14,
-        margin: [20, 0, 20, 0]
+        columnGap: 14, margin: [0, 0, 0, 14]
       });
+      blocks.push({ text: 'www.rondellobuffet.com.br', fontSize: 7.5, color: GRAY, alignment: 'center', characterSpacing: 0.5 });
 
       return blocks;
     }
@@ -1022,6 +878,7 @@
   function uid() { return Math.random().toString(36).slice(2, 9); }
   function makeSecao(nome, custom = false) { return { id: uid(), ativa: false, nome, detalhes: '', custom }; }
   function makeAdicional() { return { id: uid(), desc: '', valor: '' }; }
+  function makeFaixa()     { return { id: uid(), horas: '', valor: '' }; }
 
   function makePacote(n) {
     return {
@@ -1030,7 +887,13 @@
       palavraDestaque: n === 1 ? 'Prime' : n === 2 ? 'Classic' : '',
       expandido: true,
       secoes: SECOES_PADRAO.map(nome => makeSecao(nome)),
-      investimento: { precoOriginal:'', precoFinal:'', mostrarDesconto:false, taxaDesc:'Taxa de deslocamento', taxaValor:'', mostrarTaxa:false, adicionais:[], condicoes:'', validade:'' }
+      investimento: {
+        faixas: [],
+        precoOriginal:'', precoFinal:'', mostrarDesconto:false,
+        taxaDesc:'Taxa de deslocamento', taxaValor:'', mostrarTaxa:false, adicionais:[],
+        validade:'7 dias',
+        condicoes:'20% de entrada + 80% até 15 dias antes da festa\nCrianças até 4 anos: gratuidade  ·  De 5 a 9 anos: 50% do valor'
+      }
     };
   }
 
@@ -1042,7 +905,12 @@
       id: uid(),
       expandido: true,
       secoes: (raw.secoes || SECOES_PADRAO.map(n => makeSecao(n))).map(s => ({ ...makeSecao(s.nome || '', s.custom || false), ...s, id: uid() })),
-      investimento: { ...makePacote(1).investimento, ...(raw.investimento || {}), adicionais: ((raw.investimento || {}).adicionais || []).map(a => ({ ...makeAdicional(), ...a, id: uid() })) }
+      investimento: {
+        ...makePacote(1).investimento,
+        ...(raw.investimento || {}),
+        faixas: ((raw.investimento || {}).faixas || []).map(f => ({ ...makeFaixa(), ...f, id: uid() })),
+        adicionais: ((raw.investimento || {}).adicionais || []).map(a => ({ ...makeAdicional(), ...a, id: uid() }))
+      }
     };
   }
 
@@ -1154,25 +1022,28 @@
   /* ── InvestimentoEditor ────────────────────────────────────────────────── */
   function InvestimentoEditor({ inv, onChange }) {
     const set = (k, v) => onChange({ ...inv, [k]: v });
+    const addFaixa  = () => onChange({ ...inv, faixas: [...(inv.faixas || []), makeFaixa()] });
+    const setFaixa  = (i, k, v) => { const c = [...(inv.faixas || [])]; c[i] = { ...c[i], [k]: v }; onChange({ ...inv, faixas: c }); };
+    const remFaixa  = i => onChange({ ...inv, faixas: (inv.faixas || []).filter((_, j) => j !== i) });
     const addA = () => onChange({ ...inv, adicionais: [...(inv.adicionais || []), makeAdicional()] });
     const setA = (i, f, v) => { const c = [...(inv.adicionais || [])]; c[i] = { ...c[i], [f]: v }; onChange({ ...inv, adicionais: c }); };
     const remA = i => onChange({ ...inv, adicionais: (inv.adicionais || []).filter((_, j) => j !== i) });
+    const addBtnSt = { background:'none', border:'1px dashed #D1D5DB', borderRadius:6, padding:'6px 14px', fontSize:11, color:GRAY, cursor:'pointer', marginTop:4, marginBottom:16 };
 
     return (
       <div>
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-          <Toggle checked={inv.mostrarDesconto} onChange={v => set('mostrarDesconto', v)} />
-          <span style={{ fontSize:12, color:GRAY, fontWeight:600 }}>Exibir preço De / Por</span>
-        </div>
-        <Grid>
-          {inv.mostrarDesconto && (
-            <Field label="Preço original (De)"><Input prefix="R$" value={inv.precoOriginal} onChange={v => set('precoOriginal', v)} placeholder="0,00" /></Field>
-          )}
-          <Field label={inv.mostrarDesconto ? 'Preço final (Por)' : 'Valor por pessoa'}>
-            <Input prefix="R$" value={inv.precoFinal} onChange={v => set('precoFinal', v)} placeholder="0,00" />
-          </Field>
-        </Grid>
-        <div style={{ display:'flex', alignItems:'center', gap:10, margin:'14px 0 10px' }}>
+        <Label>Faixas de preço por convidado</Label>
+        <div style={{ fontSize:11, color:GRAY, marginBottom:10 }}>Ex: R$750 para 6h de festa · R$850 para 9h. Adicione quantas faixas precisar.</div>
+        {(inv.faixas || []).map((f, i) => (
+          <div key={f.id} style={{ display:'grid', gridTemplateColumns:'110px 1fr auto', gap:8, alignItems:'end', marginBottom:8 }}>
+            <Field label="Horas de evento"><Input value={f.horas} onChange={v => setFaixa(i,'horas',v)} placeholder="ex: 6" /></Field>
+            <Field label="Valor por convidado"><Input prefix="R$" value={f.valor} onChange={v => setFaixa(i,'valor',v)} placeholder="0,00" /></Field>
+            <div style={{ paddingBottom:1 }}><IconBtn onClick={() => remFaixa(i)} title="Remover" style={{ color:'#FCA5A5' }}>✕</IconBtn></div>
+          </div>
+        ))}
+        <button onClick={addFaixa} style={addBtnSt}>+ Faixa de preço</button>
+
+        <div style={{ display:'flex', alignItems:'center', gap:10, margin:'4px 0 10px' }}>
           <Toggle checked={inv.mostrarTaxa} onChange={v => set('mostrarTaxa', v)} />
           <span style={{ fontSize:12, color:GRAY, fontWeight:600 }}>Taxa de deslocamento</span>
         </div>
@@ -1184,16 +1055,21 @@
         )}
         {(inv.adicionais || []).map((a, i) => (
           <div key={a.id} style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto', gap:8, alignItems:'end', marginBottom:8 }}>
-            <Field label={`Extra ${i + 1}`}><Input value={a.desc} onChange={v => setA(i, 'desc', v)} placeholder="Descrição" /></Field>
-            <Field label="Valor"><Input prefix="R$" value={a.valor} onChange={v => setA(i, 'valor', v)} placeholder="0,00" /></Field>
+            <Field label={`Extra ${i+1}`}><Input value={a.desc} onChange={v => setA(i,'desc',v)} placeholder="Descrição" /></Field>
+            <Field label="Valor"><Input prefix="R$" value={a.valor} onChange={v => setA(i,'valor',v)} placeholder="0,00" /></Field>
             <div style={{ paddingBottom:1 }}><IconBtn onClick={() => remA(i)} title="Remover" style={{ color:'#FCA5A5' }}>✕</IconBtn></div>
           </div>
         ))}
-        <button onClick={addA} style={{ background:'none', border:'1px dashed #D1D5DB', borderRadius:6, padding:'6px 14px', fontSize:11, color:GRAY, cursor:'pointer', marginBottom:14 }}>+ Item extra</button>
+        <button onClick={addA} style={addBtnSt}>+ Item extra</button>
+
         <Grid>
-          <Field label="Condições de pagamento"><Input value={inv.condicoes} onChange={v => set('condicoes', v)} placeholder="Ex: 50% na assinatura..." /></Field>
-          <Field label="Validade da proposta"><Input value={inv.validade} onChange={v => set('validade', v)} placeholder="Ex: 31/05/2025" /></Field>
+          <Field label="Validade da proposta"><Input value={inv.validade} onChange={v => set('validade', v)} placeholder="Ex: 7 dias" /></Field>
         </Grid>
+        <Field label="Condições de pagamento">
+          <Textarea value={inv.condicoes} onChange={v => set('condicoes', v)}
+            placeholder={"20% de entrada + 80% até 15 dias antes da festa\nCrianças até 4 anos: gratuidade  ·  De 5 a 9 anos: 50% do valor"}
+            rows={3} />
+        </Field>
       </div>
     );
   }
@@ -1339,7 +1215,7 @@
     const [fraseCapa, setFraseCapa] = React.useState('');
     const [sobreTexto, setSobreTexto] = React.useState('');
     const [pacotes, setPacotes] = React.useState([makePacote(1)]);
-    const [pagina2, setP2] = React.useState({ quebrasAtiva:false, valorSeguro:'', valorStaff:'' });
+    const [pagina2, setP2] = React.useState({ quebrasAtiva:true, valorSeguro:'', valorStaff:'' });
     const [incluirCardapio, setCardapioToggle] = React.useState(false);
     const [cardapio, setCardapio] = React.useState([{ id:uid(), categoria:'', pratos:[{ id:uid(), nome:'', desc:'' }] }]);
     const [gerando, setGerando] = React.useState(false);
