@@ -457,7 +457,7 @@
         return {
           stack: [
             { text: txt, font: 'Cormorant', fontSize: 13, bold: true, color: c || GOLD, characterSpacing: 0.8 },
-            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 218, y2: 0, lineWidth: 0.3, lineColor: c || GOLD }], margin: [0, 3, 0, 7] }
+            { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 218, y2: 0, lineWidth: 0.3, lineColor: c || GOLD }], margin: [0, 2, 0, 5] }
           ]
         };
       }
@@ -472,11 +472,11 @@
             {
               columns: [
                 { canvas: [{ type: 'rect', x: 0, y: 3, w: 2, h: 9, color: barColor }], width: 10 },
-                { text: main, fontSize: 9.5, color: NAVY, lineHeight: 1.35 }
+                { text: main, fontSize: 9, color: NAVY, lineHeight: 1.2 }
               ], columnGap: 6
             }
-          ].concat(sub ? [{ text: sub, fontSize: 7.5, color: GRAY, italics: true, lineHeight: 1.3, margin: [16, 0, 0, 0] }] : []),
-          margin: [0, 0, 0, 4]
+          ].concat(sub ? [{ text: sub, fontSize: 7, color: GRAY, italics: true, lineHeight: 1.2, margin: [16, 0, 0, 0] }] : []),
+          margin: [0, 0, 0, 2]
         };
       }
 
@@ -1380,7 +1380,8 @@
     const [fraseCapa, setFraseCapa] = React.useState('');
     const [sobreTexto, setSobreTexto] = React.useState('');
     const [pacotes, setPacotes] = React.useState([makePacote(1)]);
-    const [pagina2, setP2] = React.useState({ quebrasAtiva:true, valorSeguro:'', valorStaff:'' });
+    const [pagina2, setP2] = React.useState({ quebrasAtiva:true, valorSeguro:'6', valorStaff:'120' });
+    const [showTextos, setShowTextos] = React.useState(false);
     const [incluirCardapio, setCardapioToggle] = React.useState(false);
     const [cardapio, setCardapio] = React.useState([{ id:uid(), categoria:'', pratos:[{ id:uid(), nome:'', desc:'' }] }]);
     const [gerando, setGerando] = React.useState(false);
@@ -1559,15 +1560,22 @@
 
           {/* Frase da capa + Sobre */}
           <Card>
-            <SecHead>Textos da Proposta</SecHead>
-            <Field label="Frase da capa (Página 1)">
-              <Input value={fraseCapa} onChange={setFraseCapa} placeholder="Uma experiência gastronômica criada exclusivamente para seu casamento." />
-            </Field>
-            <div style={{ marginTop:14 }}>
-              <Field label="Sobre o Rondello (Página 4 — deixe em branco para usar o texto padrão)">
-                <Textarea value={sobreTexto} onChange={setSobreTexto} placeholder={'Há quase 30 anos criando experiências gastronômicas inesquecíveis.\n\nCom gastronomia assinada por chef formado pela Le Cordon Bleu, o Rondello Buffet tornou-se referência em eventos de alto padrão na região.'} rows={4} />
-              </Field>
+            <div onClick={() => setShowTextos(v => !v)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer', userSelect:'none' }}>
+              <SecHead style={{ margin:0 }}>Textos da Proposta</SecHead>
+              <span style={{ fontSize:11, color:GRAY, fontWeight:600, paddingRight:2 }}>{showTextos ? '▲ Recolher' : '▼ Expandir'}</span>
             </div>
+            {showTextos && (
+              <div style={{ marginTop:16 }}>
+                <Field label="Frase da capa (Página 1)">
+                  <Input value={fraseCapa} onChange={setFraseCapa} placeholder="Uma experiência gastronômica criada exclusivamente para seu casamento." />
+                </Field>
+                <div style={{ marginTop:14 }}>
+                  <Field label="Sobre o Rondello (Página 4 — deixe em branco para usar o texto padrão)">
+                    <Textarea value={sobreTexto} onChange={setSobreTexto} placeholder={'Há quase 30 anos criando experiências gastronômicas inesquecíveis.\n\nCom gastronomia assinada por chef formado pela Le Cordon Bleu, o Rondello Buffet tornou-se referência em eventos de alto padrão na região.'} rows={4} />
+                  </Field>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Página 3 */}
