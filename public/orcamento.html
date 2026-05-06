@@ -348,20 +348,20 @@
         var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
         secoesAtivas.forEach(function(secao, si) {
           if (si > 0) {
-            blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.12, lineColor: '#EAE4DC' }], margin: [0, 4, 0, 5] });
+            blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.12, lineColor: '#EAE4DC' }], margin: [0, 3, 0, 3] });
           }
           var nome    = (secao.nome || '').trim();
           var hasDesc = !!(secao.detalhes && secao.detalhes.trim());
           blocks.push({
             columns: [
-              { canvas: [{ type: 'rect', x: 0, y: 2, w: 2.5, h: hasDesc ? 28 : 10, color: GOLD }], width: 14 },
+              { canvas: [{ type: 'rect', x: 0, y: 1, w: 2.5, h: hasDesc ? 26 : 10, color: GOLD }], width: 14 },
               {
                 stack: [
-                  { text: nome.toUpperCase(), fontSize: 9, bold: true, color: NAVY, characterSpacing: 1.2, margin: [0, 1, 0, hasDesc ? 3 : 0] }
+                  { text: nome.toUpperCase(), fontSize: 9, bold: true, color: NAVY, characterSpacing: 1.2, margin: [0, 0, 0, hasDesc ? 3 : 0] }
                 ].concat(hasDesc ? [{ text: secao.detalhes.trim(), fontSize: 9, color: GRAY, lineHeight: 1.35 }] : []),
                 width: '*'
               }
-            ], columnGap: 12, margin: [0, 0, 0, 3]
+            ], columnGap: 12, margin: [0, 3, 0, 3]
           });
         });
       });
@@ -383,7 +383,7 @@
         blocks.push({
           columns: [
             { text: 'INVESTIMENTO', fontSize: 6.5, bold: true, color: GOLD, characterSpacing: 4.5 },
-            { text: 'por convidado', font: 'Cormorant', fontSize: 9.5, italics: true, color: GRAY, alignment: 'right' }
+            { text: '', alignment: 'right' }
           ], margin: [0, 14, 0, 5]
         });
         blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.4, lineColor: GOLD }], margin: [0, 0, 0, 2] });
@@ -395,7 +395,7 @@
             blocks.push({
               columns: [
                 { text: horasLabel, fontSize: 10, color: DGRAY },
-                { text: fmtMoeda(f.valor) + '/pessoa', fontSize: 11.5, bold: true, color: NAVY, alignment: 'right' }
+                { text: fmtMoeda(f.valor) + '/por convidado', fontSize: 11.5, bold: true, color: NAVY, alignment: 'right' }
               ], margin: [0, 10, 0, 0]
             });
             if (fi < faixas.length - 1) {
@@ -405,8 +405,8 @@
         } else if (preco) {
           blocks.push({
             columns: [
-              { text: 'Valor por pessoa', fontSize: 10, color: DGRAY },
-              { text: fmtMoeda(preco) + '/pessoa', fontSize: 11.5, bold: true, color: NAVY, alignment: 'right' }
+              { text: 'Valor por convidado', fontSize: 10, color: DGRAY },
+              { text: fmtMoeda(preco) + '/por convidado', fontSize: 11.5, bold: true, color: NAVY, alignment: 'right' }
             ], margin: [0, 10, 0, 0]
           });
         }
@@ -425,7 +425,7 @@
           blocks.push({ columns: [{ text: e[0], fontSize: 8.5, color: GRAY }, { text: e[1], fontSize: 9, bold: true, color: NAVY, alignment: 'right' }], margin: [0, 0, 0, 3] });
         });
         if (inv.validade) {
-          blocks.push({ fontSize: 9, margin: [0, 0, 0, 3], text: [{ text: 'Validade: ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }] });
+          blocks.push({ fontSize: 9, margin: [0, 10, 0, 3], text: [{ text: 'Validade: ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }] });
         }
         if (inv.condicoes) {
           inv.condicoes.split('\n').forEach(function(line) {
@@ -1335,7 +1335,7 @@
         faixas.forEach(function(f) {
           rows.push([
             { text: f.horas ? f.horas + 'h de serviço' : '', options:{ fontSize:10, color:'3D3028', fontFace:'Calibri' } },
-            { text: fmtMoeda(f.valor) + '/pessoa', options:{ fontSize:11, bold:true, color:NAVY, fontFace:'Calibri', align:'right' } }
+            { text: fmtMoeda(f.valor) + '/por convidado', options:{ fontSize:11, bold:true, color:NAVY, fontFace:'Calibri', align:'right' } }
           ]);
         });
         sp.addTable(rows, { x:invX, y:2.08, w:invW, rowH:0.42, border:{ pt:0.3, color:'DDD6CD' }, fill:{ color:'FFFFFF' }, colW:[2.8, 2.83] });
