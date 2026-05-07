@@ -171,7 +171,7 @@
         stack: [
           {
             columns: [
-              { image: logoB64, width: 62, margin: [0, 0, 0, 0] },
+              { image: logoB64, width: 110, margin: [0, 0, 0, 0] },
               {
                 stack: [
                   { text: 'RONDELLO BUFFET', fontSize: 6, color: GRAY, characterSpacing: 3, bold: false, alignment: 'right' },
@@ -231,7 +231,7 @@
           table: {
             widths: ['*'],
             body: [[{
-              image: logoB64, width: 252, alignment: 'center',
+              image: logoB64, width: 302, alignment: 'center',
               margin: [0, 0, 0, 0],
               fillColor: '#0D1526',
               border: [false, false, false, false]
@@ -913,7 +913,7 @@
         precoOriginal:'', precoFinal:'', mostrarDesconto:false,
         taxaDesc:'Taxa de deslocamento', taxaValor:'', mostrarTaxa:false, adicionais:[],
         validade:'7 dias',
-        condicoes:'20% de entrada + 80% até 15 dias antes da festa\nCrianças até 4 anos: gratuidade  ·  De 5 a 9 anos: 50% do valor'
+        condicoes:'20% de entrada + 80% até 15 dias antes da festa\nCrianças até 4 anos não pagam e crianças de 5 a 9 anos pagam 50% do valor'
       }
     };
   }
@@ -1106,14 +1106,14 @@
     return (
       <div style={{ borderRadius:10, border:'1px solid #D1D5DB', marginBottom:16, overflow:'hidden', boxShadow:'0 2px 8px rgba(0,0,0,.06)' }}>
         <div style={{ background:NAVY, padding:'13px 18px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, flex:1, minWidth:0 }}>
             <div style={{ width:28, height:28, borderRadius:'50%', background:`${GOLD}22`, border:`1.5px solid ${GOLD}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:GOLD, flexShrink:0 }}>
               {String(index + 1).padStart(2, '0')}
             </div>
-            <div>
+            <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontSize:10, color:`${GOLD}99`, fontWeight:600, letterSpacing:'0.1em', textTransform:'uppercase' }}>PACOTE</div>
               <input value={pacote.nome} onChange={e => onChange({ ...pacote, nome: e.target.value, palavraDestaque: e.target.value })} placeholder="Nome do pacote"
-                style={{ background:'transparent', border:'none', outline:'none', fontSize:15, fontWeight:700, color:'#fff', letterSpacing:'0.02em', width:220 }}
+                style={{ background:'transparent', border:'none', outline:'none', fontSize:15, fontWeight:700, color:'#fff', letterSpacing:'0.02em', width:'100%' }}
               />
             </div>
           </div>
