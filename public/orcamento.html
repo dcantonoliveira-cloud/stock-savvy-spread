@@ -1492,16 +1492,17 @@
       setModelos(existing);
 
       /* Also send to Bubble if embedded */
-      try { window.parent.postMessage({ action:'saveModelo', nome, dados }, '*'); } catch(e) {}
+      try { window.parent.postMessage({ action:'saveModelo', id, nome, dados }, '*'); } catch(e) {}
 
       alert('Modelo "' + nome + '" salvo!');
     }
 
     function handleDeleteModelo(id) {
+      const m = modelos.find(function(m){ return m.id === id; });
       const updated = modelos.filter(function(m){ return m.id !== id; });
       localStorage.setItem('rondello_modelos', JSON.stringify(updated));
       setModelos(updated);
-      try { window.parent.postMessage({ action:'deleteModelo', id }, '*'); } catch(e) {}
+      try { window.parent.postMessage({ action:'deleteModelo', id, nome: m ? m.nome : '' }, '*'); } catch(e) {}
     }
 
     /* postMessage + URL params + localStorage on mount */
@@ -1515,7 +1516,9 @@
       function onMessage(e) {
         if (!e.data || typeof e.data !== 'object') return;
         if (e.data.action === 'setModelos') {
-          const ms = e.data.modelos || [];
+          const ms = (e.data.modelos || []).map(function(m) {
+            return { id: m.id, nome: m.nome, dados: typeof m.dados === 'string' ? JSON.parse(m.dados) : m.dados };
+          });
           setModelos(ms);
           localStorage.setItem('rondello_modelos', JSON.stringify(ms));
         }
