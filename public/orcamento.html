@@ -1499,7 +1499,20 @@
     }
 
     function getSnapshot() {
-      return { pacotes: pacotes.map(p => ({ ...p, id:undefined, expandido:undefined })), fraseCapa, sobreTexto, pagina2, incluirCardapio, cardapio: cardapio.map(c => ({ ...c, id:undefined, pratos:(c.pratos||[]).map(p => ({ ...p, id:undefined })) })) };
+      return {
+        pacotes: pacotes.map(function(p) {
+          return {
+            ...p, id:undefined, expandido:undefined,
+            faixas: (p.faixas||[]).map(function(f) {
+              return { ...f, precoFinal:'', precoOriginal:'', taxaValor:'' };
+            })
+          };
+        }),
+        fraseCapa, sobreTexto,
+        pagina2: { ...pagina2, valorSeguro:'', valorStaff:'' },
+        incluirCardapio,
+        cardapio: cardapio.map(function(c) { return { ...c, id:undefined, pratos:(c.pratos||[]).map(function(p){ return { ...p, id:undefined }; }) }; })
+      };
     }
 
     function handleSaveModelo(nome) {
@@ -1556,10 +1569,12 @@
         if (msParam) setModelos(JSON.parse(atob(msParam)));
       } catch(e) {}
 
-      /* Ask parent for modelos list */
-      try { window.parent.postMessage({ action:'requestModelos' }, '*'); } catch(e) {}
+      /* Ask parent for modelos list — immediate + retry after 2s (listener may not be ready yet) */
+      function pedirModelos() { try { window.parent.postMessage({ action:'requestModelos' }, '*'); } catch(e) {} }
+      pedirModelos();
+      const retryTimer = setTimeout(pedirModelos, 2000);
 
-      return () => window.removeEventListener('message', onMessage);
+      return () => { window.removeEventListener('message', onMessage); clearTimeout(retryTimer); };
     }, []);
 
     const addPacote = () => setPacotes(p => [...p, makePacote(p.length + 1)]);
