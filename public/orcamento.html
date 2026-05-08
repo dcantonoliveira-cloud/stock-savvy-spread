@@ -1375,71 +1375,93 @@
 
   /* ── ModelosPage ────────────────────────────────────────────────────────── */
   function ModelosPage({ modelos, onLoad, onDelete, onNovoOrcamento }) {
-    if (modelos.length === 0) return (
-      <div style={{ maxWidth:820, margin:'0 auto', padding:'72px 20px', textAlign:'center' }}>
-        <div style={{ fontSize:40, marginBottom:16 }}>📋</div>
-        <div style={{ fontSize:18, fontWeight:700, color:NAVY, marginBottom:8 }}>Nenhum modelo salvo ainda</div>
+    const [expandido, setExpandido] = React.useState(null);
+    const sorted = [...modelos].sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||'','pt',{sensitivity:'base'}); });
+
+    if (sorted.length === 0) return (
+      <div style={{ padding:'72px 20px', textAlign:'center' }}>
+        <div style={{ fontSize:36, marginBottom:16 }}>📋</div>
+        <div style={{ fontSize:17, fontWeight:700, color:NAVY, marginBottom:8 }}>Nenhum modelo salvo ainda</div>
         <div style={{ fontSize:13, color:GRAY, marginBottom:28 }}>Crie um orçamento e salve como modelo para reutilizar.</div>
         <Btn onClick={onNovoOrcamento} variant="gold">Ir para o Editor</Btn>
       </div>
     );
 
     return (
-      <div style={{ maxWidth:820, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
+      <div style={{ padding:'28px 16px 72px' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
             <div style={{ width:3, height:20, background:GOLD, borderRadius:2 }} />
-            <div style={{ fontSize:13, fontWeight:700, color:NAVY, letterSpacing:'0.06em', textTransform:'uppercase' }}>
-              {modelos.length} {modelos.length === 1 ? 'modelo salvo' : 'modelos salvos'}
+            <div style={{ fontSize:12, fontWeight:700, color:NAVY, letterSpacing:'0.07em', textTransform:'uppercase' }}>
+              {sorted.length} {sorted.length === 1 ? 'modelo salvo' : 'modelos salvos'}
             </div>
           </div>
           <Btn onClick={onNovoOrcamento} variant="ghost" style={{ fontSize:12 }}>+ Novo orçamento</Btn>
         </div>
 
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))', gap:16 }}>
-          {modelos.map(function(m) {
+        <div style={{ border:`1px solid ${GOLD}30`, borderRadius:12, overflow:'hidden', background:'#fff', boxShadow:'0 2px 12px rgba(0,0,0,.06)' }}>
+          {sorted.map(function(m, idx) {
             const dados = m.dados || {};
             const pkgs = dados.pacotes || [];
+            const aberto = expandido === m.id;
+            const naoUltimo = idx < sorted.length - 1;
+
             return (
-              <div key={m.id} style={{ background:'#fff', border:`1.5px solid ${GOLD}33`, borderRadius:12, padding:'20px 22px', boxShadow:'0 2px 10px rgba(0,0,0,.06)', display:'flex', flexDirection:'column', gap:12 }}>
-                <div>
-                  <div style={{ fontSize:15, fontWeight:700, color:NAVY, marginBottom:4 }}>{m.nome}</div>
-                  {pkgs.length > 0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:6 }}>
-                      {pkgs.map(function(p, i) {
-                        return (
-                          <span key={i} style={{ fontSize:11, fontWeight:600, color:GOLD, background:`${GOLD}15`, border:`1px solid ${GOLD}44`, borderRadius:20, padding:'3px 10px', letterSpacing:'0.03em' }}>
-                            {p.nome || ('Pacote ' + (i+1))}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {pkgs.length === 0 && (
-                    <div style={{ fontSize:12, color:GRAY }}>Sem pacotes definidos</div>
-                  )}
+              <div key={m.id}>
+                {/* Linha principal */}
+                <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 18px', background: aberto ? `${GOLD}08` : '#fff', borderBottom:`1px solid ${GOLD}20`, transition:'background .15s' }}>
+                  <button
+                    onClick={function(){ setExpandido(aberto ? null : m.id); }}
+                    title={aberto ? 'Fechar' : 'Ver detalhes'}
+                    style={{ width:26, height:26, borderRadius:7, border:`1px solid ${GOLD}40`, background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:GOLD, fontSize:9, flexShrink:0, transition:'transform .2s', transform: aberto ? 'rotate(90deg)' : 'rotate(0deg)', padding:0 }}>
+                    ▶
+                  </button>
+
+                  <div style={{ fontWeight:700, color:NAVY, fontSize:14, whiteSpace:'nowrap' }}>{m.nome}</div>
+
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, flex:1, minWidth:0 }}>
+                    {pkgs.map(function(p, i){
+                      return (
+                        <span key={i} style={{ fontSize:10, fontWeight:600, color:GOLD, background:`${GOLD}14`, border:`1px solid ${GOLD}40`, borderRadius:20, padding:'2px 9px', whiteSpace:'nowrap', letterSpacing:'0.02em' }}>
+                          {p.nome || ('Pacote '+(i+1))}
+                        </span>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display:'flex', gap:7, flexShrink:0 }}>
+                    <Btn onClick={function(){ onLoad(m.dados); onNovoOrcamento(); }} variant="gold" style={{ fontSize:11, padding:'5px 14px' }}>Carregar</Btn>
+                    <Btn onClick={function(){ if(window.confirm('Excluir modelo "'+m.nome+'"?')) onDelete(m.id); }} variant="ghost" style={{ fontSize:11, padding:'5px 12px', color:'#c0392b', borderColor:'#c0392b33' }}>Excluir</Btn>
+                  </div>
                 </div>
 
-                {pkgs.length > 0 && (
-                  <div style={{ borderTop:`1px solid ${GOLD}22`, paddingTop:10 }}>
-                    {pkgs.slice(0,3).map(function(p, i) {
-                      const secoes = p.secoes || [];
-                      const totalItens = secoes.reduce(function(acc, s){ return acc + (s.itens||[]).length; }, 0);
+                {/* Detalhes expandidos */}
+                {aberto && (
+                  <div style={{ padding:'16px 18px 18px 56px', background:`${GOLD}05`, borderBottom: naoUltimo ? `1px solid ${GOLD}20` : 'none' }}>
+                    {pkgs.length === 0 && <div style={{ fontSize:12, color:GRAY }}>Sem pacotes definidos neste modelo.</div>}
+                    {pkgs.map(function(p, i){
+                      const secoesAtivas = (p.secoes || []).filter(function(s){ return s.ativa; });
+                      const preco = (p.faixas||[]).length > 0 && p.faixas[0].precoFinal ? 'R$ '+p.faixas[0].precoFinal+'/pessoa' : '';
                       return (
-                        <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:GRAY, marginBottom:3 }}>
-                          <span style={{ color:NAVY, fontWeight:500 }}>{p.nome || ('Pacote ' + (i+1))}</span>
-                          <span>{totalItens} {totalItens === 1 ? 'item' : 'itens'}{p.preco ? ' · R$ ' + p.preco : ''}</span>
+                        <div key={i} style={{ marginBottom: i < pkgs.length-1 ? 14 : 0 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                            <span style={{ fontWeight:700, color:NAVY, fontSize:13 }}>{p.nome || ('Pacote '+(i+1))}</span>
+                            {p.palavraDestaque && p.palavraDestaque !== p.nome && (
+                              <span style={{ fontSize:10, color:GOLD, fontWeight:600, background:`${GOLD}15`, borderRadius:10, padding:'1px 8px' }}>{p.palavraDestaque}</span>
+                            )}
+                            {preco && <span style={{ fontSize:11, color:GRAY, marginLeft:'auto' }}>{preco}</span>}
+                          </div>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                            {secoesAtivas.length > 0 ? secoesAtivas.map(function(s,si){
+                              return <span key={si} style={{ fontSize:11, color:'#444', background:'#f3f4f6', borderRadius:6, padding:'2px 9px' }}>{s.nome}</span>;
+                            }) : <span style={{ fontSize:11, color:GRAY }}>Nenhuma seção ativa</span>}
+                          </div>
+                          {p.validade && <div style={{ fontSize:11, color:GRAY, marginTop:5 }}>Validade: {p.validade}</div>}
                         </div>
                       );
                     })}
-                    {pkgs.length > 3 && <div style={{ fontSize:11, color:GRAY }}>+{pkgs.length - 3} outros pacotes</div>}
                   </div>
                 )}
-
-                <div style={{ display:'flex', gap:8, marginTop:4 }}>
-                  <Btn onClick={function(){ onLoad(m.dados); onNovoOrcamento(); }} variant="gold" style={{ flex:1, fontSize:12 }}>Carregar</Btn>
-                  <Btn onClick={function(){ if(window.confirm('Excluir modelo "' + m.nome + '"?')) onDelete(m.id); }} variant="ghost" style={{ fontSize:12, color:'#c0392b', borderColor:'#c0392b44' }}>Excluir</Btn>
-                </div>
               </div>
             );
           })}
