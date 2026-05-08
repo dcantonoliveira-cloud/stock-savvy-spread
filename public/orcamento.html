@@ -1551,11 +1551,15 @@
       function onMessage(e) {
         if (!e.data || typeof e.data !== 'object') return;
         if (e.data.action === 'setModelos') {
-          const ms = (e.data.modelos || []).map(function(m) {
-            return { id: m.id, nome: m.nome, dados: typeof m.dados === 'string' ? JSON.parse(m.dados) : m.dados };
-          });
-          setModelos(ms);
-          localStorage.setItem('rondello_modelos', JSON.stringify(ms));
+          try {
+            const ms = (e.data.modelos || []).map(function(m) {
+              return { id: m.id, nome: m.nome, dados: typeof m.dados === 'string' ? JSON.parse(m.dados) : m.dados };
+            });
+            if (ms.length > 0) {
+              setModelos(ms);
+              localStorage.setItem('rondello_modelos', JSON.stringify(ms));
+            }
+          } catch(err) {}
         }
         if (e.data.action === 'loadModelo') loadModelo(e.data.dados);
       }
