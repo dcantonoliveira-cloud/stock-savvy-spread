@@ -18,7 +18,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/vfs_fonts.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
   <script>
       /* ── Cormorant Garamond — fonte serifada premium ── */
   (function() {
@@ -1239,15 +1239,25 @@
 
   /* ── gerarWord ────────────────────────────────────────────────────────── */
   window.gerarWord = function(dados) {
+    var D = window.docx;
+    if (!D) { alert('Biblioteca Word não carregada.'); return Promise.resolve(); }
+
     var cliente = dados.cliente || {};
     var pacotes = dados.pacotes || [];
     var p2      = dados.pagina2 || {};
     var fraseCapa  = dados.fraseCapa || '';
     var sobreTexto = dados.sobreTexto || '';
 
-    var WGOLD = '#C4A87A';
-    var WNAVY = '#1D1A14';
-    var WGRAY = '#7A6B5A';
+    /* cores sem # para o docx */
+    var CVRBG = '0D1526';
+    var NAVY  = '1D1A14';
+    var GOLD  = 'C4A87A';
+    var CREAM = 'EDE6DC';
+    var GRAY  = '7A6B5A';
+    var MGRAY = '9C8E82';
+    var DGRAY = '3D3028';
+    var WHITE = 'FFFFFF';
+    var LGOLD = 'D4C09A';
 
     var INCLUSO = [
       'Todo material necessário para a operação de buffet | materiais de cozinha e utensílios necessários para realizarmos nosso serviço.',
@@ -1268,187 +1278,270 @@
     function fmtM(v) {
       var n = parseFloat(String(v||'').replace(/\./g,'').replace(',','.'));
       if (isNaN(n)) return v || '—';
-      return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+      return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
     }
 
-    function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    /* ── helpers ── */
+    var NB = { style: 'none', size: 0, color: 'FFFFFF', space: 0 };
+    var noBorders   = { top:NB, bottom:NB, left:NB, right:NB, insideHorizontal:NB, insideVertical:NB };
+    var noCellBord  = { top:NB, bottom:NB, left:NB, right:NB };
 
-    var sections = [];
+    function run(text, o) {
+      o = o || {};
+      return new D.TextRun({
+        text: text || '',
+        bold: o.bold || false,
+        italics: o.italics || false,
+        strike: o.strike || false,
+        color: o.color || NAVY,
+        size: o.size || 20,
+        font: { name: o.font || 'Calibri' },
+        characterSpacing: o.spacing || 0
+      });
+    }
 
-    /* ── Capa ── */
+    function br() { return new D.TextRun({ text: '', break: 1 }); }
+
+    function para(runs, o) {
+      o = o || {};
+      var arr = Array.isArray(runs) ? runs : (runs ? [runs] : []);
+      if (o.pageBreak) arr = [new D.PageBreak()].concat(arr);
+      return new D.Paragraph({
+        alignment: o.align || D.AlignmentType.LEFT,
+        spacing: { before: o.before || 0, after: o.after || 80 },
+        children: arr
+      });
+    }
+
+    function mkCell(content, o) {
+      o = o || {};
+      return new D.TableCell({
+        children: Array.isArray(content) ? content : [content],
+        shading: o.bg ? { type: D.ShadingType.SOLID, color: o.bg } : undefined,
+        borders: o.borders || noCellBord,
+        margins: o.margins || { top: 80, bottom: 80, left: 120, right: 120 },
+        verticalAlign: o.vAlign || D.VerticalAlign.TOP,
+        columnSpan: o.span || 1
+      });
+    }
+
+    function mkTable(rows) {
+      return new D.Table({
+        width: { size: 100, type: D.WidthType.PERCENTAGE },
+        rows: rows,
+        borders: noBorders
+      });
+    }
+
+    var children = [];
+
+    /* ══ CAPA ════════════════════════════════════════════════════════════ */
     var infos = [];
-    if (cliente.data)       infos.push(esc(cliente.data));
-    if (cliente.local)      infos.push(esc(cliente.local));
-    if (cliente.tipo)       infos.push(esc(cliente.tipo));
-    if (cliente.convidados) infos.push(esc(cliente.convidados) + ' convidados');
-    if (cliente.horas)      infos.push(esc(cliente.horas) + 'h de serviço');
+    if (cliente.data)       infos.push(cliente.data);
+    if (cliente.local)      infos.push(cliente.local);
+    if (cliente.tipo)       infos.push(cliente.tipo);
+    if (cliente.convidados) infos.push(cliente.convidados + ' convidados');
+    if (cliente.horas)      infos.push(cliente.horas + 'h de serviço');
 
-    sections.push(
-      '<div style="text-align:center;padding:60px 0 40px;">' +
-        '<p style="font-size:9pt;color:' + WGRAY + ';letter-spacing:3px;margin:0 0 6px;">PROPOSTA GASTRONÔMICA</p>' +
-        '<h1 style="font-size:30pt;color:' + WNAVY + ';margin:0 0 2px;font-family:Georgia,serif;font-weight:bold;">Rondello Buffet</h1>' +
-        '<p style="font-size:13pt;color:' + WGOLD + ';font-style:italic;font-family:Georgia,serif;margin:0 0 18px;">buffet</p>' +
-        (cliente.nome ? '<h2 style="font-size:20pt;color:' + WNAVY + ';margin:0 0 8px;">' + esc(cliente.nome) + '</h2>' : '') +
-        (infos.length  ? '<p style="font-size:10pt;color:' + WGRAY + ';margin:0 0 16px;">' + infos.join('  ·  ') + '</p>' : '') +
-        (fraseCapa ? '<p style="font-size:11pt;color:' + WNAVY + ';font-style:italic;font-family:Georgia,serif;margin:16px auto 0;max-width:500px;">' + esc(fraseCapa) + '</p>' : '') +
-      '</div>'
+    var capaParas = [
+      para([], { before: 1400, after: 0 }),
+      para(run('RONDELLO', { bold:true, color:WHITE, size:84, spacing:200 }), { align: D.AlignmentType.CENTER, before:0, after:80 }),
+      para(run('buffet', { italics:true, color:GOLD, size:42, font:'Georgia' }), { align: D.AlignmentType.CENTER, before:0, after:280 })
+    ];
+    if (cliente.nome) capaParas.push(
+      para(run(String(cliente.nome).toUpperCase(), { bold:true, color:CREAM, size:54 }), { align: D.AlignmentType.CENTER, before:0, after:100 })
     );
+    if (infos.length) capaParas.push(
+      para(run(infos.join('  ·  '), { color:MGRAY, size:18 }), { align: D.AlignmentType.CENTER, before:0, after:80 })
+    );
+    if (fraseCapa) capaParas.push(
+      para(run(fraseCapa, { italics:true, color:CREAM, size:24, font:'Georgia' }), { align: D.AlignmentType.CENTER, before:200, after:0 })
+    );
+    capaParas.push(para(run('Sorocaba  ·  SP', { color:MGRAY, size:16, spacing:80 }), { align: D.AlignmentType.CENTER, before:700, after:0 }));
 
-    /* ── Pacotes ── */
+    children.push(mkTable([
+      new D.TableRow({ children: [mkCell(capaParas, { bg: CVRBG, margins: { top:0, bottom:0, left:720, right:720 }, borders: noCellBord })] })
+    ]));
+
+    /* ══ PACOTES ════════════════════════════════════════════════════════════════════ */
     pacotes.forEach(function(pacote, idx) {
+      children.push(para([], { pageBreak: true }));
+
       var inv = pacote.investimento || {};
       var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
-      var preco  = inv.precoFinal || inv.precoOriginal;
-      var faixas = inv.faixas || [];
 
-      var secHtml = '';
+      /* Header navy */
+      children.push(mkTable([
+        new D.TableRow({ children: [mkCell([
+          para([
+            run(String(idx+1).padStart(2,'0') + '  ', { bold:true, color:GOLD, size:22 }),
+            run('PACOTE  ', { bold:true, color:LGOLD, size:14, spacing:40 }),
+            run((pacote.nome||'').toUpperCase(), { bold:true, color:WHITE, size:32, font:'Georgia' })
+          ], { align: D.AlignmentType.CENTER, before:120, after:120 })
+        ], { bg: NAVY, borders: noCellBord, margins:{ top:60, bottom:60, left:180, right:180 } })] })
+      ]));
+
+      /* Seções */
       secoesAtivas.forEach(function(sec) {
         if (!sec.nome) return;
-        secHtml += '<p style="font-size:10pt;font-weight:bold;color:' + WNAVY + ';margin:10px 0 2px;text-transform:uppercase;">' + esc(sec.nome) + '</p>';
-        if (sec.detalhes) secHtml += '<p style="font-size:9pt;color:' + WGRAY + ';font-style:italic;margin:0 0 4px;">' + esc(sec.detalhes) + '</p>';
+        children.push(para([
+          run('  ●  ', { color: GOLD, size: 16 }),
+          run(sec.nome.toUpperCase(), { bold:true, color:NAVY, size:18, spacing:14 })
+        ], { before:120, after:40 }));
+        if (sec.detalhes) children.push(
+          para(run(sec.detalhes, { italics:true, color:GRAY, size:16 }), { before:0, after:60 })
+        );
       });
 
-      var invHtml = '';
+      /* Investimento */
+      var preco  = inv.precoFinal || inv.precoOriginal;
+      var faixas = inv.faixas || [];
+      var temTaxa = inv.mostrarTaxa && inv.taxaValor;
+      var adics   = (inv.adicionais||[]).filter(function(a){ return a.desc || a.valor; });
+
       if (faixas.length > 0) {
-        invHtml += '<p style="font-size:9pt;color:' + WGOLD + ';font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin:18px 0 6px;">Investimento por pessoa</p>';
+        children.push(para([
+          run('INVESTIMENTO', { bold:true, color:GOLD, size:17, spacing:20 }),
+          run('  por convidado', { italics:true, color:GRAY, size:17, font:'Georgia' })
+        ], { before:260, after:80 }));
         faixas.forEach(function(f) {
-          invHtml += '<p style="margin:4px 0;font-size:10pt;color:' + WNAVY + ';">' +
-            (f.horas ? '<span style="color:' + WGRAY + ';">' + esc(f.horas) + 'h de serviço</span> — ' : '') +
-            '<strong>' + fmtM(f.valor) + ' / convidado</strong></p>';
+          children.push(para([
+            run(f.horas ? f.horas + 'h de serviço   ' : '', { color:DGRAY, size:20 }),
+            run(fmtM(f.valor) + ' / convidado', { bold:true, color:NAVY, size:22 })
+          ], { before:60, after:60 }));
         });
       } else if (preco) {
-        invHtml += '<p style="font-size:9pt;color:' + WGOLD + ';font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin:18px 0 4px;">Investimento por pessoa</p>';
+        children.push(para([
+          run('VALOR POR PESSOA', { bold:true, color:GOLD, size:13, spacing:30 }),
+          run('   investimento', { italics:true, color:GRAY, size:15, font:'Georgia' })
+        ], { before:260, after:60 }));
         if (inv.mostrarDesconto && inv.precoOriginal && inv.precoFinal) {
-          invHtml += '<p style="font-size:9pt;color:' + WGRAY + ';margin:0 0 2px;"><s>' + fmtM(inv.precoOriginal) + '</s></p>';
-          invHtml += '<p style="font-size:22pt;font-weight:bold;color:' + WNAVY + ';margin:0;">' + fmtM(inv.precoFinal) + '</p>';
+          children.push(para(run('De  ' + fmtM(inv.precoOriginal), { color:GRAY, size:16, strike:true }), { align: D.AlignmentType.RIGHT, before:0, after:40 }));
+          children.push(para(run(fmtM(inv.precoFinal), { bold:true, color:NAVY, size:56 }), { align: D.AlignmentType.RIGHT, before:0, after:80 }));
         } else {
-          invHtml += '<p style="font-size:22pt;font-weight:bold;color:' + WNAVY + ';margin:0;">' + fmtM(preco) + '</p>';
+          children.push(para(run(fmtM(preco), { bold:true, color:NAVY, size:56 }), { align: D.AlignmentType.RIGHT, before:0, after:80 }));
         }
       }
 
-      var temTaxa = inv.mostrarTaxa && inv.taxaValor;
-      var extras = [];
-      if (temTaxa) extras.push([inv.taxaDesc || 'Taxa de deslocamento', fmtM(inv.taxaValor)]);
-      (inv.adicionais || []).filter(function(a){ return a.desc || a.valor; }).forEach(function(a) {
-        extras.push([a.desc || 'Adicional', fmtM(a.valor)]);
+      if (temTaxa) children.push(para([
+        run((inv.taxaDesc||'Taxa de deslocamento') + '   ', { color:GRAY, size:18 }),
+        run(fmtM(inv.taxaValor), { bold:true, color:NAVY, size:18 })
+      ], { before:40, after:40 }));
+      adics.forEach(function(a) {
+        children.push(para([
+          run((a.desc||'Adicional') + '   ', { color:GRAY, size:18 }),
+          run(fmtM(a.valor), { bold:true, color:NAVY, size:18 })
+        ], { before:40, after:40 }));
       });
-      if (extras.length) {
-        extras.forEach(function(e) {
-          invHtml += '<p style="font-size:9pt;color:' + WGRAY + ';margin:4px 0;">' + esc(e[0]) + ': <strong style="color:' + WNAVY + ';">' + e[1] + '</strong></p>';
-        });
-      }
 
       if (inv.validade || inv.condicoes) {
-        invHtml += '<p style="margin-top:10px;"></p>';
-        if (inv.validade)  invHtml += '<p style="font-size:9pt;color:' + WGRAY + ';margin:2px 0;"><strong>Validade:</strong> ' + esc(inv.validade) + '</p>';
-        if (inv.condicoes) invHtml += '<p style="font-size:9pt;color:' + WGRAY + ';margin:2px 0;"><strong>Pagamento:</strong> ' + esc(inv.condicoes) + '</p>';
+        children.push(para([], { before:120, after:0 }));
+        if (inv.validade)  children.push(para([run('Validade:   ', {bold:true, color:NAVY, size:15}), run(inv.validade, {color:GRAY, size:15})], { before:0, after:40 }));
+        if (inv.condicoes) children.push(para([run('Pagamento:   ', {bold:true, color:NAVY, size:15}), run(inv.condicoes, {color:GRAY, size:15})], { before:0, after:40 }));
       }
-
-      sections.push(
-        '<div style="page-break-before:always;padding:20px 0;">' +
-          '<p style="font-size:8pt;color:' + WGOLD + ';letter-spacing:3px;text-align:center;margin:0 0 2px;">PACOTE ' + String(idx+1).padStart(2,'0') + '</p>' +
-          '<h2 style="font-size:22pt;color:' + WNAVY + ';text-align:center;font-family:Georgia,serif;margin:0 0 16px;">' + esc(pacote.nome||'') + '</h2>' +
-          '<hr style="border:none;border-top:1px solid ' + WGOLD + ';margin:0 0 16px;" />' +
-          (secHtml  ? '<div style="margin-bottom:10px;">' + secHtml + '</div>' : '') +
-          invHtml +
-        '</div>'
-      );
     });
 
-    /* ── O Que Você Recebe ── */
-    var inclusoHtml = INCLUSO.map(function(x) {
-      var parts = x.split('|');
-      return '<li style="font-size:9pt;color:' + WNAVY + ';margin-bottom:5px;">' + esc(parts[0].trim()) +
-        (parts[1] ? '<br><em style="color:' + WGRAY + ';font-size:8pt;">' + esc(parts[1].trim()) + '</em>' : '') + '</li>';
-    }).join('');
-    var naoInclusoHtml = NAO_INCLUSO.map(function(x) {
-      var parts = x.split('|');
-      return '<li style="font-size:9pt;color:' + WGRAY + ';margin-bottom:5px;">' + esc(parts[0].trim()) +
-        (parts[1] ? '<br><em style="font-size:8pt;">' + esc(parts[1].trim()) + '</em>' : '') + '</li>';
-    }).join('');
+    /* ══ O QUE VOCÊ RECEBE ══════════════════════════════════════════════════════════════════════ */
+    children.push(para([], { pageBreak: true }));
+    children.push(para(run('O QUE VOCÊ RECEBE', { bold:true, color:NAVY, size:28, font:'Georgia', spacing:20 }), { align: D.AlignmentType.CENTER, before:0, after:200 }));
 
-    sections.push(
-      '<div style="page-break-before:always;padding:20px 0;">' +
-        '<h3 style="font-size:14pt;color:' + WNAVY + ';margin:0 0 16px;font-family:Georgia,serif;">O QUE VOCÊ RECEBE</h3>' +
-        '<table style="width:100%;border-collapse:collapse;">' +
-          '<tr>' +
-            '<td style="width:50%;vertical-align:top;padding-right:20px;">' +
-              '<p style="font-size:9pt;color:' + WGOLD + ';font-weight:bold;text-transform:uppercase;margin:0 0 8px;">O que entregamos</p>' +
-              '<ul style="padding-left:16px;margin:0;">' + inclusoHtml + '</ul>' +
-            '</td>' +
-            '<td style="width:50%;vertical-align:top;padding-left:20px;">' +
-              '<p style="font-size:9pt;color:#9C8E82;font-weight:bold;text-transform:uppercase;margin:0 0 8px;">Fora do pacote</p>' +
-              '<ul style="padding-left:16px;margin:0;">' + naoInclusoHtml + '</ul>' +
-            '</td>' +
-          '</tr>' +
-        '</table>' +
-        (p2 && p2.quebrasAtiva ?
-          '<p style="font-size:9pt;color:#9C8E82;font-weight:bold;text-transform:uppercase;letter-spacing:1px;margin:24px 0 6px;">Seguro e Quebras</p>' +
-          '<p style="font-size:9pt;color:' + WGRAY + ';margin:0 0 4px;">1. Seguro quebra por <strong style="color:' + WNAVY + ';">' + (p2.valorSeguro ? fmtM(p2.valorSeguro) + ' por convidado' : 'R$ 6,00 por convidado') + '</strong></p>' +
-          '<p style="font-size:9pt;color:' + WGRAY + ';margin:0;">2. Envio da contagem após o evento, com possibilidade de acerto via transferência ou fornecimento dos materiais.</p>'
-        : '') +
-      '</div>'
-    );
+    var goldBord = { style: D.BorderStyle.SINGLE, size: 6, color: GOLD };
+    var grayBord = { style: D.BorderStyle.SINGLE, size: 6, color: MGRAY };
 
-    /* ── Sobre o Rondello ── */
-    var textoMarca = sobreTexto || 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa.';
-
-    sections.push(
-      '<div style="page-break-before:always;padding:20px 0;">' +
-        '<p style="font-size:8pt;color:#9C8E82;letter-spacing:3px;text-align:center;margin:0 0 2px;">SOBRE O</p>' +
-        '<h2 style="font-size:26pt;color:' + WNAVY + ';text-align:center;font-family:Georgia,serif;margin:0 0 16px;">Rondello Buffet</h2>' +
-        '<hr style="border:none;border-top:1px solid ' + WGOLD + ';width:30%;margin:0 auto 20px;" />' +
-        '<p style="font-size:11pt;color:#3D3028;line-height:1.8;margin:0 0 20px;">' + esc(textoMarca).replace(/\n/g,'<br>') + '</p>' +
-        '<hr style="border:none;border-top:1px solid #D8C9A8;width:30%;margin:0 auto 20px;" />' +
-        '<p style="font-size:8pt;color:' + WGOLD + ';font-weight:bold;text-transform:uppercase;letter-spacing:3px;text-align:center;margin:0 0 14px;">PRÓXIMOS PASSOS</p>' +
-        '<p style="font-size:10pt;color:#3D3028;margin:0 0 6px;"><strong>01 · Aprovação</strong> — Avalie com calma e compartilhe com quem precisar.</p>' +
-        '<p style="font-size:10pt;color:#3D3028;margin:0 0 6px;"><strong>02 · Assinatura</strong> — Formalizamos o contrato e reservamos a data exclusivamente para vocês.</p>' +
-        '<p style="font-size:10pt;color:#3D3028;margin:0 0 6px;"><strong>03 · Alinhamentos</strong> — Reunião para afinar menu, logística e cada detalhe.</p>' +
-        '<p style="font-size:10pt;color:#3D3028;margin:0 0 20px;"><strong>04 · Dia do evento</strong> — Estamos lá. Prontos. Com alegria.</p>' +
-        '<hr style="border:none;border-top:1px solid ' + WGOLD + ';width:30%;margin:0 auto 20px;" />' +
-        '<p style="text-align:center;font-size:10pt;color:#3D3028;margin:0 0 4px;"><strong>(15) 99765-0209</strong>  ·  <strong>@rondellobuffet</strong>  ·  <strong>contato@rondellobuffet.com.br</strong></p>' +
-        '<p style="text-align:center;font-size:9pt;color:#9C8E82;">www.rondellobuffet.com.br  ·  Sorocaba, SP</p>' +
-      '</div>'
-    );
-
-    /* ── Cardápio (opcional) ── */
-    var temCard = dados.incluirCardapio && (dados.cardapio || []).some(function(c) {
-      return c.categoria || (c.pratos && c.pratos.some(function(p) { return p.nome; }));
-    });
-    if (temCard) {
-      var cardHtml = '';
-      (dados.cardapio || []).forEach(function(cat) {
-        if (!cat.categoria && !(cat.pratos && cat.pratos.some(function(p) { return p.nome; }))) return;
-        cardHtml += '<h4 style="font-size:10pt;color:' + WNAVY + ';font-weight:bold;text-transform:uppercase;letter-spacing:2px;margin:18px 0 6px;border-bottom:1px solid ' + WGOLD + ';padding-bottom:4px;">' + esc(cat.categoria||'Categoria') + '</h4>';
-        (cat.pratos||[]).filter(function(p){ return p.nome; }).forEach(function(p) {
-          cardHtml += '<p style="font-size:10pt;font-weight:bold;color:' + WNAVY + ';margin:0 0 2px;">' + esc(p.nome) + '</p>';
-          if (p.desc) cardHtml += '<p style="font-size:9pt;color:' + WGRAY + ';font-style:italic;margin:0 0 8px;">' + esc(p.desc) + '</p>';
-        });
+    function inclusoRows(list, dotColor) {
+      return list.map(function(x) {
+        var parts = x.split('|');
+        var runs  = [run('● ', { color:dotColor, size:16 }), run(parts[0].trim(), { color:NAVY, size:18 })];
+        if (parts[1]) { runs.push(br()); runs.push(run(parts[1].trim(), { italics:true, color:GRAY, size:14 })); }
+        return para(runs, { before:80, after:80 });
       });
-      sections.push(
-        '<div style="page-break-before:always;padding:20px 0;">' +
-          '<p style="font-size:8pt;color:#9C8E82;letter-spacing:3px;text-align:center;margin:0 0 2px;">CARDÁPIO</p>' +
-          '<h2 style="font-size:18pt;color:' + WNAVY + ';text-align:center;font-family:Georgia,serif;margin:0 0 20px;">Seleção Gastronômica</h2>' +
-          cardHtml +
-        '</div>'
-      );
     }
 
-    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' +
-      'body{font-family:Calibri,Arial,sans-serif;color:#1D1A14;margin:40px;}' +
-      'h1,h2,h3,h4{font-family:Georgia,serif;}' +
-      'p,li{line-height:1.6;}ul{list-style-type:disc;}' +
-    '</style></head><body>' + sections.join('') + '</body></html>';
+    children.push(mkTable([
+      new D.TableRow({ children: [
+        mkCell(para(run('O QUE ENTREGAMOS', { bold:true, color:GOLD, size:24, spacing:16 }), { before:0, after:80 }), { borders:{ top:NB, left:NB, right:NB, bottom:goldBord } }),
+        mkCell(para(run('FORA DO PACOTE',   { bold:true, color:MGRAY, size:24, spacing:16 }), { before:0, after:80 }), { borders:{ top:NB, left:NB, right:NB, bottom:grayBord } })
+      ]}),
+      new D.TableRow({ children: [
+        mkCell(inclusoRows(INCLUSO,     GOLD),  { borders: noCellBord }),
+        mkCell(inclusoRows(NAO_INCLUSO, MGRAY), { borders: noCellBord })
+      ]})
+    ]));
 
-    var blob = htmlDocx.asBlob(html, { orientation:'portrait', margins:{ top:720, right:720, bottom:720, left:720 } });
-    var url  = URL.createObjectURL(blob);
-    var a    = document.createElement('a');
-    a.href   = url;
-    a.download = 'Rondello_' + ((cliente.nome || 'Proposta').replace(/[^a-zA-Z0-9]/g, '_')) + '.docx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    if (p2 && p2.quebrasAtiva) {
+      children.push(para(run('SEGURO E QUEBRAS', { bold:true, color:MGRAY, size:26, spacing:16, font:'Georgia' }), { before:300, after:80 }));
+      children.push(para([
+        run('1. Seguro quebra por ', { color:GRAY, size:18 }),
+        run(p2.valorSeguro ? fmtM(p2.valorSeguro) + ' por convidado' : 'R$ 6,00 por convidado', { bold:true, color:NAVY, size:18 })
+      ], { before:0, after:60 }));
+      children.push(para(run('2. Envio da contagem após o evento, com possibilidade de acerto via transferência ou fornecimento dos materiais.', { color:GRAY, size:18 }), { before:0, after:60 }));
+    }
+
+    /* ══ SOBRE O RONDELLO ══════════════════════════════════════════════════════════════════ */
+    children.push(para([], { pageBreak: true }));
+    children.push(para(run('SOBRE O', { color:GRAY, size:13, spacing:100 }), { align: D.AlignmentType.CENTER, before:0, after:60 }));
+    children.push(para(run('Rondello Buffet', { bold:true, color:NAVY, size:68, font:'Georgia' }), { align: D.AlignmentType.CENTER, before:0, after:240 }));
+
+    var textoMarca = sobreTexto || 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que transforma o dia de vocês em algo que nenhum dos dois vai querer esquecer.';
+    textoMarca.split('\n').forEach(function(t) {
+      children.push(para(run(t || ' ', { color:DGRAY, size:21 }), { before:0, after:160 }));
+    });
+
+    children.push(para(run('PRÓXIMOS PASSOS', { bold:true, color:GOLD, size:13, spacing:80 }), { align: D.AlignmentType.CENTER, before:240, after:200 }));
+    [
+      ['01 · Aprovação',    'Avalie com calma e compartilhe com quem precisar.'],
+      ['02 · Assinatura',   'Formalizamos o contrato e reservamos a data exclusivamente para vocês.'],
+      ['03 · Alinhamentos', 'Reunião para afinar menu, logística e cada detalhe.'],
+      ['04 · Dia do evento','Estamos lá. Prontos. Com alegria.']
+    ].forEach(function(s) {
+      children.push(para([run(s[0] + '  —  ', {bold:true, color:NAVY, size:20}), run(s[1], {color:DGRAY, size:20})], { before:60, after:60 }));
+    });
+
+    children.push(para([
+      run('(15) 99765-0209', {bold:true, color:DGRAY, size:22}),
+      run('  ·  ', {color:GRAY, size:22}),
+      run('@rondellobuffet', {bold:true, color:GOLD, size:22}),
+      run('  ·  ', {color:GRAY, size:22}),
+      run('contato@rondellobuffet.com.br', {bold:true, color:DGRAY, size:22})
+    ], { align: D.AlignmentType.CENTER, before:300, after:80 }));
+    children.push(para(run('www.rondellobuffet.com.br  ·  Sorocaba, SP', {color:MGRAY, size:18, spacing:40}), { align: D.AlignmentType.CENTER, before:0, after:80 }));
+
+    /* ══ CARDÁPIO (opcional) ═══════════════════════════════════════════════════════════════════════ */
+    var temCard = dados.incluirCardapio && (dados.cardapio||[]).some(function(c){
+      return c.categoria || (c.pratos && c.pratos.some(function(p){return p.nome;}));
+    });
+    if (temCard) {
+      children.push(para([], { pageBreak: true }));
+      children.push(para(run('CARDÁPIO', {color:GRAY, size:14, spacing:60}), { align: D.AlignmentType.CENTER, before:0, after:80 }));
+      children.push(para(run('Seleção Gastronômica', {bold:true, color:NAVY, size:32, font:'Georgia'}), { align: D.AlignmentType.CENTER, before:0, after:200 }));
+      (dados.cardapio||[]).forEach(function(cat, ci) {
+        if (!cat.categoria && !(cat.pratos && cat.pratos.some(function(p){return p.nome;}))) return;
+        children.push(para(run((cat.categoria||'Categoria').toUpperCase(), {bold:true, color:NAVY, size:18, spacing:36}), { before: ci>0?200:0, after:80 }));
+        (cat.pratos||[]).filter(function(p){return p.nome;}).forEach(function(p) {
+          children.push(para(run(p.nome, {bold:true, color:NAVY, size:20}), { before:80, after:40 }));
+          if (p.desc) children.push(para(run(p.desc, {italics:true, color:GRAY, size:17}), { before:0, after:60 }));
+        });
+      });
+    }
+
+    /* ══ GERAR ARQUIVO ═════════════════════════════════════════════════════════════════════════ */
+    var doc = new D.Document({
+      sections: [{
+        properties: { page: { margin: { top: 720, right: 720, bottom: 720, left: 720 } } },
+        children: children
+      }]
+    });
+
+    return D.Packer.toBlob(doc).then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a   = document.createElement('a');
+      a.href  = url;
+      a.download = 'Rondello_' + ((cliente.nome||'Proposta').replace(/[^a-zA-Z0-9]/g,'_')) + '.docx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    });
   };
 
   /* ── ModelosPage ────────────────────────────────────────────────────────── */
@@ -1699,11 +1792,18 @@
 
     const handleGerarWord = () => {
       setGerandoPPT(true);
-      setTimeout(() => {
-        try { window.gerarWord({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio }); }
-        catch(e) { alert('Erro ao gerar Word:\n' + e.message); }
+      try {
+        const p = window.gerarWord({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio });
+        if (p && p.then) {
+          p.then(() => setGerandoPPT(false))
+           .catch(e => { alert('Erro ao gerar Word:\n' + e.message); setGerandoPPT(false); });
+        } else {
+          setGerandoPPT(false);
+        }
+      } catch(e) {
+        alert('Erro ao gerar Word:\n' + e.message);
         setGerandoPPT(false);
-      }, 100);
+      }
     };
 
     const handleGerar = () => {
