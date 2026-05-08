@@ -1249,6 +1249,22 @@
     var WNAVY = '#1D1A14';
     var WGRAY = '#7A6B5A';
 
+    var INCLUSO = [
+      'Todo material necessário para a operação de buffet | materiais de cozinha e utensílios necessários para realizarmos nosso serviço.',
+      'Mão de obra qualificada e em quantidade necessária para um atendimento de excelência.',
+      'Taças de água e refrigerante, vinho, champagne e copo de whisky | consulte-nos para saber as opções.',
+      'Pratos, talheres, toalhas, sousplats, guardanapos de pano | consulte-nos para conhecer as opções.',
+      'Gelo para todas as bebidas servidas pelo Buffet | Incluindo whisky.',
+      'Alimentação para toda a equipe do Buffet Rondello.'
+    ];
+    var NAO_INCLUSO = [
+      'Vinhos, espumantes, whiskys ou qualquer outra bebida destilada | Oferecemos taças e servimos essas bebidas, porém não fornecemos e não cobramos rolha.',
+      'Cadeiras, mesas, tampos de mesas, aparadores e outros mobiliários.',
+      'Taxas de cozinha, lixo ou qualquer outra taxa para utilização da estrutura do salão.',
+      'Alimentação de profissionais de outras empresas envolvidas no evento | consulte-nos para saber as condições.',
+      'Frete para eventos fora de Sorocaba, Votorantim ou Araçoiaba | consulte-nos para eventos em outras cidades.'
+    ];
+
     function fmtM(v) {
       var n = parseFloat(String(v||'').replace(/\./g,'').replace(',','.'));
       if (isNaN(n)) return v || '—';
