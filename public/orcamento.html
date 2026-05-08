@@ -1573,12 +1573,28 @@
         if (msParam) setModelos(JSON.parse(atob(msParam)));
       } catch(e) {}
 
-      /* Ask parent for modelos list — immediate + retry after 2s (listener may not be ready yet) */
-      function pedirModelos() { try { window.parent.postMessage({ action:'requestModelos' }, '*'); } catch(e) {} }
-      pedirModelos();
-      const retryTimer = setTimeout(pedirModelos, 2000);
+      /* Fetch modelos direto da Bubble Data API */
+      fetch('https://rondellobuffet-app.com.br/api/1.1/obj/modelo_proposta?limit=100', {
+        headers: { 'Authorization': 'Bearer b4b3c4138bb1000811d5a3c0ba47a238' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var results = (data.response && data.response.results) || [];
+        var ms = results.map(function(item) {
+          try {
+            return { id: item.modelo_id || item._id, nome: item.nome, dados: JSON.parse(item.dados_json) };
+          } catch(e) { return null; }
+        }).filter(Boolean);
+        if (ms.length > 0) {
+          setModelos(ms);
+          localStorage.setItem('rondello_modelos', JSON.stringify(ms));
+        }
+      }).catch(function(){});
 
-      return () => { window.removeEventListener('message', onMessage); clearTimeout(retryTimer); };
+      /* postMessage fallback para compatibilidade */
+      try { window.parent.postMessage({ action:'requestModelos' }, '*'); } catch(e) {}
+
+      return () => window.removeEventListener('message', onMessage);
     }, []);
 
     const addPacote = () => setPacotes(p => [...p, makePacote(p.length + 1)]);
