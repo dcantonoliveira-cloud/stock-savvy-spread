@@ -326,7 +326,7 @@
       blocks.push({
         columns: [
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 130, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 130 },
-          { text: 'A EXPERIÊNCIA GASTRONÔMICA', fontSize: 7, color: GRAY, characterSpacing: 2.5, alignment: 'center', margin: [0, 2, 0, 0] },
+          { text: 'CARDÁPIO', fontSize: 7, color: GRAY, characterSpacing: 2.5, alignment: 'center', margin: [0, 2, 0, 0] },
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 130, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 130 }
         ],
         columnGap: 10, margin: [0, 0, 0, 14]
@@ -339,7 +339,6 @@
 
         /* Título do cardápio — herói */
         if (pacote.nome) {
-          blocks.push({ text: 'CARDÁPIO', fontSize: 7, bold: true, color: GOLD, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 4] });
           blocks.push({ text: (pacote.nome || '').toUpperCase(), font: 'Cormorant', fontSize: 22, bold: true, color: NAVY, characterSpacing: 2, alignment: 'center', lineHeight: 1, margin: [0, 0, 0, 6] });
           blocks.push({ canvas: [{ type: 'line', x1: 150, y1: 0, x2: 325, y2: 0, lineWidth: 0.5, lineColor: GOLD }], margin: [0, 0, 0, 10] });
         }
