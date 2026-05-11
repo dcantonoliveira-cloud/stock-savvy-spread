@@ -18,7 +18,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/vfs_fonts.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
   <script>
       /* ── Cormorant Garamond — fonte serifada premium ── */
   (function() {
@@ -1237,140 +1237,311 @@
     );
   }
 
-  /* ── gerarPPT ─────────────────────────────────────────────────────────── */
-  window.gerarPPT = function(dados) {
-    var pptx = new PptxGenJS();
-    pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches
-
-    var NAVY    = '1D1A14';
-    var CVRBG   = '0D1526';
-    var GOLD_H  = 'C4A87A';
-    var CREAM_H = 'EDE6DC';
-    var GRAY_H  = '7A6B5A';
+  /* ── gerarWord ────────────────────────────────────────────────────────── */
+  window.gerarWord = function(dados) {
+    var D = window.docx;
+    if (!D) { alert('Biblioteca Word não carregada.'); return Promise.resolve(); }
 
     var cliente = dados.cliente || {};
     var pacotes = dados.pacotes || [];
-    var frase   = dados.fraseCapa || '';
-    var sobre   = dados.sobreTexto || '';
+    var p2      = dados.pagina2 || {};
+    var fraseCapa  = dados.fraseCapa || '';
+    var sobreTexto = dados.sobreTexto || '';
 
-    function fmtMoeda(v) {
-      var n = parseFloat(v);
-      if (isNaN(n)) return '';
-      return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    /* cores sem # para o docx */
+    var CVRBG = '0D1526';
+    var NAVY  = '1D1A14';
+    var GOLD  = 'C4A87A';
+    var CREAM = 'EDE6DC';
+    var GRAY  = '7A6B5A';
+    var MGRAY = '9C8E82';
+    var DGRAY = '3D3028';
+    var WHITE = 'FFFFFF';
+    var LGOLD = 'D4C09A';
+
+    var INCLUSO = [
+      'Todo material necessário para a operação de buffet | materiais de cozinha e utensílios necessários para realizarmos nosso serviço.',
+      'Mão de obra qualificada e em quantidade necessária para um atendimento de excelência.',
+      'Taças de água e refrigerante, vinho, champagne e copo de whisky | consulte-nos para saber as opções.',
+      'Pratos, talheres, toalhas, sousplats, guardanapos de pano | consulte-nos para conhecer as opções.',
+      'Gelo para todas as bebidas servidas pelo Buffet | Incluindo whisky.',
+      'Alimentação para toda a equipe do Buffet Rondello.'
+    ];
+    var NAO_INCLUSO = [
+      'Vinhos, espumantes, whiskys ou qualquer outra bebida destilada | Oferecemos taças e servimos essas bebidas, porém não fornecemos e não cobramos rolha.',
+      'Cadeiras, mesas, tampos de mesas, aparadores e outros mobiliários.',
+      'Taxas de cozinha, lixo ou qualquer outra taxa para utilização da estrutura do salão.',
+      'Alimentação de profissionais de outras empresas envolvidas no evento | consulte-nos para saber as condições.',
+      'Frete para eventos fora de Sorocaba, Votorantim ou Araçoiaba | consulte-nos para eventos em outras cidades.'
+    ];
+
+    function fmtM(v) {
+      var n = parseFloat(String(v||'').replace(/\./g,'').replace(',','.'));
+      if (isNaN(n)) return v || '—';
+      return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
     }
 
-    /* ── SLIDE 1: Capa ─────────────────────────────────────── */
-    var s1 = pptx.addSlide();
-    s1.background = { color: CVRBG };
+    /* ── helpers ── */
+    var NB = { style: 'none', size: 0, color: 'FFFFFF', space: 0 };
+    var noBorders   = { top:NB, bottom:NB, left:NB, right:NB, insideHorizontal:NB, insideVertical:NB };
+    var noCellBord  = { top:NB, bottom:NB, left:NB, right:NB };
 
-    s1.addText('RONDELLO', { x:0, y:2.0, w:13.33, h:0.9, align:'center', fontSize:48, bold:true, color:'FFFFFF', fontFace:'Calibri', charSpacing:10 });
-    s1.addText('buffet',   { x:0, y:3.0, w:13.33, h:0.55, align:'center', fontSize:22, italic:true, color:GOLD_H, fontFace:'Georgia' });
-    s1.addShape(pptx.ShapeType.line, { x:4.17, y:3.75, w:5, h:0, line:{ color:GOLD_H, width:0.8 } });
+    function run(text, o) {
+      o = o || {};
+      return new D.TextRun({
+        text: text || '',
+        bold: o.bold || false,
+        italics: o.italics || false,
+        strike: o.strike || false,
+        color: o.color || NAVY,
+        size: o.size || 20,
+        font: { name: o.font || 'Calibri' },
+        characterSpacing: o.spacing || 0
+      });
+    }
 
-    var nomeCliente = (cliente.nome || '').toUpperCase();
-    if (nomeCliente) s1.addText(nomeCliente, { x:0.5, y:4.0, w:12.33, h:0.7, align:'center', fontSize:26, bold:true, color:CREAM_H, fontFace:'Calibri' });
+    function br() { return new D.TextRun({ text: '', break: 1 }); }
 
-    var infoParts = [];
-    if (cliente.data)       infoParts.push(cliente.data);
-    if (cliente.local)      infoParts.push(cliente.local);
-    if (cliente.convidados) infoParts.push(cliente.convidados + ' convidados');
-    if (cliente.tipo)       infoParts.push(cliente.tipo);
-    if (cliente.horas)      infoParts.push(cliente.horas + 'h');
-    if (infoParts.length) s1.addText(infoParts.join('  ·  '), { x:0.5, y:4.8, w:12.33, h:0.35, align:'center', fontSize:11, color:'9C8E82', fontFace:'Calibri' });
+    function para(runs, o) {
+      o = o || {};
+      var arr = Array.isArray(runs) ? runs : (runs ? [runs] : []);
+      if (o.pageBreak) arr = [new D.PageBreak()].concat(arr);
+      return new D.Paragraph({
+        alignment: o.align || D.AlignmentType.LEFT,
+        spacing: { before: o.before || 0, after: o.after || 80 },
+        children: arr
+      });
+    }
 
-    if (frase) s1.addText(frase, { x:1.5, y:5.3, w:10.33, h:1.1, align:'center', fontSize:13, italic:true, color:CREAM_H, fontFace:'Georgia', wrap:true });
-    s1.addText('Sorocaba  ·  SP', { x:0, y:7.05, w:13.33, h:0.3, align:'center', fontSize:8, color:GRAY_H, fontFace:'Calibri', charSpacing:4 });
+    function mkCell(content, o) {
+      o = o || {};
+      return new D.TableCell({
+        children: Array.isArray(content) ? content : [content],
+        shading: o.bg ? { type: D.ShadingType.SOLID, color: o.bg } : undefined,
+        borders: o.borders || noCellBord,
+        margins: o.margins || { top: 80, bottom: 80, left: 120, right: 120 },
+        verticalAlign: o.vAlign || D.VerticalAlign.TOP,
+        columnSpan: o.span || 1
+      });
+    }
 
-    /* ── SLIDES por pacote ─────────────────────────────────── */
-    pacotes.forEach(function(pacote) {
-      var sp = pptx.addSlide();
-      sp.background = { color: 'FAF8F4' };
+    function mkTable(rows) {
+      return new D.Table({
+        width: { size: 100, type: D.WidthType.PERCENTAGE },
+        rows: rows,
+        borders: noBorders
+      });
+    }
 
-      sp.addShape(pptx.ShapeType.rect, { x:0, y:0, w:13.33, h:0.06, fill:{ color:GOLD_H }, line:{ color:GOLD_H } });
-      sp.addText('CARDÁPIO', { x:0, y:0.18, w:13.33, h:0.28, align:'center', fontSize:7.5, bold:true, color:GOLD_H, fontFace:'Calibri', charSpacing:5 });
-      sp.addText((pacote.nome || '').toUpperCase(), { x:0, y:0.5, w:13.33, h:0.75, align:'center', fontSize:34, bold:true, color:NAVY, fontFace:'Georgia', charSpacing:2 });
-      sp.addShape(pptx.ShapeType.line, { x:3.67, y:1.35, w:6, h:0, line:{ color:GOLD_H, width:0.6 } });
+    var children = [];
 
-      /* Seções (coluna esquerda) */
-      var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
-      var colX = 0.4; var colW = 6.5;
+    /* ══ CAPA ════════════════════════════════════════════════════════════ */
+    var infos = [];
+    if (cliente.data)       infos.push(cliente.data);
+    if (cliente.local)      infos.push(cliente.local);
+    if (cliente.tipo)       infos.push(cliente.tipo);
+    if (cliente.convidados) infos.push(cliente.convidados + ' convidados');
+    if (cliente.horas)      infos.push(cliente.horas + 'h de serviço');
 
-      if (secoesAtivas.length > 0) {
-        sp.addText('O QUE VOCÊ RECEBE', { x:colX, y:1.55, w:colW, h:0.35, fontSize:9.5, bold:true, color:GOLD_H, fontFace:'Calibri', charSpacing:1 });
-        sp.addShape(pptx.ShapeType.line, { x:colX, y:1.93, w:colW, h:0, line:{ color:GOLD_H, width:0.25 } });
+    var capaParas = [
+      para([], { before: 1400, after: 0 }),
+      para(run('RONDELLO', { bold:true, color:WHITE, size:84, spacing:200 }), { align: D.AlignmentType.CENTER, before:0, after:80 }),
+      para(run('buffet', { italics:true, color:GOLD, size:42, font:'Georgia' }), { align: D.AlignmentType.CENTER, before:0, after:280 })
+    ];
+    if (cliente.nome) capaParas.push(
+      para(run(String(cliente.nome).toUpperCase(), { bold:true, color:CREAM, size:54 }), { align: D.AlignmentType.CENTER, before:0, after:100 })
+    );
+    if (infos.length) capaParas.push(
+      para(run(infos.join('  ·  '), { color:MGRAY, size:18 }), { align: D.AlignmentType.CENTER, before:0, after:80 })
+    );
+    if (fraseCapa) capaParas.push(
+      para(run(fraseCapa, { italics:true, color:CREAM, size:24, font:'Georgia' }), { align: D.AlignmentType.CENTER, before:200, after:0 })
+    );
+    capaParas.push(para(run('Sorocaba  ·  SP', { color:MGRAY, size:16, spacing:80 }), { align: D.AlignmentType.CENTER, before:700, after:0 }));
 
-        var ly = 2.05;
-        secoesAtivas.forEach(function(sec) {
-          if (ly > 6.9) return;
-          if (sec.nome) {
-            sp.addText(sec.nome, { x:colX, y:ly, w:colW, h:0.28, fontSize:10.5, bold:true, color:NAVY, fontFace:'Calibri' });
-            ly += 0.3;
-          }
-          (sec.itens || []).filter(function(it){ return it.incluso && it.nome; }).forEach(function(it) {
-            if (ly > 6.9) return;
-            sp.addText('  ✓  ' + it.nome + (it.sub ? '  —  ' + it.sub : ''), { x:colX, y:ly, w:colW, h:0.22, fontSize:9, color:'4A3F35', fontFace:'Calibri' });
-            ly += 0.22;
-          });
-          (sec.itens || []).filter(function(it){ return !it.incluso && it.nome; }).forEach(function(it) {
-            if (ly > 6.9) return;
-            sp.addText('  ✗  ' + it.nome, { x:colX, y:ly, w:colW, h:0.22, fontSize:8.5, italic:true, color:GRAY_H, fontFace:'Calibri' });
-            ly += 0.22;
-          });
-          ly += 0.08;
-        });
-      }
+    children.push(mkTable([
+      new D.TableRow({ children: [mkCell(capaParas, { bg: CVRBG, margins: { top:0, bottom:0, left:720, right:720 }, borders: noCellBord })] })
+    ]));
 
-      /* Investimento (coluna direita) */
+    /* ══ PACOTES ════════════════════════════════════════════════════════════════════ */
+    pacotes.forEach(function(pacote, idx) {
+      children.push(para([], { pageBreak: true }));
+
       var inv = pacote.investimento || {};
+      var secoesAtivas = (pacote.secoes || []).filter(function(s) { return s.ativa; });
+
+      /* Header navy */
+      children.push(mkTable([
+        new D.TableRow({ children: [mkCell([
+          para([
+            run(String(idx+1).padStart(2,'0') + '  ', { bold:true, color:GOLD, size:22 }),
+            run('PACOTE  ', { bold:true, color:LGOLD, size:14, spacing:40 }),
+            run((pacote.nome||'').toUpperCase(), { bold:true, color:WHITE, size:32, font:'Georgia' })
+          ], { align: D.AlignmentType.CENTER, before:120, after:120 })
+        ], { bg: NAVY, borders: noCellBord, margins:{ top:60, bottom:60, left:180, right:180 } })] })
+      ]));
+
+      /* Seções */
+      secoesAtivas.forEach(function(sec) {
+        if (!sec.nome) return;
+        children.push(para([
+          run('  ●  ', { color: GOLD, size: 16 }),
+          run(sec.nome.toUpperCase(), { bold:true, color:NAVY, size:18, spacing:14 })
+        ], { before:120, after:40 }));
+        if (sec.detalhes) children.push(
+          para(run(sec.detalhes, { italics:true, color:GRAY, size:16 }), { before:0, after:60 })
+        );
+      });
+
+      /* Investimento */
+      var preco  = inv.precoFinal || inv.precoOriginal;
       var faixas = inv.faixas || [];
-      var invX = 7.3; var invW = 5.63;
+      var temTaxa = inv.mostrarTaxa && inv.taxaValor;
+      var adics   = (inv.adicionais||[]).filter(function(a){ return a.desc || a.valor; });
 
       if (faixas.length > 0) {
-        sp.addText('INVESTIMENTO', { x:invX, y:1.55, w:invW, h:0.35, fontSize:9.5, bold:true, color:GOLD_H, fontFace:'Calibri', charSpacing:1 });
-        sp.addText('por convidado', { x:invX, y:1.56, w:invW, h:0.3, align:'right', fontSize:8.5, italic:true, color:GRAY_H, fontFace:'Georgia' });
-        sp.addShape(pptx.ShapeType.line, { x:invX, y:1.93, w:invW, h:0, line:{ color:GOLD_H, width:0.25 } });
-
-        var rows = [];
+        children.push(para([
+          run('INVESTIMENTO', { bold:true, color:GOLD, size:17, spacing:20 }),
+          run('  por convidado', { italics:true, color:GRAY, size:17, font:'Georgia' })
+        ], { before:260, after:80 }));
         faixas.forEach(function(f) {
-          rows.push([
-            { text: f.horas ? f.horas + 'h de serviço' : '', options:{ fontSize:10, color:'3D3028', fontFace:'Calibri' } },
-            { text: fmtMoeda(f.valor) + '/por convidado', options:{ fontSize:11, bold:true, color:NAVY, fontFace:'Calibri', align:'right' } }
-          ]);
+          children.push(para([
+            run(f.horas ? f.horas + 'h de serviço   ' : '', { color:DGRAY, size:20 }),
+            run(fmtM(f.valor) + ' / convidado', { bold:true, color:NAVY, size:22 })
+          ], { before:60, after:60 }));
         });
-        sp.addTable(rows, { x:invX, y:2.08, w:invW, rowH:0.42, border:{ pt:0.3, color:'DDD6CD' }, fill:{ color:'FFFFFF' }, colW:[2.8, 2.83] });
-
-        var ty = 2.08 + rows.length * 0.42 + 0.18;
-        if (inv.validade) { sp.addText('Validade: ' + inv.validade, { x:invX, y:ty, w:invW, h:0.25, fontSize:8.5, italic:true, color:GRAY_H, fontFace:'Calibri' }); ty += 0.28; }
-        if (inv.condicoes) sp.addText(inv.condicoes, { x:invX, y:ty, w:invW, h:1.5, fontSize:8, color:GRAY_H, fontFace:'Calibri', wrap:true });
+      } else if (preco) {
+        children.push(para([
+          run('VALOR POR PESSOA', { bold:true, color:GOLD, size:13, spacing:30 }),
+          run('   investimento', { italics:true, color:GRAY, size:15, font:'Georgia' })
+        ], { before:260, after:60 }));
+        if (inv.mostrarDesconto && inv.precoOriginal && inv.precoFinal) {
+          children.push(para(run('De  ' + fmtM(inv.precoOriginal), { color:GRAY, size:16, strike:true }), { align: D.AlignmentType.RIGHT, before:0, after:40 }));
+          children.push(para(run(fmtM(inv.precoFinal), { bold:true, color:NAVY, size:56 }), { align: D.AlignmentType.RIGHT, before:0, after:80 }));
+        } else {
+          children.push(para(run(fmtM(preco), { bold:true, color:NAVY, size:56 }), { align: D.AlignmentType.RIGHT, before:0, after:80 }));
+        }
       }
 
-      sp.addShape(pptx.ShapeType.line, { x:0, y:7.3, w:13.33, h:0, line:{ color:GOLD_H, width:0.25 } });
-      sp.addText('RONDELLO BUFFET  ·  Sorocaba SP', { x:0, y:7.33, w:13.33, h:0.22, align:'center', fontSize:7.5, color:GRAY_H, fontFace:'Calibri', charSpacing:3 });
+      if (temTaxa) children.push(para([
+        run((inv.taxaDesc||'Taxa de deslocamento') + '   ', { color:GRAY, size:18 }),
+        run(fmtM(inv.taxaValor), { bold:true, color:NAVY, size:18 })
+      ], { before:40, after:40 }));
+      adics.forEach(function(a) {
+        children.push(para([
+          run((a.desc||'Adicional') + '   ', { color:GRAY, size:18 }),
+          run(fmtM(a.valor), { bold:true, color:NAVY, size:18 })
+        ], { before:40, after:40 }));
+      });
+
+      if (inv.validade || inv.condicoes) {
+        children.push(para([], { before:120, after:0 }));
+        if (inv.validade)  children.push(para([run('Validade:   ', {bold:true, color:NAVY, size:15}), run(inv.validade, {color:GRAY, size:15})], { before:0, after:40 }));
+        if (inv.condicoes) children.push(para([run('Pagamento:   ', {bold:true, color:NAVY, size:15}), run(inv.condicoes, {color:GRAY, size:15})], { before:0, after:40 }));
+      }
     });
 
-    /* ── SLIDE FINAL: Contato ──────────────────────────────── */
-    var sc = pptx.addSlide();
-    sc.background = { color: CVRBG };
+    /* ══ O QUE VOCÊ RECEBE ══════════════════════════════════════════════════════════════════════ */
+    children.push(para([], { pageBreak: true }));
+    children.push(para(run('O QUE VOCÊ RECEBE', { bold:true, color:NAVY, size:28, font:'Georgia', spacing:20 }), { align: D.AlignmentType.CENTER, before:0, after:200 }));
 
-    if (sobre) sc.addText(sobre, { x:1, y:0.5, w:11.33, h:2.2, align:'center', fontSize:12, italic:true, color:CREAM_H, fontFace:'Georgia', wrap:true });
-    sc.addShape(pptx.ShapeType.line, { x:4.17, y:2.9, w:5, h:0, line:{ color:GOLD_H, width:0.6 } });
-    sc.addText('RONDELLO', { x:0, y:3.1, w:13.33, h:0.75, align:'center', fontSize:38, bold:true, color:'FFFFFF', fontFace:'Calibri', charSpacing:10 });
-    sc.addText('buffet',   { x:0, y:3.9, w:13.33, h:0.5,  align:'center', fontSize:20, italic:true, color:GOLD_H, fontFace:'Georgia' });
-    sc.addShape(pptx.ShapeType.line, { x:4.17, y:4.6, w:5, h:0, line:{ color:GOLD_H, width:0.6 } });
+    var goldBord = { style: D.BorderStyle.SINGLE, size: 6, color: GOLD };
+    var grayBord = { style: D.BorderStyle.SINGLE, size: 6, color: MGRAY };
 
-    sc.addText([
-      { text:'(15) 99765-0209',          options:{ color:CREAM_H } },
-      { text:'  ·  ',                    options:{ color:GRAY_H } },
-      { text:'@rondellobuffet',           options:{ color:GOLD_H } },
-      { text:'  ·  ',                    options:{ color:GRAY_H } },
-      { text:'contato@rondellobuffet.com.br', options:{ color:CREAM_H } }
-    ], { x:0, y:4.85, w:13.33, h:0.4, align:'center', fontSize:11, fontFace:'Calibri' });
+    function inclusoRows(list, dotColor) {
+      return list.map(function(x) {
+        var parts = x.split('|');
+        var runs  = [run('● ', { color:dotColor, size:16 }), run(parts[0].trim(), { color:NAVY, size:18 })];
+        if (parts[1]) { runs.push(br()); runs.push(run(parts[1].trim(), { italics:true, color:GRAY, size:14 })); }
+        return para(runs, { before:80, after:80 });
+      });
+    }
 
-    sc.addText('www.rondellobuffet.com.br', { x:0, y:5.35, w:13.33, h:0.3, align:'center', fontSize:9, color:GRAY_H, fontFace:'Calibri', charSpacing:2 });
-    sc.addText('Sorocaba  ·  SP',           { x:0, y:7.05, w:13.33, h:0.3, align:'center', fontSize:8, color:GRAY_H, fontFace:'Calibri', charSpacing:4 });
+    children.push(mkTable([
+      new D.TableRow({ children: [
+        mkCell(para(run('O QUE ENTREGAMOS', { bold:true, color:GOLD, size:24, spacing:16 }), { before:0, after:80 }), { borders:{ top:NB, left:NB, right:NB, bottom:goldBord } }),
+        mkCell(para(run('FORA DO PACOTE',   { bold:true, color:MGRAY, size:24, spacing:16 }), { before:0, after:80 }), { borders:{ top:NB, left:NB, right:NB, bottom:grayBord } })
+      ]}),
+      new D.TableRow({ children: [
+        mkCell(inclusoRows(INCLUSO,     GOLD),  { borders: noCellBord }),
+        mkCell(inclusoRows(NAO_INCLUSO, MGRAY), { borders: noCellBord })
+      ]})
+    ]));
 
-    var arqNome = 'Rondello_' + ((cliente.nome || 'Proposta').replace(/[^a-zA-Z0-9]/g, '_')) + '.pptx';
-    pptx.writeFile({ fileName: arqNome });
+    if (p2 && p2.quebrasAtiva) {
+      children.push(para(run('SEGURO E QUEBRAS', { bold:true, color:MGRAY, size:26, spacing:16, font:'Georgia' }), { before:300, after:80 }));
+      children.push(para([
+        run('1. Seguro quebra por ', { color:GRAY, size:18 }),
+        run(p2.valorSeguro ? fmtM(p2.valorSeguro) + ' por convidado' : 'R$ 6,00 por convidado', { bold:true, color:NAVY, size:18 })
+      ], { before:0, after:60 }));
+      children.push(para(run('2. Envio da contagem após o evento, com possibilidade de acerto via transferência ou fornecimento dos materiais.', { color:GRAY, size:18 }), { before:0, after:60 }));
+    }
+
+    /* ══ SOBRE O RONDELLO ══════════════════════════════════════════════════════════════════ */
+    children.push(para([], { pageBreak: true }));
+    children.push(para(run('SOBRE O', { color:GRAY, size:13, spacing:100 }), { align: D.AlignmentType.CENTER, before:0, after:60 }));
+    children.push(para(run('Rondello Buffet', { bold:true, color:NAVY, size:68, font:'Georgia' }), { align: D.AlignmentType.CENTER, before:0, after:240 }));
+
+    var textoMarca = sobreTexto || 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que transforma o dia de vocês em algo que nenhum dos dois vai querer esquecer.';
+    textoMarca.split('\n').forEach(function(t) {
+      children.push(para(run(t || ' ', { color:DGRAY, size:21 }), { before:0, after:160 }));
+    });
+
+    children.push(para(run('PRÓXIMOS PASSOS', { bold:true, color:GOLD, size:13, spacing:80 }), { align: D.AlignmentType.CENTER, before:240, after:200 }));
+    [
+      ['01 · Aprovação',    'Avalie com calma e compartilhe com quem precisar.'],
+      ['02 · Assinatura',   'Formalizamos o contrato e reservamos a data exclusivamente para vocês.'],
+      ['03 · Alinhamentos', 'Reunião para afinar menu, logística e cada detalhe.'],
+      ['04 · Dia do evento','Estamos lá. Prontos. Com alegria.']
+    ].forEach(function(s) {
+      children.push(para([run(s[0] + '  —  ', {bold:true, color:NAVY, size:20}), run(s[1], {color:DGRAY, size:20})], { before:60, after:60 }));
+    });
+
+    children.push(para([
+      run('(15) 99765-0209', {bold:true, color:DGRAY, size:22}),
+      run('  ·  ', {color:GRAY, size:22}),
+      run('@rondellobuffet', {bold:true, color:GOLD, size:22}),
+      run('  ·  ', {color:GRAY, size:22}),
+      run('contato@rondellobuffet.com.br', {bold:true, color:DGRAY, size:22})
+    ], { align: D.AlignmentType.CENTER, before:300, after:80 }));
+    children.push(para(run('www.rondellobuffet.com.br  ·  Sorocaba, SP', {color:MGRAY, size:18, spacing:40}), { align: D.AlignmentType.CENTER, before:0, after:80 }));
+
+    /* ══ CARDÁPIO (opcional) ═══════════════════════════════════════════════════════════════════════ */
+    var temCard = dados.incluirCardapio && (dados.cardapio||[]).some(function(c){
+      return c.categoria || (c.pratos && c.pratos.some(function(p){return p.nome;}));
+    });
+    if (temCard) {
+      children.push(para([], { pageBreak: true }));
+      children.push(para(run('CARDÁPIO', {color:GRAY, size:14, spacing:60}), { align: D.AlignmentType.CENTER, before:0, after:80 }));
+      children.push(para(run('Seleção Gastronômica', {bold:true, color:NAVY, size:32, font:'Georgia'}), { align: D.AlignmentType.CENTER, before:0, after:200 }));
+      (dados.cardapio||[]).forEach(function(cat, ci) {
+        if (!cat.categoria && !(cat.pratos && cat.pratos.some(function(p){return p.nome;}))) return;
+        children.push(para(run((cat.categoria||'Categoria').toUpperCase(), {bold:true, color:NAVY, size:18, spacing:36}), { before: ci>0?200:0, after:80 }));
+        (cat.pratos||[]).filter(function(p){return p.nome;}).forEach(function(p) {
+          children.push(para(run(p.nome, {bold:true, color:NAVY, size:20}), { before:80, after:40 }));
+          if (p.desc) children.push(para(run(p.desc, {italics:true, color:GRAY, size:17}), { before:0, after:60 }));
+        });
+      });
+    }
+
+    /* ══ GERAR ARQUIVO ═════════════════════════════════════════════════════════════════════════ */
+    var doc = new D.Document({
+      sections: [{
+        properties: { page: { margin: { top: 720, right: 720, bottom: 720, left: 720 } } },
+        children: children
+      }]
+    });
+
+    return D.Packer.toBlob(doc).then(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a   = document.createElement('a');
+      a.href  = url;
+      a.download = 'Rondello_' + ((cliente.nome||'Proposta').replace(/[^a-zA-Z0-9]/g,'_')) + '.docx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    });
   };
 
   /* ── ModelosPage ────────────────────────────────────────────────────────── */
@@ -1501,11 +1672,14 @@
     function getSnapshot() {
       return {
         pacotes: pacotes.map(function(p) {
+          var inv = p.investimento || {};
           return {
             ...p, id:undefined, expandido:undefined,
-            faixas: (p.faixas||[]).map(function(f) {
-              return { ...f, precoFinal:'', precoOriginal:'', taxaValor:'' };
-            })
+            investimento: {
+              ...inv,
+              precoFinal:'', precoOriginal:'', taxaValor:'',
+              faixas: (inv.faixas||[]).map(function(f) { return { ...f, valor:'' }; })
+            }
           };
         }),
         fraseCapa, sobreTexto,
@@ -1616,13 +1790,20 @@
       return [...ps.slice(0, i + 1), clone, ...ps.slice(i + 1)];
     });
 
-    const handleGerarPPT = () => {
+    const handleGerarWord = () => {
       setGerandoPPT(true);
-      setTimeout(() => {
-        try { window.gerarPPT({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio }); }
-        catch(e) { alert('Erro ao gerar PPT:\n' + e.message); }
+      try {
+        const p = window.gerarWord({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio });
+        if (p && p.then) {
+          p.then(() => setGerandoPPT(false))
+           .catch(e => { alert('Erro ao gerar Word:\n' + e.message); setGerandoPPT(false); });
+        } else {
+          setGerandoPPT(false);
+        }
+      } catch(e) {
+        alert('Erro ao gerar Word:\n' + e.message);
         setGerandoPPT(false);
-      }, 100);
+      }
     };
 
     const handleGerar = () => {
@@ -1652,8 +1833,8 @@
           </div>
           {aba === 'editor' && (
             <div style={{ display:'flex', gap:8 }}>
-              <Btn onClick={handleGerarPPT} loading={gerandoPPT} variant="ghost" style={{ fontSize:12, color:'#fff', borderColor:'rgba(255,255,255,.3)' }}>
-                {gerandoPPT ? '⏳...' : '📊 PPT'}
+              <Btn onClick={handleGerarWord} loading={gerandoPPT} variant="ghost" style={{ fontSize:12, color:'#fff', borderColor:'rgba(255,255,255,.3)' }}>
+                {gerandoPPT ? '⏳...' : '📄 Word'}
               </Btn>
               <Btn onClick={handleGerar} loading={gerando} variant="gold" style={{ minWidth:150, fontSize:13 }}>
                 {gerando ? '⏳ Gerando...' : '⬇ Gerar PDF'}
@@ -1756,8 +1937,8 @@
 
           {/* Bottom generate */}
           <div style={{ display:'flex', justifyContent:'center', gap:12, marginTop:8 }}>
-            <Btn onClick={handleGerarPPT} loading={gerandoPPT} variant="ghost" style={{ fontSize:13, padding:'12px 22px' }}>
-              {gerandoPPT ? '⏳ Gerando PPT...' : '📊 Gerar PPT'}
+            <Btn onClick={handleGerarWord} loading={gerandoPPT} variant="ghost" style={{ fontSize:13, padding:'12px 22px' }}>
+              {gerandoPPT ? '⏳ Gerando...' : '📄 Gerar Word'}
             </Btn>
             <Btn onClick={handleGerar} loading={gerando} variant="gold" style={{ minWidth:230, fontSize:14, padding:'12px 28px' }}>
               {gerando ? '⏳ Gerando PDF...' : '⬇ Gerar PDF'}
