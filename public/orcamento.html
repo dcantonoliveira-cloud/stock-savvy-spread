@@ -748,7 +748,7 @@
       var blocks = [];
 
       /* Page title */
-      blocks.push({ text: 'CARDAPIO', fontSize: 7, color: GRAY, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 6] });
+      blocks.push({ text: 'CARDÁPIO', fontSize: 7, color: GRAY, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 6] });
       blocks.push({ text: 'Seleção Gastronômica', fontSize: 16, bold: true, color: NAVY, characterSpacing: 0.5, alignment: 'center', margin: [0, 0, 0, 4] });
       blocks.push(Object.assign(doubleRule(495), { margin: [0, 6, 0, 22] }));
 
@@ -770,23 +770,23 @@
           margin: [0, ci > 0 ? 18 : 0, 0, 10]
         });
 
+        /* Compact bullet list — two columns */
         var pratos = (cat.pratos || []).filter(function(p) { return p.nome; });
+        var col1 = [], col2 = [];
         pratos.forEach(function(prato, pi) {
-          var isPrime = prato.desc === 'Prime';
-          var nomeRun = isPrime
-            ? [{ text: '★  ', fontSize: 8, color: GOLD }, { text: prato.nome, fontSize: 10, bold: true, color: NAVY }]
-            : [{ text: prato.nome, fontSize: 10, bold: true, color: NAVY }];
-          var pratoStack = [{ text: nomeRun, lineHeight: 1.2 }];
-          if (!isPrime && prato.desc) {
-            pratoStack.push({ text: prato.desc, fontSize: 8.5, color: GRAY, italics: true, lineHeight: 1.35, margin: [0, 2, 0, 0] });
-          }
-
-          /* Thin separator between dishes (not after last) */
-          if (pi > 0) {
-            blocks.push(hairline(495, GOLD + '22', [0, 0, 0, 6]));
-          }
-          blocks.push({ stack: pratoStack, margin: [0, 0, 0, 6] });
+          var isPrime = prato.prime || prato.desc === 'Prime';
+          var bulletRun = isPrime
+            ? [{ text: '★  ', fontSize: 8, color: GOLD }, { text: prato.nome, fontSize: 9.5, color: NAVY }]
+            : [{ text: '·  ', fontSize: 10, color: GOLD }, { text: prato.nome, fontSize: 9.5, color: NAVY }];
+          var item = { text: bulletRun, margin: [0, 0, 0, 4], lineHeight: 1.25 };
+          if (pi % 2 === 0) col1.push(item); else col2.push(item);
         });
+
+        if (col2.length > 0) {
+          blocks.push({ columns: [{ stack: col1, width: '*' }, { stack: col2, width: '*' }], columnGap: 20, margin: [10, 0, 10, 0] });
+        } else {
+          blocks.push({ stack: col1, margin: [10, 0, 10, 0] });
+        }
       });
 
       return blocks;
@@ -1149,63 +1149,6 @@
     );
   }
 
-  /* ── CardapioEditor ────────────────────────────────────────────────────── */
-  function CardapioEditor({ cardapio, onChange }) {
-    const addCat = () => onChange([...cardapio, { id:uid(), categoria:'', pratos:[{ id:uid(), nome:'', desc:'' }] }]);
-    const remCat = i => onChange(cardapio.filter((_,j) => j !== i));
-    const setCat = (i, f, v) => { const c=[...cardapio]; c[i]={...c[i],[f]:v}; onChange(c); };
-    const addPrato = i => { const c=[...cardapio]; c[i]={...c[i],pratos:[...c[i].pratos,{id:uid(),nome:'',desc:''}]}; onChange(c); };
-    const setPrato = (ci,pi,f,v) => { const c=[...cardapio]; const ps=[...c[ci].pratos]; ps[pi]={...ps[pi],[f]:v}; c[ci]={...c[ci],pratos:ps}; onChange(c); };
-    const remPrato = (ci,pi) => { const c=[...cardapio]; c[ci]={...c[ci],pratos:c[ci].pratos.filter((_,j)=>j!==pi)}; onChange(c); };
-
-    return (
-      <div>
-        {cardapio.map((cat, ci) => (
-          <div key={cat.id} style={{ marginBottom:20, borderRadius:8, border:'1px solid #E5E7EB', padding:16, background:'#FAFAFA' }}>
-            <div style={{ display:'flex', gap:10, alignItems:'flex-end', marginBottom:12 }}>
-              <div style={{ flex:1 }}><Field label={`Categoria ${ci+1}`}><Input value={cat.categoria} onChange={v => setCat(ci,'categoria',v)} placeholder="Ex: Finger Foods" /></Field></div>
-              {cardapio.length > 1 && <IconBtn onClick={() => remCat(ci)} title="Remover" style={{ color:'#FCA5A5', marginBottom:2 }}>✕</IconBtn>}
-            </div>
-            {cat.pratos.map((p, pi) => {
-              const isPrime = p.desc === 'Prime';
-              return (
-                <div key={p.id} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'end', marginBottom:8 }}>
-                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    <Field label={`Prato ${pi+1}`}><Input value={p.nome} onChange={v => setPrato(ci,pi,'nome',v)} placeholder="Nome" /></Field>
-                    {!isPrime && (
-                      <Input value={p.desc} onChange={v => setPrato(ci,pi,'desc',v)} placeholder="Descrição / Ingredientes..." style={{ fontSize:11, padding:'4px 8px' }} />
-                    )}
-                  </div>
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, paddingBottom:2 }}>
-                    <span style={{ fontSize:10, color: isPrime ? '#C4A87A' : '#9CA3AF', fontWeight:600, letterSpacing:0.5 }}>★ Prime</span>
-                    <button
-                      onClick={() => setPrato(ci,pi,'desc', isPrime ? '' : 'Prime')}
-                      title={isPrime ? 'Remover Prime' : 'Marcar como Prime'}
-                      style={{
-                        width:36, height:20, borderRadius:10, border:'none', cursor:'pointer',
-                        background: isPrime ? '#C4A87A' : '#D1D5DB',
-                        position:'relative', transition:'background 0.2s'
-                      }}
-                    >
-                      <span style={{
-                        position:'absolute', top:2, left: isPrime ? 18 : 2, width:16, height:16,
-                        borderRadius:'50%', background:'white', transition:'left 0.2s',
-                        boxShadow:'0 1px 3px rgba(0,0,0,0.2)'
-                      }} />
-                    </button>
-                  </div>
-                  <div style={{ paddingBottom:2 }}>{cat.pratos.length > 1 && <IconBtn onClick={() => remPrato(ci,pi)} title="Remover" style={{ color:'#FCA5A5' }}>✕</IconBtn>}</div>
-                </div>
-              );
-            })}
-            <button onClick={() => addPrato(ci)} style={{ background:'none', border:'1px dashed #D1D5DB', borderRadius:6, padding:'5px 12px', fontSize:11, color:GRAY, cursor:'pointer' }}>+ Prato</button>
-          </div>
-        ))}
-        <Btn onClick={addCat} variant="ghost" style={{ width:'100%', borderStyle:'dashed', borderColor:GOLD, color:GOLD }}>+ Categoria</Btn>
-      </div>
-    );
-  }
-
   /* ── ModeloSelector ────────────────────────────────────────────────────── */
   function ModeloSelector({ modelos, onLoad, onSave, onDelete }) {
     const [showSave, setShowSave] = React.useState(false);
@@ -1548,12 +1491,11 @@
         if (!cat.categoria && !(cat.pratos && cat.pratos.some(function(p){return p.nome;}))) return;
         children.push(para(run((cat.categoria||'Categoria').toUpperCase(), {bold:true, color:NAVY, size:18, spacing:36}), { before: ci>0?200:0, after:80 }));
         (cat.pratos||[]).filter(function(p){return p.nome;}).forEach(function(p) {
-          var isPrimeW = p.desc === 'Prime';
+          var isPrimeW = p.prime || p.desc === 'Prime';
           var nomeRuns = isPrimeW
-            ? [run('★  ', {color:GOLD, size:18}), run(p.nome, {bold:true, color:NAVY, size:20})]
-            : [run(p.nome, {bold:true, color:NAVY, size:20})];
-          children.push(para(nomeRuns, { before:80, after:40 }));
-          if (!isPrimeW && p.desc) children.push(para(run(p.desc, {italics:true, color:GRAY, size:17}), { before:0, after:60 }));
+            ? [run('★  ', {color:GOLD, size:18}), run(p.nome, {color:NAVY, size:20})]
+            : [run('·  ', {color:GOLD, size:22}), run(p.nome, {color:NAVY, size:20})];
+          children.push(para(nomeRuns, { before:40, after:20 }));
         });
       });
     }
@@ -1675,6 +1617,459 @@
     );
   }
 
+  /* ── CardapioPageView ────────────────────────────────────────────────── */
+  function CardapioPageView({ masterCardapio, onChange }) {
+    const [novaCategoria, setNovaCategoria] = React.useState('');
+    const [novoPrato, setNovoPrato] = React.useState({});
+
+    const addCat = () => {
+      const nome = novaCategoria.trim().toUpperCase();
+      if (!nome) return;
+      onChange([...masterCardapio, { id: 'c' + Date.now(), categoria: nome, pratos: [] }]);
+      setNovaCategoria('');
+    };
+    const remCat = (ci) => onChange(masterCardapio.filter((_, j) => j !== ci));
+    const setCatNome = (ci, v) => { const c = [...masterCardapio]; c[ci] = { ...c[ci], categoria: v }; onChange(c); };
+    const addPrato = (ci) => {
+      const nome = (novoPrato[ci] || '').trim();
+      if (!nome) return;
+      const c = [...masterCardapio];
+      c[ci] = { ...c[ci], pratos: [...(c[ci].pratos || []), { id: 'p' + Date.now(), nome, ativo: true, prime: false }] };
+      onChange(c);
+      setNovoPrato({ ...novoPrato, [ci]: '' });
+    };
+    const remPrato = (ci, pi) => {
+      const c = [...masterCardapio];
+      c[ci] = { ...c[ci], pratos: c[ci].pratos.filter((_, j) => j !== pi) };
+      onChange(c);
+    };
+    const setPratoField = (ci, pi, field, val) => {
+      const c = [...masterCardapio];
+      const ps = [...c[ci].pratos]; ps[pi] = { ...ps[pi], [field]: val };
+      c[ci] = { ...c[ci], pratos: ps };
+      onChange(c);
+    };
+
+    const totalAtivos = (masterCardapio || []).reduce((acc, cat) => acc + (cat.pratos || []).filter(p => p.ativo !== false).length, 0);
+    const totalPratos = (masterCardapio || []).reduce((acc, cat) => acc + (cat.pratos || []).length, 0);
+
+    return (
+      <div style={{ maxWidth:820, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
+        <Card>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+            <div>
+              <SecHead style={{ margin:0 }}>Cardápio Master</SecHead>
+              <div style={{ fontSize:11, color:GRAY, marginTop:4 }}>{totalAtivos} pratos ativos de {totalPratos} total — pratos ativos aparecem nas propostas por padrão</div>
+            </div>
+          </div>
+          {(masterCardapio || []).map((cat, ci) => (
+            <div key={cat.id} style={{ marginBottom:20, border:'1px solid #E5E7EB', borderRadius:8, overflow:'hidden' }}>
+              {/* Category header */}
+              <div style={{ background:'#F3F0EB', padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ flex:1 }}>
+                  <input
+                    value={cat.categoria}
+                    onChange={e => setCatNome(ci, e.target.value)}
+                    style={{ background:'transparent', border:'none', outline:'none', fontWeight:700, fontSize:12, color:NAVY, letterSpacing:'0.06em', textTransform:'uppercase', width:'100%', fontFamily:'inherit' }}
+                  />
+                </div>
+                <span style={{ fontSize:11, color:GRAY }}>{(cat.pratos||[]).filter(p=>p.ativo!==false).length}/{(cat.pratos||[]).length}</span>
+                <IconBtn onClick={() => remCat(ci)} title="Remover categoria" style={{ color:'#FCA5A5', fontSize:14 }}>✕</IconBtn>
+              </div>
+              {/* Dishes */}
+              <div style={{ padding:'8px 14px' }}>
+                {(cat.pratos || []).map((p, pi) => (
+                  <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom: pi < cat.pratos.length-1 ? '1px solid #F3F0EB' : 'none' }}>
+                    {/* Active toggle */}
+                    <button
+                      onClick={() => setPratoField(ci, pi, 'ativo', p.ativo === false ? true : false)}
+                      title={p.ativo !== false ? 'Desativar prato' : 'Ativar prato'}
+                      style={{
+                        width:32, height:18, borderRadius:9, border:'none', cursor:'pointer', flexShrink:0,
+                        background: p.ativo !== false ? '#C4A87A' : '#D1D5DB', position:'relative', transition:'background 0.2s'
+                      }}
+                    >
+                      <span style={{
+                        position:'absolute', top:1, left: p.ativo !== false ? 15 : 1, width:16, height:16,
+                        borderRadius:'50%', background:'white', transition:'left 0.2s',
+                        boxShadow:'0 1px 3px rgba(0,0,0,0.2)'
+                      }} />
+                    </button>
+                    {/* Prime star */}
+                    <span
+                      onClick={() => setPratoField(ci, pi, 'prime', !p.prime)}
+                      title={p.prime ? 'Remover Prime' : 'Marcar como Prime'}
+                      style={{ fontSize:14, cursor:'pointer', color: p.prime ? '#C4A87A' : '#D1D5DB', userSelect:'none', flexShrink:0 }}
+                    >★</span>
+                    {/* Name */}
+                    <input
+                      value={p.nome}
+                      onChange={e => setPratoField(ci, pi, 'nome', e.target.value)}
+                      style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:12, color: p.ativo !== false ? NAVY : GRAY, fontFamily:'inherit', textDecoration: p.ativo === false ? 'line-through' : 'none' }}
+                    />
+                    <IconBtn onClick={() => remPrato(ci, pi)} title="Remover" style={{ color:'#FCA5A5', fontSize:12 }}>✕</IconBtn>
+                  </div>
+                ))}
+                {/* Add new dish */}
+                <div style={{ display:'flex', gap:6, marginTop:8 }}>
+                  <input
+                    value={novoPrato[ci] || ''}
+                    onChange={e => setNovoPrato({ ...novoPrato, [ci]: e.target.value })}
+                    onKeyDown={e => e.key === 'Enter' && addPrato(ci)}
+                    placeholder="Nome do prato..."
+                    style={{ flex:1, border:'1px dashed #D1D5DB', borderRadius:6, padding:'5px 10px', fontSize:11, color:NAVY, fontFamily:'inherit', outline:'none', background:'transparent' }}
+                  />
+                  <button onClick={() => addPrato(ci)} style={{ background:'none', border:'1px dashed #C4A87A', borderRadius:6, padding:'4px 12px', fontSize:11, color:GOLD, cursor:'pointer', fontFamily:'inherit' }}>+ Prato</button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {/* Add category */}
+          <div style={{ display:'flex', gap:8, marginTop:8 }}>
+            <input
+              value={novaCategoria}
+              onChange={e => setNovaCategoria(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addCat()}
+              placeholder="Nome da nova categoria..."
+              style={{ flex:1, border:'1px dashed #D1D5DB', borderRadius:6, padding:'7px 12px', fontSize:12, color:NAVY, fontFamily:'inherit', outline:'none', background:'transparent' }}
+            />
+            <Btn onClick={addCat} variant="ghost" style={{ borderStyle:'dashed', borderColor:GOLD, color:GOLD }}>+ Categoria</Btn>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  /* ── CardapioSelector ────────────────────────────────────────────────── */
+  function CardapioSelector({ masterCardapio, cardapioSelecionados, onChange, expandido, onToggleExpandido }) {
+    // Get all active pratos
+    var todosAtivos = [];
+    (masterCardapio || []).forEach(function(cat) {
+      (cat.pratos || []).filter(function(p) { return p.ativo !== false && p.nome; }).forEach(function(p) {
+        todosAtivos.push(p.id);
+      });
+    });
+    var selecionados = cardapioSelecionados === null ? todosAtivos : cardapioSelecionados;
+    var countSel = selecionados.length;
+    var countTodos = todosAtivos.length;
+
+    function isSelected(id) {
+      return selecionados.indexOf(id) !== -1;
+    }
+    function toggle(id) {
+      var next = isSelected(id) ? selecionados.filter(function(x) { return x !== id; }) : [...selecionados, id];
+      onChange(next.length === todosAtivos.length ? null : next);
+    }
+    function desmarcarTodos() { onChange([]); }
+    function marcarTodos() { onChange(null); }
+
+    return (
+      <div>
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+          <div style={{ fontSize:12, color:NAVY, fontWeight:600 }}>
+            {countSel === countTodos ? 'Todos os pratos selecionados' : `${countSel} de ${countTodos} pratos selecionados`}
+          </div>
+          <button onClick={desmarcarTodos} style={{ background:'none', border:'1px solid #E5E7EB', borderRadius:5, padding:'3px 10px', fontSize:11, color:GRAY, cursor:'pointer', fontFamily:'inherit' }}>Desmarcar todos</button>
+          {countSel < countTodos && (
+            <button onClick={marcarTodos} style={{ background:'none', border:'1px solid #C4A87A', borderRadius:5, padding:'3px 10px', fontSize:11, color:GOLD, cursor:'pointer', fontFamily:'inherit' }}>Marcar todos</button>
+          )}
+          <button onClick={onToggleExpandido} style={{ background:'none', border:'1px solid #E5E7EB', borderRadius:5, padding:'3px 10px', fontSize:11, color:GRAY, cursor:'pointer', fontFamily:'inherit', marginLeft:'auto' }}>
+            {expandido ? '▲ Recolher' : '▼ Expandir lista'}
+          </button>
+        </div>
+        {expandido && (
+          <div style={{ marginTop:14 }}>
+            {(masterCardapio || []).map(function(cat, ci) {
+              var pratosAtivos = (cat.pratos || []).filter(function(p) { return p.ativo !== false && p.nome; });
+              if (pratosAtivos.length === 0) return null;
+              return (
+                <div key={cat.id} style={{ marginBottom:12 }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:NAVY, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:6, paddingBottom:4, borderBottom:'1px solid #E5E7EB' }}>
+                    {cat.categoria}
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    {pratosAtivos.map(function(p) {
+                      var sel = isSelected(p.id);
+                      return (
+                        <label key={p.id} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', padding:'2px 0' }}>
+                          <input type="checkbox" checked={sel} onChange={() => toggle(p.id)} style={{ accentColor: GOLD, width:13, height:13 }} />
+                          {p.prime && <span style={{ color:GOLD, fontSize:11 }}>★</span>}
+                          <span style={{ fontSize:12, color: sel ? NAVY : GRAY, textDecoration: sel ? 'none' : 'line-through' }}>{p.nome}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ── DEFAULT_MASTER_CARDAPIO ────────────────────────────────────────── */
+  var DEFAULT_MASTER_CARDAPIO = [
+  { id:'c1', categoria:'ILHA GOURMET', pratos:[
+    { id:'p1', nome:'Mini temaki de salmão com cream cheese e cebolinha', ativo:true, prime:true },
+    { id:'p2', nome:'Tortilha de batata com cenoura e brandade de bacalhau', ativo:true, prime:true },
+    { id:'p3', nome:'Portobello recheado com pasta de clorofila e chips de Jamon', ativo:true, prime:true },
+    { id:'p4', nome:'Glavax de atum (curado com gin, sal e dill) com creme azedo de limão taiti', ativo:true, prime:true },
+    { id:'p5', nome:'Salada de arroz negro, ervilha fresca, cenoura, milho e broto de alfafa', ativo:true, prime:true },
+    { id:'p6', nome:'Cevicce de lichia, manga verde e cebola roxa', ativo:true, prime:true },
+    { id:'p7', nome:'Mini Mussarela de búfala com tomate cereja confit e pesto de manjericão', ativo:true, prime:false },
+    { id:'p8', nome:'Disquete de provolone com guacamole e pimenta biquinho confitada em azeite de alecrim', ativo:true, prime:false },
+    { id:'p9', nome:'Involtini de queijo coalho com bacon fatiado e barbecue de goiabada', ativo:true, prime:false },
+    { id:'p10', nome:'Laminas de abobrinha marinada com tomate seco, sunomono e molho ranch', ativo:true, prime:false },
+    { id:'p11', nome:'Homus de grão de bico com azeite trufado e mini pão sírio', ativo:true, prime:false },
+    { id:'p12', nome:'Copa fatiada com uvas vermelhas frescas', ativo:true, prime:false },
+    { id:'p13', nome:'Tábua de presunto parma com figo', ativo:true, prime:false },
+    { id:'p14', nome:'Lombo canadense condimentado, molho de beterraba e maionese verde', ativo:true, prime:false },
+    { id:'p15', nome:'Queijo tipo brie com palha de massa filo, geleia de damasco ou geleia de frutas vermelhas', ativo:true, prime:false },
+    { id:'p16', nome:'Queijo tipo parmesão com peras ao vinho e favo de mel', ativo:true, prime:false },
+    { id:'p17', nome:'Carpaccio de lagarto tradicional com mostarda, parmesão ralado e alcaparra', ativo:true, prime:false },
+    { id:'p18', nome:'Mini crostata com lemon peper e crissinis', ativo:true, prime:false },
+    { id:'p19', nome:'Tulipa de filo com creme de limão siciliano e mirtilo', ativo:true, prime:false },
+    { id:'p20', nome:'Nuts (amêndos, nozes, ameixa turca, damasco turco, laranja e limão desidratados)', ativo:true, prime:false },
+    { id:'p21', nome:'Palmito tolete assado ao molho chimichurry', ativo:true, prime:false },
+    { id:'p22', nome:'Focaccia de cebola com alecrim e tomate confit', ativo:true, prime:false }
+  ]},
+  { id:'c2', categoria:'FINGER FOODS FRIOS', pratos:[
+    { id:'p23', nome:'Anchova defumada com sour cream de limão siciliano e dill na torrada de pão preto', ativo:true, prime:true },
+    { id:'p24', nome:'Cogumelo paris recheado com pasta de clorofila com presunto parma', ativo:true, prime:true },
+    { id:'p25', nome:'Lichia recheado com pasta de gorgonzola', ativo:true, prime:true },
+    { id:'p26', nome:'Mini temaki de salmão com cream cheese e cebolinha', ativo:true, prime:true },
+    { id:'p27', nome:'Abobrinha grelhada, presunto parma e manga', ativo:true, prime:false },
+    { id:'p28', nome:'Bruschetta de pão de queijo com mussarela de búfala', ativo:true, prime:false },
+    { id:'p29', nome:'Cachepô de kibe com creme de gorgonzola', ativo:true, prime:false },
+    { id:'p30', nome:'Canutini de cheddar com peito de peru', ativo:true, prime:false },
+    { id:'p31', nome:'Canutini de creme de queijo com azeitonas', ativo:true, prime:false },
+    { id:'p32', nome:'Casquinha de provolone e tomate marinado', ativo:true, prime:false },
+    { id:'p33', nome:'Casquinha de parmesão com guacamole e pimenta biquinho', ativo:true, prime:false },
+    { id:'p34', nome:'Cestinho de frango defumado com hortelã', ativo:true, prime:false },
+    { id:'p35', nome:'Copinho de mandioquinha com salame', ativo:true, prime:false },
+    { id:'p36', nome:'Disquete de provolone desidratado', ativo:true, prime:false },
+    { id:'p37', nome:'Espeto caprece', ativo:true, prime:false },
+    { id:'p38', nome:'Embrulhadinhos de rúcula com mussarela e tomate seco', ativo:true, prime:false },
+    { id:'p39', nome:'Petit alfajor de peito de peru defumado', ativo:true, prime:false },
+    { id:'p40', nome:'Torradas com carpaccio', ativo:true, prime:false },
+    { id:'p41', nome:'Torre de lombo canadense com estepe', ativo:true, prime:false },
+    { id:'p42', nome:'Tortelete de caponata com mel', ativo:true, prime:false },
+    { id:'p43', nome:'Tulipas de fillo com mousse de brie e roll de pastrame e rúcula', ativo:true, prime:false },
+    { id:'p44', nome:'Tulipas de creme de queijo com limão siciliano e blueberry', ativo:true, prime:false }
+  ]},
+  { id:'c3', categoria:'FINGER FOODS QUENTES', pratos:[
+    { id:'p45', nome:'Carolina recheada com creme de camarão', ativo:true, prime:true },
+    { id:'p46', nome:'Colher comestível de tapioca com bacalhau', ativo:true, prime:true },
+    { id:'p47', nome:'Colher comestível com brandade de siri', ativo:true, prime:true },
+    { id:'p48', nome:'Estrela folhada de escarola com aliche', ativo:true, prime:true },
+    { id:'p49', nome:'Mil folhas de salmão com ementhal', ativo:true, prime:true },
+    { id:'p50', nome:'Mini Kafta de cordeiro ao molho de tahine com iogurte', ativo:true, prime:true },
+    { id:'p51', nome:'Tulipa de gorgonzola com figo fresco', ativo:true, prime:false },
+    { id:'p52', nome:'Backed potato de bacon', ativo:true, prime:false },
+    { id:'p53', nome:'Backed potato de rúcula com tomate seco', ativo:true, prime:false },
+    { id:'p54', nome:'Bolinha de queijo', ativo:true, prime:false },
+    { id:'p55', nome:'Brie individual na massa filo com compota de damasco (ou) mel (ou) geleia de framboesa', ativo:true, prime:false },
+    { id:'p56', nome:'Brusccheta de shimeji com presunto', ativo:true, prime:false },
+    { id:'p57', nome:'Canudinho de brócolis com lombo canadense', ativo:true, prime:false },
+    { id:'p58', nome:'Carolina de linguiça fresca picante', ativo:true, prime:false },
+    { id:'p59', nome:'Carolina recheada com creme de palmito', ativo:true, prime:false },
+    { id:'p60', nome:'Casquinha de provolone com mignon e peras', ativo:true, prime:false },
+    { id:'p61', nome:'Coxinha de carne seca com mandioca', ativo:true, prime:false },
+    { id:'p62', nome:'Coxinha de creme de frango', ativo:true, prime:false },
+    { id:'p63', nome:'Coxinha de frango', ativo:true, prime:false },
+    { id:'p64', nome:'Empadinha de palmito', ativo:true, prime:false },
+    { id:'p65', nome:'Estufadinho de brócolis com bacon', ativo:true, prime:false },
+    { id:'p66', nome:'Estufadinho de frango com cheddar', ativo:true, prime:false },
+    { id:'p67', nome:'Flor de filo com recheio de abóbora e carne seca', ativo:true, prime:false },
+    { id:'p68', nome:'Flor de filo com recheio mexicano', ativo:true, prime:false },
+    { id:'p69', nome:'Kibinho com cremely e cebolinha baby', ativo:true, prime:false },
+    { id:'p70', nome:'Meia lua de tender com abacaxi', ativo:true, prime:false },
+    { id:'p71', nome:'Meia lua de champignon com ervilhas frescas', ativo:true, prime:false },
+    { id:'p72', nome:'Mini Bruschetta de presunto com shimeji', ativo:true, prime:false },
+    { id:'p73', nome:'Mini Kafta com molho tártaro', ativo:true, prime:false },
+    { id:'p74', nome:'Mini sanduíche de alcatra', ativo:true, prime:false },
+    { id:'p75', nome:'Pastelzinho de Coração de tomate seco com mussarela', ativo:true, prime:false },
+    { id:'p76', nome:'Petit polpetone', ativo:true, prime:false },
+    { id:'p77', nome:'Petit burguer no palito', ativo:true, prime:false },
+    { id:'p78', nome:'Queijo coalho com bacon e molho agridoce', ativo:true, prime:false },
+    { id:'p79', nome:'Quiche de queijo com champignon', ativo:true, prime:false },
+    { id:'p80', nome:'Quiche de queijo com alho poró', ativo:true, prime:false },
+    { id:'p81', nome:'Rococó de alcachofra', ativo:true, prime:false },
+    { id:'p82', nome:'Tartelete de zucchini com parmesão', ativo:true, prime:false },
+    { id:'p83', nome:'Voul au vent de brócolis com alho torrado', ativo:true, prime:false },
+    { id:'p84', nome:'Wrapp de costelinha com barbecue', ativo:true, prime:false },
+    { id:'p85', nome:'Folhado de queijo com damasco', ativo:true, prime:false },
+    { id:'p86', nome:'Folhado de ricota com gorgonzola e tomate seco', ativo:true, prime:false }
+  ]},
+  { id:'c4', categoria:'MINI PRATOS', pratos:[
+    { id:'p87', nome:'Bacalhoada com purê de batata baroa', ativo:true, prime:true },
+    { id:'p88', nome:'Bobó de camarão com aipim', ativo:true, prime:true },
+    { id:'p89', nome:'Casquinha de siri', ativo:true, prime:true },
+    { id:'p90', nome:'Cevicce de linguado com vinagrete de avocado levemente apimentado', ativo:true, prime:true },
+    { id:'p91', nome:'Casquinha de camarão com creme de mandioquinha, cream cheese e mostarda', ativo:true, prime:true },
+    { id:'p92', nome:'Charutinho de cordeiro ao molho de tomates frescos', ativo:true, prime:true },
+    { id:'p93', nome:'Escondidinho de bacalhau com purê de grão de bico (ou) mandioquinha', ativo:true, prime:true },
+    { id:'p94', nome:'Magrê defumado com musseline de cenoura ao molho de assaí', ativo:true, prime:true },
+    { id:'p95', nome:'Mil folhas de eryngui com saladinha de broto e milho de vinho', ativo:true, prime:true },
+    { id:'p96', nome:'Poke (salmão defumado, repolho roxo, pepino, manga, cenoura, tomate cereja e couve frita)', ativo:true, prime:true },
+    { id:'p97', nome:'Salmão grelhado em cama de purê de gengibre', ativo:true, prime:true },
+    { id:'p98', nome:'Capuccino de mandioquinha com pancetta', ativo:true, prime:false },
+    { id:'p99', nome:'Pupunha gergelim com creme de siri', ativo:true, prime:false },
+    { id:'p100', nome:'Pupunha gergelim com frango defumado, pepino, pimentão e cebola roxa', ativo:true, prime:false },
+    { id:'p101', nome:'Pupunha gergelim com creme de bacalhau', ativo:true, prime:false },
+    { id:'p102', nome:'Mini muçarela de búfala com tartare de tomate e pesto', ativo:true, prime:false },
+    { id:'p103', nome:'Cuscuz de quinoa com chips de batata doce', ativo:true, prime:false },
+    { id:'p104', nome:'Cogumelo Portobello na manteiga com creme de leite e molho tarê', ativo:true, prime:false },
+    { id:'p105', nome:'Mignon Suíno com barbecue de goiabada e coleslaw', ativo:true, prime:false },
+    { id:'p106', nome:'Brie empanado com figo caramelado, presunto serrano e geleia de damasco', ativo:true, prime:false },
+    { id:'p107', nome:'Dadinho de tapioca com geleia de pimenta', ativo:true, prime:false },
+    { id:'p108', nome:'Baby cake de shitake com zucchini', ativo:true, prime:false },
+    { id:'p109', nome:'Risoto de carne seca com banana da terra', ativo:true, prime:false },
+    { id:'p110', nome:'Dadinho de tapioca com calabresa e geleia de pimenta', ativo:true, prime:false },
+    { id:'p111', nome:'Dadinho de tapioca com gorgonzola e geleia de pimenta', ativo:true, prime:false },
+    { id:'p112', nome:'Dadinho de tapioca com peito de peru e geleia de kiwi', ativo:true, prime:false },
+    { id:'p113', nome:'Escondidinho de carne seca com couve frita', ativo:true, prime:false },
+    { id:'p114', nome:'Cappuccino de mandioquinha com pancetta crocante', ativo:true, prime:false },
+    { id:'p115', nome:'Escondidinho de charque e velouté de abóbora com chips de couve', ativo:true, prime:false },
+    { id:'p116', nome:'Fundo de alcachofra gratinado com tomate cereja seco', ativo:true, prime:false },
+    { id:'p117', nome:'Strogonoff de palmito com ervilhas frescas e batata palha fina', ativo:true, prime:false },
+    { id:'p118', nome:'Batata em rodelas com lombo canadense, catupiry e molho branco gratinado', ativo:true, prime:false },
+    { id:'p119', nome:'Polentinha cremosa com ragu de pernil ou ragu de shimeji e shitake', ativo:true, prime:false },
+    { id:'p120', nome:'Ceviche de lichia', ativo:true, prime:false },
+    { id:'p121', nome:'Mini muçarela de búfala com tartare de tomate e molho pesto', ativo:true, prime:false },
+    { id:'p122', nome:'Temaki quadrado com pasta de salmão ou shitake cream cheese e cebolinha', ativo:true, prime:false },
+    { id:'p123', nome:'Risoto de limão siciliano (na casca do limão)', ativo:true, prime:false },
+    { id:'p124', nome:'Risoto de laranja com bacon (na casca da laranja)', ativo:true, prime:false },
+    { id:'p125', nome:'Risoto de carne seca, banana de terra e queijo brie', ativo:true, prime:false },
+    { id:'p126', nome:'Risoto de shimeji', ativo:true, prime:false },
+    { id:'p127', nome:'Risoto de tomate seco com rúcula', ativo:true, prime:false },
+    { id:'p128', nome:'Risoto de palmito', ativo:true, prime:false },
+    { id:'p129', nome:'Tortinha de mignon com gorgonzola e pera', ativo:true, prime:false },
+    { id:'p130', nome:'Conchilha com tomate cereja laminado, muçarela de búfala e pesto de manjericão', ativo:true, prime:false }
+  ]},
+  { id:'c5', categoria:'SALADAS', pratos:[
+    { id:'p131', nome:'Folhas verdes com gomos de laranja e nozes', ativo:true, prime:false },
+    { id:'p132', nome:'Tomate seco, rúcula e parmesão em lascas', ativo:true, prime:false }
+  ]},
+  { id:'c6', categoria:'MASSAS', pratos:[
+    { id:'p133', nome:'Conchiglione de bacalhau', ativo:true, prime:true },
+    { id:'p134', nome:'Canelone de peru com ricota', ativo:true, prime:false },
+    { id:'p135', nome:'Canelone de ricota com passas', ativo:true, prime:false },
+    { id:'p136', nome:'Canelone de tomate seco com catupiry', ativo:true, prime:false },
+    { id:'p137', nome:'Conchiglione de 4 queijos', ativo:true, prime:false },
+    { id:'p138', nome:'Conchiglione de carne seca com abóbora', ativo:true, prime:false },
+    { id:'p139', nome:'Conchiglione napolitano', ativo:true, prime:false },
+    { id:'p140', nome:'Fagotini de carne ou queijo', ativo:true, prime:false },
+    { id:'p141', nome:'Nhoque de abóbora', ativo:true, prime:false },
+    { id:'p142', nome:'Nhoque de batata', ativo:true, prime:false },
+    { id:'p143', nome:'Nhoque de mandioquinha', ativo:true, prime:false },
+    { id:'p144', nome:'Penne', ativo:true, prime:false },
+    { id:'p145', nome:'Rondelli napolitano', ativo:true, prime:false },
+    { id:'p146', nome:'Rondelli de frango', ativo:true, prime:false },
+    { id:'p147', nome:'Rondelli de peito de peru', ativo:true, prime:false },
+    { id:'p148', nome:'Sofiatelli 4 queijos', ativo:true, prime:false },
+    { id:'p149', nome:'Sofiatelli de alho poro', ativo:true, prime:false },
+    { id:'p150', nome:'Sofiatelli de champignon', ativo:true, prime:false },
+    { id:'p151', nome:'Sofiatelli de palmito com catupiry', ativo:true, prime:false },
+    { id:'p152', nome:'Sofiatelli de alcachofra com tomate e catupiry', ativo:true, prime:false },
+    { id:'p153', nome:'Sorrentine de mascarpone com damasco', ativo:true, prime:false },
+    { id:'p154', nome:'Talharim', ativo:true, prime:false }
+  ]},
+  { id:'c7', categoria:'MOLHOS', pratos:[
+    { id:'p155', nome:'Funghi', ativo:true, prime:true },
+    { id:'p156', nome:'Alfredo', ativo:true, prime:false },
+    { id:'p157', nome:'Branco (bechamel)', ativo:true, prime:false },
+    { id:'p158', nome:'Carbonara', ativo:true, prime:false },
+    { id:'p159', nome:'Gorgonzola', ativo:true, prime:false },
+    { id:'p160', nome:'Gruyére', ativo:true, prime:false },
+    { id:'p161', nome:'Parisiense', ativo:true, prime:false },
+    { id:'p162', nome:'Pesto', ativo:true, prime:false },
+    { id:'p163', nome:'Rosê', ativo:true, prime:false },
+    { id:'p164', nome:'Tomate fresco', ativo:true, prime:false },
+    { id:'p165', nome:'Tomate com Manjericão', ativo:true, prime:false },
+    { id:'p166', nome:'Tomate cereja', ativo:true, prime:false }
+  ]},
+  { id:'c8', categoria:'CARNES', pratos:[
+    { id:'p167', nome:'Abadejo com molho de camarão e champignon', ativo:true, prime:true },
+    { id:'p168', nome:'Abadejo ao molho de limão siciliano', ativo:true, prime:true },
+    { id:'p169', nome:'Abadejo ao pesto de laranja', ativo:true, prime:true },
+    { id:'p170', nome:'Camarão ao catupiry', ativo:true, prime:true },
+    { id:'p171', nome:'Salmão ao molho de limão e alcaparras', ativo:true, prime:true },
+    { id:'p172', nome:'Salmão ao molho de maracujá', ativo:true, prime:true },
+    { id:'p173', nome:'Salmão ao molho de morango e alecrim', ativo:true, prime:true },
+    { id:'p174', nome:'Medalhão de mignon ao molho de cebolinhas e cogumelos', ativo:true, prime:false },
+    { id:'p175', nome:'Medalhão de mignon com provolone e molho de vinho com sálvia', ativo:true, prime:false },
+    { id:'p176', nome:'Medalhão de mignon ao molho de manteiga e ervas finas', ativo:true, prime:false },
+    { id:'p177', nome:'Medalhão de mignon ao molho de gorgonzola', ativo:true, prime:false },
+    { id:'p178', nome:'Medalhão de mignon ao molho de blueberry', ativo:true, prime:false },
+    { id:'p179', nome:'Medalhão de mignon ao molho de cacau', ativo:true, prime:false },
+    { id:'p180', nome:'Medalhão de mignon ao molho de bacon', ativo:true, prime:false },
+    { id:'p181', nome:'Medalhão de mignon ao molho de açaí', ativo:true, prime:false },
+    { id:'p182', nome:'Filé mignon suíno em redução de laranja', ativo:true, prime:false },
+    { id:'p183', nome:'Filé mignon suíno, creme de mostarda e cogumelos', ativo:true, prime:false },
+    { id:'p184', nome:'Filé mignon suíno ao molho de manga e maracujá com gengibre', ativo:true, prime:false },
+    { id:'p185', nome:'Filé mignon suíno ao molho de damasco', ativo:true, prime:false },
+    { id:'p186', nome:'Medalhão de peito de frango ao bechamel com tomate seco gratinado', ativo:true, prime:false },
+    { id:'p187', nome:'Filé de frango defumado ao pesto de laranja e rúcula', ativo:true, prime:false },
+    { id:'p188', nome:'Filé de frango defumado ao molho honey mostard', ativo:true, prime:false },
+    { id:'p189', nome:'Gratinado de frango com muçarela de búfala e tomate seco', ativo:true, prime:false }
+  ]},
+  { id:'c9', categoria:'GUARNIÇÕES', pratos:[
+    { id:'p190', nome:'Mini legumes salteados na manteiga (mini cenoura, cebola baby, cogumelo paris, tomate cereja e aspargo)', ativo:true, prime:true },
+    { id:'p191', nome:'Arroz branco', ativo:true, prime:false },
+    { id:'p192', nome:'Arroz com ervas', ativo:true, prime:false },
+    { id:'p193', nome:'Arroz com amêndoas laminadas tostadas', ativo:true, prime:false },
+    { id:'p194', nome:'Arroz com crispy de alho poró', ativo:true, prime:false },
+    { id:'p195', nome:'Aligot de mandioquinha', ativo:true, prime:false },
+    { id:'p196', nome:'Ratatuile (beringela, abobrinha, cebola, tomate e pimentão)', ativo:true, prime:false },
+    { id:'p197', nome:'Risoto de limão siciliano e grana padano', ativo:true, prime:false },
+    { id:'p198', nome:'Risoto de tomate seco com rúcula', ativo:true, prime:false },
+    { id:'p199', nome:'Risoto de shimeji com brie', ativo:true, prime:false },
+    { id:'p200', nome:'Palmito grelhado ao molho de manteiga e ervas finas', ativo:true, prime:false },
+    { id:'p201', nome:'Suflê de palmito com zucchini laminada', ativo:true, prime:false },
+    { id:'p202', nome:'Purê de cenoura', ativo:true, prime:false },
+    { id:'p203', nome:'Purê de couve-flor', ativo:true, prime:false },
+    { id:'p204', nome:'Purê de ervilhas frescas com bacon', ativo:true, prime:false },
+    { id:'p205', nome:'Batata rústica com alecrim e sálvia chips', ativo:true, prime:false },
+    { id:'p206', nome:'Batata assada com parmesão ralado', ativo:true, prime:false },
+    { id:'p207', nome:'Batata baby ao barbecue e tomilho fresco', ativo:true, prime:false },
+    { id:'p208', nome:'Batata na manteiga com cebolete e salsinha', ativo:true, prime:false },
+    { id:'p209', nome:'Aspargos grelhados com presunto cru', ativo:true, prime:false },
+    { id:'p210', nome:'Cocóte de legumes com raspas de limão siciliano e gengibre', ativo:true, prime:false }
+  ]},
+  { id:'c10', categoria:'SOBREMESAS', pratos:[
+    { id:'p211', nome:'Bolo de corte Leila Savioli - escolher sabor', ativo:true, prime:false },
+    { id:'p212', nome:'Panna cotta com calda de frutas vermelhas', ativo:true, prime:false },
+    { id:'p213', nome:'Cocada de forno com sorvete de creme', ativo:true, prime:false },
+    { id:'p214', nome:'Cheesecake com geleia de goiaba', ativo:true, prime:false },
+    { id:'p215', nome:'Sorvete de manga com calda de maracujá', ativo:true, prime:false },
+    { id:'p216', nome:'Crepe de pêssego com calda de laranja e conhaque', ativo:true, prime:false },
+    { id:'p217', nome:'Banoffe', ativo:true, prime:false },
+    { id:'p218', nome:'Cremè Brulée', ativo:true, prime:false },
+    { id:'p219', nome:'Pera ao vinho com ganache de chocolate', ativo:true, prime:false },
+    { id:'p220', nome:'Brownie com sorvete de creme e calda de chocolate', ativo:true, prime:false }
+  ]},
+  { id:'c11', categoria:'MESA DO CAFÉ', pratos:[
+    { id:'p221', nome:'Café', ativo:true, prime:false },
+    { id:'p222', nome:'Biscoitinhos', ativo:true, prime:false },
+    { id:'p223', nome:'Mini Brownie ou palha italiana (escolher 1 opção)', ativo:true, prime:false },
+    { id:'p224', nome:'Tortinha de limão', ativo:true, prime:false }
+  ]},
+  { id:'c12', categoria:'LANCHINHO DA MADRUGADA', pratos:[
+    { id:'p225', nome:'Mini burguer de carne bovina, queijo ementhal, tomate seco e rúcula', ativo:true, prime:false },
+    { id:'p226', nome:'Mini burguer de carne bovina, queijo cheddar, shimeji e cebola caramelizada', ativo:true, prime:false },
+    { id:'p227', nome:'Mini burguer de carne bovina, queijo cheddar, bacon e cebola caramelizada', ativo:true, prime:false },
+    { id:'p228', nome:'Lanchinho com pasta de peito de peru, nozes e maça verde', ativo:true, prime:false },
+    { id:'p229', nome:'Lanchinho rústico de pernil com vinagrete', ativo:true, prime:false },
+    { id:'p230', nome:'Mini Pizza napolitana', ativo:true, prime:false },
+    { id:'p231', nome:'Mini Hotdog', ativo:true, prime:false },
+    { id:'p232', nome:'Milk shake (sabor a escolher)', ativo:true, prime:false },
+    { id:'p233', nome:'Pastelzinho (recheio à escolher)', ativo:true, prime:false },
+    { id:'p234', nome:'Mini churros com doce de leite', ativo:true, prime:false }
+  ]}
+];
+
   /* ── App ───────────────────────────────────────────────────────────────── */
   function App() {
     const [cliente, setCliente] = React.useState({ nome:'', data:'', local:'', convidados:'', tipo:'', horas:'' });
@@ -1684,270 +2079,20 @@
     const [pagina2, setP2] = React.useState({ quebrasAtiva:true, valorSeguro:'6', valorStaff:'120' });
     const [showTextos, setShowTextos] = React.useState(false);
     const [incluirCardapio, setCardapioToggle] = React.useState(false);
-    const [cardapio, setCardapio] = React.useState([
-  { id:uid(), categoria:'ILHA GOURMET', pratos:[
-    { id:uid(), nome:'Mini temaki de salmão com cream cheese e cebolinha', desc:'Prime' },
-    { id:uid(), nome:'Tortilha de batata com cenoura e brandade de bacalhau', desc:'Prime' },
-    { id:uid(), nome:'Portobello recheado com pasta de clorofila e chips de Jamon', desc:'Prime' },
-    { id:uid(), nome:'Glavax de atum (curado com gin, sal e dill) com creme azedo de limão taiti', desc:'Prime' },
-    { id:uid(), nome:'Salada de arroz negro, ervilha fresca, cenoura, milho e broto de alfafa', desc:'Prime' },
-    { id:uid(), nome:'Cevicce de lichia, manga verde e cebola roxa', desc:'Prime' },
-    { id:uid(), nome:'Mini Mussarela de búfala com tomate cereja confit e pesto de manjericão', desc:'' },
-    { id:uid(), nome:'Disquete de provolone com guacamole e pimenta biquinho confitada em azeite de alecrim', desc:'' },
-    { id:uid(), nome:'Involtini de queijo coalho com bacon fatiado e barbecue de goiabada', desc:'' },
-    { id:uid(), nome:'Laminas de abobrinha marinada com tomate seco, sunomono e molho ranch', desc:'' },
-    { id:uid(), nome:'Homus de grão de bico com azeite trufado e mini pão sírio', desc:'' },
-    { id:uid(), nome:'Copa fatiada com uvas vermelhas frescas', desc:'' },
-    { id:uid(), nome:'Tábua de presunto parma com figo', desc:'' },
-    { id:uid(), nome:'Lombo canadense condimentado, molho de beterraba e maionese verde', desc:'' },
-    { id:uid(), nome:'Queijo tipo brie com palha de massa filo, geleia de damasco ou geleia de frutas vermelhas', desc:'' },
-    { id:uid(), nome:'Queijo tipo parmesão com peras ao vinho e favo de mel', desc:'' },
-    { id:uid(), nome:'Carpaccio de lagarto tradicional com mostarda, parmesão ralado e alcaparra', desc:'' },
-    { id:uid(), nome:'Mini crostata com lemon peper e crissinis', desc:'' },
-    { id:uid(), nome:'Tulipa de filo com creme de limão siciliano e mirtilo', desc:'' },
-    { id:uid(), nome:'Nuts (amêndos, nozes, ameixa turca, damasco turco, laranja e limão desidratados)', desc:'' },
-    { id:uid(), nome:'Palmito tolete assado ao molho chimichurry', desc:'' },
-    { id:uid(), nome:'Focaccia de cebola com alecrim e tomate confit', desc:'' }
-  ]},
-  { id:uid(), categoria:'FINGER FOODS FRIOS', pratos:[
-    { id:uid(), nome:'Anchova defumada com sour cream de limão siciliano e dill na torrada de pão preto', desc:'Prime' },
-    { id:uid(), nome:'Cogumelo paris recheado com pasta de clorofila com presunto parma', desc:'Prime' },
-    { id:uid(), nome:'Lichia recheado com pasta de gorgonzola', desc:'Prime' },
-    { id:uid(), nome:'Mini temaki de salmão com cream cheese e cebolinha', desc:'Prime' },
-    { id:uid(), nome:'Abobrinha grelhada, presunto parma e manga', desc:'' },
-    { id:uid(), nome:'Bruschetta de pão de queijo com mussarela de búfala', desc:'' },
-    { id:uid(), nome:'Cachepô de kibe com creme de gorgonzola', desc:'' },
-    { id:uid(), nome:'Canutini de cheddar com peito de peru', desc:'' },
-    { id:uid(), nome:'Canutini de creme de queijo com azeitonas', desc:'' },
-    { id:uid(), nome:'Casquinha de provolone e tomate marinado', desc:'' },
-    { id:uid(), nome:'Casquinha de parmesão com guacamole e pimenta biquinho', desc:'' },
-    { id:uid(), nome:'Cestinho de frango defumado com hortelã', desc:'' },
-    { id:uid(), nome:'Copinho de mandioquinha com salame', desc:'' },
-    { id:uid(), nome:'Disquete de provolone desidratado', desc:'' },
-    { id:uid(), nome:'Espeto caprece', desc:'' },
-    { id:uid(), nome:'Embrulhadinhos de rúcula com mussarela e tomate seco', desc:'' },
-    { id:uid(), nome:'Petit alfajor de peito de peru defumado', desc:'' },
-    { id:uid(), nome:'Torradas com carpaccio', desc:'' },
-    { id:uid(), nome:'Torre de lombo canadense com estepe', desc:'' },
-    { id:uid(), nome:'Tortelete de caponata com mel', desc:'' },
-    { id:uid(), nome:'Tulipas de fillo com mousse de brie e roll de pastrame e rúcula', desc:'' },
-    { id:uid(), nome:'Tulipas de creme de queijo com limão siciliano e blueberry', desc:'' }
-  ]},
-  { id:uid(), categoria:'FINGER FOODS QUENTES', pratos:[
-    { id:uid(), nome:'Carolina recheada com creme de camarão', desc:'Prime' },
-    { id:uid(), nome:'Colher comestível de tapioca com bacalhau', desc:'Prime' },
-    { id:uid(), nome:'Colher comestível com brandade de siri', desc:'Prime' },
-    { id:uid(), nome:'Estrela folhada de escarola com aliche', desc:'Prime' },
-    { id:uid(), nome:'Mil folhas de salmão com ementhal', desc:'Prime' },
-    { id:uid(), nome:'Mini Kafta de cordeiro ao molho de tahine com iogurte', desc:'Prime' },
-    { id:uid(), nome:'Tulipa de gorgonzola com figo fresco', desc:'' },
-    { id:uid(), nome:'Backed potato de bacon', desc:'' },
-    { id:uid(), nome:'Backed potato de rúcula com tomate seco', desc:'' },
-    { id:uid(), nome:'Bolinha de queijo', desc:'' },
-    { id:uid(), nome:'Brie individual na massa filo com compota de damasco (ou) mel (ou) geleia de framboesa', desc:'' },
-    { id:uid(), nome:'Brusccheta de shimeji com presunto', desc:'' },
-    { id:uid(), nome:'Canudinho de brócolis com lombo canadense', desc:'' },
-    { id:uid(), nome:'Carolina de linguiça fresca picante', desc:'' },
-    { id:uid(), nome:'Carolina recheada com creme de palmito', desc:'' },
-    { id:uid(), nome:'Casquinha de provolone com mignon e peras', desc:'' },
-    { id:uid(), nome:'Coxinha de carne seca com mandioca', desc:'' },
-    { id:uid(), nome:'Coxinha de creme de frango', desc:'' },
-    { id:uid(), nome:'Coxinha de frango', desc:'' },
-    { id:uid(), nome:'Empadinha de palmito', desc:'' },
-    { id:uid(), nome:'Estufadinho de brócolis com bacon', desc:'' },
-    { id:uid(), nome:'Estufadinho de frango com cheddar', desc:'' },
-    { id:uid(), nome:'Flor de filo com recheio de abóbora e carne seca', desc:'' },
-    { id:uid(), nome:'Flor de filo com recheio mexicano', desc:'' },
-    { id:uid(), nome:'Kibinho com cremely e cebolinha baby', desc:'' },
-    { id:uid(), nome:'Meia lua de tender com abacaxi', desc:'' },
-    { id:uid(), nome:'Meia lua de champignon com ervilhas frescas', desc:'' },
-    { id:uid(), nome:'Mini Bruschetta de presunto com shimeji', desc:'' },
-    { id:uid(), nome:'Mini Kafta com molho tártaro', desc:'' },
-    { id:uid(), nome:'Mini sanduíche de alcatra', desc:'' },
-    { id:uid(), nome:'Pastelzinho de Coração de tomate seco com mussarela', desc:'' },
-    { id:uid(), nome:'Petit polpetone', desc:'' },
-    { id:uid(), nome:'Petit burguer no palito', desc:'' },
-    { id:uid(), nome:'Queijo coalho com bacon e molho agridoce', desc:'' },
-    { id:uid(), nome:'Quiche de queijo com champignon', desc:'' },
-    { id:uid(), nome:'Quiche de queijo com alho poró', desc:'' },
-    { id:uid(), nome:'Rococó de alcachofra', desc:'' },
-    { id:uid(), nome:'Tartelete de zucchini com parmesão', desc:'' },
-    { id:uid(), nome:'Voul au vent de brócolis com alho torrado', desc:'' },
-    { id:uid(), nome:'Wrapp de costelinha com barbecue', desc:'' },
-    { id:uid(), nome:'Folhado de queijo com damasco', desc:'' },
-    { id:uid(), nome:'Folhado de ricota com gorgonzola e tomate seco', desc:'' }
-  ]},
-  { id:uid(), categoria:'MINI PRATOS', pratos:[
-    { id:uid(), nome:'Bacalhoada com purê de batata baroa', desc:'Prime' },
-    { id:uid(), nome:'Bobó de camarão com aipim', desc:'Prime' },
-    { id:uid(), nome:'Casquinha de siri', desc:'Prime' },
-    { id:uid(), nome:'Cevicce de linguado com vinagrete de avocado levemente apimentado', desc:'Prime' },
-    { id:uid(), nome:'Casquinha de camarão com creme de mandioquinha, cream cheese e mostarda', desc:'Prime' },
-    { id:uid(), nome:'Charutinho de cordeiro ao molho de tomates frescos', desc:'Prime' },
-    { id:uid(), nome:'Escondidinho de bacalhau com purê de grão de bico (ou) mandioquinha', desc:'Prime' },
-    { id:uid(), nome:'Magrê defumado com musseline de cenoura ao molho de assaí', desc:'Prime' },
-    { id:uid(), nome:'Mil folhas de eryngui com saladinha de broto e milho de vinho', desc:'Prime' },
-    { id:uid(), nome:'Poke (salmão defumado, repolho roxo, pepino, manga, cenoura, tomate cereja e couve frita)', desc:'Prime' },
-    { id:uid(), nome:'Salmão grelhado em cama de purê de gengibre', desc:'Prime' },
-    { id:uid(), nome:'Capuccino de mandioquinha com pancetta', desc:'' },
-    { id:uid(), nome:'Pupunha gergelim com creme de siri', desc:'' },
-    { id:uid(), nome:'Pupunha gergelim com frango defumado, pepino, pimentão e cebola roxa', desc:'' },
-    { id:uid(), nome:'Pupunha gergelim com creme de bacalhau', desc:'' },
-    { id:uid(), nome:'Mini muçarela de búfala com tartare de tomate e pesto', desc:'' },
-    { id:uid(), nome:'Cuscuz de quinoa com chips de batata doce', desc:'' },
-    { id:uid(), nome:'Cogumelo Portobello na manteiga com creme de leite e molho tarê', desc:'' },
-    { id:uid(), nome:'Mignon Suíno com barbecue de goiabada e coleslaw', desc:'' },
-    { id:uid(), nome:'Brie empanado com figo caramelado, presunto serrano e geleia de damasco', desc:'' },
-    { id:uid(), nome:'Dadinho de tapioca com geleia de pimenta', desc:'' },
-    { id:uid(), nome:'Baby cake de shitake com zucchini', desc:'' },
-    { id:uid(), nome:'Risoto de carne seca com banana da terra', desc:'' },
-    { id:uid(), nome:'Dadinho de tapioca com calabresa e geleia de pimenta', desc:'' },
-    { id:uid(), nome:'Dadinho de tapioca com gorgonzola e geleia de pimenta', desc:'' },
-    { id:uid(), nome:'Dadinho de tapioca com peito de peru e geleia de kiwi', desc:'' },
-    { id:uid(), nome:'Escondidinho de carne seca com couve frita', desc:'' },
-    { id:uid(), nome:'Cappuccino de mandioquinha com pancetta crocante', desc:'' },
-    { id:uid(), nome:'Escondidinho de charque e velouté de abóbora com chips de couve', desc:'' },
-    { id:uid(), nome:'Fundo de alcachofra gratinado com tomate cereja seco', desc:'' },
-    { id:uid(), nome:'Strogonoff de palmito com ervilhas frescas e batata palha fina', desc:'' },
-    { id:uid(), nome:'Batata em rodelas com lombo canadense, catupiry e molho branco gratinado', desc:'' },
-    { id:uid(), nome:'Polentinha cremosa com ragu de pernil ou ragu de shimeji e shitake', desc:'' },
-    { id:uid(), nome:'Ceviche de lichia', desc:'' },
-    { id:uid(), nome:'Mini muçarela de búfala com tartare de tomate e molho pesto', desc:'' },
-    { id:uid(), nome:'Temaki quadrado com pasta de salmão ou shitake cream cheese e cebolinha', desc:'' },
-    { id:uid(), nome:'Risoto de limão siciliano (na casca do limão)', desc:'' },
-    { id:uid(), nome:'Risoto de laranja com bacon (na casca da laranja)', desc:'' },
-    { id:uid(), nome:'Risoto de carne seca, banana de terra e queijo brie', desc:'' },
-    { id:uid(), nome:'Risoto de shimeji', desc:'' },
-    { id:uid(), nome:'Risoto de tomate seco com rúcula', desc:'' },
-    { id:uid(), nome:'Risoto de palmito', desc:'' },
-    { id:uid(), nome:'Tortinha de mignon com gorgonzola e pera', desc:'' },
-    { id:uid(), nome:'Conchilha com tomate cereja laminado, muçarela de búfala e pesto de manjericão', desc:'' }
-  ]},
-  { id:uid(), categoria:'SALADAS', pratos:[
-    { id:uid(), nome:'Folhas verdes com gomos de laranja e nozes', desc:'' },
-    { id:uid(), nome:'Tomate seco, rúcula e parmesão em lascas', desc:'' }
-  ]},
-  { id:uid(), categoria:'MASSAS', pratos:[
-    { id:uid(), nome:'Conchiglione de bacalhau', desc:'Prime' },
-    { id:uid(), nome:'Canelone de peru com ricota', desc:'' },
-    { id:uid(), nome:'Canelone de ricota com passas', desc:'' },
-    { id:uid(), nome:'Canelone de tomate seco com catupiry', desc:'' },
-    { id:uid(), nome:'Conchiglione de 4 queijos', desc:'' },
-    { id:uid(), nome:'Conchiglione de carne seca com abóbora', desc:'' },
-    { id:uid(), nome:'Conchiglione napolitano', desc:'' },
-    { id:uid(), nome:'Fagotini de carne ou queijo', desc:'' },
-    { id:uid(), nome:'Nhoque de abóbora', desc:'' },
-    { id:uid(), nome:'Nhoque de batata', desc:'' },
-    { id:uid(), nome:'Nhoque de mandioquinha', desc:'' },
-    { id:uid(), nome:'Penne', desc:'' },
-    { id:uid(), nome:'Rondelli napolitano', desc:'' },
-    { id:uid(), nome:'Rondelli de frango', desc:'' },
-    { id:uid(), nome:'Rondelli de peito de peru', desc:'' },
-    { id:uid(), nome:'Sofiatelli 4 queijos', desc:'' },
-    { id:uid(), nome:'Sofiatelli de alho poro', desc:'' },
-    { id:uid(), nome:'Sofiatelli de champignon', desc:'' },
-    { id:uid(), nome:'Sofiatelli de palmito com catupiry', desc:'' },
-    { id:uid(), nome:'Sofiatelli de alcachofra com tomate e catupiry', desc:'' },
-    { id:uid(), nome:'Sorrentine de mascarpone com damasco', desc:'' },
-    { id:uid(), nome:'Talharim', desc:'' }
-  ]},
-  { id:uid(), categoria:'MOLHOS', pratos:[
-    { id:uid(), nome:'Funghi', desc:'Prime' },
-    { id:uid(), nome:'Alfredo', desc:'' },
-    { id:uid(), nome:'Branco (bechamel)', desc:'' },
-    { id:uid(), nome:'Carbonara', desc:'' },
-    { id:uid(), nome:'Gorgonzola', desc:'' },
-    { id:uid(), nome:'Gruyére', desc:'' },
-    { id:uid(), nome:'Parisiense', desc:'' },
-    { id:uid(), nome:'Pesto', desc:'' },
-    { id:uid(), nome:'Rosê', desc:'' },
-    { id:uid(), nome:'Tomate fresco', desc:'' },
-    { id:uid(), nome:'Tomate com Manjericão', desc:'' },
-    { id:uid(), nome:'Tomate cereja', desc:'' }
-  ]},
-  { id:uid(), categoria:'CARNES', pratos:[
-    { id:uid(), nome:'Abadejo com molho de camarão e champignon', desc:'Prime' },
-    { id:uid(), nome:'Abadejo ao molho de limão siciliano', desc:'Prime' },
-    { id:uid(), nome:'Abadejo ao pesto de laranja', desc:'Prime' },
-    { id:uid(), nome:'Camarão ao catupiry', desc:'Prime' },
-    { id:uid(), nome:'Salmão ao molho de limão e alcaparras', desc:'Prime' },
-    { id:uid(), nome:'Salmão ao molho de maracujá', desc:'Prime' },
-    { id:uid(), nome:'Salmão ao molho de morango e alecrim', desc:'Prime' },
-    { id:uid(), nome:'Medalhão de mignon ao molho de cebolinhas e cogumelos', desc:'' },
-    { id:uid(), nome:'Medalhão de mignon com provolone e molho de vinho com sálvia', desc:'' },
-    { id:uid(), nome:'Medalhão de mignon ao molho de manteiga e ervas finas', desc:'' },
-    { id:uid(), nome:'Medalhão de mignon ao molho de gorgonzola', desc:'' },
-    { id:uid(), nome:'Medalhão de mignon ao molho de blueberry', desc:'' },
-    { id:uid(), nome:'Medalhão de mignon ao molho de cacau', desc:'' },
-    { id:uid(), nome:'Medalhão de mignon ao molho de bacon', desc:'' },
-    { id:uid(), nome:'Medalhão de mignon ao molho de açaí', desc:'' },
-    { id:uid(), nome:'Filé mignon suíno em redução de laranja', desc:'' },
-    { id:uid(), nome:'Filé mignon suíno, creme de mostarda e cogumelos', desc:'' },
-    { id:uid(), nome:'Filé mignon suíno ao molho de manga e maracujá com gengibre', desc:'' },
-    { id:uid(), nome:'Filé mignon suíno ao molho de damasco', desc:'' },
-    { id:uid(), nome:'Medalhão de peito de frango ao bechamel com tomate seco gratinado', desc:'' },
-    { id:uid(), nome:'Filé de frango defumado ao pesto de laranja e rúcula', desc:'' },
-    { id:uid(), nome:'Filé de frango defumado ao molho honey mostard', desc:'' },
-    { id:uid(), nome:'Gratinado de frango com muçarela de búfala e tomate seco', desc:'' }
-  ]},
-  { id:uid(), categoria:'GUARNIÇÕES', pratos:[
-    { id:uid(), nome:'Mini legumes salteados na manteiga (mini cenoura, cebola baby, cogumelo paris, tomate cereja e aspargo)', desc:'Prime' },
-    { id:uid(), nome:'Arroz branco', desc:'' },
-    { id:uid(), nome:'Arroz com ervas', desc:'' },
-    { id:uid(), nome:'Arroz com amêndoas laminadas tostadas', desc:'' },
-    { id:uid(), nome:'Arroz com crispy de alho poró', desc:'' },
-    { id:uid(), nome:'Aligot de mandioquinha', desc:'' },
-    { id:uid(), nome:'Ratatuile (beringela, abobrinha, cebola, tomate e pimentão)', desc:'' },
-    { id:uid(), nome:'Risoto de limão siciliano e grana padano', desc:'' },
-    { id:uid(), nome:'Risoto de tomate seco com rúcula', desc:'' },
-    { id:uid(), nome:'Risoto de shimeji com brie', desc:'' },
-    { id:uid(), nome:'Palmito grelhado ao molho de manteiga e ervas finas', desc:'' },
-    { id:uid(), nome:'Suflê de palmito com zucchini laminada', desc:'' },
-    { id:uid(), nome:'Purê de cenoura', desc:'' },
-    { id:uid(), nome:'Purê de couve-flor', desc:'' },
-    { id:uid(), nome:'Purê de ervilhas frescas com bacon', desc:'' },
-    { id:uid(), nome:'Batata rústica com alecrim e sálvia chips', desc:'' },
-    { id:uid(), nome:'Batata assada com parmesão ralado', desc:'' },
-    { id:uid(), nome:'Batata baby ao barbecue e tomilho fresco', desc:'' },
-    { id:uid(), nome:'Batata na manteiga com cebolete e salsinha', desc:'' },
-    { id:uid(), nome:'Aspargos grelhados com presunto cru', desc:'' },
-    { id:uid(), nome:'Cocóte de legumes com raspas de limão siciliano e gengibre', desc:'' }
-  ]},
-  { id:uid(), categoria:'SOBREMESAS', pratos:[
-    { id:uid(), nome:'Bolo de corte Leila Savioli - escolher sabor', desc:'' },
-    { id:uid(), nome:'Panna cotta com calda de frutas vermelhas', desc:'' },
-    { id:uid(), nome:'Cocada de forno com sorvete de creme', desc:'' },
-    { id:uid(), nome:'Cheesecake com geleia de goiaba', desc:'' },
-    { id:uid(), nome:'Sorvete de manga com calda de maracujá', desc:'' },
-    { id:uid(), nome:'Crepe de pêssego com calda de laranja e conhaque', desc:'' },
-    { id:uid(), nome:'Banoffe', desc:'' },
-    { id:uid(), nome:'Cremè Brulée', desc:'' },
-    { id:uid(), nome:'Pera ao vinho com ganache de chocolate', desc:'' },
-    { id:uid(), nome:'Brownie com sorvete de creme e calda de chocolate', desc:'' }
-  ]},
-  { id:uid(), categoria:'MESA DO CAFÉ', pratos:[
-    { id:uid(), nome:'Café', desc:'' },
-    { id:uid(), nome:'Biscoitinhos', desc:'' },
-    { id:uid(), nome:'Mini Brownie ou palha italiana (escolher 1 opção)', desc:'' },
-    { id:uid(), nome:'Tortinha de limão', desc:'' }
-  ]},
-  { id:uid(), categoria:'LANCHINHO DA MADRUGADA', pratos:[
-    { id:uid(), nome:'Mini burguer de carne bovina, queijo ementhal, tomate seco e rúcula', desc:'' },
-    { id:uid(), nome:'Mini burguer de carne bovina, queijo cheddar, shimeji e cebola caramelizada', desc:'' },
-    { id:uid(), nome:'Mini burguer de carne bovina, queijo cheddar, bacon e cebola caramelizada', desc:'' },
-    { id:uid(), nome:'Lanchinho com pasta de peito de peru, nozes e maça verde', desc:'' },
-    { id:uid(), nome:'Lanchinho rústico de pernil com vinagrete', desc:'' },
-    { id:uid(), nome:'Mini Pizza napolitana', desc:'' },
-    { id:uid(), nome:'Mini Hotdog', desc:'' },
-    { id:uid(), nome:'Milk shake (sabor a escolher)', desc:'' },
-    { id:uid(), nome:'Pastelzinho (recheio à escolher)', desc:'' },
-    { id:uid(), nome:'Mini churros com doce de leite', desc:'' }
-  ]}
-]);
+    const [cardapioExpandido, setCardapioExpandido] = React.useState(false);
+    const [cardapioSelecionados, setCardapioSelecionados] = React.useState(null); // null = todos os ativos
+    const [masterCardapio, setMasterCardapio] = React.useState(function() {
+      try { var s = localStorage.getItem('rondello_cardapio'); if (s) return JSON.parse(s); } catch(e) {}
+      return DEFAULT_MASTER_CARDAPIO;
+    });
     const [gerando, setGerando] = React.useState(false);
     const [gerandoPPT, setGerandoPPT] = React.useState(false);
     const [modelos, setModelos] = React.useState([]);
     const [aba, setAba] = React.useState('editor');
+
+    React.useEffect(function() {
+      try { localStorage.setItem('rondello_cardapio', JSON.stringify(masterCardapio)); } catch(e) {}
+    }, [masterCardapio]);
 
     const setC = (k, v) => setCliente(c => ({ ...c, [k]: v }));
 
@@ -1958,8 +2103,8 @@
       if (dados.fraseCapa !== undefined) setFraseCapa(dados.fraseCapa);
       if (dados.sobreTexto !== undefined) setSobreTexto(dados.sobreTexto);
       if (dados.pagina2) setP2(p => ({ ...p, ...dados.pagina2 }));
+      if (dados.cardapioSelecionados !== undefined) setCardapioSelecionados(dados.cardapioSelecionados);
       if (dados.incluirCardapio !== undefined) setCardapioToggle(dados.incluirCardapio);
-      if (dados.cardapio) setCardapio(dados.cardapio.map(c => ({ ...c, id:uid(), pratos:(c.pratos||[]).map(p => ({ ...p, id:uid() })) })));
     }
 
     function getSnapshot() {
@@ -1978,7 +2123,7 @@
         fraseCapa, sobreTexto,
         pagina2: { ...pagina2, valorSeguro:'', valorStaff:'' },
         incluirCardapio,
-        cardapio: cardapio.map(function(c) { return { ...c, id:undefined, pratos:(c.pratos||[]).map(function(p){ return { ...p, id:undefined }; }) }; })
+        cardapioSelecionados
       };
     }
 
@@ -2083,10 +2228,24 @@
       return [...ps.slice(0, i + 1), clone, ...ps.slice(i + 1)];
     });
 
+    function getCardapioParaPDF() {
+      // Returns filtered array for PDF/Word generation
+      var todos = (masterCardapio || []).map(function(cat) {
+        var pratos = (cat.pratos || []).filter(function(p) {
+          return p.ativo !== false && p.nome;
+        }).filter(function(p) {
+          if (cardapioSelecionados === null) return true;
+          return cardapioSelecionados.indexOf(p.id) !== -1;
+        });
+        return { ...cat, pratos };
+      }).filter(function(cat) { return cat.pratos.length > 0; });
+      return todos;
+    }
+
     const handleGerarWord = () => {
       setGerandoPPT(true);
       try {
-        const p = window.gerarWord({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio });
+        const p = window.gerarWord({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio: getCardapioParaPDF() });
         if (p && p.then) {
           p.then(() => setGerandoPPT(false))
            .catch(e => { alert('Erro ao gerar Word:\n' + e.message); setGerandoPPT(false); });
@@ -2102,7 +2261,7 @@
     const handleGerar = () => {
       setGerando(true);
       setTimeout(() => {
-        try { window.gerarPDF({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio }); }
+        try { window.gerarPDF({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio: getCardapioParaPDF() }); }
         catch(e) { alert('Erro ao gerar PDF:\n' + e.message); }
         setGerando(false);
       }, 100);
@@ -2119,7 +2278,7 @@
               <div style={{ fontSize:10, color:`${GOLD}CC`, letterSpacing:'0.08em', textTransform:'uppercase' }}>Gerador de Orçamento</div>
             </div>
             <div style={{ display:'flex', gap:4, marginLeft:16 }}>
-              {[['editor','Orçamento'],['modelos','Modelos']].map(([id, label]) => (
+              {[['editor','Orçamento'],['cardapio','Cardápio'],['modelos','Modelos']].map(([id, label]) => (
                 <button key={id} onClick={() => setAba(id)} style={{ background: aba===id ? GOLD : 'transparent', color: aba===id ? NAVY : `${GOLD}CC`, border: `1.5px solid ${aba===id ? GOLD : GOLD+'55'}`, borderRadius:6, padding:'5px 14px', fontSize:12, fontWeight:600, fontFamily:'inherit', cursor:'pointer', letterSpacing:'0.04em', transition:'all .15s' }}>{label}</button>
               ))}
             </div>
@@ -2138,6 +2297,10 @@
 
         {aba === 'modelos' && (
           <ModelosPage modelos={modelos} onLoad={loadModelo} onDelete={handleDeleteModelo} onNovoOrcamento={() => setAba('editor')} />
+        )}
+
+        {aba === 'cardapio' && (
+          <CardapioPageView masterCardapio={masterCardapio} onChange={setMasterCardapio} />
         )}
 
         {aba === 'editor' && <div style={{ maxWidth:820, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
@@ -2218,14 +2381,22 @@
 
           {/* Cardápio */}
           <Card>
-            <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom: incluirCardapio ? 20 : 0 }}>
-              <div style={{ marginTop:2 }}><Toggle checked={incluirCardapio} onChange={setCardapioToggle} /></div>
+            <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom: incluirCardapio ? 16 : 0 }}>
+              <div style={{ marginTop:2 }}><Toggle checked={incluirCardapio} onChange={v => { setCardapioToggle(v); if(v) setCardapioSelecionados(null); }} /></div>
               <div>
                 <div style={{ fontSize:13, fontWeight:600, color:NAVY }}>Incluir Cardápio Completo</div>
-                <div style={{ fontSize:11, color:GRAY, marginTop:2 }}>Páginas adicionais no PDF com categorias e pratos detalhados</div>
+                <div style={{ fontSize:11, color:GRAY, marginTop:2 }}>Páginas adicionais no PDF com a seleção de pratos</div>
               </div>
             </div>
-            {incluirCardapio && <CardapioEditor cardapio={cardapio} onChange={setCardapio} />}
+            {incluirCardapio && (
+              <CardapioSelector
+                masterCardapio={masterCardapio}
+                cardapioSelecionados={cardapioSelecionados}
+                onChange={setCardapioSelecionados}
+                expandido={cardapioExpandido}
+                onToggleExpandido={() => setCardapioExpandido(v => !v)}
+              />
+            )}
           </Card>
 
           {/* Bottom generate */}
