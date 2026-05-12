@@ -804,7 +804,8 @@
         /* Compact bullet list — two columns
            Prime  = filled gold rect + bold #0D1526 text
            Normal = filled navy rect + regular navy text */
-        var pratos = (cat.pratos || []).filter(function(p) { return p.nome; });
+        var pratos = (cat.pratos || []).filter(function(p) { return p.nome; })
+          .sort(function(a, b) { return a.nome.localeCompare(b.nome, 'pt', { sensitivity: 'base' }); });
         var col1 = [], col2 = [];
         pratos.forEach(function(prato, pi) {
           var isPrime = prato.prime || prato.desc === 'Prime';
@@ -1670,6 +1671,11 @@
   function CardapioPageView({ masterCardapio, onChange, syncStatus }) {
     const [novaCategoria, setNovaCategoria] = React.useState('');
     const [novoPrato, setNovoPrato] = React.useState({});
+    const [busca, setBusca] = React.useState('');
+
+    const sortAlfa = pratos => [...pratos].sort((a, b) =>
+      a.nome.localeCompare(b.nome, 'pt', { sensitivity: 'base' })
+    );
 
     const addCat = () => {
       const nome = novaCategoria.trim().toUpperCase();
@@ -1683,7 +1689,8 @@
       const nome = (novoPrato[ci] || '').trim();
       if (!nome) return;
       const c = [...masterCardapio];
-      c[ci] = { ...c[ci], pratos: [...(c[ci].pratos || []), { id: 'p' + Date.now(), nome, ativo: true, prime: false }] };
+      const novo = { id: 'p' + Date.now(), nome, ativo: true, prime: false };
+      c[ci] = { ...c[ci], pratos: sortAlfa([...(c[ci].pratos || []), novo]) };
       onChange(c);
       setNovoPrato({ ...novoPrato, [ci]: '' });
     };
@@ -1698,26 +1705,53 @@
       c[ci] = { ...c[ci], pratos: ps };
       onChange(c);
     };
+    /* Re-sort após editar nome (no blur) */
+    const onPratoNomeBlur = (ci) => {
+      const c = [...masterCardapio];
+      c[ci] = { ...c[ci], pratos: sortAlfa(c[ci].pratos) };
+      onChange(c);
+    };
 
+    const termoBusca = busca.trim().toLowerCase();
     const totalAtivos = (masterCardapio || []).reduce((acc, cat) => acc + (cat.pratos || []).filter(p => p.ativo !== false).length, 0);
     const totalPratos = (masterCardapio || []).reduce((acc, cat) => acc + (cat.pratos || []).length, 0);
 
     return (
       <div style={{ maxWidth:820, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
         <Card>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
             <div>
               <SecHead style={{ margin:0 }}>Cardápio Master</SecHead>
               <div style={{ fontSize:11, color:GRAY, marginTop:4 }}>{totalAtivos} pratos ativos de {totalPratos} total — pratos ativos aparecem nas propostas por padrão</div>
             </div>
             <div style={{ fontSize:11, fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
-              {syncStatus === 'saving' && <><span style={{ width:8, height:8, borderRadius:'50%', background:'#F59E0B', display:'inline-block', animation:'pulse 1s infinite' }} /> <span style={{ color:'#92400E' }}>Salvando...</span></>}
+              {syncStatus === 'saving' && <><span style={{ width:8, height:8, borderRadius:'50%', background:'#F59E0B', display:'inline-block' }} /> <span style={{ color:'#92400E' }}>Salvando...</span></>}
               {syncStatus === 'saved'  && <><span style={{ width:8, height:8, borderRadius:'50%', background:'#22C55E', display:'inline-block' }} /> <span style={{ color:'#166534' }}>Sincronizado ✓</span></>}
               {syncStatus === 'error'  && <><span style={{ width:8, height:8, borderRadius:'50%', background:'#EF4444', display:'inline-block' }} /> <span style={{ color:'#991B1B' }}>Erro ao salvar</span></>}
               {syncStatus === 'idle'   && <span style={{ color:'#9CA3AF' }}>☁ Bubble</span>}
             </div>
           </div>
-          {(masterCardapio || []).map((cat, ci) => (
+
+          {/* Barra de busca */}
+          <div style={{ position:'relative', marginBottom:20 }}>
+            <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', fontSize:14, color:GRAY, pointerEvents:'none' }}>🔍</span>
+            <input
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar prato..."
+              style={{ width:'100%', boxSizing:'border-box', border:`1px solid ${busca ? GOLD : '#E5E7EB'}`, borderRadius:8, padding:'8px 12px 8px 34px', fontSize:13, color:NAVY, fontFamily:'inherit', outline:'none', background:'white', transition:'border-color .15s' }}
+            />
+            {busca && (
+              <button onClick={() => setBusca('')} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:GRAY, fontSize:16, lineHeight:1 }}>×</button>
+            )}
+          </div>
+
+          {(masterCardapio || []).map((cat, ci) => {
+            const pratosFiltrados = termoBusca
+              ? (cat.pratos || []).filter(p => p.nome.toLowerCase().includes(termoBusca))
+              : (cat.pratos || []);
+            if (termoBusca && pratosFiltrados.length === 0) return null;
+            return (
             <div key={cat.id} style={{ marginBottom:20, border:'1px solid #E5E7EB', borderRadius:8, overflow:'hidden' }}>
               {/* Category header */}
               <div style={{ background:'#F3F0EB', padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
@@ -1733,8 +1767,15 @@
               </div>
               {/* Dishes */}
               <div style={{ padding:'8px 14px' }}>
-                {(cat.pratos || []).map((p, pi) => (
-                  <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom: pi < cat.pratos.length-1 ? '1px solid #F3F0EB' : 'none' }}>
+                {termoBusca && pratosFiltrados.length > 0 && (
+                  <div style={{ fontSize:10, color:GOLD, fontWeight:600, marginBottom:6 }}>
+                    {pratosFiltrados.length} resultado{pratosFiltrados.length > 1 ? 's' : ''} nesta categoria
+                  </div>
+                )}
+                {pratosFiltrados.map((p) => {
+                  const pi = (cat.pratos || []).findIndex(x => x.id === p.id);
+                  return (
+                  <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom:'1px solid #F3F0EB' }}>
                     {/* Active toggle */}
                     <button
                       onClick={() => setPratoField(ci, pi, 'ativo', p.ativo === false ? true : false)}
@@ -1756,29 +1797,34 @@
                       title={p.prime ? 'Remover Prime' : 'Marcar como Prime'}
                       style={{ fontSize:14, cursor:'pointer', color: p.prime ? '#C4A87A' : '#D1D5DB', userSelect:'none', flexShrink:0 }}
                     >★</span>
-                    {/* Name */}
+                    {/* Name — re-sort on blur */}
                     <input
                       value={p.nome}
                       onChange={e => setPratoField(ci, pi, 'nome', e.target.value)}
+                      onBlur={() => onPratoNomeBlur(ci)}
                       style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:12, color: p.ativo !== false ? NAVY : GRAY, fontFamily:'inherit', textDecoration: p.ativo === false ? 'line-through' : 'none' }}
                     />
                     <IconBtn onClick={() => remPrato(ci, pi)} title="Remover" style={{ color:'#FCA5A5', fontSize:12 }}>✕</IconBtn>
                   </div>
-                ))}
-                {/* Add new dish */}
-                <div style={{ display:'flex', gap:6, marginTop:8 }}>
-                  <input
-                    value={novoPrato[ci] || ''}
-                    onChange={e => setNovoPrato({ ...novoPrato, [ci]: e.target.value })}
-                    onKeyDown={e => e.key === 'Enter' && addPrato(ci)}
-                    placeholder="Nome do prato..."
-                    style={{ flex:1, border:'1px dashed #D1D5DB', borderRadius:6, padding:'5px 10px', fontSize:11, color:NAVY, fontFamily:'inherit', outline:'none', background:'transparent' }}
-                  />
-                  <button onClick={() => addPrato(ci)} style={{ background:'none', border:'1px dashed #C4A87A', borderRadius:6, padding:'4px 12px', fontSize:11, color:GOLD, cursor:'pointer', fontFamily:'inherit' }}>+ Prato</button>
-                </div>
+                  );
+                })}
+                {/* Add new dish — hidden during search */}
+                {!termoBusca && (
+                  <div style={{ display:'flex', gap:6, marginTop:8 }}>
+                    <input
+                      value={novoPrato[ci] || ''}
+                      onChange={e => setNovoPrato({ ...novoPrato, [ci]: e.target.value })}
+                      onKeyDown={e => e.key === 'Enter' && addPrato(ci)}
+                      placeholder="Nome do prato..."
+                      style={{ flex:1, border:'1px dashed #D1D5DB', borderRadius:6, padding:'5px 10px', fontSize:11, color:NAVY, fontFamily:'inherit', outline:'none', background:'transparent' }}
+                    />
+                    <button onClick={() => addPrato(ci)} style={{ background:'none', border:'1px dashed #C4A87A', borderRadius:6, padding:'4px 12px', fontSize:11, color:GOLD, cursor:'pointer', fontFamily:'inherit' }}>+ Prato</button>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
           {/* Add category */}
           <div style={{ display:'flex', gap:8, marginTop:8 }}>
             <input
