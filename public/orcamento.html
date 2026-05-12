@@ -195,16 +195,21 @@
     /* ── Footer páginas internas ─────────────────────────────────────────── */
     function buildFooter(p, total) {
       return {
-        margin: [60, 8, 60, 16],
-        columns: [
+        margin: [60, 0, 60, 16],
+        stack: [
+          { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.3, lineColor: '#D4C09A' }], margin: [0, 0, 0, 6] },
           {
-            text: [
-              { text: 'Rondello Buffet', font: 'Cormorant', fontSize: 8, italics: true, color: NAVY },
-              { text: '  ·  @rondellobuffet  ·  www.rondellobuffet.com.br', fontSize: 6.5, color: GRAY }
-            ],
-            characterSpacing: 0.2
-          },
-          { text: p + ' / ' + total, fontSize: 6.5, color: '#A89B8F', characterSpacing: 0.5, alignment: 'right' }
+            columns: [
+              {
+                text: [
+                  { text: 'Rondello Buffet', font: 'Cormorant', fontSize: 8, italics: true, color: NAVY },
+                  { text: '  ·  @rondellobuffet  ·  www.rondellobuffet.com.br', fontSize: 6.5, color: GRAY }
+                ],
+                characterSpacing: 0.2
+              },
+              { text: p + ' / ' + total, fontSize: 6.5, color: '#A89B8F', characterSpacing: 0.5, alignment: 'right' }
+            ]
+          }
         ]
       };
     }
