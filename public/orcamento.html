@@ -339,7 +339,7 @@
 
         /* Título do cardápio — herói */
         if (pacote.nome) {
-          blocks.push({ text: (pacote.nome || '').toUpperCase(), font: 'Cormorant', fontSize: 22, bold: true, color: NAVY, characterSpacing: 2, alignment: 'center', lineHeight: 1, margin: [0, 0, 0, 6] });
+          blocks.push({ text: (pacote.nome || '').toUpperCase(), font: 'Cormorant', fontSize: 22, bold: true, color: '#0D1526', characterSpacing: 2, alignment: 'center', lineHeight: 1, margin: [0, 0, 0, 6] });
           blocks.push({ canvas: [{ type: 'line', x1: 150, y1: 0, x2: 325, y2: 0, lineWidth: 0.5, lineColor: GOLD }], margin: [0, 0, 0, 10] });
         }
 
@@ -517,7 +517,7 @@
       /* Seguro e Quebras */
       if (p2 && p2.quebrasAtiva) {
         blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 22, 0, 12] });
-        blocks.push({ text: 'SEGURO E QUEBRAS', font: 'Cormorant', fontSize: 13, bold: true, color: MGRAY, characterSpacing: 0.8, margin: [0, 0, 0, 8] });
+        blocks.push({ text: 'SEGURO E QUEBRAS', font: 'Cormorant', fontSize: 13, bold: true, color: GOLD, characterSpacing: 0.8, margin: [0, 0, 0, 8] });
         blocks.push({ text: 'Em caso de quebras e perdas de utensílios, oferecemos 2 opções:', fontSize: 9, color: GRAY, lineHeight: 1.45, margin: [0, 0, 0, 6] });
         blocks.push({
           ol: [
@@ -540,11 +540,11 @@
       var blocks = [];
 
       blocks.push({ text: 'SOBRE O', fontSize: 6.5, color: GRAY, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 4] });
-      blocks.push({ text: 'Rondello Buffet', font: 'Cormorant', fontSize: 34, bold: true, color: NAVY, alignment: 'center', margin: [0, 0, 0, 4] });
+      blocks.push({ text: 'Rondello Buffet', font: 'Cormorant', fontSize: 34, bold: true, color: '#0D1526', alignment: 'center', margin: [0, 0, 0, 4] });
       blocks.push({ canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.35, lineColor: GOLD }], margin: [0, 0, 0, 22] });
 
       /* Brand story — vertical, texto do cliente */
-      var textoMarca = sobreTexto || 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que transforma o dia de vocês em algo que nenhum dos dois vai querer esquecer.';
+      var textoMarca = sobreTexto || 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que transforma o dia de vocês em algo que ninguém vai querer esquecer.';
 
       blocks.push({ text: textoMarca, fontSize: 10.5, color: DGRAY, lineHeight: 1.85, margin: [0, 0, 0, 22] });
 
@@ -1459,7 +1459,7 @@
     children.push(para(run('SOBRE O', { color:GRAY, size:13, spacing:100 }), { align: D.AlignmentType.CENTER, before:0, after:60 }));
     children.push(para(run('Rondello Buffet', { bold:true, color:NAVY, size:68, font:'Georgia' }), { align: D.AlignmentType.CENTER, before:0, after:240 }));
 
-    var textoMarca = sobreTexto || 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que transforma o dia de vocês em algo que nenhum dos dois vai querer esquecer.';
+    var textoMarca = sobreTexto || 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que transforma o dia de vocês em algo que ninguém vai querer esquecer.';
     textoMarca.split('\n').forEach(function(t) {
       children.push(para(run(t || ' ', { color:DGRAY, size:21 }), { before:0, after:160 }));
     });
@@ -1622,7 +1622,7 @@
   }
 
   /* ── CardapioPageView ────────────────────────────────────────────────── */
-  function CardapioPageView({ masterCardapio, onChange }) {
+  function CardapioPageView({ masterCardapio, onChange, syncStatus }) {
     const [novaCategoria, setNovaCategoria] = React.useState('');
     const [novoPrato, setNovoPrato] = React.useState({});
 
@@ -1664,6 +1664,12 @@
             <div>
               <SecHead style={{ margin:0 }}>Cardápio Master</SecHead>
               <div style={{ fontSize:11, color:GRAY, marginTop:4 }}>{totalAtivos} pratos ativos de {totalPratos} total — pratos ativos aparecem nas propostas por padrão</div>
+            </div>
+            <div style={{ fontSize:11, fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
+              {syncStatus === 'saving' && <><span style={{ width:8, height:8, borderRadius:'50%', background:'#F59E0B', display:'inline-block', animation:'pulse 1s infinite' }} /> <span style={{ color:'#92400E' }}>Salvando...</span></>}
+              {syncStatus === 'saved'  && <><span style={{ width:8, height:8, borderRadius:'50%', background:'#22C55E', display:'inline-block' }} /> <span style={{ color:'#166534' }}>Sincronizado ✓</span></>}
+              {syncStatus === 'error'  && <><span style={{ width:8, height:8, borderRadius:'50%', background:'#EF4444', display:'inline-block' }} /> <span style={{ color:'#991B1B' }}>Erro ao salvar</span></>}
+              {syncStatus === 'idle'   && <span style={{ color:'#9CA3AF' }}>☁ Bubble</span>}
             </div>
           </div>
           {(masterCardapio || []).map((cat, ci) => (
@@ -2089,13 +2095,63 @@
       try { var s = localStorage.getItem('rondello_cardapio'); if (s) return JSON.parse(s); } catch(e) {}
       return DEFAULT_MASTER_CARDAPIO;
     });
+    const [cardapioSyncStatus, setCardapioSyncStatus] = React.useState('idle'); // 'idle'|'saving'|'saved'|'error'
+    const bubbleCardapioId = React.useRef(null); // Bubble _id do registro cardapio_master
+    const cardapioSaveTimer = React.useRef(null);
+    const gerando_ref = React.useRef(false);
     const [gerando, setGerando] = React.useState(false);
     const [gerandoPPT, setGerandoPPT] = React.useState(false);
     const [modelos, setModelos] = React.useState([]);
     const [aba, setAba] = React.useState('editor');
 
+    /* ── Bubble sync para masterCardapio ─────────────────────────────────── */
+    var BUBBLE_BASE = 'https://rondellobuffet-app.com.br/api/1.1';
+    var BUBBLE_TOKEN = 'Bearer b4b3c4138bb1000811d5a3c0ba47a238';
+
+    /* Carrega cardápio do Bubble no mount */
+    React.useEffect(function() {
+      fetch(BUBBLE_BASE + '/obj/cardapio_master?limit=1', { headers: { Authorization: BUBBLE_TOKEN } })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var results = (data.response && data.response.results) || [];
+          if (results.length > 0) {
+            var item = results[0];
+            bubbleCardapioId.current = item._id;
+            try {
+              var parsed = typeof item.dados_json === 'string' ? JSON.parse(item.dados_json) : item.dados_json;
+              if (parsed && parsed.length > 0) {
+                setMasterCardapio(parsed);
+                localStorage.setItem('rondello_cardapio', JSON.stringify(parsed));
+              }
+            } catch(e) {}
+          }
+        })
+        .catch(function() {});
+    }, []);
+
+    /* Salva no Bubble (debounce 2s) sempre que masterCardapio mudar */
     React.useEffect(function() {
       try { localStorage.setItem('rondello_cardapio', JSON.stringify(masterCardapio)); } catch(e) {}
+
+      clearTimeout(cardapioSaveTimer.current);
+      cardapioSaveTimer.current = setTimeout(function() {
+        setCardapioSyncStatus('saving');
+        var body = JSON.stringify({ dados_json: JSON.stringify(masterCardapio) });
+        var headers = { 'Authorization': BUBBLE_TOKEN, 'Content-Type': 'application/json' };
+        var req;
+        if (bubbleCardapioId.current) {
+          req = fetch(BUBBLE_BASE + '/obj/cardapio_master/' + bubbleCardapioId.current, { method: 'PATCH', headers: headers, body: body });
+        } else {
+          req = fetch(BUBBLE_BASE + '/obj/cardapio_master', { method: 'POST', headers: headers, body: body })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.id) bubbleCardapioId.current = data.id;
+              return data;
+            });
+        }
+        req.then(function() { setCardapioSyncStatus('saved'); setTimeout(function(){ setCardapioSyncStatus('idle'); }, 2500); })
+           .catch(function() { setCardapioSyncStatus('error'); setTimeout(function(){ setCardapioSyncStatus('idle'); }, 3000); });
+      }, 2000);
     }, [masterCardapio]);
 
     const setC = (k, v) => setCliente(c => ({ ...c, [k]: v }));
@@ -2304,7 +2360,7 @@
         )}
 
         {aba === 'cardapio' && (
-          <CardapioPageView masterCardapio={masterCardapio} onChange={setMasterCardapio} />
+          <CardapioPageView masterCardapio={masterCardapio} onChange={setMasterCardapio} syncStatus={cardapioSyncStatus} />
         )}
 
         {aba === 'editor' && <div style={{ maxWidth:820, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
