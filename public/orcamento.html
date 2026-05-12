@@ -770,6 +770,15 @@
           margin: [0, ci > 0 ? 20 : 0, 0, 10]
         });
 
+        /* Nota especial para Ilha Gourmet */
+        if ((cat.categoria || '').toUpperCase() === 'ILHA GOURMET') {
+          blocks.push({
+            text: 'A seleção abaixo é uma sugestão. Todos os pratos disponíveis no cardápio podem integrar a Ilha Gourmet.',
+            fontSize: 8, color: GRAY, italics: true, alignment: 'center', lineHeight: 1.45,
+            margin: [20, -4, 20, 12]
+          });
+        }
+
         /* Compact bullet list — two columns
            Prime  = filled gold rect + bold navy text
            Normal = small gold dash + regular navy text */
