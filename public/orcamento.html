@@ -750,39 +750,48 @@
       /* Page title */
       blocks.push({ text: 'CARDÁPIO', fontSize: 7, color: GRAY, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 6] });
       blocks.push({ text: 'Seleção Gastronômica', fontSize: 16, bold: true, color: NAVY, characterSpacing: 0.5, alignment: 'center', margin: [0, 0, 0, 4] });
-      blocks.push(Object.assign(doubleRule(495), { margin: [0, 6, 0, 22] }));
+      blocks.push({ canvas: [{ type:'line', x1:0, y1:0, x2:475, y2:0, lineWidth:0.5, lineColor:GOLD }], margin:[0, 6, 0, 22] });
 
       categorias.forEach(function(cat, ci) {
         if (!cat.categoria && (!cat.pratos || !cat.pratos.some(function(p) { return p.nome; }))) return;
 
-        /* Category header — full-width lines centering with text */
+        /* Category header — fixed-width lines flanking centered text */
         blocks.push({
           columns: [
-            { canvas: [{ type:'line', x1:0, y1:0, x2:500, y2:0, lineWidth:0.5, lineColor:'#D4C09A' }], width:'*', margin:[0, 5, 0, 0] },
+            { canvas: [{ type:'line', x1:0, y1:5, x2:110, y2:5, lineWidth:0.5, lineColor:'#D4C09A' }], width: 110 },
             {
               text: (cat.categoria || 'Categoria').toUpperCase(),
-              fontSize: 9, bold: true, color: NAVY, characterSpacing: 1.8, alignment: 'center',
-              width: 'auto', margin: [12, 0, 12, 0]
+              fontSize: 9, bold: true, color: NAVY, characterSpacing: 1.8,
+              width: '*', alignment: 'center', margin: [4, 0, 4, 0]
             },
-            { canvas: [{ type:'line', x1:0, y1:0, x2:500, y2:0, lineWidth:0.5, lineColor:'#D4C09A' }], width:'*', margin:[0, 5, 0, 0] }
+            { canvas: [{ type:'line', x1:0, y1:5, x2:110, y2:5, lineWidth:0.5, lineColor:'#D4C09A' }], width: 110 }
           ],
           columnGap: 0,
-          margin: [0, ci > 0 ? 18 : 0, 0, 10]
+          margin: [0, ci > 0 ? 20 : 0, 0, 10]
         });
 
-        /* Compact bullet list — two columns */
+        /* Compact bullet list — two columns
+           Prime  = filled gold rect + bold navy text
+           Normal = small gold dash + regular navy text */
         var pratos = (cat.pratos || []).filter(function(p) { return p.nome; });
         var col1 = [], col2 = [];
         pratos.forEach(function(prato, pi) {
           var isPrime = prato.prime || prato.desc === 'Prime';
-          /* Use canvas circle as bullet — avoids font glyph issues */
-          var item = {
-            columns: [
-              { canvas: [{ type:'ellipse', x:4, y:4.5, r1: isPrime ? 3.5 : 2.5, r2: isPrime ? 3.5 : 2.5, fillColor: GOLD }], width:14 },
-              { text: prato.nome, fontSize: 9.5, color: NAVY, width:'*', margin:[0, 0, 4, 0] }
-            ],
-            margin: [0, 0, 0, 5]
-          };
+          var item = isPrime
+            ? {
+                columns: [
+                  { canvas: [{ type:'rect', x:1, y:2.5, w:6, h:6, color:GOLD, r:1 }], width:14 },
+                  { text: prato.nome, fontSize: 9.5, bold: true, color: '#0D1526', width:'*', margin:[0,0,4,0] }
+                ],
+                margin: [0, 0, 0, 5]
+              }
+            : {
+                columns: [
+                  { canvas: [{ type:'rect', x:2, y:4, w:4, h:4, color:'#C4A87A55', r:1 }], width:14 },
+                  { text: prato.nome, fontSize: 9.5, color: NAVY, width:'*', margin:[0,0,4,0] }
+                ],
+                margin: [0, 0, 0, 5]
+              };
           if (pi % 2 === 0) col1.push(item); else col2.push(item);
         });
 
