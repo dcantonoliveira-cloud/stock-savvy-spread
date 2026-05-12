@@ -14,6 +14,11 @@
     ::-webkit-scrollbar-thumb { background: #C9A87A; border-radius: 3px; }
     input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
     input, textarea, button, select { font-family: inherit; }
+    /* Ícone vegetariano na lista de pratos */
+    .veg-icon { font-size:13px; cursor:pointer; user-select:none; flex-shrink:0; transition:opacity 0.15s; }
+    .veg-on  { opacity:1; }
+    .veg-off { opacity:0; }
+    .prato-row:hover .veg-off { opacity:0.25; }
   </style>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.9/pdfmake.min.js"></script>
@@ -1695,7 +1700,7 @@
       const nome = (novoPrato[ci] || '').trim();
       if (!nome) return;
       const c = [...masterCardapio];
-      const novo = { id: 'p' + Date.now(), nome, ativo: true, prime: false };
+      const novo = { id: 'p' + Date.now(), nome, ativo: true, prime: false, vegetariano: isVeg(nome) };
       c[ci] = { ...c[ci], pratos: sortAlfa([...(c[ci].pratos || []), novo]) };
       onChange(c);
       setNovoPrato({ ...novoPrato, [ci]: '' });
@@ -1781,7 +1786,7 @@
                 {pratosFiltrados.map((p) => {
                   const pi = (cat.pratos || []).findIndex(x => x.id === p.id);
                   return (
-                  <div key={p.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom:'1px solid #F3F0EB' }}>
+                  <div key={p.id} className="prato-row" style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom:'1px solid #F3F0EB' }}>
                     {/* Active toggle */}
                     <button
                       onClick={() => setPratoField(ci, pi, 'ativo', p.ativo === false ? true : false)}
@@ -1803,11 +1808,11 @@
                       title={p.prime ? 'Remover Prime' : 'Marcar como Prime'}
                       style={{ fontSize:14, cursor:'pointer', color: p.prime ? '#C4A87A' : '#D1D5DB', userSelect:'none', flexShrink:0 }}
                     >★</span>
-                    {/* Vegetariano */}
+                    {/* Vegetariano — só aparece visivelmente quando ativo; caso contrário mostra sutil no hover */}
                     <span
+                      className={p.vegetariano ? 'veg-icon veg-on' : 'veg-icon veg-off'}
                       onClick={() => setPratoField(ci, pi, 'vegetariano', !p.vegetariano)}
                       title={p.vegetariano ? 'Remover vegetariano' : 'Marcar como vegetariano'}
-                      style={{ fontSize:13, cursor:'pointer', color: p.vegetariano ? '#22C55E' : '#D1D5DB', userSelect:'none', flexShrink:0 }}
                     >🌱</span>
                     {/* Name — re-sort on blur */}
                     <input
@@ -1919,6 +1924,101 @@
         )}
       </div>
     );
+  }
+
+  /* ── isVeg: determina se um prato é vegetariano pelo nome ────────────── */
+  function isVeg(nome) {
+    var n = nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    var naoVeg = [
+      'salmao','camarao','bacalhau','bacalhoada','frango','bacon','presunto','salame',
+      'linguica','costelinha','costela','alcatra','cordeiro','tender',
+      'kafta','hamburguer','burguer','polpetone','anchova','atum',
+      'mignon','lombo canadense','lombo de','carpaccio','carneseca','carne seca',
+      'peru ','pernil','leitao','pato ','kibe','coxinha','pastrame','aliche','copa fat',
+      'magret','linguado','shimeji com presunto','defumado','defumada',
+      'calabresa','picanha','tilap','abadejo','contra file','file ao',
+      'frutos do mar','sardinha','cachorro quente','jamon','peito de peru',
+      'charque','torresmo','caldo de feijao','mini burguer','pastel de carne',
+      'mini pizza de frango','strogonoff de frango','blanquete de frango',
+      'escalope de frango','escalope de salmao','salmao grelhado',
+      'tartar de atum','tortinha de carne','costelinha','wrapp de costeli',
+      'queijo coalho com bacon','bruschetta de presunto','mini bruschetta de presunto',
+      'mini kafta','petit alfajor de peito','cestinho de frango','canutini de cheddar com peito',
+      'petit burguer','petit polpetone','disquete.*carne','brusccheta de shimeji com presunto',
+      'cogumelo.*presunto parma','estrela folhada.*aliche','colher.*brandade de siri',
+      'colher.*bacalhau','canudinho.*lombo','torradas com carpaccio',
+      'torre de lombo','tortilha.*brandade de bacalhau','tulipas de fillo.*pastrame',
+      'mil folhas de salmao','mini temaki de salmao','tortilha de batata.*bacalhau',
+      'portobello.*jamon','flor de filo.*carne seca','flor de filo.*mexicano',
+      'meia lua de tender','cachepô de kibe','copinho de mandioquinha com salame',
+      'abobrinha.*presunto','carolina.*camarao','casquinha de provolone com mignon',
+      'kibinho','estufadinho.*bacon','estufadinho.*frango',
+      'petit alfajor','queijo coalho.*bacon'
+    ];
+    var has = naoVeg.some(function(k) {
+      if (k.indexOf('.*') >= 0) return new RegExp(k).test(n);
+      return n.indexOf(k.normalize('NFD').replace(/[̀-ͯ]/g, '')) >= 0;
+    });
+    return !has;
+  }
+
+  /* ── applyMigrations: garante estrutura atualizada do cardápio ────────── */
+  function applyMigrations(data) {
+    if (!Array.isArray(data) || data.length === 0) return data;
+    var result = data.map(function(cat) { return Object.assign({}, cat, { pratos: (cat.pratos || []).slice() }); });
+
+    /* Migração 1: unificar FINGER FOODS FRIOS + QUENTES → FINGER FOODS */
+    var friosIdx = result.findIndex(function(c) { return c.categoria && c.categoria.toUpperCase().includes('FINGER FOODS FRIOS'); });
+    var quentesIdx = result.findIndex(function(c) { return c.categoria && c.categoria.toUpperCase().includes('FINGER FOODS QUENTES'); });
+    var mergedIdx = result.findIndex(function(c) { return c.categoria && c.categoria.toUpperCase() === 'FINGER FOODS'; });
+    if (friosIdx >= 0 || quentesIdx >= 0) {
+      var pratosFrios   = friosIdx   >= 0 ? result[friosIdx].pratos   : [];
+      var pratosQuentes = quentesIdx >= 0 ? result[quentesIdx].pratos : [];
+      var todos = pratosFrios.concat(pratosQuentes);
+      /* deduplicar por nome */
+      var vistos = {};
+      todos = todos.filter(function(p) {
+        var k = p.nome.toLowerCase().trim();
+        if (vistos[k]) return false;
+        vistos[k] = true;
+        return true;
+      });
+      /* ordenar alfabeticamente */
+      todos.sort(function(a, b) { return a.nome.localeCompare(b.nome, 'pt', { sensitivity: 'base' }); });
+      if (mergedIdx >= 0) {
+        /* já existe FINGER FOODS — adicionar pratos que faltam */
+        var existentes = {};
+        result[mergedIdx].pratos.forEach(function(p) { existentes[p.nome.toLowerCase().trim()] = true; });
+        var novos = todos.filter(function(p) { return !existentes[p.nome.toLowerCase().trim()]; });
+        result[mergedIdx].pratos = result[mergedIdx].pratos.concat(novos);
+        result[mergedIdx].pratos.sort(function(a, b) { return a.nome.localeCompare(b.nome, 'pt', { sensitivity: 'base' }); });
+      } else {
+        /* criar categoria FINGER FOODS na posição do primeiro encontrado */
+        var insertAt = Math.min(friosIdx >= 0 ? friosIdx : 9999, quentesIdx >= 0 ? quentesIdx : 9999);
+        result.splice(insertAt, 0, { id: 'c2', categoria: 'FINGER FOODS', pratos: todos });
+        /* atualizar índices */
+        friosIdx   = result.findIndex(function(c) { return c.categoria && c.categoria.toUpperCase().includes('FINGER FOODS FRIOS'); });
+        quentesIdx = result.findIndex(function(c) { return c.categoria && c.categoria.toUpperCase().includes('FINGER FOODS QUENTES'); });
+      }
+      /* remover categorias antigas */
+      var toRemove = [];
+      if (friosIdx   >= 0) toRemove.push(friosIdx);
+      if (quentesIdx >= 0) toRemove.push(quentesIdx);
+      toRemove.sort(function(a,b){return b-a;});
+      toRemove.forEach(function(i) { result.splice(i, 1); });
+    }
+
+    /* Migração 2: marcar campo vegetariano em todos os pratos */
+    result.forEach(function(cat) {
+      cat.pratos = cat.pratos.map(function(p) {
+        if (p.vegetariano === undefined || p.vegetariano === null) {
+          return Object.assign({}, p, { vegetariano: isVeg(p.nome) });
+        }
+        return p;
+      });
+    });
+
+    return result;
   }
 
   /* ── DEFAULT_MASTER_CARDAPIO ────────────────────────────────────────── */
@@ -2193,8 +2293,15 @@
     const [cardapioExpandido, setCardapioExpandido] = React.useState(false);
     const [cardapioSelecionados, setCardapioSelecionados] = React.useState(null); // null = todos os ativos
     const [masterCardapio, setMasterCardapio] = React.useState(function() {
-      try { var s = localStorage.getItem('rondello_cardapio'); if (s) return JSON.parse(s); } catch(e) {}
-      return DEFAULT_MASTER_CARDAPIO;
+      try {
+        var s = localStorage.getItem('rondello_cardapio');
+        if (s) {
+          var parsed = JSON.parse(s);
+          var migrated = applyMigrations(parsed);
+          return migrated;
+        }
+      } catch(e) {}
+      return applyMigrations(DEFAULT_MASTER_CARDAPIO);
     });
     const [cardapioSyncStatus, setCardapioSyncStatus] = React.useState('idle'); // 'idle'|'saving'|'saved'|'error'
     const bubbleCardapioId = React.useRef(null); // Bubble _id do registro cardapio_master
@@ -2221,8 +2328,9 @@
             try {
               var parsed = typeof item.dados_json === 'string' ? JSON.parse(item.dados_json) : item.dados_json;
               if (parsed && parsed.length > 0) {
-                setMasterCardapio(parsed);
-                localStorage.setItem('rondello_cardapio', JSON.stringify(parsed));
+                var migrated = applyMigrations(parsed);
+                setMasterCardapio(migrated);
+                localStorage.setItem('rondello_cardapio', JSON.stringify(migrated));
               }
             } catch(e) {}
           }
