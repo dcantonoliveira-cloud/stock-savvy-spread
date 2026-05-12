@@ -764,7 +764,14 @@
             width: 'auto',
             columns: [
               { canvas: [{ type:'rect', x:1, y:2, w:7, h:7, color:'#0D1526', r:1 }], width:14 },
-              { text: 'Cardápio Padrão', fontSize: 7.5, color: NAVY, margin:[0,1,0,0] }
+              { text: 'Cardápio Padrão', fontSize: 7.5, color: NAVY, margin:[0,1,16,0] }
+            ]
+          },
+          {
+            width: 'auto',
+            columns: [
+              { canvas: [{ type:'ellipse', x:4, y:5, r1:4, r2:4, color:'#22C55E' }], width:14 },
+              { text: 'Vegetariano', fontSize: 7.5, color: '#22C55E', margin:[0,1,0,0] }
             ]
           },
           { width: '*', text: '' }
@@ -809,21 +816,20 @@
         var col1 = [], col2 = [];
         pratos.forEach(function(prato, pi) {
           var isPrime = prato.prime || prato.desc === 'Prime';
-          var item = isPrime
-            ? {
-                columns: [
-                  { canvas: [{ type:'rect', x:1, y:2.5, w:6, h:6, color:GOLD, r:1 }], width:14 },
-                  { text: prato.nome, fontSize: 9.5, bold: true, color: '#0D1526', width:'*', margin:[0,0,4,0] }
-                ],
-                margin: [0, 0, 0, 5]
-              }
-            : {
-                columns: [
-                  { canvas: [{ type:'rect', x:1, y:2.5, w:6, h:6, color:'#0D1526', r:1 }], width:14 },
-                  { text: prato.nome, fontSize: 9.5, color: NAVY, width:'*', margin:[0,0,4,0] }
-                ],
-                margin: [0, 0, 0, 5]
-              };
+          var isVeg   = prato.vegetariano === true;
+          /* bullet: gold rect = Prime, navy rect = padrão; green circle = vegetariano */
+          var bulletCanvas = isPrime
+            ? [{ type:'rect', x:1, y:2.5, w:6, h:6, color:GOLD, r:1 }]
+            : [{ type:'rect', x:1, y:2.5, w:6, h:6, color:'#0D1526', r:1 }];
+          var nomeText = { text: prato.nome, fontSize: 9.5, bold: isPrime, color: isPrime ? '#0D1526' : NAVY };
+          var rowCols = [
+            { canvas: bulletCanvas, width:14 },
+            { stack: [{ columns: [
+                nomeText,
+                isVeg ? { canvas: [{ type:'ellipse', x:5, y:5, r1:4, r2:4, color:'#22C55E' }], width:14, margin:[2,0,0,0] } : { text:'', width:0 }
+              ], columnGap:0 }], width:'*', margin:[0,0,4,0] }
+          ];
+          var item = { columns: rowCols, margin: [0, 0, 0, 5] };
           if (pi % 2 === 0) col1.push(item); else col2.push(item);
         });
 
@@ -1797,6 +1803,12 @@
                       title={p.prime ? 'Remover Prime' : 'Marcar como Prime'}
                       style={{ fontSize:14, cursor:'pointer', color: p.prime ? '#C4A87A' : '#D1D5DB', userSelect:'none', flexShrink:0 }}
                     >★</span>
+                    {/* Vegetariano */}
+                    <span
+                      onClick={() => setPratoField(ci, pi, 'vegetariano', !p.vegetariano)}
+                      title={p.vegetariano ? 'Remover vegetariano' : 'Marcar como vegetariano'}
+                      style={{ fontSize:13, cursor:'pointer', color: p.vegetariano ? '#22C55E' : '#D1D5DB', userSelect:'none', flexShrink:0 }}
+                    >🌱</span>
                     {/* Name — re-sort on blur */}
                     <input
                       value={p.nome}
@@ -1935,73 +1947,71 @@
     { id:'p21', nome:'Palmito tolete assado ao molho chimichurry', ativo:true, prime:false },
     { id:'p22', nome:'Focaccia de cebola com alecrim e tomate confit', ativo:true, prime:false }
   ]},
-  { id:'c2', categoria:'FINGER FOODS FRIOS', pratos:[
-    { id:'p23', nome:'Anchova defumada com sour cream de limão siciliano e dill na torrada de pão preto', ativo:true, prime:true },
-    { id:'p24', nome:'Cogumelo paris recheado com pasta de clorofila com presunto parma', ativo:true, prime:true },
-    { id:'p25', nome:'Lichia recheado com pasta de gorgonzola', ativo:true, prime:true },
-    { id:'p26', nome:'Mini temaki de salmão com cream cheese e cebolinha', ativo:true, prime:true },
-    { id:'p27', nome:'Abobrinha grelhada, presunto parma e manga', ativo:true, prime:false },
-    { id:'p28', nome:'Bruschetta de pão de queijo com mussarela de búfala', ativo:true, prime:false },
-    { id:'p29', nome:'Cachepô de kibe com creme de gorgonzola', ativo:true, prime:false },
-    { id:'p30', nome:'Canutini de cheddar com peito de peru', ativo:true, prime:false },
-    { id:'p31', nome:'Canutini de creme de queijo com azeitonas', ativo:true, prime:false },
-    { id:'p32', nome:'Casquinha de provolone e tomate marinado', ativo:true, prime:false },
-    { id:'p33', nome:'Casquinha de parmesão com guacamole e pimenta biquinho', ativo:true, prime:false },
-    { id:'p34', nome:'Cestinho de frango defumado com hortelã', ativo:true, prime:false },
-    { id:'p35', nome:'Copinho de mandioquinha com salame', ativo:true, prime:false },
-    { id:'p36', nome:'Disquete de provolone desidratado', ativo:true, prime:false },
-    { id:'p37', nome:'Espeto caprece', ativo:true, prime:false },
-    { id:'p38', nome:'Embrulhadinhos de rúcula com mussarela e tomate seco', ativo:true, prime:false },
-    { id:'p39', nome:'Petit alfajor de peito de peru defumado', ativo:true, prime:false },
-    { id:'p40', nome:'Torradas com carpaccio', ativo:true, prime:false },
-    { id:'p41', nome:'Torre de lombo canadense com estepe', ativo:true, prime:false },
-    { id:'p42', nome:'Tortelete de caponata com mel', ativo:true, prime:false },
-    { id:'p43', nome:'Tulipas de fillo com mousse de brie e roll de pastrame e rúcula', ativo:true, prime:false },
-    { id:'p44', nome:'Tulipas de creme de queijo com limão siciliano e blueberry', ativo:true, prime:false }
-  ]},
-  { id:'c3', categoria:'FINGER FOODS QUENTES', pratos:[
-    { id:'p45', nome:'Carolina recheada com creme de camarão', ativo:true, prime:true },
-    { id:'p46', nome:'Colher comestível de tapioca com bacalhau', ativo:true, prime:true },
-    { id:'p47', nome:'Colher comestível com brandade de siri', ativo:true, prime:true },
-    { id:'p48', nome:'Estrela folhada de escarola com aliche', ativo:true, prime:true },
-    { id:'p49', nome:'Mil folhas de salmão com ementhal', ativo:true, prime:true },
-    { id:'p50', nome:'Mini Kafta de cordeiro ao molho de tahine com iogurte', ativo:true, prime:true },
-    { id:'p51', nome:'Tulipa de gorgonzola com figo fresco', ativo:true, prime:false },
-    { id:'p52', nome:'Backed potato de bacon', ativo:true, prime:false },
-    { id:'p53', nome:'Backed potato de rúcula com tomate seco', ativo:true, prime:false },
-    { id:'p54', nome:'Bolinha de queijo', ativo:true, prime:false },
-    { id:'p55', nome:'Brie individual na massa filo com compota de damasco (ou) mel (ou) geleia de framboesa', ativo:true, prime:false },
-    { id:'p56', nome:'Brusccheta de shimeji com presunto', ativo:true, prime:false },
-    { id:'p57', nome:'Canudinho de brócolis com lombo canadense', ativo:true, prime:false },
-    { id:'p58', nome:'Carolina de linguiça fresca picante', ativo:true, prime:false },
-    { id:'p59', nome:'Carolina recheada com creme de palmito', ativo:true, prime:false },
-    { id:'p60', nome:'Casquinha de provolone com mignon e peras', ativo:true, prime:false },
-    { id:'p61', nome:'Coxinha de carne seca com mandioca', ativo:true, prime:false },
-    { id:'p62', nome:'Coxinha de creme de frango', ativo:true, prime:false },
-    { id:'p63', nome:'Coxinha de frango', ativo:true, prime:false },
-    { id:'p64', nome:'Empadinha de palmito', ativo:true, prime:false },
-    { id:'p65', nome:'Estufadinho de brócolis com bacon', ativo:true, prime:false },
-    { id:'p66', nome:'Estufadinho de frango com cheddar', ativo:true, prime:false },
-    { id:'p67', nome:'Flor de filo com recheio de abóbora e carne seca', ativo:true, prime:false },
-    { id:'p68', nome:'Flor de filo com recheio mexicano', ativo:true, prime:false },
-    { id:'p69', nome:'Kibinho com cremely e cebolinha baby', ativo:true, prime:false },
-    { id:'p70', nome:'Meia lua de tender com abacaxi', ativo:true, prime:false },
-    { id:'p71', nome:'Meia lua de champignon com ervilhas frescas', ativo:true, prime:false },
-    { id:'p72', nome:'Mini Bruschetta de presunto com shimeji', ativo:true, prime:false },
-    { id:'p73', nome:'Mini Kafta com molho tártaro', ativo:true, prime:false },
-    { id:'p74', nome:'Mini sanduíche de alcatra', ativo:true, prime:false },
-    { id:'p75', nome:'Pastelzinho de Coração de tomate seco com mussarela', ativo:true, prime:false },
-    { id:'p76', nome:'Petit polpetone', ativo:true, prime:false },
-    { id:'p77', nome:'Petit burguer no palito', ativo:true, prime:false },
-    { id:'p78', nome:'Queijo coalho com bacon e molho agridoce', ativo:true, prime:false },
-    { id:'p79', nome:'Quiche de queijo com champignon', ativo:true, prime:false },
-    { id:'p80', nome:'Quiche de queijo com alho poró', ativo:true, prime:false },
-    { id:'p81', nome:'Rococó de alcachofra', ativo:true, prime:false },
-    { id:'p82', nome:'Tartelete de zucchini com parmesão', ativo:true, prime:false },
-    { id:'p83', nome:'Voul au vent de brócolis com alho torrado', ativo:true, prime:false },
-    { id:'p84', nome:'Wrapp de costelinha com barbecue', ativo:true, prime:false },
-    { id:'p85', nome:'Folhado de queijo com damasco', ativo:true, prime:false },
-    { id:'p86', nome:'Folhado de ricota com gorgonzola e tomate seco', ativo:true, prime:false }
+  { id:'c2', categoria:'FINGER FOODS', pratos:[
+    { id:'p27', nome:'Abobrinha grelhada, presunto parma e manga', ativo:true, prime:false, vegetariano:false },
+    { id:'p23', nome:'Anchova defumada com sour cream de limão siciliano e dill na torrada de pão preto', ativo:true, prime:true, vegetariano:false },
+    { id:'p52', nome:'Backed potato de bacon', ativo:true, prime:false, vegetariano:false },
+    { id:'p53', nome:'Backed potato de rúcula com tomate seco', ativo:true, prime:false, vegetariano:false },
+    { id:'p54', nome:'Bolinha de queijo', ativo:true, prime:false, vegetariano:true },
+    { id:'p55', nome:'Brie individual na massa filo com compota de damasco (ou) mel (ou) geleia de framboesa', ativo:true, prime:false, vegetariano:true },
+    { id:'p56', nome:'Brusccheta de shimeji com presunto', ativo:true, prime:false, vegetariano:false },
+    { id:'p28', nome:'Bruschetta de pão de queijo com mussarela de búfala', ativo:true, prime:false, vegetariano:true },
+    { id:'p29', nome:'Cachepô de kibe com creme de gorgonzola', ativo:true, prime:false, vegetariano:false },
+    { id:'p57', nome:'Canudinho de brócolis com lombo canadense', ativo:true, prime:false, vegetariano:false },
+    { id:'p30', nome:'Canutini de cheddar com peito de peru', ativo:true, prime:false, vegetariano:false },
+    { id:'p31', nome:'Canutini de creme de queijo com azeitonas', ativo:true, prime:false, vegetariano:true },
+    { id:'p58', nome:'Carolina de linguiça fresca picante', ativo:true, prime:false, vegetariano:false },
+    { id:'p45', nome:'Carolina recheada com creme de camarão', ativo:true, prime:true, vegetariano:false },
+    { id:'p59', nome:'Carolina recheada com creme de palmito', ativo:true, prime:false, vegetariano:false },
+    { id:'p33', nome:'Casquinha de parmesão com guacamole e pimenta biquinho', ativo:true, prime:false, vegetariano:true },
+    { id:'p60', nome:'Casquinha de provolone com mignon e peras', ativo:true, prime:false, vegetariano:false },
+    { id:'p32', nome:'Casquinha de provolone e tomate marinado', ativo:true, prime:false, vegetariano:true },
+    { id:'p34', nome:'Cestinho de frango defumado com hortelã', ativo:true, prime:false, vegetariano:false },
+    { id:'p24', nome:'Cogumelo paris recheado com pasta de clorofila com presunto parma', ativo:true, prime:true, vegetariano:false },
+    { id:'p47', nome:'Colher comestível com brandade de siri', ativo:true, prime:true, vegetariano:false },
+    { id:'p46', nome:'Colher comestível de tapioca com bacalhau', ativo:true, prime:true, vegetariano:false },
+    { id:'p35', nome:'Copinho de mandioquinha com salame', ativo:true, prime:false, vegetariano:false },
+    { id:'p61', nome:'Coxinha de carne seca com mandioca', ativo:true, prime:false, vegetariano:false },
+    { id:'p62', nome:'Coxinha de creme de frango', ativo:true, prime:false, vegetariano:false },
+    { id:'p63', nome:'Coxinha de frango', ativo:true, prime:false, vegetariano:false },
+    { id:'p36', nome:'Disquete de provolone desidratado', ativo:true, prime:false, vegetariano:true },
+    { id:'p38', nome:'Embrulhadinhos de rúcula com mussarela e tomate seco', ativo:true, prime:false, vegetariano:true },
+    { id:'p64', nome:'Empadinha de palmito', ativo:true, prime:false, vegetariano:true },
+    { id:'p37', nome:'Espeto caprece', ativo:true, prime:false, vegetariano:true },
+    { id:'p48', nome:'Estrela folhada de escarola com aliche', ativo:true, prime:true, vegetariano:false },
+    { id:'p65', nome:'Estufadinho de brócolis com bacon', ativo:true, prime:false, vegetariano:false },
+    { id:'p66', nome:'Estufadinho de frango com cheddar', ativo:true, prime:false, vegetariano:false },
+    { id:'p67', nome:'Flor de filo com recheio de abóbora e carne seca', ativo:true, prime:false, vegetariano:false },
+    { id:'p68', nome:'Flor de filo com recheio mexicano', ativo:true, prime:false, vegetariano:false },
+    { id:'p85', nome:'Folhado de queijo com damasco', ativo:true, prime:false, vegetariano:true },
+    { id:'p86', nome:'Folhado de ricota com gorgonzola e tomate seco', ativo:true, prime:false, vegetariano:true },
+    { id:'p69', nome:'Kibinho com cremely e cebolinha baby', ativo:true, prime:false, vegetariano:false },
+    { id:'p25', nome:'Lichia recheado com pasta de gorgonzola', ativo:true, prime:true, vegetariano:true },
+    { id:'p71', nome:'Meia lua de champignon com ervilhas frescas', ativo:true, prime:false, vegetariano:true },
+    { id:'p70', nome:'Meia lua de tender com abacaxi', ativo:true, prime:false, vegetariano:false },
+    { id:'p49', nome:'Mil folhas de salmão com ementhal', ativo:true, prime:true, vegetariano:false },
+    { id:'p72', nome:'Mini Bruschetta de presunto com shimeji', ativo:true, prime:false, vegetariano:false },
+    { id:'p73', nome:'Mini Kafta com molho tártaro', ativo:true, prime:false, vegetariano:false },
+    { id:'p50', nome:'Mini Kafta de cordeiro ao molho de tahine com iogurte', ativo:true, prime:true, vegetariano:false },
+    { id:'p74', nome:'Mini sanduíche de alcatra', ativo:true, prime:false, vegetariano:false },
+    { id:'p26', nome:'Mini temaki de salmão com cream cheese e cebolinha', ativo:true, prime:true, vegetariano:false },
+    { id:'p75', nome:'Pastelzinho de Coração de tomate seco com mussarela', ativo:true, prime:false, vegetariano:true },
+    { id:'p39', nome:'Petit alfajor de peito de peru defumado', ativo:true, prime:false, vegetariano:false },
+    { id:'p77', nome:'Petit burguer no palito', ativo:true, prime:false, vegetariano:false },
+    { id:'p76', nome:'Petit polpetone', ativo:true, prime:false, vegetariano:false },
+    { id:'p78', nome:'Queijo coalho com bacon e molho agridoce', ativo:true, prime:false, vegetariano:false },
+    { id:'p80', nome:'Quiche de queijo com alho poró', ativo:true, prime:false, vegetariano:true },
+    { id:'p79', nome:'Quiche de queijo com champignon', ativo:true, prime:false, vegetariano:true },
+    { id:'p81', nome:'Rococó de alcachofra', ativo:true, prime:false, vegetariano:true },
+    { id:'p82', nome:'Tartelete de zucchini com parmesão', ativo:true, prime:false, vegetariano:true },
+    { id:'p40', nome:'Torradas com carpaccio', ativo:true, prime:false, vegetariano:false },
+    { id:'p41', nome:'Torre de lombo canadense com estepe', ativo:true, prime:false, vegetariano:false },
+    { id:'p42', nome:'Tortelete de caponata com mel', ativo:true, prime:false, vegetariano:true },
+    { id:'p51', nome:'Tulipa de gorgonzola com figo fresco', ativo:true, prime:false, vegetariano:true },
+    { id:'p44', nome:'Tulipas de creme de queijo com limão siciliano e blueberry', ativo:true, prime:false, vegetariano:true },
+    { id:'p43', nome:'Tulipas de fillo com mousse de brie e roll de pastrame e rúcula', ativo:true, prime:false, vegetariano:false },
+    { id:'p83', nome:'Voul au vent de brócolis com alho torrado', ativo:true, prime:false, vegetariano:true },
+    { id:'p84', nome:'Wrapp de costelinha com barbecue', ativo:true, prime:false, vegetariano:false }
   ]},
   { id:'c4', categoria:'MINI PRATOS', pratos:[
     { id:'p87', nome:'Bacalhoada com purê de batata baroa', ativo:true, prime:true },
