@@ -127,11 +127,13 @@ export default function DegustacaoPage() {
                       <p className="font-bold text-gray-900 text-sm flex-1">
                         Degustação
                       </p>
-                      {!isPast && (
-                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-violet-50 text-violet-700 border border-violet-200">
-                          Agendada
-                        </span>
-                      )}
+                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                        isPast
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-violet-50 text-violet-700 border-violet-200'
+                      }`}>
+                        {isPast ? 'Realizada' : 'Agendada'}
+                      </span>
                     </div>
 
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5">
@@ -141,7 +143,7 @@ export default function DegustacaoPage() {
                           {fmtDate(d.data)}
                         </span>
                       )}
-                      {d.convidados != null && d.convidados > 0 && (
+                      {d.convidados != null && (
                         <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
                           <Users className="w-3.5 h-3.5 text-gold-400" />
                           {d.convidados} convidados
@@ -149,11 +151,6 @@ export default function DegustacaoPage() {
                       )}
                     </div>
 
-                    {d['Observações'] && (
-                      <p className="mt-2 text-xs text-gray-500 leading-relaxed line-clamp-2 border-t border-gray-50 pt-2">
-                        {d['Observações']}
-                      </p>
-                    )}
                   </div>
 
                   <ArrowRight className="w-4 h-4 text-gray-200 shrink-0 mt-0.5" />
