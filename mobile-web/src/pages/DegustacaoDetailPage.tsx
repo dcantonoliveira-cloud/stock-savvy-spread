@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, UtensilsCrossed } from 'lucide-react';
 import { fetchAssessoria, fetchDegustacao, fetchEvento, fetchLocal } from '../api/bubble';
 import { BubbleDegustacao, BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
+
+function stripBubbleRichText(text: string): string {
+  return text
+    .replace(/\[([^\]]+)\]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -26,12 +33,12 @@ function Field({ label, value }: { label: string; value?: string | number | null
 export default function DegustacaoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [degu, setDegu]               = useState<BubbleDegustacao | null>(null);
-  const [evento, setEvento]           = useState<BubbleEvento | null>(null);
-  const [localNome, setLocalNome]     = useState('');
+  const [degu, setDegu]                     = useState<BubbleDegustacao | null>(null);
+  const [evento, setEvento]                 = useState<BubbleEvento | null>(null);
+  const [localNome, setLocalNome]           = useState('');
   const [assessoriaNome, setAssessoriaNome] = useState('');
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState(false);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -61,6 +68,7 @@ export default function DegustacaoDetailPage() {
   }, [id]);
 
   const isPast = degu?.data ? new Date(degu.data) < new Date() : false;
+  const observacoes = degu?.['Observações'] ? stripBubbleRichText(degu['Observações']) : null;
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
@@ -96,12 +104,20 @@ export default function DegustacaoDetailPage() {
             <h1 className="text-2xl font-black text-white leading-tight">
               {evento?.NomeDoEvento ?? 'Degustação'}
             </h1>
-            {degu?.data && (
-              <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium mt-2">
-                <Calendar className="w-3.5 h-3.5" />
-                {fmtDate(degu.data)}
-              </span>
-            )}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+              {degu?.data && (
+                <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {fmtDate(degu.data)}
+                </span>
+              )}
+              {degu?.convidados != null && (
+                <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
+                  <Users className="w-3.5 h-3.5" />
+                  {degu.convidados} convidados
+                </span>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -121,17 +137,30 @@ export default function DegustacaoDetailPage() {
           </div>
         ) : (
           <>
-            <div>
-              <SectionTitle>Informações do Evento</SectionTitle>
-              <div className="bg-white rounded-3xl px-5 shadow-sm divide-y divide-gray-100">
-                <Field label="Casal / Contratante" value={evento?.NomeDoEvento} />
-                <Field label="Local da festa"       value={localNome || evento?.['Local Do Evento_TXT']} />
-                <Field label="Assessoria"           value={assessoriaNome} />
-                <Field label="Status do evento"     value={evento?.status} />
-                <Field label="Tipo de degustação"   value={degu.tipo_degust} />
-                <Field label="Convidados"           value={degu.convidados != null ? `${degu.convidados}` : null} />
+            {/* Evento vinculado */}
+            {evento && (
+              <div>
+                <SectionTitle>Evento</SectionTitle>
+                <div className="bg-white rounded-3xl px-5 shadow-sm divide-y divide-gray-100">
+                  <Field label="Casal / Contratante" value={evento.NomeDoEvento} />
+                  <Field label="Local da festa"       value={localNome || evento['Local Do Evento_TXT']} />
+                  <Field label="Assessoria"           value={assessoriaNome} />
+                  <Field label="Status do evento"     value={evento.status} />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Observações (lista de convidados da degustação) */}
+            {observacoes && (
+              <div>
+                <SectionTitle>Convidados / Observações</SectionTitle>
+                <div className="bg-white rounded-3xl p-5 shadow-sm">
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                    {observacoes}
+                  </p>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
