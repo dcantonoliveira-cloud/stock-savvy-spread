@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, ClipboardList, Users, UtensilsCrossed } from 'lucide-react';
-import { fetchDegustacao } from '../api/bubble';
-import { BubbleDegustacao } from '../types';
+import { ArrowLeft, Calendar, UtensilsCrossed } from 'lucide-react';
+import { fetchAssessoria, fetchDegustacao, fetchEvento, fetchLocal } from '../api/bubble';
+import { BubbleDegustacao, BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -14,7 +14,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
-  if (value == null || value === '' || value === 0) return null;
+  if (value == null || value === '') return null;
   return (
     <div className="py-3.5 border-b border-gray-100 last:border-0">
       <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
@@ -26,14 +26,36 @@ function Field({ label, value }: { label: string; value?: string | number | null
 export default function DegustacaoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [degu, setDegu]     = useState<BubbleDegustacao | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState(false);
+  const [degu, setDegu]               = useState<BubbleDegustacao | null>(null);
+  const [evento, setEvento]           = useState<BubbleEvento | null>(null);
+  const [localNome, setLocalNome]     = useState('');
+  const [assessoriaNome, setAssessoriaNome] = useState('');
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(false);
 
   useEffect(() => {
     if (!id) return;
     fetchDegustacao(id)
-      .then((r) => setDegu(r.response))
+      .then((r) => {
+        const d = r.response;
+        setDegu(d);
+        if (d.evento) {
+          return fetchEvento(d.evento).then((er) => {
+            const ev = er.response;
+            setEvento(ev);
+            if (ev.LocalDoEvento) {
+              fetchLocal(ev.LocalDoEvento)
+                .then((lr) => setLocalNome(lr.response.Nome ?? ''))
+                .catch(() => {});
+            }
+            if (ev.Assessoria) {
+              fetchAssessoria(ev.Assessoria)
+                .then((ar) => setAssessoriaNome(ar.response.Nome ?? ''))
+                .catch(() => {});
+            }
+          });
+        }
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [id]);
@@ -71,7 +93,9 @@ export default function DegustacaoDetailPage() {
                 {isPast ? 'Realizada' : 'Agendada'}
               </p>
             </div>
-            <h1 className="text-2xl font-black text-white leading-tight">Degustação</h1>
+            <h1 className="text-2xl font-black text-white leading-tight">
+              {evento?.NomeDoEvento ?? 'Degustação'}
+            </h1>
             {degu?.data && (
               <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium mt-2">
                 <Calendar className="w-3.5 h-3.5" />
@@ -86,7 +110,7 @@ export default function DegustacaoDetailPage() {
       <div className="px-4 pt-4 space-y-4">
         {loading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-14 bg-black/5 rounded-2xl animate-pulse" />
             ))}
           </div>
@@ -97,49 +121,17 @@ export default function DegustacaoDetailPage() {
           </div>
         ) : (
           <>
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-3xl p-4 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-4 h-4 text-gold-400" />
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Convidados</p>
-                </div>
-                <p className="text-3xl font-black text-ron-900 leading-none">
-                  {degu.convidados ?? '—'}
-                </p>
-              </div>
-              {degu.QtdEventos != null && (
-                <div className="bg-white rounded-3xl p-4 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <ClipboardList className="w-4 h-4 text-gold-400" />
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Eventos</p>
-                  </div>
-                  <p className="text-3xl font-black text-ron-900 leading-none">
-                    {degu.QtdEventos}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Details */}
             <div>
-              <SectionTitle>Detalhes</SectionTitle>
+              <SectionTitle>Informações do Evento</SectionTitle>
               <div className="bg-white rounded-3xl px-5 shadow-sm divide-y divide-gray-100">
-                <Field label="Tipo"     value={degu.tipo_degust} />
-                <Field label="Cardápio" value={degu['Cardápio']} />
+                <Field label="Casal / Contratante" value={evento?.NomeDoEvento} />
+                <Field label="Local da festa"       value={localNome || evento?.['Local Do Evento_TXT']} />
+                <Field label="Assessoria"           value={assessoriaNome} />
+                <Field label="Status do evento"     value={evento?.status} />
+                <Field label="Tipo de degustação"   value={degu.tipo_degust} />
+                <Field label="Convidados"           value={degu.convidados != null ? `${degu.convidados}` : null} />
               </div>
             </div>
-
-            {degu['Observações'] && (
-              <div>
-                <SectionTitle>Observações</SectionTitle>
-                <div className="bg-white rounded-3xl p-5 shadow-sm">
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                    {degu['Observações']}
-                  </p>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
