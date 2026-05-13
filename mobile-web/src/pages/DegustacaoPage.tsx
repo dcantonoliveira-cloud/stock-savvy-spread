@@ -151,11 +151,6 @@ export default function DegustacaoPage() {
                       )}
                     </div>
 
-                    {d['Observações'] && (
-                      <p className="mt-2 text-xs text-gray-500 leading-relaxed line-clamp-2 border-t border-gray-50 pt-2">
-                        {d['Observações']}
-                      </p>
-                    )}
                   </div>
 
                   <ArrowRight className="w-4 h-4 text-gray-200 shrink-0 mt-0.5" />
