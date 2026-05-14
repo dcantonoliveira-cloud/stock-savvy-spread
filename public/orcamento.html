@@ -1701,12 +1701,11 @@
       if (!v) return '—';
       return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
     }
-    function getNomeCliente(item) {
-      try {
-        var c = typeof item.cliente_json === 'string' ? JSON.parse(item.cliente_json) : item.cliente_json;
-        return (c && c.nome) ? c.nome : '—';
-      } catch(e) { return '—'; }
+    function getCliente(item) {
+      try { return typeof item.cliente_json === 'string' ? JSON.parse(item.cliente_json) : (item.cliente_json || {}); }
+      catch(e) { return {}; }
     }
+    function getNomeCliente(item) { var c = getCliente(item); return c.nome || '—'; }
 
     var termo = busca.trim().toLowerCase();
     var filtrado = historico.filter(function(item) {
@@ -1716,8 +1715,8 @@
       return nome.includes(termo) || pac.includes(termo);
     });
 
-    /* grid: cliente | evento | pacotes | valor | data | ações */
-    var cols = '200px 130px 1fr 110px 140px 180px';
+    /* grid: cliente | data evento | pacotes | valor | gerado em | ações */
+    var cols = '180px 100px 1fr 110px 130px 180px';
 
     return (
       <div style={{ width:'100%', padding:'28px 32px 72px' }}>
@@ -1759,19 +1758,20 @@
           {!loading && filtrado.length > 0 && (
             <div style={{ overflowX:'auto' }}>
               {/* Header */}
-              <div style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'6px 12px', borderBottom:`2px solid ${GOLD}33`, marginBottom:2, minWidth:900 }}>
-                {['Cliente','Tipo de Evento','Pacotes','Valor','Data',''].map(function(h,i){ return (
+              <div style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'6px 12px', borderBottom:`2px solid ${GOLD}33`, marginBottom:2, minWidth:960 }}>
+                {['Cliente','Data Evento','Pacotes','Valor','Gerado em',''].map(function(h,i){ return (
                   <div key={i} style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</div>
                 ); })}
               </div>
               {filtrado.map(function(item) {
+                var cli = getCliente(item);
                 return (
-                  <div key={item._id} style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'11px 12px', borderBottom:'1px solid #F3F0EB', alignItems:'center', minWidth:900 }}
+                  <div key={item._id} style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'11px 12px', borderBottom:'1px solid #F3F0EB', alignItems:'center', minWidth:960 }}
                     onMouseEnter={function(e){ e.currentTarget.style.background='#FAF8F4'; }}
                     onMouseLeave={function(e){ e.currentTarget.style.background=''; }}
                   >
-                    <div style={{ fontSize:13, fontWeight:600, color:NAVY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{getNomeCliente(item)}</div>
-                    <div style={{ fontSize:12, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.nome_evento || '—'}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:NAVY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cli.nome || '—'}</div>
+                    <div style={{ fontSize:12, color:NAVY, fontWeight:500, whiteSpace:'nowrap' }}>{cli.data || '—'}</div>
                     <div style={{ fontSize:12, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={item.tipo_pacote || ''}>{item.tipo_pacote || '—'}</div>
                     <div style={{ fontSize:13, fontWeight:600, color:NAVY, whiteSpace:'nowrap' }}>{fmtValor(item.valor_total)}</div>
                     <div style={{ fontSize:11, color:GRAY, whiteSpace:'nowrap' }}>{fmtData(item.data_geracao || item['Created Date'])}</div>
