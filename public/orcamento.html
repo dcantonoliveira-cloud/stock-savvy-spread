@@ -418,15 +418,12 @@
           extras.push([a.desc || 'Adicional', fmtMoeda(a.valor)]);
         });
 
-        if (extras.length || inv.validade || inv.condicoes) {
+        if (extras.length || inv.condicoes) {
           blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 12, 0, 8] });
         }
         extras.forEach(function(e) {
           blocks.push({ columns: [{ text: e[0], fontSize: 8.5, color: GRAY }, { text: e[1], fontSize: 9, bold: true, color: NAVY, alignment: 'right' }], margin: [0, 0, 0, 3] });
         });
-        if (inv.validade) {
-          blocks.push({ fontSize: 9, margin: [0, 10, 0, 3], text: [{ text: 'Validade: ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }] });
-        }
         if (inv.condicoes) {
           inv.condicoes.split('\n').forEach(function(line) {
             if (line.trim()) blocks.push({ text: line.trim(), fontSize: 9, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 1] });
@@ -732,11 +729,10 @@
           });
         }
 
-        /* Validade / Condições */
-        if (inv.validade || inv.condicoes) {
+        /* Condições de pagamento */
+        if (inv.condicoes) {
           blocks.push({ text: '', margin: [0, 8, 0, 0] });
-          if (inv.validade) blocks.push({ text: [{ text: 'Validade:  ', bold: true, color: NAVY }, { text: inv.validade, color: GRAY }], fontSize: 7.5, margin: [0, 0, 0, 3] });
-          if (inv.condicoes) blocks.push({ text: [{ text: 'Pagamento:  ', bold: true, color: NAVY }, { text: inv.condicoes, color: GRAY }], fontSize: 7.5 });
+          blocks.push({ text: [{ text: 'Pagamento:  ', bold: true, color: NAVY }, { text: inv.condicoes, color: GRAY }], fontSize: 7.5 });
         }
       }
 
@@ -1476,10 +1472,9 @@
         ], { before:40, after:40 }));
       });
 
-      if (inv.validade || inv.condicoes) {
+      if (inv.condicoes) {
         children.push(para([], { before:120, after:0 }));
-        if (inv.validade)  children.push(para([run('Validade:   ', {bold:true, color:NAVY, size:15}), run(inv.validade, {color:GRAY, size:15})], { before:0, after:40 }));
-        if (inv.condicoes) children.push(para([run('Pagamento:   ', {bold:true, color:NAVY, size:15}), run(inv.condicoes, {color:GRAY, size:15})], { before:0, after:40 }));
+        children.push(para([run('Pagamento:   ', {bold:true, color:NAVY, size:15}), run(inv.condicoes, {color:GRAY, size:15})], { before:0, after:40 }));
       }
     });
 
@@ -2871,14 +2866,22 @@
           {/* Página 3 */}
           <Card>
             <SecHead>Configurações — Página 3</SecHead>
-            <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom: pagina2.quebrasAtiva ? 16 : 0 }}>
+            <div style={{ display:'flex', alignItems:'flex-start', gap:12, marginBottom: pagina2.quebrasAtiva ? 12 : 0 }}>
               <div style={{ marginTop:2 }}><Toggle checked={pagina2.quebrasAtiva} onChange={v => setP2(p => ({ ...p, quebrasAtiva:v }))} /></div>
-              <div>
-                <div style={{ fontSize:13, fontWeight:600, color:NAVY }}>Incluir seção "Quebras e Perdas"</div>
+              <div style={{ flex:1 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:NAVY }}>Incluir seção "Quebras e Perdas"</div>
+                  {pagina2.quebrasAtiva && (
+                    <button onClick={() => setP2(p => ({ ...p, _showValores: !p._showValores }))}
+                      style={{ background:'none', border:'none', fontSize:11, color:GOLD, cursor:'pointer', fontFamily:'inherit', padding:0, textDecoration:'underline' }}>
+                      {pagina2._showValores ? 'ocultar valores' : 'editar valores'}
+                    </button>
+                  )}
+                </div>
                 <div style={{ fontSize:11, color:GRAY, marginTop:2 }}>Exibida no final da página 2, após Alimentação de Staff</div>
               </div>
             </div>
-            {pagina2.quebrasAtiva && (
+            {pagina2.quebrasAtiva && pagina2._showValores && (
               <Grid>
                 <Field label="Taxa de seguro (por convidado)"><Input prefix="R$" value={pagina2.valorSeguro} onChange={v => setP2(p => ({ ...p, valorSeguro:v }))} placeholder="0,00" /></Field>
                 <Field label="Alimentação de staff (por profissional)"><Input prefix="R$" value={pagina2.valorStaff} onChange={v => setP2(p => ({ ...p, valorStaff:v }))} placeholder="0,00" /></Field>
