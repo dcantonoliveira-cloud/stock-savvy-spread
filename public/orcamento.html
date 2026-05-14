@@ -1684,6 +1684,82 @@
     );
   }
 
+  /* ── HistoricoPage ───────────────────────────────────────────────────── */
+  function HistoricoPage({ historico, loading, onRecarregar, onAbrir, onExcluir }) {
+    function fmtData(iso) {
+      if (!iso) return '—';
+      try {
+        var d = new Date(iso);
+        return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+      } catch(e) { return iso; }
+    }
+    function fmtValor(v) {
+      if (!v) return '—';
+      return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+    }
+    function getNomeCliente(item) {
+      try {
+        var c = typeof item.cliente_json === 'string' ? JSON.parse(item.cliente_json) : item.cliente_json;
+        return (c && c.nome) ? c.nome : '—';
+      } catch(e) { return '—'; }
+    }
+
+    return (
+      <div style={{ maxWidth:860, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
+        <Card>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+            <div>
+              <div style={{ fontSize:16, fontWeight:700, color:NAVY }}>Histórico de Orçamentos</div>
+              <div style={{ fontSize:12, color:GRAY, marginTop:2 }}>Gerados ao clicar em "Gerar PDF". Clique em Reabrir para editar.</div>
+            </div>
+            <button onClick={onRecarregar} disabled={loading} style={{ background:'none', border:`1px solid ${GOLD}`, borderRadius:6, padding:'6px 14px', fontSize:12, color:GOLD, cursor:'pointer', fontFamily:'inherit', opacity: loading ? 0.6 : 1 }}>
+              {loading ? 'Carregando...' : '↻ Atualizar'}
+            </button>
+          </div>
+
+          {loading && <div style={{ textAlign:'center', padding:'40px 0', color:GRAY, fontSize:13 }}>Carregando histórico...</div>}
+
+          {!loading && historico.length === 0 && (
+            <div style={{ textAlign:'center', padding:'48px 0' }}>
+              <div style={{ fontSize:32, marginBottom:12 }}>📄</div>
+              <div style={{ fontSize:15, fontWeight:600, color:NAVY, marginBottom:6 }}>Nenhum orçamento gerado ainda</div>
+              <div style={{ fontSize:12, color:GRAY }}>Gere um PDF para ele aparecer aqui.</div>
+            </div>
+          )}
+
+          {!loading && historico.length > 0 && (
+            <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+              {/* Header */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 110px 140px 120px 130px', gap:12, padding:'6px 12px', borderBottom:`2px solid ${GOLD}33`, marginBottom:4 }}>
+                {['Cliente','Tipo de Evento','Pacotes','Valor','Data'].map(h => (
+                  <div key={h} style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</div>
+                ))}
+              </div>
+              {historico.map(function(item) {
+                return (
+                  <div key={item._id} style={{ display:'grid', gridTemplateColumns:'1fr 110px 140px 120px 130px', gap:12, padding:'10px 12px', borderBottom:'1px solid #F3F0EB', alignItems:'center' }}
+                    onMouseEnter={function(e){ e.currentTarget.style.background='#FAF8F4'; }}
+                    onMouseLeave={function(e){ e.currentTarget.style.background=''; }}
+                  >
+                    <div style={{ fontSize:13, fontWeight:600, color:NAVY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{getNomeCliente(item)}</div>
+                    <div style={{ fontSize:12, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.nome_evento || '—'}</div>
+                    <div style={{ fontSize:11, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.tipo_pacote || '—'}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:NAVY }}>{fmtValor(item.valor_total)}</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <span style={{ fontSize:11, color:GRAY, whiteSpace:'nowrap' }}>{fmtData(item.data_geracao || item['Created Date'])}</span>
+                      <button onClick={function(){ onAbrir(item); }} title="Reabrir no editor" style={{ background:GOLD, border:'none', borderRadius:5, padding:'3px 9px', fontSize:11, fontWeight:600, color:NAVY, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit' }}>Reabrir</button>
+                      <button onClick={function(){ onExcluir(item._id); }} title="Excluir" style={{ background:'none', border:'none', padding:'3px 6px', fontSize:13, color:'#FCA5A5', cursor:'pointer', lineHeight:1 }}>✕</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
   /* ── CardapioPageView ────────────────────────────────────────────────── */
   function CardapioPageView({ masterCardapio, onChange, syncStatus }) {
     const [novaCategoria, setNovaCategoria] = React.useState('');
@@ -2317,6 +2393,8 @@
     const [gerandoPPT, setGerandoPPT] = React.useState(false);
     const [modelos, setModelos] = React.useState([]);
     const [aba, setAba] = React.useState('editor');
+    const [historico, setHistorico] = React.useState([]);
+    const [historicoLoading, setHistoricoLoading] = React.useState(false);
 
     /* ── Bubble sync para masterCardapio ─────────────────────────────────── */
     var BUBBLE_BASE = 'https://rondellobuffet-app.com.br/api/1.1';
@@ -2539,8 +2617,89 @@
         try { window.gerarPDF({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio: getCardapioParaPDF() }); }
         catch(e) { alert('Erro ao gerar PDF:\n' + e.message); }
         setGerando(false);
+        /* Salva registro no Bubble */
+        salvarOrcamento();
       }, 100);
     };
+
+    function salvarOrcamento() {
+      /* Calcula valor total: soma precoFinal (ou precoOriginal) de todos os pacotes */
+      var total = 0;
+      pacotes.forEach(function(pac) {
+        var inv = pac.investimento || {};
+        var v = parseFloat((inv.precoFinal || inv.precoOriginal || '').toString().replace(',','.')) || 0;
+        if (v > 0) total = Math.max(total, v); /* pega o maior (proposta multi-pacote) */
+      });
+      var nomePacotes = pacotes.map(function(p){ return p.nome || ''; }).filter(Boolean).join(' + ');
+      var dadosCompletos = {
+        cliente, pacotes, pagina2, fraseCapa, sobreTexto,
+        incluirCardapio, cardapioSelecionados
+      };
+      var body = JSON.stringify({
+        cliente_json:  JSON.stringify(cliente),
+        nome_evento:   cliente.tipo || '',
+        tipo_pacote:   nomePacotes,
+        valor_total:   total,
+        data_geracao:  new Date().toISOString(),
+        dados_json:    JSON.stringify(dadosCompletos)
+      });
+      fetch(BUBBLE_BASE + '/obj/orcamento', {
+        method: 'POST',
+        headers: { 'Authorization': BUBBLE_TOKEN, 'Content-Type': 'application/json' },
+        body: body
+      }).then(function(r){ return r.json(); })
+        .then(function(data){
+          /* Recarrega lista se a aba histórico estiver aberta */
+          setHistorico(function(prev){
+            var novo = {
+              _id: data.id || ('tmp_' + Date.now()),
+              cliente_json: JSON.stringify(cliente),
+              nome_evento: cliente.tipo || '',
+              tipo_pacote: nomePacotes,
+              valor_total: total,
+              data_geracao: new Date().toISOString(),
+              dados_json: JSON.stringify(dadosCompletos)
+            };
+            return [novo, ...prev];
+          });
+        }).catch(function(){});
+    }
+
+    function loadHistorico() {
+      setHistoricoLoading(true);
+      fetch(BUBBLE_BASE + '/obj/orcamento?sort_field=Created+Date&descending=true&limit=50', {
+        headers: { Authorization: BUBBLE_TOKEN }
+      }).then(function(r){ return r.json(); })
+        .then(function(data){
+          var results = (data.response && data.response.results) || [];
+          setHistorico(results);
+          setHistoricoLoading(false);
+        }).catch(function(){ setHistoricoLoading(false); });
+    }
+
+    function loadOrcamento(item) {
+      try {
+        var dados = typeof item.dados_json === 'string' ? JSON.parse(item.dados_json) : item.dados_json;
+        if (!dados) return;
+        if (dados.cliente)    setCliente(dados.cliente);
+        if (dados.pacotes)    setPacotes(dados.pacotes.map(hydratePacote));
+        if (dados.fraseCapa !== undefined)  setFraseCapa(dados.fraseCapa);
+        if (dados.sobreTexto !== undefined) setSobreTexto(dados.sobreTexto);
+        if (dados.pagina2)    setP2(p => ({ ...p, ...dados.pagina2 }));
+        if (dados.cardapioSelecionados !== undefined) setCardapioSelecionados(dados.cardapioSelecionados);
+        if (dados.incluirCardapio !== undefined) setCardapioToggle(dados.incluirCardapio);
+        setAba('editor');
+      } catch(e) { alert('Erro ao carregar orçamento.'); }
+    }
+
+    function deleteOrcamento(id) {
+      if (!window.confirm('Excluir este orçamento do histórico?')) return;
+      fetch(BUBBLE_BASE + '/obj/orcamento/' + id, {
+        method: 'DELETE',
+        headers: { Authorization: BUBBLE_TOKEN }
+      }).catch(function(){});
+      setHistorico(function(prev){ return prev.filter(function(o){ return o._id !== id; }); });
+    }
 
     return (
       <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }}>
@@ -2553,8 +2712,8 @@
               <div style={{ fontSize:10, color:`${GOLD}CC`, letterSpacing:'0.08em', textTransform:'uppercase' }}>Gerador de Orçamento</div>
             </div>
             <div style={{ display:'flex', gap:4, marginLeft:16 }}>
-              {[['editor','Orçamento'],['cardapio','Cardápio'],['modelos','Modelos']].map(([id, label]) => (
-                <button key={id} onClick={() => setAba(id)} style={{ background: aba===id ? GOLD : 'transparent', color: aba===id ? NAVY : `${GOLD}CC`, border: `1.5px solid ${aba===id ? GOLD : GOLD+'55'}`, borderRadius:6, padding:'5px 14px', fontSize:12, fontWeight:600, fontFamily:'inherit', cursor:'pointer', letterSpacing:'0.04em', transition:'all .15s' }}>{label}</button>
+              {[['editor','Orçamento'],['cardapio','Cardápio'],['modelos','Modelos'],['historico','Histórico']].map(([id, label]) => (
+                <button key={id} onClick={() => { setAba(id); if (id === 'historico') loadHistorico(); }} style={{ background: aba===id ? GOLD : 'transparent', color: aba===id ? NAVY : `${GOLD}CC`, border: `1.5px solid ${aba===id ? GOLD : GOLD+'55'}`, borderRadius:6, padding:'5px 14px', fontSize:12, fontWeight:600, fontFamily:'inherit', cursor:'pointer', letterSpacing:'0.04em', transition:'all .15s' }}>{label}</button>
               ))}
             </div>
           </div>
@@ -2576,6 +2735,16 @@
 
         {aba === 'cardapio' && (
           <CardapioPageView masterCardapio={masterCardapio} onChange={setMasterCardapio} syncStatus={cardapioSyncStatus} />
+        )}
+
+        {aba === 'historico' && (
+          <HistoricoPage
+            historico={historico}
+            loading={historicoLoading}
+            onRecarregar={loadHistorico}
+            onAbrir={loadOrcamento}
+            onExcluir={deleteOrcamento}
+          />
         )}
 
         {aba === 'editor' && <div style={{ maxWidth:820, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
