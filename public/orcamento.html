@@ -983,7 +983,7 @@
         faixas: [],
         precoOriginal:'', precoFinal:'', mostrarDesconto:false,
         taxaDesc:'Taxa de deslocamento', taxaValor:'', mostrarTaxa:false, adicionais:[],
-        validade:'7 dias',
+        validade:'',
         condicoes:'20% de entrada + 80% até 15 dias antes da festa\nCrianças até 4 anos não pagam e crianças de 5 a 9 anos pagam 50% do valor'
       }
     };
@@ -1154,9 +1154,6 @@
         ))}
         <button onClick={addA} style={addBtnSt}>+ Item extra</button>
 
-        <Grid>
-          <Field label="Validade da proposta"><Input value={inv.validade} onChange={v => set('validade', v)} placeholder="Ex: 7 dias" /></Field>
-        </Grid>
         <Field label="Condições de pagamento">
           <Textarea value={inv.condicoes} onChange={v => set('condicoes', v)}
             placeholder={"20% de entrada + 80% até 15 dias antes da festa\nCrianças até 4 anos: gratuidade  ·  De 5 a 9 anos: 50% do valor"}
@@ -1667,7 +1664,6 @@
                               return <span key={si} style={{ fontSize:11, color:'#444', background:'#f3f4f6', borderRadius:6, padding:'2px 9px' }}>{s.nome}</span>;
                             }) : <span style={{ fontSize:11, color:GRAY }}>Nenhuma seção ativa</span>}
                           </div>
-                          {p.validade && <div style={{ fontSize:11, color:GRAY, marginTop:5 }}>Validade: {p.validade}</div>}
                         </div>
                       );
                     })}
