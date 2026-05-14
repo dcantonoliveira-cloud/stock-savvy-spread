@@ -2510,14 +2510,29 @@
       const id = 'mdl_' + Date.now();
       const novo = { id, nome, dados };
 
-      /* Persist to localStorage */
-      const existing = JSON.parse(localStorage.getItem('rondello_modelos') || '[]');
-      existing.push(novo);
-      localStorage.setItem('rondello_modelos', JSON.stringify(existing));
-      setModelos(existing);
+      /* Atualiza estado e localStorage imediatamente */
+      setModelos(function(prev) {
+        const updated = [...prev, novo];
+        localStorage.setItem('rondello_modelos', JSON.stringify(updated));
+        return updated;
+      });
 
-      /* Also send to Bubble if embedded */
-      try { window.parent.postMessage({ action:'saveModelo', id, nome, dados }, '*'); } catch(e) {}
+      /* Salva no Bubble Data API */
+      fetch(BUBBLE_BASE + '/obj/modelo_proposta', {
+        method: 'POST',
+        headers: { 'Authorization': BUBBLE_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelo_id: id, nome: nome, dados_json: JSON.stringify(dados) })
+      }).then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.id) {
+            /* Atualiza o bubble_id no registro local para DELETE funcionar depois */
+            setModelos(function(prev) {
+              const updated = prev.map(function(m) { return m.id === id ? Object.assign({}, m, { bubble_id: data.id }) : m; });
+              localStorage.setItem('rondello_modelos', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }).catch(function(e) { console.error('[Rondello] Erro ao salvar modelo no Bubble:', e); });
 
       alert('Modelo "' + nome + '" salvo!');
     }
@@ -2527,7 +2542,27 @@
       const updated = modelos.filter(function(m){ return m.id !== id; });
       localStorage.setItem('rondello_modelos', JSON.stringify(updated));
       setModelos(updated);
-      try { window.parent.postMessage({ action:'deleteModelo', id, nome: m ? m.nome : '' }, '*'); } catch(e) {}
+
+      /* Remove do Bubble pelo bubble_id (se disponível) */
+      const bubbleId = m && m.bubble_id;
+      if (bubbleId) {
+        fetch(BUBBLE_BASE + '/obj/modelo_proposta/' + bubbleId, {
+          method: 'DELETE', headers: { 'Authorization': BUBBLE_TOKEN }
+        }).catch(function(){});
+      } else {
+        /* Fallback: busca pelo modelo_id e deleta */
+        fetch(BUBBLE_BASE + '/obj/modelo_proposta?constraints=' + encodeURIComponent(JSON.stringify([{key:'modelo_id',constraint_type:'equals',value:id}])), {
+          headers: { 'Authorization': BUBBLE_TOKEN }
+        }).then(function(r){ return r.json(); })
+          .then(function(data){
+            var results = (data.response && data.response.results) || [];
+            results.forEach(function(item) {
+              fetch(BUBBLE_BASE + '/obj/modelo_proposta/' + item._id, {
+                method: 'DELETE', headers: { 'Authorization': BUBBLE_TOKEN }
+              }).catch(function(){});
+            });
+          }).catch(function(){});
+      }
     }
 
     /* postMessage + URL params + localStorage on mount */
@@ -2563,22 +2598,23 @@
         if (msParam) setModelos(JSON.parse(atob(msParam)));
       } catch(e) {}
 
-      /* Fetch modelos direto da Bubble Data API */
-      fetch('https://rondellobuffet-app.com.br/api/1.1/obj/modelo_proposta?limit=100', {
-        headers: { 'Authorization': 'Bearer b4b3c4138bb1000811d5a3c0ba47a238' }
+      /* Fetch modelos do Bubble — fonte de verdade */
+      fetch(BUBBLE_BASE + '/obj/modelo_proposta?limit=100', {
+        headers: { 'Authorization': BUBBLE_TOKEN }
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
         var results = (data.response && data.response.results) || [];
         var ms = results.map(function(item) {
           try {
-            return { id: item.modelo_id || item._id, nome: item.nome, dados: JSON.parse(item.dados_json) };
+            var dados = typeof item.dados_json === 'string' ? JSON.parse(item.dados_json) : item.dados_json;
+            if (!dados || !item.nome) return null;
+            return { id: item.modelo_id || item._id, bubble_id: item._id, nome: item.nome, dados: dados };
           } catch(e) { return null; }
         }).filter(Boolean);
-        if (ms.length > 0) {
-          setModelos(ms);
-          localStorage.setItem('rondello_modelos', JSON.stringify(ms));
-        }
+        /* Usa Bubble como fonte de verdade — substitui localStorage */
+        setModelos(ms);
+        localStorage.setItem('rondello_modelos', JSON.stringify(ms));
       }).catch(function(){});
 
       /* postMessage fallback para compatibilidade */
