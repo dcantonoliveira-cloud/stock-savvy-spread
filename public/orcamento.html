@@ -2651,10 +2651,11 @@
         body: body
       }).then(function(r){ return r.json(); })
         .then(function(data){
-          /* Recarrega lista se a aba histórico estiver aberta */
+          console.log('[Rondello] Bubble POST orcamento response:', data);
+          var registroId = data.id || (data.body && data.body.id) || ('tmp_' + Date.now());
           setHistorico(function(prev){
             var novo = {
-              _id: data.id || ('tmp_' + Date.now()),
+              _id: registroId,
               cliente_json: JSON.stringify(cliente),
               nome_evento: cliente.tipo || '',
               tipo_pacote: nomePacotes,
@@ -2664,7 +2665,7 @@
             };
             return [novo, ...prev];
           });
-        }).catch(function(){});
+        }).catch(function(err){ console.error('[Rondello] Erro ao salvar orçamento no Bubble:', err); });
     }
 
     function loadHistorico() {
@@ -2673,8 +2674,8 @@
         headers: { Authorization: BUBBLE_TOKEN }
       }).then(function(r){ return r.json(); })
         .then(function(data){
+          console.log('[Rondello] Bubble GET orcamento response:', data);
           var results = (data.response && data.response.results) || [];
-          /* Ordena client-side por data_geracao ou Created Date, mais recente primeiro */
           results.sort(function(a, b) {
             var da = new Date(a.data_geracao || a['Created Date'] || 0);
             var db = new Date(b.data_geracao || b['Created Date'] || 0);
@@ -2682,7 +2683,7 @@
           });
           setHistorico(results);
           setHistoricoLoading(false);
-        }).catch(function(){ setHistoricoLoading(false); });
+        }).catch(function(err){ console.error('[Rondello] Erro ao buscar histórico:', err); setHistoricoLoading(false); });
     }
 
     function loadOrcamento(item) {
