@@ -1687,7 +1687,9 @@
   }
 
   /* ── HistoricoPage ───────────────────────────────────────────────────── */
-  function HistoricoPage({ historico, loading, onRecarregar, onAbrir, onExcluir }) {
+  function HistoricoPage({ historico, loading, onRecarregar, onAbrir, onExcluir, onGerarPDF }) {
+    const [busca, setBusca] = React.useState('');
+
     function fmtData(iso) {
       if (!iso) return '—';
       try {
@@ -1706,17 +1708,38 @@
       } catch(e) { return '—'; }
     }
 
+    var termo = busca.trim().toLowerCase();
+    var filtrado = historico.filter(function(item) {
+      if (!termo) return true;
+      var nome = getNomeCliente(item).toLowerCase();
+      var pac  = (item.tipo_pacote || '').toLowerCase();
+      return nome.includes(termo) || pac.includes(termo);
+    });
+
+    /* grid: cliente | evento | pacotes | valor | data | ações */
+    var cols = '200px 130px 1fr 110px 140px 180px';
+
     return (
-      <div style={{ maxWidth:860, margin:'0 auto', padding:'28px 20px 72px', width:'100%' }}>
+      <div style={{ width:'100%', padding:'28px 32px 72px' }}>
         <Card>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+          {/* Cabeçalho */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
             <div>
               <div style={{ fontSize:16, fontWeight:700, color:NAVY }}>Histórico de Orçamentos</div>
-              <div style={{ fontSize:12, color:GRAY, marginTop:2 }}>Gerados ao clicar em "Gerar PDF". Clique em Reabrir para editar.</div>
+              <div style={{ fontSize:12, color:GRAY, marginTop:2 }}>{historico.length} orçamento{historico.length !== 1 ? 's' : ''} · mais recente primeiro</div>
             </div>
             <button onClick={onRecarregar} disabled={loading} style={{ background:'none', border:`1px solid ${GOLD}`, borderRadius:6, padding:'6px 14px', fontSize:12, color:GOLD, cursor:'pointer', fontFamily:'inherit', opacity: loading ? 0.6 : 1 }}>
               {loading ? 'Carregando...' : '↻ Atualizar'}
             </button>
+          </div>
+
+          {/* Busca */}
+          <div style={{ marginBottom:16 }}>
+            <input
+              value={busca} onChange={function(e){ setBusca(e.target.value); }}
+              placeholder="Buscar por nome do cliente ou pacote..."
+              style={{ width:'100%', maxWidth:400, border:'1px solid #E5E1D8', borderRadius:7, padding:'8px 14px', fontSize:12, color:NAVY, fontFamily:'inherit', outline:'none', background:'#FDFCFA' }}
+            />
           </div>
 
           {loading && <div style={{ textAlign:'center', padding:'40px 0', color:GRAY, fontSize:13 }}>Carregando histórico...</div>}
@@ -1729,28 +1752,33 @@
             </div>
           )}
 
-          {!loading && historico.length > 0 && (
-            <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+          {!loading && historico.length > 0 && filtrado.length === 0 && (
+            <div style={{ textAlign:'center', padding:'32px 0', color:GRAY, fontSize:13 }}>Nenhum resultado para "{busca}".</div>
+          )}
+
+          {!loading && filtrado.length > 0 && (
+            <div style={{ overflowX:'auto' }}>
               {/* Header */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 110px 140px 120px 130px', gap:12, padding:'6px 12px', borderBottom:`2px solid ${GOLD}33`, marginBottom:4 }}>
-                {['Cliente','Tipo de Evento','Pacotes','Valor','Data'].map(h => (
-                  <div key={h} style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</div>
-                ))}
+              <div style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'6px 12px', borderBottom:`2px solid ${GOLD}33`, marginBottom:2, minWidth:900 }}>
+                {['Cliente','Tipo de Evento','Pacotes','Valor','Data',''].map(function(h,i){ return (
+                  <div key={i} style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</div>
+                ); })}
               </div>
-              {historico.map(function(item) {
+              {filtrado.map(function(item) {
                 return (
-                  <div key={item._id} style={{ display:'grid', gridTemplateColumns:'1fr 110px 140px 120px 130px', gap:12, padding:'10px 12px', borderBottom:'1px solid #F3F0EB', alignItems:'center' }}
+                  <div key={item._id} style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'11px 12px', borderBottom:'1px solid #F3F0EB', alignItems:'center', minWidth:900 }}
                     onMouseEnter={function(e){ e.currentTarget.style.background='#FAF8F4'; }}
                     onMouseLeave={function(e){ e.currentTarget.style.background=''; }}
                   >
                     <div style={{ fontSize:13, fontWeight:600, color:NAVY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{getNomeCliente(item)}</div>
                     <div style={{ fontSize:12, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.nome_evento || '—'}</div>
-                    <div style={{ fontSize:11, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.tipo_pacote || '—'}</div>
-                    <div style={{ fontSize:13, fontWeight:600, color:NAVY }}>{fmtValor(item.valor_total)}</div>
+                    <div style={{ fontSize:12, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={item.tipo_pacote || ''}>{item.tipo_pacote || '—'}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:NAVY, whiteSpace:'nowrap' }}>{fmtValor(item.valor_total)}</div>
+                    <div style={{ fontSize:11, color:GRAY, whiteSpace:'nowrap' }}>{fmtData(item.data_geracao || item['Created Date'])}</div>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                      <span style={{ fontSize:11, color:GRAY, whiteSpace:'nowrap' }}>{fmtData(item.data_geracao || item['Created Date'])}</span>
-                      <button onClick={function(){ onAbrir(item); }} title="Reabrir no editor" style={{ background:GOLD, border:'none', borderRadius:5, padding:'3px 9px', fontSize:11, fontWeight:600, color:NAVY, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit' }}>Reabrir</button>
-                      <button onClick={function(){ onExcluir(item._id); }} title="Excluir" style={{ background:'none', border:'none', padding:'3px 6px', fontSize:13, color:'#FCA5A5', cursor:'pointer', lineHeight:1 }}>✕</button>
+                      <button onClick={function(){ onGerarPDF(item); }} title="Reimprimir PDF" style={{ background:'none', border:`1px solid ${GOLD}55`, borderRadius:5, padding:'4px 10px', fontSize:11, fontWeight:600, color:GOLD, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit' }}>⬇ PDF</button>
+                      <button onClick={function(){ onAbrir(item); }} title="Reabrir no editor" style={{ background:GOLD, border:'none', borderRadius:5, padding:'4px 10px', fontSize:11, fontWeight:600, color:NAVY, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit' }}>Reabrir</button>
+                      <button onClick={function(){ onExcluir(item._id); }} title="Excluir" style={{ background:'none', border:'none', padding:'4px 6px', fontSize:13, color:'#FCA5A5', cursor:'pointer', lineHeight:1 }}>✕</button>
                     </div>
                   </div>
                 );
@@ -2710,6 +2738,31 @@
       setHistorico(function(prev){ return prev.filter(function(o){ return o._id !== id; }); });
     }
 
+    function gerarPDFFromHistorico(item) {
+      try {
+        var dados = typeof item.dados_json === 'string' ? JSON.parse(item.dados_json) : item.dados_json;
+        if (!dados) { alert('Dados do orçamento não encontrados.'); return; }
+        var cardapioParaPDF = (masterCardapio || []).map(function(cat) {
+          var pratos = (cat.pratos || []).filter(function(p) {
+            return p.ativo !== false && p.nome;
+          }).filter(function(p) {
+            if (!dados.cardapioSelecionados) return true;
+            return dados.cardapioSelecionados.indexOf(p.id) !== -1;
+          });
+          return Object.assign({}, cat, { pratos: pratos });
+        }).filter(function(cat) { return cat.pratos.length > 0; });
+        window.gerarPDF({
+          cliente:         dados.cliente || {},
+          pacotes:         (dados.pacotes || []).map(hydratePacote),
+          pagina2:         dados.pagina2 || {},
+          fraseCapa:       dados.fraseCapa || '',
+          sobreTexto:      dados.sobreTexto || '',
+          incluirCardapio: dados.incluirCardapio || false,
+          cardapio:        cardapioParaPDF
+        });
+      } catch(e) { alert('Erro ao gerar PDF: ' + e.message); }
+    }
+
     return (
       <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }}>
         {/* Header */}
@@ -2753,6 +2806,7 @@
             onRecarregar={loadHistorico}
             onAbrir={loadOrcamento}
             onExcluir={deleteOrcamento}
+            onGerarPDF={gerarPDFFromHistorico}
           />
         )}
 
