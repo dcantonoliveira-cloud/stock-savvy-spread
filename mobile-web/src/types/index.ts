@@ -118,14 +118,22 @@ export interface BubbleValorAdicional {
 
 export interface BubbleDegustacao {
   _id: string;
-  data?: string;           // ISO date string (tasting date)
+  data?: string;
   convidados?: number;
-  QtdEventos?: number;     // number of events linked to this tasting
+  QtdEventos?: number;
   'Observações'?: string;
   'Cardápio'?: string;
   tipo_degust?: string;
-  evento?: string;         // linked event ID (if single)
-  Eventos?: string[];      // linked event IDs (if multiple)
+  eventos?: string[];   // Bubble field: "Degustação's eventos" (lowercase)
+  Eventos?: string[];   // alternate capitalisation fallback
+  evento?: string;      // legacy single-event link
+}
+
+export interface BubbleConvidadoDeg {
+  _id: string;
+  qtd?: number;
+  evento?: string;       // event ID reference
+  'Degustação'?: string; // degustação ID reference
 }
 
 export interface BubbleListResponse<T> {
