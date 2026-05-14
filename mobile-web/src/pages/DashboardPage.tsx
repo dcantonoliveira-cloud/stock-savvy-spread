@@ -197,7 +197,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-8 pb-8 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-8 overflow-hidden">
         <div className="absolute -top-10 -right-10 w-56 h-56 bg-white/5 rounded-full" />
         <div className="absolute top-6 right-8 w-2 h-2 bg-gold-400/50 rounded-full" />
         <div className="absolute top-11 right-16 w-1 h-1 bg-gold-400/30 rounded-full" />
@@ -207,9 +207,6 @@ export default function DashboardPage() {
             <h1 className="text-4xl font-black text-white tracking-tight leading-none">
               Rondello
             </h1>
-            <p className="text-white/35 text-xs font-bold mt-1.5 uppercase tracking-[0.2em]">
-              Buffet · Gestão de Eventos
-            </p>
           </div>
 
           {/* PWA Install button */}
