@@ -2677,9 +2677,17 @@
       setTimeout(() => {
         try { window.gerarPDF({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio: getCardapioParaPDF() }); }
         catch(e) { alert('Erro ao gerar PDF:\n' + e.message); }
-        setGerando(false);
-        /* Salva registro no Bubble */
+        /* Salva no histórico */
         salvarOrcamento();
+        /* Zera o formulário para o próximo orçamento */
+        setCliente({ nome:'', data:'', local:'', convidados:'', tipo:'', horas:'' });
+        setPacotes([makePacote(1)]);
+        setFraseCapa('');
+        setSobreTexto('');
+        setP2(function(p){ return { ...p, _showValores: false }; });
+        setCardapioToggle(false);
+        setCardapioSelecionados(null);
+        setGerando(false);
       }, 100);
     };
 
