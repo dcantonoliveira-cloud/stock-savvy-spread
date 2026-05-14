@@ -848,12 +848,14 @@
           ? { columns: [{ stack: col1, width: '*' }, { stack: col2, width: '*' }], columnGap: 16, margin: [4, 0, 4, 0] }
           : { stack: col1, margin: [4, 0, 4, 0] };
 
-        /* Wrap category in unbreakable block to avoid mid-category page breaks */
+        /* Wrap category in unbreakable block only when small enough to fit on one page.
+           Large categories (> 24 pratos) break naturally to avoid blank pages. */
         var catStack = [catHeader];
         if (catNote) catStack.push(catNote);
         catStack.push(dishesBlock);
 
-        blocks.push({ stack: catStack, unbreakable: true, margin: [0, ci > 0 ? 22 : 0, 0, 0] });
+        var canUnbreak = pratos.length <= 24;
+        blocks.push({ stack: catStack, unbreakable: canUnbreak, margin: [0, ci > 0 ? 22 : 0, 0, 0] });
       });
 
       return blocks;
