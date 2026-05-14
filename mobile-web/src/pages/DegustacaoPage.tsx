@@ -84,7 +84,7 @@ function DegCard({
           )}
           {primeiros > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-black">
-              {primeiros} 1ª deg.
+              {primeiros} novo{primeiros !== 1 ? 's' : ''}
             </span>
           )}
         </div>
