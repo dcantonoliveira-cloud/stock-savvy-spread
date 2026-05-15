@@ -229,7 +229,6 @@
       var mute     = '#7A90A8';
 
       if (logoB64) {
-        /* Wrap logo in table cell so fillColor paints navy behind transparent pixels */
         blocks.push({
           table: {
             widths: ['*'],
@@ -249,7 +248,7 @@
             paddingTop: function() { return 0; },
             paddingBottom: function() { return 0; }
           },
-          margin: [0, 0, 0, 90]
+          margin: [0, 0, 0, 72]
         });
       }
 
@@ -897,7 +896,7 @@
 
       var docDef = {
         pageSize: 'A4',
-        pageMargins: [60, 90, 60, 55],
+        pageMargins: [60, 52, 60, 55],
 
         /* ── Background: imagem cinematográfica na capa, papel off-white nas internas ── */
         background: function(currentPage, pageSize) {
