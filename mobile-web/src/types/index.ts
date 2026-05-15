@@ -120,7 +120,9 @@ export interface BubbleDegustacao {
   _id: string;
   data?: string;
   convidados?: number;
-  QtdEventos?: number;
+  QtdEventos?: number;     // total events linked
+  QtdNovos?: number;       // new couples (not yet signed)
+  QtdVelhos?: number;      // existing clients
   'Observações'?: string;
   'Cardápio'?: string;
   tipo_degust?: string;
