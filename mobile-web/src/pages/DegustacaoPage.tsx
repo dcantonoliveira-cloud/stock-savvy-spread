@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Calendar, Users, UtensilsCrossed } from 'lucide-react';
+import { ArrowRight, Calendar, ClipboardList, UtensilsCrossed } from 'lucide-react';
 import { fetchAllDegustacoes } from '../api/bubble';
 import { BubbleDegustacao } from '../types';
 import { fmtDate } from '../lib/format';
@@ -61,11 +61,10 @@ export default function DegustacaoPage() {
       )}
 
       {/* ── Hero header ──────────────────────────────────────────────── */}
-      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-8 pb-8 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pb-8 overflow-hidden min-h-[130px] flex flex-col justify-end">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="relative">
-          <p className="text-gold-400/70 text-xs font-bold uppercase tracking-widest">Menu de prova</p>
-          <h1 className="text-4xl font-black text-white tracking-tight mt-1 leading-none">Degustações</h1>
+          <h1 className="text-4xl font-black text-white tracking-tight leading-none">Degustações</h1>
           <p className="text-white/35 text-xs font-bold mt-1.5 uppercase tracking-[0.15em]">
             {loading ? '…' : `${upcoming} próxima${upcoming !== 1 ? 's' : ''} · ${items.length} total`}
           </p>
@@ -143,10 +142,15 @@ export default function DegustacaoPage() {
                           {fmtDate(d.data)}
                         </span>
                       )}
-                      {d.convidados != null && (
+                      {(d.QtdEventos != null || d.Eventos?.length) && (
                         <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                          <Users className="w-3.5 h-3.5 text-gold-400" />
-                          {d.convidados} convidados
+                          <ClipboardList className="w-3.5 h-3.5 text-gold-400" />
+                          {d.QtdEventos ?? d.Eventos?.length ?? 0} eventos
+                          {d.QtdNovos != null && d.QtdVelhos != null && (
+                            <span className="text-gray-300 ml-1">
+                              · {d.QtdNovos} nov. · {d.QtdVelhos} ant.
+                            </span>
+                          )}
                         </span>
                       )}
                     </div>

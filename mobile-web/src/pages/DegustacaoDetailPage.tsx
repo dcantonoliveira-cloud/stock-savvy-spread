@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Building2, Calendar, CalendarDays,
+  ArrowLeft, ArrowRight, Building2, Calendar, CalendarDays,
   CircleDot, MapPin, UtensilsCrossed, Users,
 } from 'lucide-react';
 import { fetchAssessoria, fetchDegustacao, fetchEvento, fetchLocal } from '../api/bubble';
@@ -161,18 +161,24 @@ export default function DegustacaoDetailPage() {
           </div>
         ) : (
           eventos.map((ev) => (
-            <div key={ev.id} className="bg-white rounded-3xl p-4 shadow-sm space-y-3">
-
-              {/* Nome do casal + status */}
+            <button
+              key={ev.id}
+              onClick={() => navigate(`/eventos/${ev.id}`)}
+              className="w-full text-left bg-white rounded-3xl p-4 shadow-sm space-y-3 active:scale-[0.99] transition-transform"
+            >
+              {/* Nome do casal + status + seta */}
               <div className="flex items-start justify-between gap-2">
                 <p className="font-bold text-gray-900 text-base leading-tight flex-1">
                   {ev.nomeDoEvento ?? '—'}
                 </p>
-                {ev.status && (
-                  <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${statusStyle(ev.status)}`}>
-                    {ev.status}
-                  </span>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {ev.status && (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${statusStyle(ev.status)}`}>
+                      {ev.status}
+                    </span>
+                  )}
+                  <ArrowRight className="w-4 h-4 text-gray-200" />
+                </div>
               </div>
 
               {/* Detalhes */}
@@ -203,7 +209,7 @@ export default function DegustacaoDetailPage() {
                 )}
               </div>
 
-            </div>
+            </button>
           ))
         )}
       </div>
