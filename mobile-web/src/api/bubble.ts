@@ -21,14 +21,24 @@ const HEADERS = {
   'Content-Type': 'application/json',
 };
 
+// In-memory response cache — avoids redundant requests when navigating between pages.
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const _cache = new Map<string, { data: unknown; ts: number }>();
+
 async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${BASE_URL}/${path}`);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const res = await fetch(url.toString(), { headers: HEADERS });
+  const key = url.toString();
+  const hit = _cache.get(key);
+  if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data as T;
+
+  const res = await fetch(key, { headers: HEADERS });
   if (!res.ok) throw new Error(`Bubble API ${res.status}: ${path}`);
-  return res.json() as Promise<T>;
+  const data = await res.json() as T;
+  _cache.set(key, { data, ts: Date.now() });
+  return data;
 }
 
 // ── Events ──────────────────────────────────────────────────────────────────
@@ -54,24 +64,22 @@ export function fetchEvento(id: string) {
   return apiFetch<BubbleSingleResponse<BubbleEvento>>(`eventos/${id}`);
 }
 
-// Bubble caps each response at 100 records. Paginate until remaining === 0.
+// Fetch first page, then fire all remaining pages in parallel.
 export async function fetchAllEventos(
   opts?: { sortOrder?: 'asc' | 'desc' }
 ): Promise<BubbleEvento[]> {
-  const all: BubbleEvento[] = [];
-  let cursor = 0;
+  const first = await fetchEventos({ limit: 100, sortOrder: opts?.sortOrder ?? 'desc' });
+  const all = [...first.response.results];
+  if (first.response.remaining === 0) return all;
 
-  while (true) {
-    const r = await fetchEventos({
-      limit: 100,
-      cursor: cursor > 0 ? cursor : undefined,
-      sortOrder: opts?.sortOrder ?? 'desc',
-    });
-    all.push(...r.response.results);
-    if (r.response.remaining === 0) break;
-    cursor += r.response.count;
-  }
-
+  const pageSize = first.response.count;
+  const extraPages = Math.ceil(first.response.remaining / pageSize);
+  const pages = await Promise.all(
+    Array.from({ length: extraPages }, (_, i) =>
+      fetchEventos({ limit: 100, cursor: pageSize * (i + 1), sortOrder: opts?.sortOrder ?? 'desc' })
+    )
+  );
+  pages.forEach((p) => all.push(...p.response.results));
   return all;
 }
 
@@ -123,18 +131,20 @@ export function fetchDegustacoes(opts?: { cursor?: number }) {
   return apiFetch<BubbleListResponse<BubbleDegustacao>>('Degusta%C3%A7%C3%A3o', params);
 }
 
-// Bubble caps each response at 100 records. Paginate until remaining === 0.
+// Fetch first page, then fire all remaining pages in parallel.
 export async function fetchAllDegustacoes(): Promise<BubbleDegustacao[]> {
-  const all: BubbleDegustacao[] = [];
-  let cursor = 0;
+  const first = await fetchDegustacoes();
+  const all = [...first.response.results];
+  if (first.response.remaining === 0) return all;
 
-  while (true) {
-    const r = await fetchDegustacoes(cursor > 0 ? { cursor } : undefined);
-    all.push(...r.response.results);
-    if (r.response.remaining === 0) break;
-    cursor += r.response.count;
-  }
-
+  const pageSize = first.response.count;
+  const extraPages = Math.ceil(first.response.remaining / pageSize);
+  const pages = await Promise.all(
+    Array.from({ length: extraPages }, (_, i) =>
+      fetchDegustacoes({ cursor: pageSize * (i + 1) })
+    )
+  );
+  pages.forEach((p) => all.push(...p.response.results));
   return all;
 }
 
