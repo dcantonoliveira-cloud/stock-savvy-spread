@@ -1705,8 +1705,8 @@
       return nome.includes(termo) || pac.includes(termo);
     });
 
-    /* grid: cliente | data evento | pacotes | valor | gerado em | ações */
-    var cols = '180px 100px 1fr 110px 130px 180px';
+    /* grid: cliente | data evento | pacotes | valor | por | gerado em | ações */
+    var cols = '160px 95px 1fr 100px 110px 120px 170px';
 
     return (
       <div style={{ width:'100%', padding:'28px 32px 72px' }}>
@@ -1748,15 +1748,15 @@
           {!loading && filtrado.length > 0 && (
             <div style={{ overflowX:'auto' }}>
               {/* Header */}
-              <div style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'6px 12px', borderBottom:`2px solid ${GOLD}33`, marginBottom:2, minWidth:960 }}>
-                {['Cliente','Data Evento','Pacotes','Valor','Gerado em',''].map(function(h,i){ return (
+              <div style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'6px 12px', borderBottom:`2px solid ${GOLD}33`, marginBottom:2, minWidth:1060 }}>
+                {['Cliente','Data Evento','Pacotes','Valor','Por','Gerado em',''].map(function(h,i){ return (
                   <div key={i} style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</div>
                 ); })}
               </div>
               {filtrado.map(function(item) {
                 var cli = getCliente(item);
                 return (
-                  <div key={item._id} style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'11px 12px', borderBottom:'1px solid #F3F0EB', alignItems:'center', minWidth:960 }}
+                  <div key={item._id} style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'11px 12px', borderBottom:'1px solid #F3F0EB', alignItems:'center', minWidth:1060 }}
                     onMouseEnter={function(e){ e.currentTarget.style.background='#FAF8F4'; }}
                     onMouseLeave={function(e){ e.currentTarget.style.background=''; }}
                   >
@@ -1764,6 +1764,7 @@
                     <div style={{ fontSize:12, color:NAVY, fontWeight:500, whiteSpace:'nowrap' }}>{cli.data || '—'}</div>
                     <div style={{ fontSize:12, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={item.tipo_pacote || ''}>{item.tipo_pacote || '—'}</div>
                     <div style={{ fontSize:13, fontWeight:600, color:NAVY, whiteSpace:'nowrap' }}>{fmtValor(item.valor_total)}</div>
+                    <div style={{ fontSize:12, color:NAVY, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.criado_por || '—'}</div>
                     <div style={{ fontSize:11, color:GRAY, whiteSpace:'nowrap' }}>{fmtData(item.data_geracao || item['Created Date'])}</div>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <button onClick={function(){ onGerarPDF(item); }} title="Reimprimir PDF" style={{ background:'none', border:`1px solid ${GOLD}55`, borderRadius:5, padding:'4px 10px', fontSize:11, fontWeight:600, color:GOLD, cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit' }}>⬇ PDF</button>
@@ -2415,6 +2416,12 @@
     const [aba, setAba] = React.useState('editor');
     const [historico, setHistorico] = React.useState([]);
     const [historicoLoading, setHistoricoLoading] = React.useState(false);
+    const [usuarioAtual, setUsuarioAtual] = React.useState(function() {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        return p.get('usuario') || p.get('user') || '';
+      } catch(e) { return ''; }
+    });
 
     /* ── Bubble sync para masterCardapio ─────────────────────────────────── */
     var BUBBLE_BASE = 'https://rondellobuffet-app.com.br/api/1.1';
@@ -2705,7 +2712,8 @@
         tipo_pacote:   nomePacotes,
         valor_total:   total,
         data_geracao:  new Date().toISOString(),
-        dados_json:    JSON.stringify(dadosCompletos)
+        dados_json:    JSON.stringify(dadosCompletos),
+        criado_por:    usuarioAtual || ''
       });
       fetch(BUBBLE_BASE + '/obj/orcamento', {
         method: 'POST',
@@ -2713,7 +2721,6 @@
         body: body
       }).then(function(r){ return r.json(); })
         .then(function(data){
-          console.log('[Rondello] Bubble POST orcamento response:', data);
           var registroId = data.id || (data.body && data.body.id) || ('tmp_' + Date.now());
           setHistorico(function(prev){
             var novo = {
@@ -2723,7 +2730,8 @@
               tipo_pacote: nomePacotes,
               valor_total: total,
               data_geracao: new Date().toISOString(),
-              dados_json: JSON.stringify(dadosCompletos)
+              dados_json: JSON.stringify(dadosCompletos),
+              criado_por: usuarioAtual || ''
             };
             return [novo, ...prev];
           });
