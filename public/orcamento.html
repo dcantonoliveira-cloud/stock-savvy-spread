@@ -1705,8 +1705,8 @@
       return nome.includes(termo) || pac.includes(termo);
     });
 
-    /* grid: cliente | data evento | pacotes | valor | por | gerado em | ações */
-    var cols = '160px 95px 1fr 100px 110px 120px 170px';
+    /* grid: cliente | data evento | local | pacotes | por | gerado em | ações */
+    var cols = '160px 95px 150px 1fr 110px 120px 170px';
 
     return (
       <div style={{ width:'100%', padding:'28px 32px 72px' }}>
@@ -1749,7 +1749,7 @@
             <div style={{ overflowX:'auto' }}>
               {/* Header */}
               <div style={{ display:'grid', gridTemplateColumns:cols, gap:12, padding:'6px 12px', borderBottom:`2px solid ${GOLD}33`, marginBottom:2, minWidth:1060 }}>
-                {['Cliente','Data Evento','Pacotes','Valor','Por','Gerado em',''].map(function(h,i){ return (
+                {['Cliente','Data Evento','Local','Pacotes','Por','Gerado em',''].map(function(h,i){ return (
                   <div key={i} style={{ fontSize:10, fontWeight:700, color:GRAY, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</div>
                 ); })}
               </div>
@@ -1762,8 +1762,8 @@
                   >
                     <div style={{ fontSize:13, fontWeight:600, color:NAVY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{cli.nome || '—'}</div>
                     <div style={{ fontSize:12, color:NAVY, fontWeight:500, whiteSpace:'nowrap' }}>{cli.data || '—'}</div>
+                    <div style={{ fontSize:12, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={cli.local || ''}>{cli.local || '—'}</div>
                     <div style={{ fontSize:12, color:GRAY, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={item.tipo_pacote || ''}>{item.tipo_pacote || '—'}</div>
-                    <div style={{ fontSize:13, fontWeight:600, color:NAVY, whiteSpace:'nowrap' }}>{fmtValor(item.valor_total)}</div>
                     <div style={{ fontSize:12, color:NAVY, fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.criado_por || '—'}</div>
                     <div style={{ fontSize:11, color:GRAY, whiteSpace:'nowrap' }}>{fmtData(item.data_geracao || item['Created Date'])}</div>
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
