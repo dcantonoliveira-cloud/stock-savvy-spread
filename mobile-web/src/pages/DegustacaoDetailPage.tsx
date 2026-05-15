@@ -47,8 +47,10 @@ export default function DegustacaoDetailPage() {
         setDegu(d);
 
         // Collect all linked event IDs (deduplicated)
+        // Bubble returns the field as lowercase "eventos"
         const ids = Array.from(new Set([
-          ...(d.Eventos ?? []),
+          ...(d.eventos ?? []),   // lowercase — actual Bubble API field name
+          ...(d.Eventos ?? []),   // uppercase — fallback
           ...(d.evento ? [d.evento] : []),
         ]));
 
@@ -97,7 +99,7 @@ export default function DegustacaoDetailPage() {
       )}
 
       {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pt-12 pb-6 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-6 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-36 h-36 bg-white/5 rounded-full" />
 
         <button
