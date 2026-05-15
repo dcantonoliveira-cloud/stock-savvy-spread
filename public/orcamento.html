@@ -1700,9 +1700,10 @@
     var termo = busca.trim().toLowerCase();
     var filtrado = historico.filter(function(item) {
       if (!termo) return true;
-      var nome = getNomeCliente(item).toLowerCase();
-      var pac  = (item.tipo_pacote || '').toLowerCase();
-      return nome.includes(termo) || pac.includes(termo);
+      var nome  = getNomeCliente(item).toLowerCase();
+      var pac   = (item.tipo_pacote || '').toLowerCase();
+      var local = (getCliente(item).local || '').toLowerCase();
+      return nome.includes(termo) || pac.includes(termo) || local.includes(termo);
     });
 
     /* grid: cliente | data evento | local | pacotes | por | gerado em | ações */
@@ -1726,7 +1727,7 @@
           <div style={{ marginBottom:16 }}>
             <input
               value={busca} onChange={function(e){ setBusca(e.target.value); }}
-              placeholder="Buscar por nome do cliente ou pacote..."
+              placeholder="Buscar por nome, local ou pacote..."
               style={{ width:'100%', maxWidth:400, border:'1px solid #E5E1D8', borderRadius:7, padding:'8px 14px', fontSize:12, color:NAVY, fontFamily:'inherit', outline:'none', background:'#FDFCFA' }}
             />
           </div>
