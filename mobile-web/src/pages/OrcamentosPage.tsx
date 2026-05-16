@@ -61,15 +61,27 @@ export default function OrcamentosPage() {
   const activeStatuses = ALL_FILTERS.find((f) => f.key === filter)?.statuses ?? DEFAULT_STATUSES;
 
   const filtered = useMemo(() => {
+    const now = new Date();
+    const q = search.trim().toLowerCase();
+
     let list = eventos.filter((e) =>
       activeStatuses.includes((e.status ?? '').toLowerCase())
     );
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
+
+    // Without search: "Em aberto" only shows future events
+    if (!q && filter === 'abertos') {
+      list = list.filter((e) =>
+        e.dataDoEvento ? new Date(e.dataDoEvento) >= now : true
+      );
+    }
+
+    // With search: include past events too, filter by name
+    if (q) {
       list = list.filter((e) =>
         (e.NomeDoEvento ?? '').toLowerCase().includes(q)
       );
     }
+
     return list.sort((a, b) => {
       const da = a.dataDoEvento ? new Date(a.dataDoEvento).getTime() : 0;
       const db = b.dataDoEvento ? new Date(b.dataDoEvento).getTime() : 0;
