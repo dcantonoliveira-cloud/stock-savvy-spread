@@ -144,15 +144,20 @@ export default function DegustacaoPage() {
                       )}
                       {(() => {
                         const evList = d.eventos ?? d.Eventos;
-                        const total = d.QtdEventos ?? evList?.length;
-                        if (total == null) return null;
+                        const total = (d.EventosFechado ?? 0) + (d.PrimeiraDeg ?? 0) || evList?.length;
+                        if (!total) return null;
                         return (
                           <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
                             <ClipboardList className="w-3.5 h-3.5 text-gold-400" />
                             {total} evento{total !== 1 ? 's' : ''}
-                            {d.QtdNovos != null && d.QtdVelhos != null && (
-                              <span className="text-gray-300 ml-1">
-                                · {d.QtdNovos} nov. · {d.QtdVelhos} ant.
+                            {(d.PrimeiraDeg != null || d.EventosFechado != null) && (
+                              <span className="ml-1">
+                                {d.PrimeiraDeg != null && (
+                                  <span className="text-violet-400"> · {d.PrimeiraDeg} nov.</span>
+                                )}
+                                {d.EventosFechado != null && (
+                                  <span className="text-emerald-500"> · {d.EventosFechado} fech.</span>
+                                )}
                               </span>
                             )}
                           </span>

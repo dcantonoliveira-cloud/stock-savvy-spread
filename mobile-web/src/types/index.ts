@@ -120,15 +120,14 @@ export interface BubbleDegustacao {
   _id: string;
   data?: string;
   convidados?: number;
-  QtdEventos?: number;     // total events linked
-  QtdNovos?: number;       // new couples (not yet signed)
-  QtdVelhos?: number;      // existing clients
+  EventosFechado?: number; // clientes com contrato fechado nesta deg
+  PrimeiraDeg?: number;    // clientes novos (1ª degustação)
   'Observações'?: string;
   'Cardápio'?: string;
   tipo_degust?: string;
-  eventos?: string[];   // Bubble field: "Degustação's eventos" (lowercase)
-  Eventos?: string[];   // alternate capitalisation fallback
-  evento?: string;      // legacy single-event link
+  eventos?: string[];      // lista de IDs dos eventos vinculados
+  Eventos?: string[];      // fallback capitalização alternativa
+  evento?: string;         // campo legado single-event
 }
 
 export interface BubbleConvidadoDeg {
