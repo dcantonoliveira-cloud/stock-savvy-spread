@@ -42,10 +42,13 @@ export default function OrcamentosPage() {
   useEffect(() => {
     fetchAllEventos()
       .then(async (all) => {
-        // Keep only non-closed prospects
+        // Keep only non-closed prospects with a name
         const prospects = all.filter((e) => {
           const s = (e.status ?? '').toLowerCase();
-          return ['1º contato', 'negociando', 'não fechou', 'cancelado'].includes(s);
+          return (
+            e.NomeDoEvento?.trim() &&
+            ['1º contato', 'negociando', 'não fechou', 'cancelado'].includes(s)
+          );
         });
         setEventos(prospects);
         const map = await fetchLocaisMap(prospects);
