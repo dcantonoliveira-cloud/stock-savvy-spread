@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Calendar, MapPin, FileText } from 'lucide-react';
-import { fetchAllEventos, fetchLocaisMap } from '../api/bubble';
+import { ArrowRight, Calendar, MapPin, FileText, UtensilsCrossed } from 'lucide-react';
+import { fetchAllEventos, fetchAllDegustacoes, fetchLocaisMap } from '../api/bubble';
 import { BubbleEvento } from '../types';
 import { fmtDate } from '../lib/format';
 
@@ -32,18 +32,20 @@ function Skeleton() {
 }
 
 export default function OrcamentosPage() {
-  const [eventos, setEventos]     = useState<BubbleEvento[]>([]);
-  const [locaisMap, setLocaisMap] = useState<Record<string, string>>({});
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(false);
-  const [filter, setFilter]       = useState('abertos');
-  const [search, setSearch]       = useState('');
+  const [eventos, setEventos]           = useState<BubbleEvento[]>([]);
+  const [locaisMap, setLocaisMap]       = useState<Record<string, string>>({});
+  // map: eventId → tasting date string
+  const [degMap, setDegMap]             = useState<Record<string, string>>({});
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState(false);
+  const [filter, setFilter]             = useState('abertos');
+  const [search, setSearch]             = useState('');
 
   useEffect(() => {
-    fetchAllEventos()
-      .then(async (all) => {
+    Promise.all([fetchAllEventos(), fetchAllDegustacoes()])
+      .then(async ([allEventos, allDegs]) => {
         // Keep only non-closed prospects with a name
-        const prospects = all.filter((e) => {
+        const prospects = allEventos.filter((e) => {
           const s = (e.status ?? '').toLowerCase();
           return (
             e.NomeDoEvento?.trim() &&
@@ -51,8 +53,21 @@ export default function OrcamentosPage() {
           );
         });
         setEventos(prospects);
-        const map = await fetchLocaisMap(prospects);
-        setLocaisMap(map);
+
+        // Build eventId → tasting date map from all degustações
+        const map: Record<string, string> = {};
+        for (const deg of allDegs) {
+          if (!deg.data) continue;
+          const ids = [...(deg.eventos ?? []), ...(deg.Eventos ?? []), ...(deg.evento ? [deg.evento] : [])];
+          for (const eid of ids) {
+            // Keep the earliest future tasting date per event
+            if (!map[eid] || deg.data < map[eid]) map[eid] = deg.data;
+          }
+        }
+        setDegMap(map);
+
+        const locMap = await fetchLocaisMap(prospects);
+        setLocaisMap(locMap);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
@@ -185,6 +200,12 @@ export default function OrcamentosPage() {
                         <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
                           <MapPin className="w-3 h-3 text-gold-400" />
                           <span className="truncate max-w-[140px]">{local}</span>
+                        </span>
+                      )}
+                      {degMap[e._id] && (
+                        <span className="flex items-center gap-1 text-xs text-violet-600 font-medium">
+                          <UtensilsCrossed className="w-3 h-3" />
+                          Deg. {fmtDate(degMap[e._id])}
                         </span>
                       )}
                     </div>
