@@ -7,6 +7,7 @@ import DegustacaoPage from './pages/DegustacaoPage';
 import EstatisticasPage from './pages/EstatisticasPage';
 import EventoDetailPage from './pages/EventoDetailPage';
 import EventosPage from './pages/EventosPage';
+import OrcamentosPage from './pages/OrcamentosPage';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/eventos"            element={<EventosPage />}           />
           <Route path="/eventos/:id"        element={<EventoDetailPage />}      />
           <Route path="/calendario"         element={<CalendarioPage />}        />
+          <Route path="/orcamentos"         element={<OrcamentosPage />}        />
           <Route path="/degustacoes"        element={<DegustacaoPage />}        />
           <Route path="/degustacoes/:id"    element={<DegustacaoDetailPage />}  />
           <Route path="/estatisticas"       element={<EstatisticasPage />}      />
