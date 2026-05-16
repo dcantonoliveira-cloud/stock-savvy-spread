@@ -144,7 +144,7 @@ export default function DegustacaoPage() {
                       )}
                       {(() => {
                         const evList = d.eventos ?? d.Eventos;
-                        const total = (d.EventosFechado ?? 0) + (d.PrimeiraDeg ?? 0) || evList?.length;
+                        const total = evList?.length;
                         if (!total) return null;
                         return (
                           <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
