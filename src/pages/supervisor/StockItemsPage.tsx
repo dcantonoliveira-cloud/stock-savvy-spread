@@ -888,18 +888,51 @@ export default function StockItemsPage() {
     if (!importRows.length) return;
     setImportLoading(true);
 
-    // Delete all existing items whose names appear in the spreadsheet (removes duplicates too)
     const names = importRows.map(r => r.name);
-    const { error: delError } = await supabase.from('stock_items').delete().in('name', names);
-    if (delError) { console.error('Erro ao limpar itens existentes:', delError.message); }
 
-    // Insert all rows fresh
-    const { error } = await supabase.from('stock_items').insert(importRows as any);
-    if (error) {
-      console.error('Erro ao importar:', error.message);
-      toast.error('Erro ao importar planilha.');
+    // Fetch all existing items matching the imported names (may include duplicates)
+    const { data: existing } = await (supabase.from('stock_items') as any)
+      .select('id, name')
+      .in('name', names);
+
+    // Build map: normalized name → first matching id (keep the canonical one)
+    const existingById = new Map<string, string>();
+    for (const e of (existing || [])) {
+      const key = (e.name as string).trim().toLowerCase();
+      if (!existingById.has(key)) existingById.set(key, e.id);
+    }
+
+    const toUpdate: { id: string; data: any }[] = [];
+    const toInsert: any[] = [];
+
+    for (const row of importRows) {
+      const key = row.name.trim().toLowerCase();
+      const existingId = existingById.get(key);
+      if (existingId) {
+        toUpdate.push({ id: existingId, data: row });
+      } else {
+        toInsert.push(row);
+      }
+    }
+
+    let hasError = false;
+
+    // Update existing items in place (preserves FK references)
+    for (const { id, data } of toUpdate) {
+      const { error } = await (supabase.from('stock_items') as any).update(data).eq('id', id);
+      if (error) { console.error('Erro ao atualizar item:', error.message); hasError = true; }
+    }
+
+    // Insert truly new items
+    if (toInsert.length > 0) {
+      const { error } = await (supabase.from('stock_items') as any).insert(toInsert);
+      if (error) { console.error('Erro ao inserir itens:', error.message); hasError = true; }
+    }
+
+    if (hasError) {
+      toast.error('Alguns itens não puderam ser importados. Veja o console.');
     } else {
-      toast.success(`${importRows.length} itens importados com sucesso!`);
+      toast.success(`${toUpdate.length} atualizados · ${toInsert.length} novos importados`);
     }
 
     setImportLoading(false);
