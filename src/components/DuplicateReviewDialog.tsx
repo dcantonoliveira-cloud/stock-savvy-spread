@@ -32,6 +32,73 @@ export default function DuplicateReviewDialog({ open, onClose, items, onDone }: 
   const [expanded, setExpanded] = useState<Set<number>>(new Set([0]));
   const [progress, setProgress] = useState('');
 
+  const mergeExactDuplicates = async () => {
+    setStep('merging');
+    setProgress('Buscando todos os itens...');
+
+    // Fetch all items (no 500 limit)
+    const { data: allItems } = await (supabase.from('stock_items') as any)
+      .select('id, name, current_stock, created_at')
+      .neq('category', '_sistema_')
+      .order('created_at', { ascending: true });
+
+    // Group by normalized name
+    const groups = new Map<string, any[]>();
+    for (const item of (allItems || [])) {
+      const key = (item.name as string).trim().toLowerCase();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(item);
+    }
+
+    let mergedCount = 0;
+    let errorCount = 0;
+    const dupGroups = [...groups.values()].filter(g => g.length > 1);
+
+    setProgress(`Encontrados ${dupGroups.length} grupos de duplicatas exatas...`);
+
+    for (let i = 0; i < dupGroups.length; i++) {
+      const group = dupGroups[i];
+      setProgress(`Unificando grupo ${i + 1} de ${dupGroups.length}...`);
+
+      // Keep the first (oldest) item as canonical; rest are duplicates
+      const [canonical, ...duplicates] = group;
+      const dupIds = duplicates.map((d: any) => d.id);
+
+      try {
+        // Reassign FK references to canonical
+        await (supabase.from('item_suppliers') as any).update({ item_id: canonical.id }).in('item_id', dupIds);
+        await (supabase.from('event_separation_items') as any).update({ item_id: canonical.id }).in('item_id', dupIds);
+        await (supabase.from('stock_entries') as any).update({ item_id: canonical.id }).in('item_id', dupIds);
+        await (supabase.from('stock_outputs') as any).update({ item_id: canonical.id }).in('item_id', dupIds);
+        await (supabase.from('stock_transfers') as any).update({ item_id: canonical.id }).in('item_id', dupIds);
+        await (supabase.from('technical_sheet_items') as any).update({ item_id: canonical.id }).in('item_id', dupIds);
+
+        // Transfer stock
+        const dupStock = duplicates.reduce((sum: number, d: any) => sum + (d.current_stock || 0), 0);
+        if (dupStock > 0) {
+          await (supabase.from('stock_items') as any)
+            .update({ current_stock: canonical.current_stock + dupStock })
+            .eq('id', canonical.id);
+        }
+
+        // Delete duplicates
+        const { error } = await (supabase.from('stock_items') as any).delete().in('id', dupIds);
+        if (error) throw new Error(error.message);
+        mergedCount += dupIds.length;
+      } catch (err) {
+        console.error('Erro ao unificar grupo:', (group[0] as any).name, err);
+        errorCount++;
+      }
+    }
+
+    if (mergedCount > 0) toast.success(`${mergedCount} duplicatas exatas removidas!`);
+    else if (errorCount === 0) toast.success('Nenhuma duplicata exata encontrada.');
+    if (errorCount > 0) toast.error(`${errorCount} grupos com erro — veja o console`);
+
+    setStep('done');
+    onDone();
+  };
+
   const analyze = async () => {
     setStep('analyzing');
     setProgress('Enviando itens para análise...');
@@ -214,21 +281,40 @@ Responda SOMENTE com este JSON (sem markdown):
 
         <div className="flex-1 overflow-y-auto">
           {step === 'idle' && (
-            <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <Sparkles className="w-8 h-8 text-primary" />
+            <div className="py-8 text-center space-y-6">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-border p-4 text-left space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="text-foreground font-medium text-sm">Remover Exatas</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Remove itens com o mesmo nome exato (maiúsculas/minúsculas). Rápido, sem IA, sem limite de itens.
+                    </p>
+                  </div>
+                  <Button variant="destructive" size="sm" onClick={mergeExactDuplicates} className="w-full">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remover Exatas
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-border p-4 text-left space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-foreground font-medium text-sm">Analisar com IA</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      A IA detecta nomes similares e variações. Analisa até 500 itens e pede confirmação antes de alterar.
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={analyze} className="w-full">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Analisar com IA
+                  </Button>
+                </div>
               </div>
-              <div>
-                <p className="text-foreground font-medium">Pronto para analisar</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  A IA vai comparar os itens e sugerir grupos de duplicatas.<br />
-                  Você poderá revisar e confirmar antes de qualquer alteração.
-                </p>
-              </div>
-              <Button onClick={analyze} className="mt-2">
-                <Sparkles className="w-4 h-4 mr-2" />
-                Analisar Duplicatas
-              </Button>
             </div>
           )}
 
