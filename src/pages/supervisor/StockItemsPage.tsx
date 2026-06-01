@@ -299,6 +299,64 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
     onDone();
   };
 
+  const mergeExactDuplicates = async () => {
+    setStep('merging');
+    setProgress({ done: 0, total: 0 });
+
+    const { data: allItems } = await (supabase.from('stock_items') as any)
+      .select('id, name, current_stock, created_at')
+      .neq('category', '_sistema_')
+      .order('created_at', { ascending: true });
+
+    const nameMap = new Map<string, any[]>();
+    for (const item of (allItems || [])) {
+      const key = (item.name as string).trim().toLowerCase();
+      if (!nameMap.has(key)) nameMap.set(key, []);
+      nameMap.get(key)!.push(item);
+    }
+
+    const dupGroups = [...nameMap.values()].filter(g => g.length > 1);
+    if (dupGroups.length === 0) {
+      toast.success('Nenhuma duplicata exata encontrada!');
+      setStep('done');
+      onDone();
+      return;
+    }
+
+    setProgress({ done: 0, total: dupGroups.length });
+    let count = 0;
+
+    for (const group of dupGroups) {
+      const [canonical, ...duplicates] = group;
+      const dupIds = duplicates.map((d: any) => d.id);
+      try {
+        await Promise.all([
+          (supabase.from('stock_entries') as any).update({ item_id: canonical.id }).in('item_id', dupIds),
+          (supabase.from('stock_outputs') as any).update({ item_id: canonical.id }).in('item_id', dupIds),
+          (supabase.from('event_separation_items') as any).update({ item_id: canonical.id }).in('item_id', dupIds),
+          (supabase.from('technical_sheet_items') as any).update({ item_id: canonical.id }).in('item_id', dupIds),
+        ]);
+        const dupStock = duplicates.reduce((s: number, d: any) => s + (d.current_stock || 0), 0);
+        if (dupStock > 0) {
+          await (supabase.from('stock_items') as any)
+            .update({ current_stock: canonical.current_stock + dupStock })
+            .eq('id', canonical.id);
+        }
+        await Promise.all([
+          (supabase.from('item_suppliers') as any).delete().in('item_id', dupIds),
+          (supabase.from('stock_item_locations') as any).delete().in('item_id', dupIds),
+        ]);
+        await (supabase.from('stock_items') as any).delete().in('id', dupIds);
+        count += dupIds.length;
+      } catch (err) { console.error('Erro ao unificar exatas:', err); }
+      setProgress(p => ({ ...p, done: p.done + 1 }));
+    }
+
+    toast.success(`${count} duplicatas exatas removidas em ${dupGroups.length} grupos!`);
+    setStep('done');
+    onDone();
+  };
+
   const reset = () => { setStep('idle'); setGroups([]); setSelected(new Set()); setDupPage(0); onClose(); };
 
   const pageGroups = groups.slice(dupPage * DUP_PAGE_SIZE, (dupPage + 1) * DUP_PAGE_SIZE);
@@ -313,10 +371,37 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
         </DialogHeader>
         <div className="flex-1 overflow-y-auto">
           {step === 'idle' && (
-            <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto"><Sparkles className="w-8 h-8 text-primary" /></div>
-              <p className="text-sm text-muted-foreground">Analisa {items.length} itens localmente, sem custo e sem API externa.</p>
-              <Button onClick={analyze}><Sparkles className="w-4 h-4 mr-2" />Analisar Duplicatas</Button>
+            <div className="py-8 space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-border p-4 text-left space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="text-foreground font-medium text-sm">Remover Exatas</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Remove itens com o mesmo nome exato. Ideal para corrigir imports duplicados. Rápido e sem limite de itens.
+                    </p>
+                  </div>
+                  <Button variant="destructive" size="sm" onClick={mergeExactDuplicates} className="w-full">
+                    <Trash2 className="w-4 h-4 mr-2" />Remover Exatas
+                  </Button>
+                </div>
+                <div className="rounded-xl border border-border p-4 text-left space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-foreground font-medium text-sm">Analisar Similaridades</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Detecta nomes parecidos (ex: "ABOBRINHA" e "ABOBRINHA 2"). Analisa {items.length} itens localmente.
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={analyze} className="w-full">
+                    <Sparkles className="w-4 h-4 mr-2" />Analisar Similaridades
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
           {step === 'analyzing' && <div className="py-8 text-center"><Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" /><p className="text-sm text-muted-foreground">Analisando {items.length} itens...</p></div>}
