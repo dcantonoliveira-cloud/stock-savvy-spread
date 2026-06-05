@@ -687,11 +687,11 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                 </div>
               </div>
 
-              {/* Top 20 */}
+              {/* Todos os itens com estoque */}
               <div>
-                <p className="text-sm font-medium text-foreground mb-2">Top 20 Itens por Valor</p>
-                <div className="space-y-1 max-h-52 overflow-y-auto">
-                  {data.topItems.map((item, i) => (
+                <p className="text-sm font-medium text-foreground mb-2">Itens com Estoque ({data.allWithStock.length})</p>
+                <div className="space-y-1 max-h-72 overflow-y-auto">
+                  {data.allWithStock.map((item, i) => (
                     <div key={item.name + i} className="flex justify-between items-center text-xs py-1 border-b border-border/40 last:border-0">
                       <div className="flex-1 min-w-0">
                         <span className="text-muted-foreground mr-2">{i + 1}.</span>
