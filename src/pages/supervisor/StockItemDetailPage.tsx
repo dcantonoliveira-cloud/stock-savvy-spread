@@ -197,7 +197,7 @@ export default function StockItemDetailPage() {
     </div>
   );
 
-  const isLow = item.current_stock < item.min_stock;
+  const isLow = item.current_stock > 0 && item.current_stock < item.min_stock && item.min_stock > 0;
   const totalEntries = entries.reduce((s, e) => s + e.quantity, 0);
   const totalOutputs = outputs.reduce((s, o) => s + o.quantity, 0);
   const avgCost = entries.length > 0

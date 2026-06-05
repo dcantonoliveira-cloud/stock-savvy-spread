@@ -70,7 +70,7 @@ export default function CategoryDetailPage() {
 
   const totalValue = items.reduce((s, i) => s + i.current_stock * i.unit_cost, 0);
   const totalStock = items.length;
-  const lowItems = items.filter(i => i.current_stock < i.min_stock).length;
+  const lowItems = items.filter(i => i.current_stock > 0 && i.current_stock < i.min_stock && i.min_stock > 0).length;
   const totalEntries = movements.filter(m => m.type === 'entrada').reduce((s, m) => s + m.qty, 0);
   const totalOutputs = movements.filter(m => m.type === 'saida').reduce((s, m) => s + m.qty, 0);
 
@@ -140,7 +140,7 @@ export default function CategoryDetailPage() {
             </thead>
             <tbody className="divide-y divide-border/50">
               {items.map(item => {
-                const isLow = item.current_stock < item.min_stock;
+                const isLow = item.current_stock > 0 && item.current_stock < item.min_stock && item.min_stock > 0;
                 return (
                   <tr key={item.id}
                     className="hover:bg-amber-50 transition-colors cursor-pointer"

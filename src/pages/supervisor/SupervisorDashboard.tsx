@@ -48,7 +48,7 @@ export default function SupervisorDashboard() {
   }, []);
 
   const totalValue = items.reduce((sum, i) => sum + i.current_stock * i.unit_cost, 0);
-  const lowStock = items.filter(i => i.current_stock <= i.min_stock);
+  const lowStock = items.filter(i => i.current_stock > 0 && i.current_stock <= i.min_stock && i.min_stock > 0);
   const today = new Date().toISOString().split('T')[0];
   const todayOutputs = outputs.filter(o => o.date === today);
   const todayEntries = entries.filter(e => e.date === today);
