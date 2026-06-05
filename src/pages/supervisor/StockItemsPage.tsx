@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Plus, Pencil, Trash2, Search, Upload, FileSpreadsheet,
   Sparkles, Loader2, ChevronUp, ChevronDown, AlertTriangle, CheckCircle2,
-  Merge, Store, X, Star, StarOff, Printer
+  Merge, Store, X, Star, StarOff, Printer, BarChart2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MaterialLabelPrint, type LabelItem } from '@/components/MaterialLabelPrint';
@@ -492,6 +492,232 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
   );
 }
 
+// ─── Stock Report Dialog ───
+function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<{
+    totalValue: number;
+    totalItems: number;
+    itemsWithStock: number;
+    byCategory: { category: string; value: number; count: number }[];
+    topItems: { name: string; category: string; unit: string; current_stock: number; unit_cost: number; value: number }[];
+    suspectDuplicates: { name: string; count: number; totalValue: number; ids: string[] }[];
+  } | null>(null);
+
+  const analyze = async () => {
+    setLoading(true);
+    const { data: items } = await (supabase.from('stock_items') as any)
+      .select('id, name, category, unit, current_stock, unit_cost')
+      .neq('category', '_sistema_')
+      .range(0, 9999);
+
+    const all = (items || []) as any[];
+
+    // Total
+    const totalValue = all.reduce((s: number, i: any) => s + (i.current_stock || 0) * (i.unit_cost || 0), 0);
+    const itemsWithStock = all.filter((i: any) => (i.current_stock || 0) > 0).length;
+
+    // By category
+    const catMap = new Map<string, { value: number; count: number }>();
+    for (const i of all) {
+      const v = (i.current_stock || 0) * (i.unit_cost || 0);
+      if (v <= 0) continue;
+      const cat = i.category || 'Outros';
+      const cur = catMap.get(cat) || { value: 0, count: 0 };
+      catMap.set(cat, { value: cur.value + v, count: cur.count + 1 });
+    }
+    const byCategory = [...catMap.entries()]
+      .map(([category, d]) => ({ category, ...d }))
+      .sort((a, b) => b.value - a.value);
+
+    // Top 20 items by value
+    const topItems = all
+      .map((i: any) => ({ ...i, value: (i.current_stock || 0) * (i.unit_cost || 0) }))
+      .filter((i: any) => i.value > 0)
+      .sort((a: any, b: any) => b.value - a.value)
+      .slice(0, 20);
+
+    // Suspect duplicates: same name, both with stock > 0
+    const nameMap = new Map<string, any[]>();
+    for (const i of all) {
+      const key = (i.name as string).trim().toLowerCase();
+      if (!nameMap.has(key)) nameMap.set(key, []);
+      nameMap.get(key)!.push(i);
+    }
+    const suspectDuplicates = [...nameMap.entries()]
+      .filter(([, group]) => group.length > 1 && group.some((i: any) => (i.current_stock || 0) > 0))
+      .map(([, group]) => ({
+        name: group[0].name,
+        count: group.length,
+        totalValue: group.reduce((s: number, i: any) => s + (i.current_stock || 0) * (i.unit_cost || 0), 0),
+        ids: group.map((i: any) => i.id),
+      }))
+      .sort((a, b) => b.totalValue - a.totalValue);
+
+    setData({ totalValue, totalItems: all.length, itemsWithStock, byCategory, topItems, suspectDuplicates });
+    setLoading(false);
+  };
+
+  const exportReport = () => {
+    if (!data) return;
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Resumo por categoria
+    const catRows = data.byCategory.map(c => ({
+      'Categoria': c.category,
+      'Itens com Estoque': c.count,
+      'Valor Total (R$)': parseFloat(c.value.toFixed(2)),
+    }));
+    catRows.push({ 'Categoria': 'TOTAL GERAL', 'Itens com Estoque': data.itemsWithStock, 'Valor Total (R$)': parseFloat(data.totalValue.toFixed(2)) });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(catRows), 'Por Categoria');
+
+    // Sheet 2: Top itens
+    const topRows = data.topItems.map(i => ({
+      'Item': i.name, 'Categoria': i.category, 'Unidade': i.unit,
+      'Estoque': i.current_stock, 'Custo Unit. (R$)': i.unit_cost,
+      'Valor Total (R$)': parseFloat(i.value.toFixed(2)),
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topRows), 'Top 20 Itens');
+
+    // Sheet 3: Suspeitos de duplicidade
+    if (data.suspectDuplicates.length > 0) {
+      const dupRows = data.suspectDuplicates.map(d => ({
+        'Nome': d.name, 'Qtd. Registros': d.count,
+        'Valor Inflado (R$)': parseFloat(d.totalValue.toFixed(2)),
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dupRows), 'Suspeitos Duplicados');
+    }
+
+    XLSX.writeFile(wb, `relatorio_estoque_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Relatório exportado!');
+  };
+
+  const reset = () => { setData(null); onClose(); };
+
+  return (
+    <Dialog open={open} onOpenChange={o => { if (!o) reset(); }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BarChart2 className="w-5 h-5 text-primary" />
+            Relatório de Estoque
+          </DialogTitle>
+          <DialogDescription>Análise completa do valor em estoque por categoria, com detecção de duplicatas que inflam o total.</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto space-y-4">
+          {!data && !loading && (
+            <div className="py-10 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <BarChart2 className="w-8 h-8 text-primary" />
+              </div>
+              <p className="text-sm text-muted-foreground">Gera um relatório completo com valor por categoria,<br />top itens e suspeitos de duplicidade.</p>
+              <Button onClick={analyze}>Gerar Relatório</Button>
+            </div>
+          )}
+
+          {loading && (
+            <div className="py-10 text-center">
+              <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Calculando...</p>
+            </div>
+          )}
+
+          {data && (
+            <>
+              {/* KPIs */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Valor Total em Estoque', value: `R$ ${fmtNum(data.totalValue)}`, highlight: true },
+                  { label: 'Itens Cadastrados', value: data.totalItems.toString() },
+                  { label: 'Itens com Estoque', value: data.itemsWithStock.toString() },
+                ].map(k => (
+                  <div key={k.label} className={`rounded-xl border p-3 ${k.highlight ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'}`}>
+                    <p className="text-xs text-muted-foreground">{k.label}</p>
+                    <p className={`text-lg font-bold mt-1 ${k.highlight ? 'text-primary' : 'text-foreground'}`}>{k.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Duplicatas suspeitas */}
+              {data.suspectDuplicates.length > 0 && (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-destructive" />
+                    <p className="text-sm font-medium text-destructive">
+                      {data.suspectDuplicates.length} itens duplicados detectados — valor inflado estimado:{' '}
+                      <span className="font-bold">R$ {fmtNum(data.suspectDuplicates.reduce((s, d) => s + d.totalValue, 0))}</span>
+                    </p>
+                  </div>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {data.suspectDuplicates.slice(0, 10).map(d => (
+                      <div key={d.name} className="flex justify-between text-xs text-muted-foreground px-1">
+                        <span>{d.name} <span className="text-destructive">×{d.count}</span></span>
+                        <span className="font-medium">R$ {fmtNum(d.totalValue)}</span>
+                      </div>
+                    ))}
+                    {data.suspectDuplicates.length > 10 && (
+                      <p className="text-xs text-muted-foreground px-1">+ {data.suspectDuplicates.length - 10} outros...</p>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Use o botão <strong>Duplicatas → Remover Exatas</strong> para corrigir.</p>
+                </div>
+              )}
+
+              {/* Por categoria */}
+              <div>
+                <p className="text-sm font-medium text-foreground mb-2">Valor por Categoria</p>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {data.byCategory.map(c => (
+                    <div key={c.category} className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <div className="flex justify-between text-xs mb-0.5">
+                          <span className="text-foreground">{c.category}</span>
+                          <span className="text-muted-foreground font-medium">R$ {fmtNum(c.value)}</span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-1.5">
+                          <div className="bg-primary h-1.5 rounded-full" style={{ width: `${Math.min(100, (c.value / data.totalValue) * 100)}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top 20 */}
+              <div>
+                <p className="text-sm font-medium text-foreground mb-2">Top 20 Itens por Valor</p>
+                <div className="space-y-1 max-h-52 overflow-y-auto">
+                  {data.topItems.map((item, i) => (
+                    <div key={item.name + i} className="flex justify-between items-center text-xs py-1 border-b border-border/40 last:border-0">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-muted-foreground mr-2">{i + 1}.</span>
+                        <span className="text-foreground font-medium">{item.name}</span>
+                        <span className="text-muted-foreground ml-2">({item.category})</span>
+                      </div>
+                      <div className="text-right shrink-0 ml-2">
+                        <span className="font-medium text-foreground">R$ {fmtNum(item.value)}</span>
+                        <span className="text-muted-foreground ml-1">({fmtNum(item.current_stock)} {item.unit} × R$ {fmtNum(item.unit_cost)})</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {data && (
+          <div className="border-t border-border pt-4 flex justify-between gap-2">
+            <Button variant="outline" onClick={reset}>Fechar</Button>
+            <Button onClick={exportReport}><FileSpreadsheet className="w-4 h-4 mr-2" />Exportar Excel</Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Item Form ───
 function ItemForm({ item, allCategories, allSubcategories, onSave, onCancel }: {
   item?: Item; allCategories: string[]; allSubcategories: Subcategory[];
@@ -648,6 +874,7 @@ export default function StockItemsPage() {
   const [labelItem, setLabelItem] = useState<LabelItem | null>(null);
   const [totalStockValue, setTotalStockValue] = useState(0);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [allItemsForDialogs, setAllItemsForDialogs] = useState<Item[]>([]);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importRows, setImportRows] = useState<any[]>([]);
@@ -1109,6 +1336,7 @@ export default function StockItemsPage() {
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={exportStock}><FileSpreadsheet className="w-4 h-4 mr-1" />Exportar</Button>
           <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(true)}><Upload className="w-4 h-4 mr-1" />Importar</Button>
+          <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}><BarChart2 className="w-4 h-4 mr-1" />Relatório</Button>
           <Button variant="outline" size="sm" onClick={() => setDuplicateOpen(true)}><Sparkles className="w-4 h-4 mr-1" />Duplicatas</Button>
           <Button size="sm" onClick={() => { setEditingItem(undefined); setDialogOpen(true); }}>
             <Plus className="w-4 h-4 mr-1" />Novo Item
@@ -1365,6 +1593,7 @@ export default function StockItemsPage() {
 
       <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} />
       <DuplicateReviewDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} items={allItemsForDialogs} onDone={() => { setDuplicateOpen(false); load(); }} />
+      <StockReportDialog open={reportOpen} onClose={() => setReportOpen(false)} />
       <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
 
       {/* Delete conflict dialog */}
