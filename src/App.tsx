@@ -20,6 +20,7 @@ const SupervisorDashboard      = lazy(() => import("./pages/supervisor/Superviso
 const StockItemsPage           = lazy(() => import("./pages/supervisor/StockItemsPage"));
 const EntriesPage              = lazy(() => import("./pages/supervisor/EntriesPage"));
 const SupervisorOutputsPage    = lazy(() => import("./pages/supervisor/OutputsPage"));
+const BatchMovementPage        = lazy(() => import("./pages/supervisor/BatchMovementPage"));
 const SupervisorSheetsPage     = lazy(() => import("./pages/supervisor/SheetsPage"));
 const SheetDetailPage          = lazy(() => import("./pages/supervisor/SheetDetailPage"));
 const SupervisorComparisonPage = lazy(() => import("./pages/supervisor/ComparisonPage"));
@@ -116,6 +117,7 @@ function AppRoutes() {
             <Route path="/items/:id" element={<StockItemDetailPage />} />
             <Route path="/entries" element={<EntriesPage />} />
             <Route path="/outputs" element={<SupervisorOutputsPage />} />
+            <Route path="/batch-movement" element={<BatchMovementPage />} />
             <Route path="/sheets" element={<SupervisorSheetsPage />} />
             <Route path="/sheets/:id" element={<SheetDetailPage />} />
             <Route path="/event-menus" element={<EventMenusPage />} />
