@@ -1205,62 +1205,85 @@ export default function StockItemsPage() {
     setImportLoading(true);
     setImportProgress({ done: 0, total: importRows.length, phase: 'Verificando itens existentes...' });
 
-    // Fetch ALL existing items (avoids Supabase URL limit with large IN queries)
+    // Fetch ALL existing items
     const { data: existing } = await (supabase.from('stock_items') as any)
       .select('id, name')
       .neq('category', '_sistema_')
       .order('created_at', { ascending: true })
       .range(0, 9999);
 
-    // Build map: normalized name → first matching id (keep the canonical one)
-    const existingById = new Map<string, string>();
+    // Build map: normalized name → first matching id
+    const existingByName = new Map<string, string>(); // name_lower → id
+    const allExistingIds = new Set<string>();
     for (const e of (existing || [])) {
       const key = (e.name as string).trim().toLowerCase();
-      if (!existingById.has(key)) existingById.set(key, e.id);
+      if (!existingByName.has(key)) existingByName.set(key, e.id);
+      allExistingIds.add(e.id);
     }
 
+    // Classify import rows
     const toUpdate: { id: string; data: any }[] = [];
     const toInsert: any[] = [];
+    const updatedIds = new Set<string>();
 
     for (const row of importRows) {
       const key = row.name.trim().toLowerCase();
-      const existingId = existingById.get(key);
+      const existingId = existingByName.get(key);
       if (existingId) {
         toUpdate.push({ id: existingId, data: row });
+        updatedIds.add(existingId);
       } else {
         toInsert.push(row);
       }
     }
 
+    // Items in system but NOT in spreadsheet → zero stock
+    const toZero = [...allExistingIds].filter(id => !updatedIds.has(id));
+
+    const totalSteps = toUpdate.length + toInsert.length + (toZero.length > 0 ? 1 : 0);
     let hasError = false;
     let done = 0;
     const BATCH = 50;
 
-    // Update existing items in batches of 50 (parallel within batch)
-    setImportProgress({ done: 0, total: importRows.length, phase: `Atualizando ${toUpdate.length} itens existentes...` });
+    // 1. Update items that exist in both
+    setImportProgress({ done: 0, total: totalSteps, phase: `Atualizando ${toUpdate.length} itens da planilha...` });
     for (let i = 0; i < toUpdate.length; i += BATCH) {
       const batch = toUpdate.slice(i, i + BATCH);
       await Promise.all(batch.map(async ({ id, data }) => {
         const { error } = await (supabase.from('stock_items') as any).update(data).eq('id', id);
-        if (error) { console.error('Erro ao atualizar item:', error.message); hasError = true; }
+        if (error) { console.error('Erro ao atualizar:', error.message); hasError = true; }
       }));
       done += batch.length;
-      setImportProgress({ done, total: importRows.length, phase: `Atualizando ${toUpdate.length} itens existentes...` });
+      setImportProgress({ done, total: totalSteps, phase: `Atualizando ${toUpdate.length} itens da planilha...` });
     }
 
-    // Insert truly new items in one shot
+    // 2. Insert new items from spreadsheet
     if (toInsert.length > 0) {
-      setImportProgress({ done, total: importRows.length, phase: `Inserindo ${toInsert.length} itens novos...` });
+      setImportProgress({ done, total: totalSteps, phase: `Criando ${toInsert.length} itens novos...` });
       const { error } = await (supabase.from('stock_items') as any).insert(toInsert);
-      if (error) { console.error('Erro ao inserir itens:', error.message); hasError = true; }
+      if (error) { console.error('Erro ao inserir:', error.message); hasError = true; }
       done += toInsert.length;
-      setImportProgress({ done, total: importRows.length, phase: `Inserindo ${toInsert.length} itens novos...` });
+      setImportProgress({ done, total: totalSteps, phase: `Criando ${toInsert.length} itens novos...` });
+    }
+
+    // 3. Zero out items that are in the system but not in the spreadsheet
+    if (toZero.length > 0) {
+      setImportProgress({ done, total: totalSteps, phase: `Zerando ${toZero.length} itens ausentes da planilha...` });
+      for (let i = 0; i < toZero.length; i += 200) {
+        const batch = toZero.slice(i, i + 200);
+        const { error } = await (supabase.from('stock_items') as any)
+          .update({ current_stock: 0 })
+          .in('id', batch);
+        if (error) { console.error('Erro ao zerar:', error.message); hasError = true; }
+      }
+      done += 1;
+      setImportProgress({ done, total: totalSteps, phase: `Zerando ${toZero.length} itens ausentes da planilha...` });
     }
 
     if (hasError) {
-      toast.error('Alguns itens não puderam ser importados. Veja o console.');
+      toast.error('Alguns itens não puderam ser processados. Veja o console.');
     } else {
-      toast.success(`${toUpdate.length} atualizados · ${toInsert.length} novos importados`);
+      toast.success(`${toUpdate.length} atualizados · ${toInsert.length} criados · ${toZero.length} zerados`);
     }
 
     setImportLoading(false);
