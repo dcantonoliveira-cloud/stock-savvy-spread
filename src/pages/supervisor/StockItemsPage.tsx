@@ -574,10 +574,10 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     catRows.push({ 'Categoria': 'TOTAL GERAL', 'Itens com Estoque': data.itemsWithStock, 'Valor Total (R$)': parseFloat(data.totalValue.toFixed(2)) });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(catRows), 'Por Categoria');
 
-    // Sheet 2: Todos os itens com estoque > 0 (ordenado por valor desc)
+    // Sheet 2: Todos os itens com estoque > 0 (mesmas colunas do export padrão para poder reimportar)
     const topRows = data.allWithStock.map(i => ({
-      'Item': i.name, 'Categoria': i.category, 'Unidade': i.unit,
-      'Estoque': i.current_stock, 'Custo Unit. (R$)': i.unit_cost,
+      'Nome': i.name, 'Categoria': i.category, 'Unidade': i.unit,
+      'Estoque Atual': i.current_stock, 'Estoque Mínimo': 0, 'Custo Unitário': i.unit_cost,
       'Valor Total (R$)': parseFloat(i.value.toFixed(2)),
     }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topRows), 'Itens com Estoque');
@@ -1183,11 +1183,15 @@ export default function StockItemsPage() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const wb = XLSX.read(ev.target?.result);
-      const ws = wb.Sheets[wb.SheetNames[0]];
+      // Prefer sheet named "Itens com Estoque" or "Estoque"; fallback to first sheet
+      const preferredSheet = wb.SheetNames.find(n =>
+        n.toLowerCase().includes('itens') || n.toLowerCase().includes('estoque')
+      ) || wb.SheetNames[0];
+      const ws = wb.Sheets[preferredSheet];
       const rows: any[] = XLSX.utils.sheet_to_json(ws);
       const parsed = rows
         .map(row => ({
-          name: (row['Nome'] || row['NOME'] || row['name'])?.toString().trim() || '',
+          name: (row['Nome'] || row['NOME'] || row['name'] || row['Item'] || row['ITEM'])?.toString().trim() || '',
           category: row['Categoria'] || row['CATEGORIA'] || row['category'] || 'Outros',
           unit: row['Unidade'] || row['UNIDADE'] || row['unit'] || 'un',
           current_stock: parseFloat(row['Estoque Atual'] ?? row['current_stock']) || 0,
