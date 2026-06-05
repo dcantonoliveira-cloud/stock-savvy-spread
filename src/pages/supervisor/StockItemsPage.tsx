@@ -652,6 +652,7 @@ export default function StockItemsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importRows, setImportRows] = useState<any[]>([]);
   const [importLoading, setImportLoading] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number; phase: string } | null>(null);
   const [sortField, setSortField] = useState<'name' | 'current_stock' | 'unit_cost'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
@@ -972,6 +973,7 @@ export default function StockItemsPage() {
   const handleImportConfirm = async () => {
     if (!importRows.length) return;
     setImportLoading(true);
+    setImportProgress({ done: 0, total: importRows.length, phase: 'Verificando itens existentes...' });
 
     const names = importRows.map(r => r.name);
 
@@ -1001,17 +1003,28 @@ export default function StockItemsPage() {
     }
 
     let hasError = false;
+    let done = 0;
+    const BATCH = 50;
 
-    // Update existing items in place (preserves FK references)
-    for (const { id, data } of toUpdate) {
-      const { error } = await (supabase.from('stock_items') as any).update(data).eq('id', id);
-      if (error) { console.error('Erro ao atualizar item:', error.message); hasError = true; }
+    // Update existing items in batches of 50 (parallel within batch)
+    setImportProgress({ done: 0, total: importRows.length, phase: `Atualizando ${toUpdate.length} itens existentes...` });
+    for (let i = 0; i < toUpdate.length; i += BATCH) {
+      const batch = toUpdate.slice(i, i + BATCH);
+      await Promise.all(batch.map(async ({ id, data }) => {
+        const { error } = await (supabase.from('stock_items') as any).update(data).eq('id', id);
+        if (error) { console.error('Erro ao atualizar item:', error.message); hasError = true; }
+      }));
+      done += batch.length;
+      setImportProgress({ done, total: importRows.length, phase: `Atualizando ${toUpdate.length} itens existentes...` });
     }
 
-    // Insert truly new items
+    // Insert truly new items in one shot
     if (toInsert.length > 0) {
+      setImportProgress({ done, total: importRows.length, phase: `Inserindo ${toInsert.length} itens novos...` });
       const { error } = await (supabase.from('stock_items') as any).insert(toInsert);
       if (error) { console.error('Erro ao inserir itens:', error.message); hasError = true; }
+      done += toInsert.length;
+      setImportProgress({ done, total: importRows.length, phase: `Inserindo ${toInsert.length} itens novos...` });
     }
 
     if (hasError) {
@@ -1021,6 +1034,7 @@ export default function StockItemsPage() {
     }
 
     setImportLoading(false);
+    setImportProgress(null);
     setImportDialogOpen(false);
     setImportRows([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1324,9 +1338,26 @@ export default function StockItemsPage() {
           {importRows.length > 0 && (
             <div className="space-y-3">
               <p className="text-sm text-green-600 font-medium">{importRows.length} itens encontrados na planilha</p>
-              <Button className="w-full" onClick={handleImportConfirm} disabled={importLoading}>
-                {importLoading ? 'Importando...' : `Importar ${importRows.length} itens`}
-              </Button>
+              {importProgress ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{importProgress.phase}</span>
+                    <span className="font-medium tabular-nums">
+                      {importProgress.done} / {importProgress.total} ({Math.round((importProgress.done / importProgress.total) * 100)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="bg-primary h-2.5 rounded-full transition-all duration-200"
+                      style={{ width: `${Math.round((importProgress.done / importProgress.total) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Button className="w-full" onClick={handleImportConfirm} disabled={importLoading}>
+                  {importLoading ? 'Importando...' : `Importar ${importRows.length} itens`}
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>
