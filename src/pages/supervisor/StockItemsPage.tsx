@@ -1443,7 +1443,7 @@ export default function StockItemsPage() {
               {items.map((item, idx) => {
                 const itemSupps = suppliers[item.id] || [];
                 const preferred = itemSupps.find(s => s.is_preferred) || itemSupps[0];
-                const isLow = item.current_stock <= item.min_stock && item.min_stock > 0;
+                const isLow = item.current_stock > 0 && item.current_stock <= item.min_stock && item.min_stock > 0;
 
                 return (
                   <tr key={item.id} className={`hover:bg-amber-50/40 transition-colors ${isLow ? 'bg-red-50/50' : ''}`}>

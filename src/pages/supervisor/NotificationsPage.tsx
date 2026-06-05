@@ -27,7 +27,7 @@ export default function NotificationsPage() {
         const alertItems: Alert[] = [];
         data.forEach(item => {
           if (item.current_stock <= 0) alertItems.push({ item, type: 'zero' });
-          else if (item.current_stock <= item.min_stock) alertItems.push({ item, type: 'low' });
+          else if (item.min_stock > 0 && item.current_stock <= item.min_stock) alertItems.push({ item, type: 'low' });
         });
         setAlerts(alertItems);
       }

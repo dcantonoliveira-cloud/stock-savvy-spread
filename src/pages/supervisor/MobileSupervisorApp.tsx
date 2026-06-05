@@ -61,7 +61,7 @@ function ItemCombobox({ items, value, onChange }: { items: StockItem[]; value: s
                     <span className="truncate">{item.name}</span>
                     <span className="ml-2 text-xs text-muted-foreground">{item.unit}</span>
                   </div>
-                  <span className={`text-xs font-medium ml-2 ${item.current_stock <= item.min_stock && item.min_stock > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <span className={`text-xs font-medium ml-2 ${item.current_stock > 0 && item.current_stock <= item.min_stock && item.min_stock > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                     {fmtNum(item.current_stock)}
                   </span>
                 </CommandItem>
@@ -179,7 +179,7 @@ function StockTab({ items, kitchens, onDone }: { items: StockItem[]; kitchens: K
     const matchCat = filterCat === 'all' || i.category === filterCat;
     return matchSearch && matchCat;
   });
-  const lowCount = items.filter(i => i.current_stock <= i.min_stock && i.min_stock > 0).length;
+  const lowCount = items.filter(i => i.current_stock > 0 && i.current_stock <= i.min_stock && i.min_stock > 0).length;
 
   if (stockView === 'history') {
     return <StockHistory onBack={() => setStockView('items')} />;
@@ -241,7 +241,7 @@ function StockTab({ items, kitchens, onDone }: { items: StockItem[]; kitchens: K
         {[
           { label: 'Itens', value: filtered.length },
           { label: 'Valor', value: fmtCur(filtered.reduce((s, i) => s + i.current_stock * i.unit_cost, 0)) },
-          { label: 'Baixo', value: filtered.filter(i => i.current_stock <= i.min_stock && i.min_stock > 0).length, danger: true },
+          { label: 'Baixo', value: filtered.filter(i => i.current_stock > 0 && i.current_stock <= i.min_stock && i.min_stock > 0).length, danger: true },
         ].map(({ label, value, danger }) => (
           <div key={label} className="bg-white rounded-xl border border-border p-3">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -253,7 +253,7 @@ function StockTab({ items, kitchens, onDone }: { items: StockItem[]; kitchens: K
       {/* Items list */}
       <div className="space-y-1">
         {filtered.map(item => {
-          const isLow = item.current_stock <= item.min_stock && item.min_stock > 0;
+          const isLow = item.current_stock > 0 && item.current_stock <= item.min_stock && item.min_stock > 0;
           return (
             <button
               key={item.id}
@@ -504,7 +504,7 @@ function ItemDetailDialog({ item, onClose }: { item: StockItem | null; onClose: 
   }, [item]);
 
   if (!item) return null;
-  const isLow = item.current_stock <= item.min_stock && item.min_stock > 0;
+  const isLow = item.current_stock > 0 && item.current_stock <= item.min_stock && item.min_stock > 0;
 
   return (
     <Dialog open={true} onOpenChange={() => onClose()}>
@@ -852,7 +852,7 @@ function InventoryCounting({ items, countId, onDone, onCancel }: {
         <div key={cat} className="space-y-1">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 pt-1">{cat}</p>
           {catItems.map(item => {
-            const isLow = item.current_stock <= item.min_stock && item.min_stock > 0;
+            const isLow = item.current_stock > 0 && item.current_stock <= item.min_stock && item.min_stock > 0;
             return (
               <div key={item.id} className="bg-white rounded-xl border border-border p-3 flex items-center gap-3">
                 <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5 ${isLow ? 'bg-destructive' : 'bg-success'}`} />
