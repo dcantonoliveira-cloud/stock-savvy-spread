@@ -501,6 +501,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     itemsWithStock: number;
     byCategory: { category: string; value: number; count: number }[];
     topItems: { name: string; category: string; unit: string; current_stock: number; unit_cost: number; value: number }[];
+    allWithStock: { name: string; category: string; unit: string; current_stock: number; unit_cost: number; value: number }[];
     suspectDuplicates: { name: string; count: number; totalValue: number; ids: string[] }[];
   } | null>(null);
 
@@ -530,12 +531,14 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       .map(([category, d]) => ({ category, ...d }))
       .sort((a, b) => b.value - a.value);
 
-    // Top 20 items by value
-    const topItems = all
+    // All items with stock > 0, sorted by value desc
+    const allWithStock = all
       .map((i: any) => ({ ...i, value: (i.current_stock || 0) * (i.unit_cost || 0) }))
       .filter((i: any) => i.value > 0)
-      .sort((a: any, b: any) => b.value - a.value)
-      .slice(0, 20);
+      .sort((a: any, b: any) => b.value - a.value);
+
+    // Top 20 for display
+    const topItems = allWithStock.slice(0, 20);
 
     // Suspect duplicates: same name, both with stock > 0
     const nameMap = new Map<string, any[]>();
@@ -554,7 +557,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       }))
       .sort((a, b) => b.totalValue - a.totalValue);
 
-    setData({ totalValue, totalItems: all.length, itemsWithStock, byCategory, topItems, suspectDuplicates });
+    setData({ totalValue, totalItems: all.length, itemsWithStock, byCategory, topItems, allWithStock, suspectDuplicates });
     setLoading(false);
   };
 
@@ -571,13 +574,13 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     catRows.push({ 'Categoria': 'TOTAL GERAL', 'Itens com Estoque': data.itemsWithStock, 'Valor Total (R$)': parseFloat(data.totalValue.toFixed(2)) });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(catRows), 'Por Categoria');
 
-    // Sheet 2: Top itens
-    const topRows = data.topItems.map(i => ({
+    // Sheet 2: Todos os itens com estoque > 0 (ordenado por valor desc)
+    const topRows = data.allWithStock.map(i => ({
       'Item': i.name, 'Categoria': i.category, 'Unidade': i.unit,
       'Estoque': i.current_stock, 'Custo Unit. (R$)': i.unit_cost,
       'Valor Total (R$)': parseFloat(i.value.toFixed(2)),
     }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topRows), 'Top 20 Itens');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topRows), 'Itens com Estoque');
 
     // Sheet 3: Suspeitos de duplicidade
     if (data.suspectDuplicates.length > 0) {
