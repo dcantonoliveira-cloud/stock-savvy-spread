@@ -975,12 +975,12 @@ export default function StockItemsPage() {
     setImportLoading(true);
     setImportProgress({ done: 0, total: importRows.length, phase: 'Verificando itens existentes...' });
 
-    const names = importRows.map(r => r.name);
-
-    // Fetch all existing items matching the imported names (may include duplicates)
+    // Fetch ALL existing items (avoids Supabase URL limit with large IN queries)
     const { data: existing } = await (supabase.from('stock_items') as any)
       .select('id, name')
-      .in('name', names);
+      .neq('category', '_sistema_')
+      .order('created_at', { ascending: true })
+      .range(0, 9999);
 
     // Build map: normalized name → first matching id (keep the canonical one)
     const existingById = new Map<string, string>();
