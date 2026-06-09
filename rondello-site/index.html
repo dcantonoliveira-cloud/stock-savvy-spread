@@ -378,80 +378,67 @@
 
 <script src="assets/main.js"></script>
 
-<!--
-  GOOGLE PLACES API — AVALIAÇÕES REAIS
-  Passos para ativar:
-  1. Acesse console.cloud.google.com → crie um projeto → ative "Maps JavaScript API" e "Places API"
-  2. Gere uma chave de API em "Credenciais" → restrinja ao domínio do site
-  3. Descubra o Place ID em https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder
-  4. Substitua YOUR_MAPS_API_KEY e YOUR_PLACE_ID abaixo e remova este comentário
--->
+<!-- Google Places API (nova versão 2025) -->
 <script>
 (function(){
-  var MAPS_KEY   = 'YOUR_MAPS_API_KEY';
-  var PLACE_ID   = 'YOUR_PLACE_ID';
+  var MAPS_KEY = 'AIzaSyBcnc3Pqk7xHw1i-KhATVD8xn-K5TRlHhc';
+  var PLACE_ID = 'ChIJP5r7TQBgz5QRfINNxWhBAoc';
 
-  if(MAPS_KEY === 'YOUR_MAPS_API_KEY' || PLACE_ID === 'YOUR_PLACE_ID'){
-    var el = document.getElementById('gr-loading');
-    if(el) el.style.display = 'none';
-    return;
-  }
+  window._grInit = async function(){
+    try {
+      var Place = (await google.maps.importLibrary('places')).Place;
 
-  window._grInit = function(){
-    var dummy = document.createElement('div');
-    var svc   = new google.maps.places.PlacesService(dummy);
-    svc.getDetails({
-      placeId: PLACE_ID,
-      fields: ['name','rating','user_ratings_total','reviews'],
-      language: 'pt-BR'
-    }, function(place, status){
+      var place = new Place({ id: PLACE_ID, requestedLanguage: 'pt-BR' });
+      await place.fetchFields({
+        fields: ['displayName','rating','userRatingCount','reviews']
+      });
+
       var loading = document.getElementById('gr-loading');
       var wrap    = document.getElementById('gr-cards');
       var summary = document.getElementById('gr-summary');
 
-      if(status !== google.maps.places.PlacesServiceStatus.OK || !place.reviews){
-        if(loading) loading.style.display = 'none';
-        return;
-      }
-
-      /* Atualiza badge de nota */
+      /* Badge de nota */
       if(summary && place.rating){
         summary.textContent = place.rating.toFixed(1).replace('.',',') +
-          ' · ' + place.user_ratings_total.toLocaleString('pt-BR') + ' avaliações';
+          ' · ' + (place.userRatingCount || '').toLocaleString('pt-BR') + ' avaliações';
       }
 
-      /* Renderiza os cards (máximo 5, nota ≥ 4, com texto) */
-      var reviews = place.reviews
-        .filter(function(r){ return r.rating >= 4 && r.text.length > 30; })
+      var reviews = (place.reviews || [])
+        .filter(function(r){ return r.rating >= 4 && r.text && r.text.text && r.text.text.length > 30; })
         .slice(0, 5);
 
       reviews.forEach(function(r, i){
-        var stars = '';
-        for(var s = 0; s < r.rating; s++) stars += '★';
-
-        /* Trunca textos muito longos */
-        var text = r.text.length > 280 ? r.text.slice(0, 280) + '…' : r.text;
+        var stars = '★'.repeat(r.rating);
+        var txt   = r.text.text;
+        if(txt.length > 280) txt = txt.slice(0, 280) + '…';
+        var name  = r.authorAttribution ? r.authorAttribution.displayName : 'Cliente';
+        var photo = r.authorAttribution ? r.authorAttribution.photoURI : '';
+        var when  = r.relativePublishTimeDescription || '';
 
         var card = document.createElement('div');
         card.className = 'gr-card reveal d' + (i % 3 + 1);
         card.innerHTML =
           '<div class="gr-stars">' + stars + '</div>' +
-          '<p class="gr-text">' + text + '</p>' +
+          '<p class="gr-text">' + txt + '</p>' +
           '<div class="gr-author">' +
-            '<img class="gr-av" src="' + r.profile_photo_url + '" alt="' + r.author_name + '" width="40" height="40" loading="lazy">' +
-            '<div><b>' + r.author_name + '</b><span>' + r.relative_time_description + '</span></div>' +
+            (photo ? '<img class="gr-av" src="' + photo + '" alt="' + name + '" width="40" height="40" loading="lazy">' : '') +
+            '<div><b>' + name + '</b><span>' + when + '</span></div>' +
           '</div>';
         wrap.appendChild(card);
       });
 
       if(loading) loading.style.display = 'none';
-      if(wrap){ wrap.style.display = 'grid'; }
-    });
+      if(wrap && reviews.length) wrap.style.display = 'grid';
+
+    } catch(e) {
+      var loading = document.getElementById('gr-loading');
+      if(loading) loading.style.display = 'none';
+    }
   };
 
   var s = document.createElement('script');
   s.src = 'https://maps.googleapis.com/maps/api/js?key=' + MAPS_KEY +
-           '&libraries=places&callback=_grInit&language=pt-BR';
+          '&loading=async&callback=_grInit&language=pt-BR';
   s.async = true; s.defer = true;
   document.head.appendChild(s);
 })();
