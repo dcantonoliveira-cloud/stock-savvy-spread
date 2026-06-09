@@ -16,12 +16,7 @@
 <header class="site-header">
   <div class="container-wide">
     <a href="index.html" class="logo" aria-label="Rondello Buffet — início">
-      <svg class="badge" viewBox="0 0 54 54" aria-hidden="true">
-        <path d="M27,1 Q31.29,5.42 36.95,2.98 Q39.22,8.71 45.38,8.62 Q45.29,14.78 51.02,17.05 Q48.58,22.71 53,27 Q48.58,31.29 51.02,36.95 Q45.29,39.22 45.38,45.38 Q39.22,45.29 36.95,51.02 Q31.29,48.58 27,53 Q22.71,48.58 17.05,51.02 Q14.78,45.29 8.62,45.38 Q8.71,39.22 2.98,36.95 Q5.42,31.29 1,27 Q5.42,22.71 2.98,17.05 Q8.71,14.78 8.62,8.62 Q14.78,8.71 17.05,2.98 Q22.71,5.42 27,1Z" fill="#C2A062"/>
-        <circle cx="27" cy="27" r="21" fill="#05111E"/>
-        <text x="27" y="36" text-anchor="middle" font-family="'Cormorant Garamond',Georgia,serif" font-weight="600" font-size="28" fill="#C2A062">R</text>
-      </svg>
-      <span class="wm"><b>RONDELLO</b><i>buffet</i></span>
+      <img src="assets/img/logo-neg.png" alt="Rondello Buffet" class="logo-img">
     </a>
     <nav class="nav">
       <a class="link active" href="index.html">Início</a>
@@ -256,15 +251,22 @@
       <span class="eyebrow center">Avaliações no Google</span>
       <h2 class="display d-md" style="margin:1rem 0 0">A confiança de quem viveu<br>um dia <span class="it">perfeito</span>.</h2>
     </div>
-    <div class="center reveal d1" style="margin-top:clamp(40px,5vw,64px)">
-      <p class="lead mx-auto" style="max-width:52ch;margin-bottom:2.8rem">Mais de 30 anos de celebrações se refletem nas palavras de quem confiou a nós o seu dia mais importante. Leia as avaliações reais dos nossos clientes no Google.</p>
+
+    <!-- Cards dinâmicos — preenchidos pelo Google Places API -->
+    <div id="gr-wrap" style="margin-top:clamp(40px,5vw,64px)">
+      <div id="gr-loading" class="center" style="color:var(--muted);font-size:.9rem;padding:2rem 0">Carregando avaliações…</div>
+      <div id="gr-cards" class="gr-cards" style="display:none"></div>
+    </div>
+
+    <!-- Rodapé da seção: badge Google + botão -->
+    <div class="center" style="margin-top:2.8rem">
       <a class="greviews" href="https://g.page/r/CXyDTcVoQQKHEAE/review" target="_blank" rel="noopener" style="display:inline-flex">
         <span class="g"><span class="b">G</span><span class="r">o</span><span class="y">o</span><span class="b">g</span><span class="g2">l</span><span class="r">e</span></span>
         <span class="stars">★★★★★</span>
-        <span class="meta"><b>5,0 · Centenas de avaliações verificadas</b><span>Ver todas no Google</span></span>
+        <span class="meta"><b id="gr-summary">5,0 · Ver no Google</b><span>Avaliações verificadas</span></span>
       </a>
-      <div style="margin-top:2.4rem">
-        <a class="btn btn-gold" href="https://g.page/r/CXyDTcVoQQKHEAE/review" target="_blank" rel="noopener">Ver avaliações no Google</a>
+      <div style="margin-top:1.6rem">
+        <a class="btn btn-gold" href="https://g.page/r/CXyDTcVoQQKHEAE/review" target="_blank" rel="noopener">Ver todas as avaliações</a>
       </div>
     </div>
   </div>
@@ -327,12 +329,7 @@
     <div class="grid">
       <div>
         <a href="index.html" class="logo" style="margin-bottom:1.6rem">
-          <svg class="badge" viewBox="0 0 54 54" aria-hidden="true">
-            <circle cx="27" cy="27" r="26" fill="#05111E" stroke="#C2A062" stroke-width="1.4"/>
-            <circle cx="27" cy="27" r="21" fill="none" stroke="#C2A062" stroke-opacity="0.45" stroke-width="0.8"/>
-            <text x="27" y="37" text-anchor="middle" font-family="'Cormorant Garamond',Georgia,serif" font-weight="600" font-size="30" fill="#C2A062">R</text>
-          </svg>
-          <span class="wm"><b style="color:var(--cream)">RONDELLO</b><i>buffet</i></span>
+          <img src="assets/img/logo-neg.png" alt="Rondello Buffet" class="logo-img">
         </a>
         <p style="max-width:34ch">Há mais de 30 anos, elevamos a gastronomia de eventos com requinte e dedicação — transformando momentos únicos em celebrações marcantes.</p>
         <div class="social">
@@ -380,5 +377,84 @@
 <div class="lightbox"><button class="x" aria-label="Fechar">✕</button><img alt="Visualização ampliada"></div>
 
 <script src="assets/main.js"></script>
+
+<!--
+  GOOGLE PLACES API — AVALIAÇÕES REAIS
+  Passos para ativar:
+  1. Acesse console.cloud.google.com → crie um projeto → ative "Maps JavaScript API" e "Places API"
+  2. Gere uma chave de API em "Credenciais" → restrinja ao domínio do site
+  3. Descubra o Place ID em https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder
+  4. Substitua YOUR_MAPS_API_KEY e YOUR_PLACE_ID abaixo e remova este comentário
+-->
+<script>
+(function(){
+  var MAPS_KEY   = 'YOUR_MAPS_API_KEY';
+  var PLACE_ID   = 'YOUR_PLACE_ID';
+
+  if(MAPS_KEY === 'YOUR_MAPS_API_KEY' || PLACE_ID === 'YOUR_PLACE_ID'){
+    var el = document.getElementById('gr-loading');
+    if(el) el.style.display = 'none';
+    return;
+  }
+
+  window._grInit = function(){
+    var dummy = document.createElement('div');
+    var svc   = new google.maps.places.PlacesService(dummy);
+    svc.getDetails({
+      placeId: PLACE_ID,
+      fields: ['name','rating','user_ratings_total','reviews'],
+      language: 'pt-BR'
+    }, function(place, status){
+      var loading = document.getElementById('gr-loading');
+      var wrap    = document.getElementById('gr-cards');
+      var summary = document.getElementById('gr-summary');
+
+      if(status !== google.maps.places.PlacesServiceStatus.OK || !place.reviews){
+        if(loading) loading.style.display = 'none';
+        return;
+      }
+
+      /* Atualiza badge de nota */
+      if(summary && place.rating){
+        summary.textContent = place.rating.toFixed(1).replace('.',',') +
+          ' · ' + place.user_ratings_total.toLocaleString('pt-BR') + ' avaliações';
+      }
+
+      /* Renderiza os cards (máximo 5, nota ≥ 4, com texto) */
+      var reviews = place.reviews
+        .filter(function(r){ return r.rating >= 4 && r.text.length > 30; })
+        .slice(0, 5);
+
+      reviews.forEach(function(r, i){
+        var stars = '';
+        for(var s = 0; s < r.rating; s++) stars += '★';
+
+        /* Trunca textos muito longos */
+        var text = r.text.length > 280 ? r.text.slice(0, 280) + '…' : r.text;
+
+        var card = document.createElement('div');
+        card.className = 'gr-card reveal d' + (i % 3 + 1);
+        card.innerHTML =
+          '<div class="gr-stars">' + stars + '</div>' +
+          '<p class="gr-text">' + text + '</p>' +
+          '<div class="gr-author">' +
+            '<img class="gr-av" src="' + r.profile_photo_url + '" alt="' + r.author_name + '" width="40" height="40" loading="lazy">' +
+            '<div><b>' + r.author_name + '</b><span>' + r.relative_time_description + '</span></div>' +
+          '</div>';
+        wrap.appendChild(card);
+      });
+
+      if(loading) loading.style.display = 'none';
+      if(wrap){ wrap.style.display = 'grid'; }
+    });
+  };
+
+  var s = document.createElement('script');
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + MAPS_KEY +
+           '&libraries=places&callback=_grInit&language=pt-BR';
+  s.async = true; s.defer = true;
+  document.head.appendChild(s);
+})();
+</script>
 </body>
 </html>
