@@ -142,14 +142,5 @@
   var yr = document.querySelector('[data-year]');
   if(yr) yr.textContent = new Date().getFullYear();
 
-  /* ---- Form (demo) ---- */
-  var form = document.querySelector('form[data-demo]');
-  if(form){
-    form.addEventListener('submit', function(e){
-      e.preventDefault();
-      var btn = form.querySelector('[type="submit"]');
-      if(btn){ var t=btn.textContent; btn.textContent='Mensagem enviada ✓'; btn.disabled=true;
-        setTimeout(function(){ btn.textContent=t; btn.disabled=false; form.reset(); }, 2600); }
-    });
-  }
+
 })();
