@@ -403,33 +403,77 @@
           ' · ' + (place.userRatingCount || '').toLocaleString('pt-BR') + ' avaliações';
       }
 
-      var reviews = (place.reviews || [])
-        .filter(function(r){ return r.rating >= 4 && r.text && String(r.text).length > 30; })
-        .slice(0, 5);
+      /* Normaliza dados das avaliações */
+      var data = (place.reviews || [])
+        .filter(function(r){ return r.rating >= 4 && r.text && String(r.text).length > 30; });
 
-      reviews.forEach(function(r, i){
+      if(!data.length){ if(loading) loading.style.display = 'none'; return; }
+
+      function buildCardHTML(r){
         var stars = '★'.repeat(r.rating);
         var txt   = String(r.text);
-        if(txt.length > 280) txt = txt.slice(0, 280) + '…';
+        if(txt.length > 240) txt = txt.slice(0, 240) + '…';
         var name  = r.authorAttribution ? r.authorAttribution.displayName : 'Cliente';
         var photo = r.authorAttribution ? r.authorAttribution.photoURI : '';
-        var when  = r.relativePublishTimeDescription || '';
+        var av = photo
+          ? '<img class="gr-av" src="' + photo + '" alt="' + name + '" width="40" height="40" referrerpolicy="no-referrer">'
+          : '<span class="gr-av gr-av-init">' + name.charAt(0).toUpperCase() + '</span>';
+        return '<div class="gr-stars">' + stars + '</div>' +
+               '<p class="gr-text">' + txt + '</p>' +
+               '<div class="gr-author">' + av + '<div><b>' + name + '</b></div></div>';
+      }
 
+      /* Cria 3 cards fixos */
+      var PER = Math.min(3, data.length);
+      var cards = [];
+      for(var i = 0; i < PER; i++){
         var card = document.createElement('div');
-        card.className = 'gr-card gr-fade';
-        card.style.animationDelay = (i * 0.1) + 's';
-        card.innerHTML =
-          '<div class="gr-stars">' + stars + '</div>' +
-          '<p class="gr-text">' + txt + '</p>' +
-          '<div class="gr-author">' +
-            (photo ? '<img class="gr-av" src="' + photo + '" alt="' + name + '" width="40" height="40" loading="lazy">' : '') +
-            '<div><b>' + name + '</b><span>' + when + '</span></div>' +
-          '</div>';
+        card.className = 'gr-card';
         wrap.appendChild(card);
+        cards.push(card);
+      }
+
+      /* Dots de navegação */
+      var dotWrap = document.createElement('div');
+      dotWrap.className = 'gr-dots';
+      wrap.after(dotWrap);
+      var dots = [];
+      var total = data.length;
+      for(var d = 0; d < total; d++){
+        var dot = document.createElement('button');
+        dot.className = 'gr-dot';
+        dot.setAttribute('aria-label', 'Avaliação ' + (d + 1));
+        dotWrap.appendChild(dot);
+        dots.push(dot);
+      }
+
+      var idx = 0;
+      var timer;
+
+      function showSlide(n){
+        idx = ((n % total) + total) % total;
+        /* Fade out */
+        cards.forEach(function(c){ c.classList.add('gr-out'); });
+        setTimeout(function(){
+          cards.forEach(function(c, i){
+            c.innerHTML = buildCardHTML(data[(idx + i) % total]);
+            c.classList.remove('gr-out');
+          });
+        }, 220);
+        dots.forEach(function(dt, i){ dt.classList.toggle('active', i === idx); });
+      }
+
+      function startTimer(){ timer = setInterval(function(){ showSlide(idx + 1); }, 5000); }
+      function resetTimer(){ clearInterval(timer); startTimer(); }
+
+      dots.forEach(function(dot, i){
+        dot.onclick = function(){ resetTimer(); showSlide(i); };
       });
 
       if(loading) loading.style.display = 'none';
-      if(wrap && reviews.length) wrap.style.display = 'grid';
+      wrap.style.display = 'grid';
+      showSlide(0);
+      startTimer();
 
     } catch(e) {
       var loading = document.getElementById('gr-loading');
