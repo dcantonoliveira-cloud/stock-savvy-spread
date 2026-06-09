@@ -144,8 +144,11 @@ strong{font-weight:700;color:var(--navy-700);}
 
 /* Logo */
 .logo{display:flex;align-items:center;gap:.85rem;}
-.logo-img{height:42px;width:auto;flex:none;transition:height .4s var(--ease);display:block;max-width:200px;}
+.logo-img{height:42px;width:auto;flex:none;transition:height .4s var(--ease),opacity .3s var(--ease);display:block;max-width:200px;}
 .scrolled .logo-img{height:36px;}
+.logo-pos{display:none;}
+.scrolled .logo-neg{display:none;}
+.scrolled .logo-pos{display:block;}
 
 /* Nav */
 .nav{display:flex;align-items:center;gap:clamp(1.4rem,2.4vw,2.6rem);}
