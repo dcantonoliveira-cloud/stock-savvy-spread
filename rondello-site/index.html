@@ -404,19 +404,20 @@
       }
 
       var reviews = (place.reviews || [])
-        .filter(function(r){ return r.rating >= 4 && r.text && r.text.text && r.text.text.length > 30; })
+        .filter(function(r){ return r.rating >= 4 && r.text && String(r.text).length > 30; })
         .slice(0, 5);
 
       reviews.forEach(function(r, i){
         var stars = '★'.repeat(r.rating);
-        var txt   = r.text.text;
+        var txt   = String(r.text);
         if(txt.length > 280) txt = txt.slice(0, 280) + '…';
         var name  = r.authorAttribution ? r.authorAttribution.displayName : 'Cliente';
         var photo = r.authorAttribution ? r.authorAttribution.photoURI : '';
         var when  = r.relativePublishTimeDescription || '';
 
         var card = document.createElement('div');
-        card.className = 'gr-card reveal d' + (i % 3 + 1);
+        card.className = 'gr-card gr-fade';
+        card.style.animationDelay = (i * 0.1) + 's';
         card.innerHTML =
           '<div class="gr-stars">' + stars + '</div>' +
           '<p class="gr-text">' + txt + '</p>' +

@@ -410,6 +410,8 @@ html.reveal-now .reveal{opacity:1 !important;transform:none !important;transitio
 .gr-av{border-radius:50%;object-fit:cover;}
 .gr-author b{display:block;font-size:.88rem;color:var(--navy-800);}
 .gr-author span{font-size:.78rem;color:var(--muted);}
+@keyframes grFade{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.gr-fade{animation:grFade .55s ease both;}
 @media(max-width:900px){.gr-cards{grid-template-columns:1fr 1fr;}}
 @media(max-width:600px){.gr-cards{grid-template-columns:1fr;}}
 
