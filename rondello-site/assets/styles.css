@@ -460,7 +460,10 @@ html.reveal-now .reveal{opacity:1 !important;transform:none !important;transitio
   .nav .link,.nav .sep{display:none;}
   .burger{display:flex;}
   .split{grid-template-columns:1fr;gap:40px;}
-  .split.reverse .col-media{order:0;}
+  .split .col-text{order:1;}
+  .split .col-media{order:2;}
+  .split.reverse .col-media{order:2;}
+  .split.reverse .col-text{order:1;}
   .feature-grid,.stats,.events,.steps,.quotes{grid-template-columns:1fr 1fr;}
   .stats{gap:40px 0;}
   .stat + .stat::before{display:none;}
