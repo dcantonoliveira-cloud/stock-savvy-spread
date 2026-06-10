@@ -236,6 +236,7 @@ strong{font-weight:700;color:var(--navy-700);}
 .media-frame .tag{position:absolute;left:-1px;bottom:24px;background:var(--gold);color:var(--navy-900);
   font-size:.7rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;padding:.8em 1.4em;}
 .media-frame .outline{position:absolute;inset:18px -18px -18px 18px;border:1px solid var(--gold);z-index:-1;border-radius:var(--radius);}
+.photo-caption{margin-top:1.2rem;font-family:var(--sans);font-size:.78rem;color:var(--muted);font-style:italic;letter-spacing:.02em;line-height:1.5;}
 .bg-navy .media-frame .outline,.bg-navy-deep .media-frame .outline{border-color:var(--gold);}
 
 /* ---------- Diferenciais ---------- */
