@@ -105,6 +105,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;}
 .bg-navy .lead,.bg-navy-deep .lead{color:#D8D2C6;}
 .muted{color:var(--muted);}
 .bg-navy .muted,.bg-navy-deep .muted{color:#A9B3BE;}
+/* Nomes em destaque azul (usado na história) */
+.nm{color:var(--navy-700);font-weight:700;}
+.bg-navy .nm,.bg-navy-deep .nm{color:var(--gold-bright);}
 strong{font-weight:700;color:var(--navy-700);}
 .bg-navy strong,.bg-navy-deep strong{color:var(--gold-bright);}
 
