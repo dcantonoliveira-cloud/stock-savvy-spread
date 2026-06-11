@@ -83,6 +83,89 @@
       'Frete para eventos fora de Sorocaba, Votorantim ou Araçoiaba | consulte-nos para eventos em outras cidades.'
     ];
 
+    /* ── English versions of static lists ─────────────────────────────────── */
+    var INCLUSO_EN = [
+      'All materials needed for buffet operations | kitchen equipment and utensils required to deliver our service.',
+      'Skilled staff in sufficient numbers to ensure an exceptional service experience.',
+      'Water and soda glasses, wine, champagne, and whisky glasses | please ask us for available options.',
+      'Plates, cutlery, tablecloths, charger plates, cloth napkins | please ask us for available options.',
+      'Ice for all beverages served by the Buffet | including whisky.',
+      'Meals for the entire Rondello Buffet team.'
+    ];
+    var NAO_INCLUSO_EN = [
+      'Wines, sparkling wines, whiskies, or any other spirits | we provide glassware and serve these, but do not supply them and do not charge corkage.',
+      'Chairs, tables, tabletops, sideboards, and other furniture.',
+      'Kitchen fees, waste fees, or any other charge for use of the venue\'s facilities.',
+      'Meals for staff from other companies involved in the event | please ask us for conditions.',
+      'Transportation for events outside Sorocaba, Votorantim, or Araçoiaba | please ask us about events in other cities.'
+    ];
+
+    /* ── PDF language / translation ─────────────────────────────────────── */
+    var _pdfLang = 'pt';
+    var _T = {
+      pt: {
+        proposta_exclusiva:  'PROPOSTA EXCLUSIVA',
+        data: 'DATA', local: 'LOCAL', convidados: 'CONVIDADOS', tipo: 'TIPO', duracao: 'DURAÇÃO',
+        frase_default: 'Uma experiência gastronômica criada exclusivamente para seu casamento.',
+        cardapio: 'CARDÁPIO', investimento: 'INVESTIMENTO',
+        h_evento: 'h de evento', por_convidado: '/por convidado',
+        valor_por_convidado: 'Valor por convidado',
+        deslocamento: 'Taxa de deslocamento', adicional: 'Adicional',
+        pacote_label: 'Pacote', pacote_header: 'PACOTE',
+        o_que_recebe: 'O QUE VOCÊ RECEBE',
+        entregamos: 'O QUE ENTREGAMOS', fora_pacote: 'FORA DO PACOTE',
+        staff_meals: 'ALIMENTAÇÃO DE STAFF',
+        staff_desc: 'Válido somente para equipes de terceiros. Todos os profissionais devem optar pela mesma modalidade.',
+        menu_convidados: 'Mesmo menu dos convidados',
+        pct_valor: '50% do valor por pessoa',
+        buffet_dinner: 'Buffet de jantar e bebidas',
+        buffet_price: 'R$ 120,00 por profissional — exceto alcoólicas',
+        seguro: 'SEGURO E QUEBRAS',
+        seguro_desc: 'Em caso de quebras e perdas de utensílios, oferecemos 2 opções:',
+        seguro_label: 'Seguro quebra por ',
+        seguro_por: ' por convidado',
+        seguro_envio: 'Envio da contagem após o evento, com a possibilidade de acerto via transferência ou fornecimento dos mesmos materiais.',
+        sobre: 'SOBRE O',
+        proximos_passos: 'PRÓXIMOS PASSOS',
+        step1_t: 'Aprovação',    step1_d: 'Avalie com calma e compartilhe com quem precisar.',
+        step2_t: 'Assinatura',   step2_d: 'Formalizamos o contrato e reservamos a data exclusivamente para vocês.',
+        step3_t: 'Alinhamentos', step3_d: 'Reunião para afinar menu, logística e cada detalhe.',
+        step4_t: 'O Grande Dia', step4_d: 'Nós cuidamos de tudo. Vocês aproveitam cada momento.',
+        sobre_default: 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que transforma o dia de vocês em algo que ninguém vai querer esquecer.'
+      },
+      en: {
+        proposta_exclusiva:  'EXCLUSIVE PROPOSAL',
+        data: 'DATE', local: 'VENUE', convidados: 'GUESTS', tipo: 'TYPE', duracao: 'DURATION',
+        frase_default: 'A gastronomic experience created exclusively for your special event.',
+        cardapio: 'MENU', investimento: 'INVESTMENT',
+        h_evento: 'h event', por_convidado: '/per guest',
+        valor_por_convidado: 'Price per guest',
+        deslocamento: 'Travel fee', adicional: 'Additional',
+        pacote_label: 'Package', pacote_header: 'PACKAGE',
+        o_que_recebe: 'WHAT YOU RECEIVE',
+        entregamos: 'WHAT WE DELIVER', fora_pacote: 'NOT INCLUDED',
+        staff_meals: 'STAFF MEALS',
+        staff_desc: 'Valid only for third-party teams. All professionals must choose the same option.',
+        menu_convidados: 'Same menu as guests',
+        pct_valor: '50% of the per-person rate',
+        buffet_dinner: 'Dinner buffet and beverages',
+        buffet_price: 'R$ 120.00 per professional — non-alcoholic drinks only',
+        seguro: 'INSURANCE & BREAKAGE',
+        seguro_desc: 'In case of breakage or loss of utensils, we offer 2 options:',
+        seguro_label: 'Breakage insurance for ',
+        seguro_por: ' per guest',
+        seguro_envio: 'A complete count will be sent after the event, with the possibility of settlement via transfer or replacement of the same materials.',
+        sobre: 'ABOUT',
+        proximos_passos: 'NEXT STEPS',
+        step1_t: 'Approval',    step1_d: 'Take your time reviewing and share with whoever you need.',
+        step2_t: 'Signature',   step2_d: 'We formalize the contract and exclusively reserve the date for you.',
+        step3_t: 'Alignment',   step3_d: 'A meeting to fine-tune the menu, logistics, and every detail.',
+        step4_t: 'The Big Day', step4_d: 'We take care of everything. You enjoy every moment.',
+        sobre_default: 'For nearly three decades, the only thing that drives us is simple: that on the most important day of your lives, you don\'t need to think about anything — just feel it. By refining every detail over all these years, we have learned that the difference between a beautiful event and an unforgettable one lies in who truly cares.\n\nOur kitchen carries the signature of chefs with international experience, but our style is distinctly Sorocaban: present, attentive, unhurried. We deliver high-end gastronomy with the hospitality of someone welcoming you into their own home. That is what transforms your day into something no one will ever want to forget.'
+      }
+    };
+    function t(key) { return (_T[_pdfLang] || _T.pt)[key] || _T.pt[key] || key; }
+
     function fmtMoeda(val) {
       var n = parseFloat(String(val || '').replace(/\./g, '').replace(',', '.'));
       if (isNaN(n)) return val || '—';
@@ -253,7 +336,7 @@
       }
 
       blocks.push({ canvas: [{ type: 'line', x1: 192, y1: 0, x2: 283, y2: 0, lineWidth: 0.3, lineColor: goldSoft }], margin: [0, 0, 0, 14] });
-      blocks.push({ text: 'PROPOSTA EXCLUSIVA', fontSize: 9, color: goldSoft, characterSpacing: 3.5, alignment: 'center', margin: [0, 0, 0, 22] });
+      blocks.push({ text: t('proposta_exclusiva'), fontSize: 9, color: goldSoft, characterSpacing: 3.5, alignment: 'center', margin: [0, 0, 0, 22] });
 
       if (cliente.nome) {
         blocks.push({ text: cliente.nome, font: 'Cormorant', fontSize: 56, bold: true, color: cream, alignment: 'center', lineHeight: 0.92, margin: [0, 0, 0, 28] });
@@ -261,16 +344,17 @@
 
       /* Grid info evento — todas as colunas com mesmo estilo */
       var infoCols = [];
-      if (cliente.data)       infoCols.push({ label: 'DATA',       val: cliente.data });
-      if (cliente.local)      infoCols.push({ label: 'LOCAL',      val: cliente.local });
-      if (cliente.convidados) infoCols.push({ label: 'CONVIDADOS', val: '' + cliente.convidados });
-      if (cliente.tipo)       infoCols.push({ label: 'TIPO',       val: cliente.tipo });
-      if (cliente.horas)      infoCols.push({ label: 'DURAÇÃO',    val: cliente.horas + 'h' });
+      if (cliente.data)       infoCols.push({ label: t('data'),       val: cliente.data });
+      if (cliente.local)      infoCols.push({ label: t('local'),      val: cliente.local });
+      if (cliente.convidados) infoCols.push({ label: t('convidados'), val: '' + cliente.convidados });
+      if (cliente.tipo)       infoCols.push({ label: t('tipo'),       val: cliente.tipo });
+      if (cliente.horas)      infoCols.push({ label: t('duracao'),    val: cliente.horas + 'h' });
 
       /* Linha 1: DATA + LOCAL */
-      var row1items = infoCols.filter(function(c){ return c.label === 'DATA' || c.label === 'LOCAL'; });
+      var _lData = t('data'); var _lLocal = t('local');
+      var row1items = infoCols.filter(function(c){ return c.label === _lData || c.label === _lLocal; });
       /* Linha 2: CONVIDADOS + TIPO + DURAÇÃO */
-      var row2items = infoCols.filter(function(c){ return c.label !== 'DATA' && c.label !== 'LOCAL'; });
+      var row2items = infoCols.filter(function(c){ return c.label !== _lData && c.label !== _lLocal; });
 
       function buildInfoRow(items, lineColor) {
         if (!items.length) return null;
@@ -327,7 +411,7 @@
       blocks.push({
         columns: [
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 130, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 130 },
-          { text: 'CARDÁPIO', fontSize: 7, color: GRAY, characterSpacing: 2.5, alignment: 'center', margin: [0, 2, 0, 0] },
+          { text: t('cardapio'), fontSize: 7, color: GRAY, characterSpacing: 2.5, alignment: 'center', margin: [0, 2, 0, 0] },
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 130, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 130 }
         ],
         columnGap: 10, margin: [0, 0, 0, 14]
@@ -381,7 +465,7 @@
         /* Cabeçalho INVESTIMENTO */
         blocks.push({
           columns: [
-            { text: 'INVESTIMENTO', fontSize: 6.5, bold: true, color: GOLD, characterSpacing: 4.5 },
+            { text: t('investimento'), fontSize: 6.5, bold: true, color: GOLD, characterSpacing: 4.5 },
             { text: '', alignment: 'right' }
           ], margin: [0, 14, 0, 5]
         });
@@ -390,11 +474,11 @@
         /* Faixas de preço — tabela limpa */
         if (faixas.length > 0) {
           faixas.forEach(function(f, fi) {
-            var horasLabel = f.horas ? (f.horas + (isNaN(parseFloat(('' + f.horas).replace(',','.'))) ? '' : 'h de evento')) : 'Pacote';
+            var horasLabel = f.horas ? (f.horas + (isNaN(parseFloat(('' + f.horas).replace(',','.'))) ? '' : t('h_evento'))) : t('pacote_label');
             blocks.push({
               columns: [
                 { text: horasLabel, fontSize: 10, color: DGRAY },
-                { text: fmtMoeda(f.valor) + '/por convidado', fontSize: 11.5, bold: true, color: NAVY, alignment: 'right' }
+                { text: fmtMoeda(f.valor) + t('por_convidado'), fontSize: 11.5, bold: true, color: NAVY, alignment: 'right' }
               ], margin: [0, 10, 0, 0]
             });
             if (fi < faixas.length - 1) {
@@ -404,17 +488,17 @@
         } else if (preco) {
           blocks.push({
             columns: [
-              { text: 'Valor por convidado', fontSize: 10, color: DGRAY },
-              { text: fmtMoeda(preco) + '/por convidado', fontSize: 11.5, bold: true, color: NAVY, alignment: 'right' }
+              { text: t('valor_por_convidado'), fontSize: 10, color: DGRAY },
+              { text: fmtMoeda(preco) + t('por_convidado'), fontSize: 11.5, bold: true, color: NAVY, alignment: 'right' }
             ], margin: [0, 10, 0, 0]
           });
         }
 
         /* Extras e condições */
         var extras = [];
-        if (inv.mostrarTaxa && inv.taxaValor) extras.push([inv.taxaDesc || 'Taxa de deslocamento', fmtMoeda(inv.taxaValor)]);
+        if (inv.mostrarTaxa && inv.taxaValor) extras.push([inv.taxaDesc || t('deslocamento'), fmtMoeda(inv.taxaValor)]);
         (inv.adicionais || []).filter(function(a) { return a.desc || a.valor; }).forEach(function(a) {
-          extras.push([a.desc || 'Adicional', fmtMoeda(a.valor)]);
+          extras.push([a.desc || t('adicional'), fmtMoeda(a.valor)]);
         });
 
         if (extras.length || inv.condicoes) {
@@ -441,7 +525,7 @@
       blocks.push({
         columns: [
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 120, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 120 },
-          { text: 'O QUE VOCÊ RECEBE', font: 'Cormorant', fontSize: 14, bold: true, color: GRAY, characterSpacing: 1, alignment: 'center', margin: [0, 2, 0, 0] },
+          { text: t('o_que_recebe'), font: 'Cormorant', fontSize: 14, bold: true, color: GRAY, characterSpacing: 1, alignment: 'center', margin: [0, 2, 0, 0] },
           { canvas: [{ type: 'line', x1: 0, y1: 8, x2: 120, y2: 8, lineWidth: 0.25, lineColor: '#D4C09A' }], width: 120 }
         ],
         columnGap: 10, margin: [0, 0, 0, 10]
@@ -478,16 +562,16 @@
 
       blocks.push({
         columns: [
-          { stack: [colLabel('O QUE ENTREGAMOS')].concat(INCLUSO.map(function(x){ return iRow(x, GOLD); })), width: '*' },
-          { stack: [colLabel('FORA DO PACOTE', MGRAY)].concat(NAO_INCLUSO.map(function(x){ return iRow(x, MGRAY); })), width: '*' }
+          { stack: [colLabel(t('entregamos'))].concat((_pdfLang === 'en' ? INCLUSO_EN : INCLUSO).map(function(x){ return iRow(x, GOLD); })), width: '*' },
+          { stack: [colLabel(t('fora_pacote'), MGRAY)].concat((_pdfLang === 'en' ? NAO_INCLUSO_EN : NAO_INCLUSO).map(function(x){ return iRow(x, MGRAY); })), width: '*' }
         ],
         columnGap: 28
       });
 
       /* Alimentação de Staff */
       blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 24, 0, 12] });
-      blocks.push({ text: 'ALIMENTAÇÃO DE STAFF', font: 'Cormorant', fontSize: 13, bold: true, color: GOLD, characterSpacing: 0.8, margin: [0, 0, 0, 8] });
-      blocks.push({ text: 'Válido somente para equipes de terceiros. Todos os profissionais devem optar pela mesma modalidade.', fontSize: 9, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 10] });
+      blocks.push({ text: t('staff_meals'), font: 'Cormorant', fontSize: 13, bold: true, color: GOLD, characterSpacing: 0.8, margin: [0, 0, 0, 8] });
+      blocks.push({ text: t('staff_desc'), fontSize: 9, color: GRAY, lineHeight: 1.5, margin: [0, 0, 0, 10] });
 
       blocks.push({
         columns: [
@@ -495,16 +579,16 @@
             stack: [
               { text: '01', font: 'Cormorant', fontSize: 18, bold: true, color: '#C9AC7C', margin: [0, 0, 0, 5] },
               { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 210, y2: 0, lineWidth: 0.3, lineColor: '#E6DCC2' }], margin: [0, 0, 0, 8] },
-              { text: 'Mesmo menu dos convidados', fontSize: 10, color: NAVY, bold: true, margin: [0, 0, 0, 2] },
-              { text: '50% do valor por pessoa', fontSize: 9.5, color: DGRAY, lineHeight: 1.5 }
+              { text: t('menu_convidados'), fontSize: 10, color: NAVY, bold: true, margin: [0, 0, 0, 2] },
+              { text: t('pct_valor'), fontSize: 9.5, color: DGRAY, lineHeight: 1.5 }
             ], width: '*'
           },
           {
             stack: [
               { text: '02', font: 'Cormorant', fontSize: 18, bold: true, color: '#C9AC7C', margin: [0, 0, 0, 5] },
               { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 210, y2: 0, lineWidth: 0.3, lineColor: '#E6DCC2' }], margin: [0, 0, 0, 8] },
-              { text: 'Buffet de jantar e bebidas', fontSize: 10, color: NAVY, bold: true, margin: [0, 0, 0, 2] },
-              { text: 'R$ 120,00 por profissional — exceto alcoólicas', fontSize: 9.5, color: DGRAY, lineHeight: 1.5 }
+              { text: t('buffet_dinner'), fontSize: 10, color: NAVY, bold: true, margin: [0, 0, 0, 2] },
+              { text: t('buffet_price'), fontSize: 9.5, color: DGRAY, lineHeight: 1.5 }
             ], width: '*'
           }
         ], columnGap: 24
@@ -515,16 +599,16 @@
       /* Seguro e Quebras */
       if (p2 && p2.quebrasAtiva) {
         blocks.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 475, y2: 0, lineWidth: 0.18, lineColor: '#DDD6CD' }], margin: [0, 22, 0, 12] });
-        blocks.push({ text: 'SEGURO E QUEBRAS', font: 'Cormorant', fontSize: 13, bold: true, color: GOLD, characterSpacing: 0.8, margin: [0, 0, 0, 8] });
-        blocks.push({ text: 'Em caso de quebras e perdas de utensílios, oferecemos 2 opções:', fontSize: 9, color: GRAY, lineHeight: 1.45, margin: [0, 0, 0, 6] });
+        blocks.push({ text: t('seguro'), font: 'Cormorant', fontSize: 13, bold: true, color: GOLD, characterSpacing: 0.8, margin: [0, 0, 0, 8] });
+        blocks.push({ text: t('seguro_desc'), fontSize: 9, color: GRAY, lineHeight: 1.45, margin: [0, 0, 0, 6] });
         blocks.push({
           ol: [
             { text: [
-                { text: 'Seguro quebra por ', color: GRAY, fontSize: 9 },
-                { text: p2.valorSeguro ? fmtMoeda(p2.valorSeguro) + ' por convidado' : 'R$ 6,00 por convidado', bold: true, color: NAVY, fontSize: 9 }
+                { text: t('seguro_label'), color: GRAY, fontSize: 9 },
+                { text: p2.valorSeguro ? fmtMoeda(p2.valorSeguro) + t('seguro_por') : 'R$ 6,00' + t('seguro_por'), bold: true, color: NAVY, fontSize: 9 }
               ], margin: [0, 0, 0, 4]
             },
-            { text: 'Envio da contagem após o evento, com a possibilidade de acerto via transferência ou fornecimento dos mesmos materiais.', color: GRAY, fontSize: 9, lineHeight: 1.35 }
+            { text: t('seguro_envio'), color: GRAY, fontSize: 9, lineHeight: 1.35 }
           ],
           fontSize: 9, color: GRAY, margin: [4, 0, 0, 2]
         });
@@ -537,24 +621,24 @@
     function buildAutoridade(sobreTexto) {
       var blocks = [];
 
-      blocks.push({ text: 'SOBRE O', fontSize: 6.5, color: GRAY, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 4] });
+      blocks.push({ text: t('sobre'), fontSize: 6.5, color: GRAY, characterSpacing: 5, alignment: 'center', margin: [0, 0, 0, 4] });
       blocks.push({ text: 'Rondello Buffet', font: 'Cormorant', fontSize: 34, bold: true, color: '#0D1526', alignment: 'center', margin: [0, 0, 0, 4] });
       blocks.push({ canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.35, lineColor: GOLD }], margin: [0, 0, 0, 22] });
 
       /* Brand story — vertical, texto do cliente */
-      var textoMarca = sobreTexto || 'Há quase três décadas, a única coisa que nos move é simples: que vocês não precisem pensar em nada no dia mais importante das suas vidas, só sentir. Afinando cada detalhe ao longo de todos esses anos, aprendemos que a diferença entre um evento bonito e um inesquecível está em quem cuida de verdade.\n\nNossa cozinha carrega a assinatura de chefs com passagem internacional, mas nosso jeito é sorocabano mesmo: presente, atencioso, sem pressa. Entregamos gastronomia de alto nível com a hospitalidade de quem recebe na própria casa. É isso que transforma o dia de vocês em algo que ninguém vai querer esquecer.';
+      var textoMarca = sobreTexto || t('sobre_default');
 
       blocks.push({ text: textoMarca, fontSize: 10.5, color: DGRAY, lineHeight: 1.85, margin: [0, 0, 0, 22] });
 
       blocks.push({ canvas: [{ type: 'line', x1: 190, y1: 0, x2: 285, y2: 0, lineWidth: 0.3, lineColor: '#D8C9A8' }], margin: [0, 0, 0, 18] });
 
       /* Próximos passos */
-      blocks.push({ text: 'PRÓXIMOS PASSOS', fontSize: 6.5, color: GOLD, characterSpacing: 4, bold: true, alignment: 'center', margin: [0, 0, 0, 18] });
+      blocks.push({ text: t('proximos_passos'), fontSize: 6.5, color: GOLD, characterSpacing: 4, bold: true, alignment: 'center', margin: [0, 0, 0, 18] });
       var steps = [
-        { n: '01', t: 'Aprovação',    d: 'Avalie com calma e compartilhe com quem precisar.' },
-        { n: '02', t: 'Assinatura',   d: 'Formalizamos o contrato e reservamos a data exclusivamente para vocês.' },
-        { n: '03', t: 'Alinhamentos', d: 'Reunião para afinar menu, logística e cada detalhe.' },
-        { n: '04', t: 'O Grande Dia', d: 'Nós cuidamos de tudo. Vocês aproveitam cada momento.' }
+        { n: '01', lbl: t('step1_t'), d: t('step1_d') },
+        { n: '02', lbl: t('step2_t'), d: t('step2_d') },
+        { n: '03', lbl: t('step3_t'), d: t('step3_d') },
+        { n: '04', lbl: t('step4_t'), d: t('step4_d') }
       ];
       blocks.push({
         columns: steps.map(function(s) {
@@ -562,7 +646,7 @@
             stack: [
               { text: s.n, font: 'Cormorant', fontSize: 24, color: '#C9AC7C', margin: [0, 0, 0, 4] },
               { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 95, y2: 0, lineWidth: 0.3, lineColor: '#E6DCC2' }], margin: [0, 0, 0, 8] },
-              { text: s.t, font: 'Cormorant', fontSize: 13, bold: true, color: NAVY, margin: [0, 0, 0, 5] },
+              { text: s.lbl, font: 'Cormorant', fontSize: 13, bold: true, color: NAVY, margin: [0, 0, 0, 5] },
               { text: s.d, fontSize: 9, color: GRAY, lineHeight: 1.55 }
             ], width: '*'
           };
@@ -632,7 +716,7 @@
       /* ── Slim navy header ── */
       var headerInline = [
         { text: num + '  ', color: GOLD, bold: true, fontSize: 10 },
-        { text: 'PACOTE  ', color: '#D4C09A', fontSize: 6, characterSpacing: 2, bold: true }
+        { text: t('pacote_header') + '  ', color: '#D4C09A', fontSize: 6, characterSpacing: 2, bold: true }
       ].concat(nomeParts);
 
       blocks.push({
@@ -745,8 +829,8 @@
       var blocks = [];
 
       /* Page title */
-      blocks.push({ text: 'CARDÁPIO', fontSize: 7, color: GRAY, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 6] });
-      blocks.push({ text: 'Seleção Gastronômica', fontSize: 16, bold: true, color: NAVY, characterSpacing: 0.5, alignment: 'center', margin: [0, 0, 0, 4] });
+      blocks.push({ text: t('cardapio'), fontSize: 7, color: GRAY, characterSpacing: 3, alignment: 'center', margin: [0, 0, 0, 6] });
+      blocks.push({ text: _pdfLang === 'en' ? 'Gastronomic Selection' : 'Seleção Gastronômica', fontSize: 16, bold: true, color: NAVY, characterSpacing: 0.5, alignment: 'center', margin: [0, 0, 0, 4] });
       blocks.push({ canvas: [{ type:'line', x1:0, y1:0, x2:475, y2:0, lineWidth:0.5, lineColor:GOLD }], margin:[0, 6, 0, 10] });
 
       /* Legenda dos marcadores */
@@ -764,14 +848,14 @@
             width: 'auto',
             columns: [
               { canvas: [{ type:'rect', x:1, y:2, w:7, h:7, color:'#0D1526', r:1 }], width:14 },
-              { text: 'Cardápio Padrão', fontSize: 7.5, color: NAVY, margin:[0,1,16,0] }
+              { text: _pdfLang === 'en' ? 'Standard Menu' : 'Cardápio Padrão', fontSize: 7.5, color: NAVY, margin:[0,1,16,0] }
             ]
           },
           {
             width: 'auto',
             columns: [
               { canvas: [{ type:'rect', x:1, y:2, w:7, h:7, color:'#3D7A5A', r:1 }], width:14 },
-              { text: 'Vegetariano', fontSize: 7.5, bold: true, color: '#3D7A5A', margin:[0,1,0,0] }
+              { text: _pdfLang === 'en' ? 'Vegetarian' : 'Vegetariano', fontSize: 7.5, bold: true, color: '#3D7A5A', margin:[0,1,0,0] }
             ]
           },
           { width: '*', text: '' }
@@ -802,7 +886,9 @@
         var catNote = null;
         if ((cat.categoria || '').toUpperCase() === 'ILHA GOURMET') {
           catNote = {
-            text: 'A seleção abaixo é uma sugestão. Todos os pratos disponíveis no cardápio podem integrar a Ilha Gourmet.',
+            text: _pdfLang === 'en'
+              ? 'The selection below is a suggestion. All dishes available in the menu can be part of the Gourmet Station.'
+              : 'A seleção abaixo é uma sugestão. Todos os pratos disponíveis no cardápio podem integrar a Ilha Gourmet.',
             fontSize: 8, color: GRAY, italics: true, alignment: 'center', lineHeight: 1.45,
             margin: [20, -2, 20, 12]
           };
@@ -858,12 +944,13 @@
 
     /* ── Main entry — 4 páginas premium ────────────────────────────────── */
     window.gerarPDF = function(dados) {
+      _pdfLang = dados.lang || 'pt';
       var logo     = window.LOGO_HORIZONTAL_B64 || window.LOGO_B64; /* horizontal - header pages 2+ */
       var logoDark = window.LOGO_DARK_B64 || window.LOGO_B64;  /* dark-bg version - cover */
       var cliente = dados.cliente || {};
       var pacotes = dados.pacotes || [];
       var p2 = dados.pagina2 || {};
-      var fraseCapa = dados.fraseCapa || 'Uma experiência gastronômica criada exclusivamente para seu casamento.';
+      var fraseCapa = dados.fraseCapa || t('frase_default');
       var sobreTexto = dados.sobreTexto || '';
 
       var content = [];
@@ -2675,6 +2762,15 @@
       }
     };
 
+    const handleGerarEN = () => {
+      setGerando(true);
+      setTimeout(() => {
+        try { window.gerarPDF({ cliente, pacotes, pagina2, fraseCapa, sobreTexto, incluirCardapio, cardapio: getCardapioParaPDF(), lang: 'en' }); }
+        catch(e) { alert('Erro ao gerar PDF EN:\n' + e.message); }
+        setGerando(false);
+      }, 100);
+    };
+
     const handleGerar = () => {
       setGerando(true);
       setTimeout(() => {
@@ -2826,6 +2922,9 @@
             <div style={{ display:'flex', gap:8 }}>
               <Btn onClick={handleGerarWord} loading={gerandoPPT} variant="ghost" style={{ fontSize:12, color:'#fff', borderColor:'rgba(255,255,255,.3)' }}>
                 {gerandoPPT ? '⏳...' : '📄 Word'}
+              </Btn>
+              <Btn onClick={handleGerarEN} loading={gerando} variant="ghost" style={{ fontSize:12, color:'#fff', borderColor:'rgba(255,255,255,.3)' }} title="Generate PDF in English">
+                🌐 EN
               </Btn>
               <Btn onClick={handleGerar} loading={gerando} variant="gold" style={{ minWidth:150, fontSize:13 }}>
                 {gerando ? '⏳ Gerando...' : '⬇ Gerar PDF'}
