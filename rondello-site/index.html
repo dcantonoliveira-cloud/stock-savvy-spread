@@ -113,7 +113,7 @@
 <section class="hero" data-screen-label="Hero">
   <div class="bg">
     <img src="assets/img/hero.jpg" alt="Buffet para casamento em Sorocaba — mesa principal Rondello Buffet" class="hero-img">
-    <video class="hero-video" autoplay muted loop playsinline>
+    <video class="hero-video" autoplay muted loop playsinline preload="auto" id="heroVideo">
       <source src="assets/img/hero-video.mp4" type="video/mp4">
     </video>
   </div>
@@ -547,6 +547,24 @@
           '&loading=async&callback=_grInit&language=pt-BR';
   s.async = true; s.defer = true;
   document.head.appendChild(s);
+})();
+</script>
+<script>
+// iOS autoplay fallback — tenta dar play no primeiro toque do usuário
+(function(){
+  var v = document.getElementById('heroVideo');
+  if(!v) return;
+  function tryPlay(){
+    v.play().catch(function(){});
+    document.removeEventListener('touchstart', tryPlay);
+    document.removeEventListener('click', tryPlay);
+  }
+  // Tenta imediatamente (funciona na maioria dos casos)
+  v.play().catch(function(){
+    // Se bloqueado (ex: Low Power Mode no iOS), aguarda primeiro toque
+    document.addEventListener('touchstart', tryPlay, {once:true, passive:true});
+    document.addEventListener('click', tryPlay, {once:true});
+  });
 })();
 </script>
 </body>
