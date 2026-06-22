@@ -25,6 +25,7 @@ import type {
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const DRY_RUN = process.argv.includes("--dry-run");
+const SKIP_CLIENTS = process.argv.includes("--skip-clients");
 const DRY_RUN_SAMPLES = 5;
 
 // Bubble Data Type names — adjust if your app uses different casing
@@ -62,11 +63,40 @@ function printSamples(label: string, items: unknown[], total: number): void {
 
 // ─── Migrate clients ──────────────────────────────────────────────────────────
 
+async function loadClientIdMapFromSupabase(
+  supabase: ReturnType<typeof buildSupabase>
+): Promise<Map<string, string>> {
+  console.log("  → Reconstruindo mapa de clientes a partir do Supabase...");
+  const idMap = new Map<string, string>();
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, bubble_id")
+      .not("bubble_id", "is", null)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      if (row.bubble_id) idMap.set(row.bubble_id as string, row.id as string);
+    }
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
+  }
+  console.log(`  ✓ ${idMap.size} clientes carregados do Supabase\n`);
+  return idMap;
+}
+
 async function migrateClients(
   supabase: ReturnType<typeof buildSupabase>,
   summary: MigrationSummary
 ): Promise<Map<string, string>> {
   console.log("\n── 1/3  Clientes ──────────────────────────────────────────");
+
+  if (SKIP_CLIENTS) {
+    console.log("  (pulando inserção — carregando IDs existentes)");
+    return loadClientIdMapFromSupabase(supabase);
+  }
 
   const raw = await fetchAll<BubbleClient>(BUBBLE_TYPE_CLIENTS);
   const idMap = new Map<string, string>(); // bubble_id → supabase uuid
