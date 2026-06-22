@@ -12,6 +12,12 @@ export function initLogger(dryRun: boolean): void {
   console.log(`  Log de erros: ${LOG_PATH}\n`);
 }
 
+export function serializeError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null) return JSON.stringify(err);
+  return String(err);
+}
+
 export function logError(entity: string, bubbleId: string, reason: string): void {
   const line = `[${entity}] bubble_id=${bubbleId} | ${reason}\n`;
   if (stream) {
