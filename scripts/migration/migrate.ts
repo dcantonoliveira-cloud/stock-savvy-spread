@@ -11,7 +11,6 @@
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
-import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 import { fetchAll } from "./bubble-api.js";
 import { transformClient, transformEvent, transformTasting } from "./transform.js";

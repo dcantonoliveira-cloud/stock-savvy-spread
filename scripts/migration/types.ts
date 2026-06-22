@@ -19,51 +19,42 @@ export type BubbleRecord = Record<string, unknown> & {
 // ─── Bubble entity shapes (fields we actually use) ────────────────────────────
 
 export interface BubbleClient extends BubbleRecord {
-  nome?: string;
-  telefone?: string;
+  NomeDoCliente?: string;
+  Telefone?: string;
   email?: string;
-  cpf?: string;
-  rg?: string;
-  endereco?: string;
-  cep?: string;
-  restricoes_alimentares?: string;
-  observacoes?: string;
-  origem?: string;
+  CPF?: string;
+  RG?: string;
+  "endereço"?: string;
+  CEP?: string;
+  StatusDoCliente?: string;
 }
 
 export interface BubbleEvent extends BubbleRecord {
-  nome_evento?: string;
-  tipo_evento?: string;
-  statuscliente?: string;
-  data_evento?: string;
-  hora_inicio?: string;
-  hora_fim?: string;
-  duracao_horas?: number;
-  local?: string;
-  numero_convidados?: number;
-  criancas_50pct?: number;
-  nao_pagantes?: number;
-  produto?: string;
-  preco_por_pessoa?: number;
-  valor_total?: number;
-  contrato_assinado?: boolean | string;
-  data_assinatura_contrato?: string;
-  pago_integralmente?: boolean | string;
-  observacoes?: string;
-  // FK to client
-  cliente?: string;
+  NomeDoEvento?: string;
+  Tipo_Do_Evento?: string;
+  status?: string;
+  dataDoEvento?: string;
+  "Local Do Evento_TXT"?: string;
+  QtdConvidados?: number;
+  "Crianças50%"?: number;
+  CriançasNãoPagantes?: number;
+  PreçoCombinado?: number;
+  ValorTotalEvento?: number;
+  dataQueFechouContrato?: string;
+  Quitado?: boolean | string;
+  Observações?: string;
+  // FK to client (single Bubble ID string)
+  Cliente?: string;
 }
 
 export interface BubbleTasting extends BubbleRecord {
-  data_degustacao?: string;
-  numero_convidados?: number;
-  confirmado?: boolean | string;
-  status?: string;
-  notas_cardapio?: string;
-  feedback?: string;
-  // FKs
-  evento?: string;
-  cliente?: string;
+  data?: string;
+  convidados?: number;
+  Cardápio?: string;
+  clientesConfirmados?: string[];
+  // FKs (may be arrays in Bubble)
+  eventos?: string | string[];
+  clientes?: string | string[];
 }
 
 // ─── Supabase insert shapes ────────────────────────────────────────────────────

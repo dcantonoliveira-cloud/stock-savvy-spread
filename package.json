@@ -11,8 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "migrate:dry": "tsx scripts/migration/migrate.ts --dry-run",
-    "migrate:run": "tsx scripts/migration/migrate.ts"
+    "migrate:dry": "tsx --env-file scripts/migration/.env scripts/migration/migrate.ts --dry-run",
+    "migrate:run": "tsx --env-file scripts/migration/.env scripts/migration/migrate.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
