@@ -85,7 +85,7 @@ async function migrateClients(
     try {
       const { data, error } = await supabase
         .from("clients")
-        .insert(record)
+        .insert({ ...record, bubble_id: bubbleId })
         .select("id")
         .single();
 
@@ -139,7 +139,7 @@ async function migrateEvents(
 
       const { data, error } = await supabase
         .from("events")
-        .insert(record)
+        .insert({ ...record, bubble_id: bubbleId })
         .select("id")
         .single();
 
@@ -191,7 +191,7 @@ async function migrateTastings(
         logError("tastings", bubbleId, `warnings: ${warnings.join("; ")}`);
       }
 
-      const { error } = await supabase.from("tastings").insert(record);
+      const { error } = await supabase.from("tastings").insert({ ...record, bubble_id: bubbleId });
 
       if (error) throw error;
       summary.tastings.success++;
