@@ -81,7 +81,7 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-3xl font-extrabold gold-text tracking-wide">RONDELLO</h1>
-            <p className="text-xs text-muted-foreground mt-1 tracking-[0.2em] uppercase font-medium">Controle de Estoque</p>
+            <p className="text-xs text-muted-foreground mt-1 tracking-[0.2em] uppercase font-medium">Sistema de Gestão</p>
           </div>
         </div>
 

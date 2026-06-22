@@ -4,8 +4,8 @@ import { useOnlineUsers } from '@/hooks/useOnlineUsers';
 import {
   LayoutDashboard, Package, ArrowDownCircle, ArrowUpCircle, FileText,
   Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
-  ArrowRightLeft, ChevronDown, ChevronRight, Truck, ShoppingCart, Warehouse, ClipboardList,
-  AlertTriangle, BookMarked, Tag
+  ArrowRightLeft, ChevronDown, Truck, ShoppingCart, Warehouse, ClipboardList,
+  AlertTriangle, BookMarked, Tag, UserRound, CalendarDays, Coffee, Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -16,14 +16,25 @@ type NavGroup = { label: string; icon: any; items: NavItem[] } | NavItem;
 
 const navStructure: NavGroup[] = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+
   {
-    label: 'Categorias', icon: FolderOpen,
+    label: 'CRM', icon: UserRound,
     items: [
-      { path: '/categories', label: 'Insumos', icon: Package },
-      { path: '/tags', label: 'Tags', icon: Tag },
-      { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
+      { path: '/clients', label: 'Clientes', icon: UserRound },
+      { path: '/events', label: 'Eventos', icon: CalendarDays },
+      { path: '/tastings', label: 'Degustações', icon: Coffee },
     ]
   },
+
+  {
+    label: 'Operações', icon: UtensilsCrossed,
+    items: [
+      { path: '/event-menus', label: 'Cardápios', icon: UtensilsCrossed },
+      { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
+      { path: '/shopping-lists', label: 'Compras', icon: ShoppingCart },
+    ]
+  },
+
   {
     label: 'Estoque', icon: Package,
     items: [
@@ -31,8 +42,11 @@ const navStructure: NavGroup[] = [
       { path: '/inventory', label: 'Inventários', icon: ClipboardCheck },
       { path: '/kitchens', label: 'Centros de Custo', icon: Building2 },
       { path: '/fornecedores', label: 'Fornecedores', icon: Truck },
+      { path: '/categories', label: 'Insumos', icon: FolderOpen },
+      { path: '/tags', label: 'Tags', icon: Tag },
     ]
   },
+
   {
     label: 'Movimentações', icon: ArrowRightLeft,
     items: [
@@ -42,22 +56,26 @@ const navStructure: NavGroup[] = [
       { path: '/transfers', label: 'Transferências', icon: ArrowRightLeft },
     ]
   },
-  { label: 'Cardápios', icon: UtensilsCrossed, items: [
-    { path: '/event-menus', label: 'Cardápios de Eventos', icon: UtensilsCrossed },
-    { path: '/shopping-lists', label: 'Listas de Compras', icon: ShoppingCart },
-  ]},
+
   {
     label: 'Materiais', icon: Warehouse,
     items: [
       { path: '/materiais', label: 'Inventário', icon: Package },
       { path: '/materiais/categorias', label: 'Categorias', icon: FolderOpen },
-      { path: '/materiais/emprestimos', label: 'Eventos', icon: ClipboardList },
+      { path: '/materiais/emprestimos', label: 'Por Evento', icon: ClipboardList },
       { path: '/materiais/lista-base', label: 'Lista Base', icon: BookMarked },
       { path: '/materiais/perdas', label: 'Perdas & Avarias', icon: AlertTriangle },
     ]
   },
-  { path: '/analysis', label: 'Análise IA', icon: Brain },
-  { path: '/users', label: 'Funcionários', icon: Users },
+
+  {
+    label: 'Administração', icon: Users,
+    items: [
+      { path: '/users', label: 'Funcionários', icon: Users },
+      { path: '/analysis', label: 'Análise IA', icon: Brain },
+      { path: '/notifications', label: 'Notificações', icon: Bell },
+    ]
+  },
 ];
 
 function isGroup(item: NavGroup): item is { label: string; icon: any; items: NavItem[] } {
@@ -83,35 +101,34 @@ export default function SupervisorSidebar() {
 
   const toggleGroup = (label: string) => {
     setOpenGroups(prev => {
-      if (prev.has(label)) return new Set<string>();
-      return new Set([label]);
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
     });
   };
 
   const initials = profile?.display_name
-    ?.split(' ')
-    .slice(0, 2)
-    .map((w: string) => w[0])
-    .join('')
-    .toUpperCase() || '?';
+    ?.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() || '?';
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[256px] glass-sidebar flex flex-col z-50">
+    <aside className="fixed left-0 top-0 h-screen w-[252px] glass-sidebar flex flex-col z-50">
 
       {/* Logo */}
-      <div className="px-5 pt-6 pb-4">
-        <img src={logoRondello} alt="Rondello Buffet" className="h-9 object-contain" />
-        <p className="text-[10px] mt-1.5 tracking-[0.2em] uppercase font-semibold"
-           style={{ color: 'hsl(38 75% 52% / 0.7)' }}>
-          Painel do Supervisor
-        </p>
+      <div className="px-5 pt-5 pb-4 flex items-center gap-3">
+        <img src={logoRondello} alt="Rondello" className="h-8 object-contain" />
+        <div>
+          <p className="text-[10px] tracking-[0.18em] uppercase font-semibold"
+             style={{ color: 'hsl(220 40% 55%)' }}>
+            Sistema de Gestão
+          </p>
+        </div>
       </div>
 
-      {/* Divider */}
-      <div className="mx-5 h-px" style={{ background: 'hsl(222 25% 18%)' }} />
+      <div className="mx-4 h-px" style={{ background: 'hsl(220 40% 16%)' }} />
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-2.5 py-3 overflow-y-auto space-y-0.5">
         {navStructure.map((item) => {
           if (!isGroup(item)) {
             const active = pathname === item.path;
@@ -120,14 +137,12 @@ export default function SupervisorSidebar() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-                  active
-                    ? 'nav-item-active'
-                    : 'hover:bg-white/5'
+                className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
+                  active ? 'nav-item-active' : 'hover:bg-white/5'
                 }`}
-                style={{ color: active ? undefined : 'hsl(210 25% 65%)' }}
+                style={{ color: active ? undefined : 'hsl(220 20% 62%)' }}
               >
-                <Icon className="w-[17px] h-[17px] flex-shrink-0" />
+                <Icon className="w-4 h-4 shrink-0" />
                 {item.label}
               </Link>
             );
@@ -141,35 +156,38 @@ export default function SupervisorSidebar() {
             <div key={item.label}>
               <button
                 onClick={() => toggleGroup(item.label)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
                   isActiveGroup ? 'bg-white/5' : 'hover:bg-white/5'
                 }`}
-                style={{ color: isActiveGroup ? 'hsl(210 30% 85%)' : 'hsl(210 25% 60%)' }}
+                style={{ color: isActiveGroup ? 'hsl(220 25% 75%)' : 'hsl(220 15% 55%)' }}
               >
-                <Icon className="w-[17px] h-[17px] flex-shrink-0" />
+                <Icon className="w-4 h-4 shrink-0" />
                 <span className="flex-1 text-left">{item.label}</span>
-                {isOpen
-                  ? <ChevronDown className="w-3.5 h-3.5 opacity-50" />
-                  : <ChevronRight className="w-3.5 h-3.5 opacity-40" />
-                }
+                <ChevronDown
+                  className="w-3.5 h-3.5 transition-transform duration-200"
+                  style={{
+                    opacity: 0.5,
+                    transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                  }}
+                />
               </button>
 
               {isOpen && (
-                <div className="ml-5 mt-0.5 space-y-0.5 border-l pl-3"
-                     style={{ borderColor: 'hsl(222 25% 20%)' }}>
+                <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2.5"
+                     style={{ borderColor: 'hsl(220 35% 20%)' }}>
                   {item.items.map(sub => {
                     const SubIcon = sub.icon;
-                    const active = pathname === sub.path;
+                    const active = pathname === sub.path || pathname.startsWith(sub.path + '/');
                     return (
                       <Link
                         key={sub.path}
                         to={sub.path}
-                        className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150 ${
+                        className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] font-medium transition-colors ${
                           active ? 'nav-item-active' : 'hover:bg-white/5'
                         }`}
-                        style={{ color: active ? undefined : 'hsl(210 20% 55%)' }}
+                        style={{ color: active ? undefined : 'hsl(220 15% 52%)' }}
                       >
-                        <SubIcon className="w-[14px] h-[14px] flex-shrink-0" />
+                        <SubIcon className="w-3.5 h-3.5 shrink-0" />
                         {sub.label}
                       </Link>
                     );
@@ -183,37 +201,25 @@ export default function SupervisorSidebar() {
 
       {/* Online users */}
       {onlineUsers.length > 0 && (
-        <div className="mx-3 mb-2 px-3 py-2.5 rounded-xl" style={{ background: 'hsl(222 25% 14%)' }}>
+        <div className="mx-2.5 mb-2 px-3 py-2.5 rounded-lg" style={{ background: 'hsl(220 45% 15%)' }}>
           <div className="flex items-center gap-1.5 mb-2">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(210 20% 50%)' }}>
-              Online ({onlineUsers.length})
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(220 20% 48%)' }}>
+              Online · {onlineUsers.length}
             </span>
           </div>
           <div className="space-y-1.5">
             {onlineUsers.map(u => {
-              const initials = u.display_name
-                .split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
-              const isSupervisor = u.role === 'supervisor';
+              const uInitials = u.display_name.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
               return (
                 <div key={u.user_id} className="flex items-center gap-2">
-                  <div
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                    style={{
-                      background: isSupervisor ? 'hsl(38 75% 52% / 0.25)' : 'hsl(210 50% 52% / 0.25)',
-                      color: isSupervisor ? 'hsl(38 80% 62%)' : 'hsl(210 70% 70%)',
-                    }}
-                  >
-                    {initials}
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0"
+                       style={{ background: 'hsl(220 55% 28% / 0.6)', color: 'hsl(220 80% 72%)' }}>
+                    {uInitials}
                   </div>
-                  <span className="text-[11px] truncate" style={{ color: 'hsl(210 25% 65%)' }}>
+                  <span className="text-[11px] truncate" style={{ color: 'hsl(220 20% 58%)' }}>
                     {u.display_name}
                   </span>
-                  {isSupervisor && (
-                    <span className="text-[9px] px-1 rounded" style={{ background: 'hsl(38 75% 52% / 0.15)', color: 'hsl(38 80% 62%)' }}>
-                      sup
-                    </span>
-                  )}
                 </div>
               );
             })}
@@ -221,25 +227,20 @@ export default function SupervisorSidebar() {
         </div>
       )}
 
-      {/* Divider */}
-      <div className="mx-5 h-px" style={{ background: 'hsl(222 25% 18%)' }} />
+      <div className="mx-4 h-px" style={{ background: 'hsl(220 40% 16%)' }} />
 
-      {/* User */}
-      <div className="p-4 space-y-2">
-        <div className="flex items-center gap-3 px-1">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-               style={{
-                 background: 'hsl(38 75% 52% / 0.2)',
-                 color: 'hsl(38 80% 62%)',
-                 border: '1px solid hsl(38 75% 52% / 0.3)'
-               }}>
+      {/* User footer */}
+      <div className="p-3 space-y-1">
+        <div className="flex items-center gap-2.5 px-2 py-1.5">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+               style={{ background: 'hsl(220 60% 28%)', color: 'hsl(220 80% 82%)' }}>
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate" style={{ color: 'hsl(210 30% 88%)' }}>
+            <p className="text-[13px] font-semibold truncate" style={{ color: 'hsl(220 25% 82%)' }}>
               {profile?.display_name}
             </p>
-            <p className="text-[11px] truncate" style={{ color: 'hsl(210 20% 50%)' }}>
+            <p className="text-[11px] truncate" style={{ color: 'hsl(220 15% 48%)' }}>
               {profile?.email}
             </p>
           </div>
@@ -247,11 +248,12 @@ export default function SupervisorSidebar() {
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start rounded-xl text-xs hover:bg-red-500/10 hover:text-red-400"
-          style={{ color: 'hsl(210 20% 48%)' }}
+          className="w-full justify-start rounded-lg text-[12px] h-8 hover:bg-red-500/10 hover:text-red-400"
+          style={{ color: 'hsl(220 15% 45%)' }}
           onClick={signOut}
         >
-          <LogOut className="w-3.5 h-3.5 mr-2" />Sair
+          <LogOut className="w-3.5 h-3.5 mr-2" />
+          Sair da conta
         </Button>
       </div>
     </aside>
