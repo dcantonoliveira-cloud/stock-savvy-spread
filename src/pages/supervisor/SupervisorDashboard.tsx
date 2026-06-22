@@ -6,14 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const CHART_COLORS = [
-  'hsl(38, 92%, 50%)',
-  'hsl(152, 60%, 42%)',
-  'hsl(220, 70%, 55%)',
-  'hsl(0, 72%, 55%)',
-  'hsl(280, 60%, 55%)',
-  'hsl(180, 60%, 40%)',
-  'hsl(320, 60%, 50%)',
-  'hsl(60, 70%, 45%)',
+  'hsl(220, 70%, 42%)',
+  'hsl(152, 58%, 38%)',
+  'hsl(37, 90%, 52%)',
+  'hsl(0, 70%, 52%)',
+  'hsl(270, 60%, 52%)',
+  'hsl(185, 65%, 38%)',
+  'hsl(320, 55%, 48%)',
+  'hsl(55, 75%, 42%)',
 ];
 
 type StockItem = { id: string; name: string; category: string; unit: string; current_stock: number; min_stock: number; unit_cost: number };
@@ -94,8 +94,10 @@ export default function SupervisorDashboard() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold gold-text">Dashboard</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Visão geral do estoque</p>
+        <h1 className="text-2xl font-bold text-foreground">Visão Geral</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
       </div>
 
       {/* Stats Row 1 */}
@@ -134,8 +136,8 @@ export default function SupervisorDashboard() {
                     fontSize: 12,
                   }}
                 />
-                <Bar dataKey="entradas" fill="hsl(152, 60%, 42%)" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="saidas" fill="hsl(0, 72%, 55%)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="entradas" fill="hsl(220, 70%, 42%)" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="saidas" fill="hsl(0, 70%, 52%)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -218,15 +220,21 @@ export default function SupervisorDashboard() {
 function StatCard({ icon: Icon, label, value, accent, warn }: { icon: any; label: string; value: string | number; accent?: boolean; warn?: boolean }) {
   return (
     <div className="stat-card">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-          warn ? 'bg-warning/12 text-warning' : accent ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground'
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+          warn
+            ? 'bg-warning/10 text-warning'
+            : accent
+            ? 'bg-primary/10 text-primary'
+            : 'bg-secondary text-muted-foreground'
         }`}>
           <Icon className="w-4 h-4" />
         </div>
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </div>
-      <p className={`text-2xl font-extrabold tracking-tight ${warn ? 'text-warning' : 'text-foreground'}`}>{value}</p>
+      <p className={`text-[26px] font-bold tracking-tight ${warn ? 'text-warning' : accent ? 'text-primary' : 'text-foreground'}`}>
+        {value}
+      </p>
     </div>
   );
 }

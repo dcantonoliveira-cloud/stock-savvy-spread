@@ -16,7 +16,7 @@ export default function AppSidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col z-50">
       <div className="p-6 border-b border-border">
         <h1 className="font-display text-xl font-bold gold-text tracking-wide">RONDELLO</h1>
-        <p className="text-xs text-muted-foreground mt-1 tracking-widest uppercase">Controle de Estoque</p>
+        <p className="text-xs text-muted-foreground mt-1 tracking-widest uppercase">Sistema de Gestão</p>
       </div>
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map(({ path, label, icon: Icon }) => {
