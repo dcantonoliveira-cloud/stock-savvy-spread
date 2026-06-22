@@ -14,7 +14,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { fetchAll } from "./bubble-api.js";
 import { transformClient, transformEvent, transformTasting } from "./transform.js";
-import { initLogger, logError, closeLogger } from "./logger.js";
+import { initLogger, logError, serializeError, closeLogger } from "./logger.js";
 import type {
   BubbleClient,
   BubbleEvent,
@@ -93,7 +93,7 @@ async function migrateClients(
       idMap.set(bubbleId, data.id as string);
       summary.clients.success++;
     } catch (err) {
-      logError("clients", bubbleId, String(err));
+      logError("clients", bubbleId, serializeError(err));
       summary.clients.failed++;
     }
   }
@@ -147,7 +147,7 @@ async function migrateEvents(
       idMap.set(bubbleId, data.id as string);
       summary.events.success++;
     } catch (err) {
-      logError("events", bubbleId, String(err));
+      logError("events", bubbleId, serializeError(err));
       summary.events.failed++;
     }
   }
@@ -196,7 +196,7 @@ async function migrateTastings(
       if (error) throw error;
       summary.tastings.success++;
     } catch (err) {
-      logError("tastings", bubbleId, String(err));
+      logError("tastings", bubbleId, serializeError(err));
       summary.tastings.failed++;
     }
   }
