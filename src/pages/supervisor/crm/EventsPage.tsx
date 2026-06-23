@@ -9,7 +9,7 @@ import {
   CalendarDays, CheckCircle2, MoreVertical,
   Download, SlidersHorizontal, CalendarX,
   MapPin, Users, DollarSign, FileText, X,
-  Phone, Mail, Edit2, Trash2, ClipboardCheck,
+  Phone, Mail, Edit2, Trash2, ClipboardCheck, Filter,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -86,6 +86,8 @@ export default function EventsPage() {
   const [search, setSearch] = useState('');
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState<number | null>(today.getMonth());
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['confirmed']));
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Sheets
   const [newOpen, setNewOpen] = useState(false);
@@ -126,6 +128,7 @@ export default function EventsPage() {
   }, [events, year]);
 
   const filtered = useMemo(() => events.filter(e => {
+    if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
     if (!e.event_date) return month === null;
     const d = new Date(e.event_date + 'T12:00:00');
     if (d.getFullYear() !== year) return false;
@@ -139,7 +142,7 @@ export default function EventsPage() {
       );
     }
     return true;
-  }), [events, year, month, search]);
+  }), [events, year, month, search, statusFilter]);
 
   const confirmedFiltered = filtered.filter(e => e.status === 'confirmed');
   const statsValue = confirmedFiltered.reduce((s,e) => s + (e.total_value ?? 0), 0);
@@ -468,9 +471,63 @@ export default function EventsPage() {
           <button className="p-2 rounded-lg border border-border bg-white hover:bg-muted transition-colors text-muted-foreground" title="Exportar">
             <Download className="w-4 h-4" />
           </button>
-          <button className="p-2 rounded-lg border border-border bg-white hover:bg-muted transition-colors text-muted-foreground" title="Filtros">
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
+          {/* Filter dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setFilterOpen(o => !o)}
+              className={`relative p-2 rounded-lg border transition-colors ${
+                statusFilter.size !== 1 || !statusFilter.has('confirmed')
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-border bg-white hover:bg-muted text-muted-foreground'
+              }`}
+              title="Filtrar por status"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {(statusFilter.size !== 1 || !statusFilter.has('confirmed')) && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-primary rounded-full text-[9px] text-white font-bold flex items-center justify-center">
+                  {statusFilter.size === 0 ? '4' : statusFilter.size}
+                </span>
+              )}
+            </button>
+            {filterOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setFilterOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-40 w-52 bg-white border border-border rounded-xl shadow-xl p-3 space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Filtrar por status</p>
+                  {Object.entries(STATUS_LABELS).map(([key, label]) => {
+                    const active = statusFilter.has(key);
+                    return (
+                      <label key={key} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-muted cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          onChange={() => {
+                            setStatusFilter(prev => {
+                              const next = new Set(prev);
+                              if (next.has(key)) next.delete(key); else next.add(key);
+                              return next;
+                            });
+                          }}
+                          className="w-3.5 h-3.5 accent-primary"
+                        />
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_CLASSES[key]}`}>{label}</span>
+                      </label>
+                    );
+                  })}
+                  <div className="pt-2 border-t border-border flex gap-2">
+                    <button onClick={() => { setStatusFilter(new Set(['confirmed'])); setFilterOpen(false); }}
+                      className="flex-1 text-[11px] py-1 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground font-medium">
+                      Resetar
+                    </button>
+                    <button onClick={() => setStatusFilter(new Set(Object.keys(STATUS_LABELS)))}
+                      className="flex-1 text-[11px] py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-medium">
+                      Todos
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
           <Button onClick={() => { setForm({...EMPTY_FORM}); setClientQuery(''); setNewOpen(true); }}
             className="gap-1.5 shrink-0 rounded-lg h-9 px-4">
             <Plus className="w-4 h-4" />
@@ -498,8 +555,12 @@ export default function EventsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/20">
-                {['DATA','NOME DO CONTRATANTE','LOCAL DO EVENTO','TIPO DO EVENTO','PREÇO/PAX','CONVIDADOS','STATUS','PGTO',''].map(h => (
-                  <th key={h} className={`px-4 py-3 text-[11px] font-semibold text-muted-foreground tracking-wide whitespace-nowrap ${h === 'PREÇO/PAX' || h === 'CONVIDADOS' ? 'text-right' : h === 'STATUS' || h === 'PGTO' ? 'text-center' : 'text-left'}`}>
+                {['DATA','NOME DO EVENTO','LOCAL DO EVENTO','TIPO DO EVENTO','PREÇO/PAX','CONVIDADOS','STATUS','FECHAMENTO','PGTO %',''].map(h => (
+                  <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide whitespace-nowrap ${
+                    h === 'PREÇO/PAX' || h === 'CONVIDADOS' ? 'text-right'
+                    : h === 'STATUS' || h === 'FECHAMENTO' || h === 'PGTO %' ? 'text-center'
+                    : 'text-left'
+                  }`}>
                     {h}
                   </th>
                 ))}
@@ -509,15 +570,15 @@ export default function EventsPage() {
               {loading ? (
                 Array.from({length:8}).map((_,i) => (
                   <tr key={i} className="border-b border-border/50">
-                    {[50,32,25,18,14,12,14,12,4].map((w,j) => (
-                      <td key={j} className="px-4 py-3.5">
-                        <div className="h-3.5 bg-muted/40 rounded animate-pulse" style={{width:`${w}%`}} />
+                    {[50,32,25,18,14,12,14,10,10,4].map((w,j) => (
+                      <td key={j} className="px-4 py-2.5">
+                        <div className="h-3 bg-muted/40 rounded animate-pulse" style={{width:`${w}%`}} />
                       </td>
                     ))}
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="py-20 text-center">
+                <tr><td colSpan={10} className="py-20 text-center">
                   <CalendarX className="w-8 h-8 mx-auto mb-2 text-muted-foreground/20" />
                   <p className="text-sm text-muted-foreground">Nenhum evento neste período</p>
                 </td></tr>
@@ -535,49 +596,59 @@ export default function EventsPage() {
                       : 'hover:bg-primary/4'
                     }`}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    {/* DATA */}
+                    <td className="px-4 py-2 whitespace-nowrap">
                       <span className={`text-sm ${isToday_ ? 'font-bold text-primary' : past ? 'text-muted-foreground' : 'font-semibold text-foreground'}`}>
                         {fmtDate(ev.event_date)}
                       </span>
                       {isToday_ && <span className="ml-1.5 text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Hoje</span>}
                     </td>
-                    <td className="px-4 py-3">
-                      <p className={`font-medium truncate max-w-[180px] ${past ? 'text-muted-foreground' : 'text-foreground'}`}>
-                        {ev.clients?.name ?? ev.event_name ?? '—'}
-                      </p>
-                      {ev.event_name && ev.clients?.name && (
-                        <p className="text-xs text-muted-foreground truncate max-w-[180px]">{ev.event_name}</p>
-                      )}
+                    {/* NOME DO EVENTO — só uma linha */}
+                    <td className="px-4 py-2">
+                      <span className={`text-sm font-medium truncate max-w-[200px] block ${past ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {ev.event_name ?? ev.clients?.name ?? '—'}
+                      </span>
                     </td>
-                    <td className="px-4 py-3">
+                    {/* LOCAL */}
+                    <td className="px-4 py-2">
                       <span className="text-sm text-muted-foreground truncate max-w-[130px] block">{ev.location_text || '—'}</span>
                     </td>
-                    <td className="px-4 py-3">
+                    {/* TIPO */}
+                    <td className="px-4 py-2">
                       <span className="text-sm text-muted-foreground">{ev.event_type || '—'}</span>
                     </td>
-                    <td className="px-4 py-3 text-right font-medium text-foreground whitespace-nowrap">
+                    {/* PREÇO/PAX */}
+                    <td className="px-4 py-2 text-right font-medium text-foreground whitespace-nowrap text-sm">
                       {fmtBRL(ev.price_per_person)}
                     </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
+                    {/* CONVIDADOS */}
+                    <td className="px-4 py-2 text-right text-sm text-muted-foreground">
                       {ev.guest_count ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${STATUS_CLASSES[ev.status] ?? 'bg-muted text-muted-foreground'}`}>
+                    {/* STATUS */}
+                    <td className="px-4 py-2 text-center">
+                      <span className={`inline-flex text-[11px] font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${STATUS_CLASSES[ev.status] ?? 'bg-muted text-muted-foreground'}`}>
                         {STATUS_LABELS[ev.status] ?? ev.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      {ev.status === 'confirmed' ? (
-                        <div className="flex flex-col items-center gap-0.5">
-                          {contractShort && <span className="text-[10px] text-muted-foreground font-mono">{contractShort}</span>}
-                          {ev.is_paid_in_full
-                            ? <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600"><CheckCircle2 className="w-3 h-3"/>100%</span>
-                            : <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Pendente</span>
-                          }
-                        </div>
-                      ) : <span className="text-muted-foreground/30">—</span>}
+                    {/* FECHAMENTO — mês/ano do contrato */}
+                    <td className="px-4 py-2 text-center">
+                      {contractShort
+                        ? <span className="text-[12px] font-mono text-muted-foreground">{contractShort}</span>
+                        : <span className="text-muted-foreground/30 text-xs">—</span>}
                     </td>
-                    <td className="px-2 py-3">
+                    {/* PGTO % */}
+                    <td className="px-4 py-2 text-center">
+                      {ev.status === 'confirmed' ? (
+                        ev.is_paid_in_full
+                          ? <span className="inline-flex items-center gap-1 text-[12px] font-bold text-emerald-600">
+                              <CheckCircle2 className="w-3 h-3"/>100%
+                            </span>
+                          : <span className="text-[12px] font-semibold text-amber-600">0%</span>
+                      ) : <span className="text-muted-foreground/30 text-xs">—</span>}
+                    </td>
+                    {/* AÇÕES */}
+                    <td className="px-2 py-2">
                       <button
                         onClick={e => { e.stopPropagation(); openEdit(ev); }}
                         className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-all text-muted-foreground"
