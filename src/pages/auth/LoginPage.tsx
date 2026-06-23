@@ -40,6 +40,7 @@ export default function LoginPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !name.trim()) { toast.error('Preencha todos os campos'); return; }
+    if (password.length < 6) { toast.error('Senha deve ter no mínimo 6 caracteres'); return; }
     setLoading(true);
 
     const { data, error } = await supabase.auth.signUp({
@@ -52,14 +53,21 @@ export default function LoginPage() {
     });
 
     if (error) {
-      toast.error(error.message);
+      if (error.message.includes('already registered') || error.message.includes('already been registered')) {
+        toast.error('Este email já está cadastrado. Faça login.');
+      } else {
+        toast.error(error.message);
+      }
       setLoading(false);
       return;
     }
 
-    if (data.user) {
-      await supabase.from('user_roles').insert({ user_id: data.user.id, role: 'supervisor' as const });
-      toast.success('Conta criada! Faça login.');
+    if (data.session) {
+      // Email confirmation disabled — user is logged in immediately
+      toast.success('Conta criada com sucesso!');
+    } else {
+      // Email confirmation required
+      toast.success('Verifique seu email para confirmar o cadastro e depois faça login.', { duration: 6000 });
       setIsSignUp(false);
     }
     setLoading(false);
