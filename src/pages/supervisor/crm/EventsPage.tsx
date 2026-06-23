@@ -129,7 +129,7 @@ export default function EventsPage() {
 
   const filtered = useMemo(() => events.filter(e => {
     if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
-    if (!e.event_date) return month === null;
+    if (!e.event_date) return false;
     const d = new Date(e.event_date + 'T12:00:00');
     if (d.getFullYear() !== year) return false;
     if (month !== null && d.getMonth() !== month) return false;
