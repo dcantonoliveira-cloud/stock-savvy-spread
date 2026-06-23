@@ -394,11 +394,12 @@ export default function EventsPage() {
 
   // ── Render ────────────────────────────────────────────────────────
   return (
-    <div className="flex gap-0 -mx-8 -mt-8 min-h-[calc(100vh-56px)]">
+    <div className="flex gap-6 min-h-[calc(100vh-56px)]">
 
       {/* ── Sidebar mensal ── */}
-      <aside className="w-52 shrink-0 border-r border-border bg-card/60 pt-6 pb-4 flex flex-col">
-        <div className="flex items-center justify-between px-4 mb-4">
+      <aside className="w-48 shrink-0 self-start sticky top-6">
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
           <button onClick={() => setYear(y => y-1)} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground">
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -408,7 +409,7 @@ export default function EventsPage() {
           </button>
         </div>
 
-        <nav className="flex-1 px-2 space-y-0.5">
+        <nav className="px-2 py-2 space-y-0.5">
           <button
             onClick={() => setMonth(null)}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -455,10 +456,11 @@ export default function EventsPage() {
             );
           })}
         </nav>
+        </div>
       </aside>
 
       {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col pt-6 px-6 pb-6 min-w-0">
+      <div className="flex-1 flex flex-col min-w-0">
 
         {/* Toolbar */}
         <div className="flex items-center gap-3 mb-4">
