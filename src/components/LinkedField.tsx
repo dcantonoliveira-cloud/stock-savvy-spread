@@ -45,8 +45,15 @@ export default function LinkedField({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Quando items carregam e há valueId mas sem nome, resolve o nome pelo id
+  useEffect(() => {
+    if (!valueId || query) return;
+    const found = items.find(i => i.id === valueId);
+    if (found) setQuery(found.name);
+  }, [items, valueId]);
+
   // Sync external valueName → query
-  useEffect(() => { setQuery(valueName); }, [valueName]);
+  useEffect(() => { if (valueName) setQuery(valueName); }, [valueName]);
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(query.toLowerCase()));
   const selected = items.find(i => i.id === valueId);
