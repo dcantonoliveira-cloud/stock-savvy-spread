@@ -6,6 +6,7 @@ import {
   Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
   ArrowRightLeft, ChevronDown, Truck, ShoppingCart, Warehouse, ClipboardList,
   AlertTriangle, BookMarked, Tag, UserRound, CalendarDays, Coffee, Bell,
+  TrendingUp, DollarSign, Calendar,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -23,6 +24,14 @@ const navStructure: NavGroup[] = [
       { path: '/clients', label: 'Clientes', icon: UserRound },
       { path: '/events', label: 'Eventos', icon: CalendarDays },
       { path: '/tastings', label: 'Degustações', icon: Coffee },
+      { path: '/calendar', label: 'Calendário', icon: Calendar },
+    ]
+  },
+
+  {
+    label: 'Financeiro', icon: DollarSign,
+    items: [
+      { path: '/financeiro', label: 'Visão Geral', icon: TrendingUp },
     ]
   },
 
