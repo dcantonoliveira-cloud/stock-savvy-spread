@@ -184,6 +184,9 @@ export default function EventDetailPage() {
       pastry_chef: form.pastry_chef, band_dj: form.band_dj,
       photo_video: form.photo_video, bartender: form.bartender,
       other_professionals: form.other_professionals, extra_attractions: form.extra_attractions,
+      witness_name: form.witness_name ?? null,
+      witness_cpf: form.witness_cpf ?? null,
+      witness_email: form.witness_email ?? null,
     }).eq('id', id);
     setSaving(false);
     if (error) { toast.error('Erro ao salvar: ' + error.message); return; }
