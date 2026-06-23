@@ -191,11 +191,11 @@ export default function EventDetailPage() {
   const statusLabel = event.is_paid_in_full ? 'Quitado' : STATUS_LABELS[event.status] ?? event.status;
 
   return (
-    // -m-8 cancels the p-8 of SupervisorLayout so we can have a full-bleed header
     <div className="-m-8">
 
-      {/* ════ TOP BAR ════ */}
-      <div className="sticky top-14 z-30 bg-white border-b border-border shadow-sm">
+      {/* ════ TOP BAR — fixed, da borda do sidebar até a direita ════ */}
+      <div className="fixed z-30 bg-white border-b border-border shadow-sm"
+           style={{ top: 56, left: 252, right: 0 }}>
         <div className="px-8 py-3 flex items-center justify-between gap-4">
 
           <div className="min-w-0">
@@ -255,6 +255,9 @@ export default function EventDetailPage() {
       </div>
 
       {/* ════ CONTENT ════ */}
+      {/* Espaçador para compensar o header fixo (topbar ~72px + tabs ~42px) */}
+      <div style={{ height: 114 }} />
+
       <div className="px-8 py-6 space-y-5">
 
         {/* ── FICHA TÉCNICA ── */}
