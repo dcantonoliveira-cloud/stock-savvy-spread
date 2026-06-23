@@ -42,6 +42,11 @@ const FornecedorDetailPage     = lazy(() => import("./pages/supervisor/Fornecedo
 const ShoppingListsPage        = lazy(() => import("./pages/supervisor/ShoppingListsPage"));
 const ShoppingListDetailPage   = lazy(() => import("./pages/supervisor/ShoppingListDetailPage"));
 const MobileSupervisorApp      = lazy(() => import("./pages/supervisor/MobileSupervisorApp"));
+const ClientsPage              = lazy(() => import("./pages/supervisor/crm/ClientsPage"));
+const EventsPage               = lazy(() => import("./pages/supervisor/crm/EventsPage"));
+const TastingsPage             = lazy(() => import("./pages/supervisor/crm/TastingsPage"));
+const CalendarPage             = lazy(() => import("./pages/supervisor/crm/CalendarPage"));
+const FinanceiroPage           = lazy(() => import("./pages/supervisor/FinanceiroPage"));
 const MateriaisInventarioPage  = lazy(() => import("./pages/supervisor/materiais/MateriaisInventarioPage"));
 const MateriaisCategoriasPage  = lazy(() => import("./pages/supervisor/materiais/MateriaisCategoriasPage"));
 const EmprestimosPage          = lazy(() => import("./pages/supervisor/materiais/EmprestimosPage"));
@@ -110,6 +115,11 @@ function AppRoutes() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<SupervisorDashboard />} />
+            <Route path="/clients" element={<ClientsPage />} />
+            <Route path="/events" element={<EventsPage />} />
+            <Route path="/tastings" element={<TastingsPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/financeiro" element={<FinanceiroPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/categories/:name" element={<CategoryDetailPage />} />
             <Route path="/tags" element={<TagsPage />} />
