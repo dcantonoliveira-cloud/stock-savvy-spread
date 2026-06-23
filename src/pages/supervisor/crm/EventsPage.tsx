@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -205,9 +206,9 @@ export default function EventsPage() {
     load();
   };
 
+  const navigate = useNavigate();
   const openDetail = (event: EventRow) => {
-    setDetailEvent(event);
-    setEditMode(false);
+    navigate(`/events/${event.id}`);
   };
 
   const openEdit = (event: EventRow) => {
