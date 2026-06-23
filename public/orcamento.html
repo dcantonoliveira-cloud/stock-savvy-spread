@@ -2741,7 +2741,7 @@
 
     function loadHistorico() {
       setHistoricoLoading(true);
-      fetch(BUBBLE_BASE + '/obj/orcamento?limit=50', {
+      fetch(BUBBLE_BASE + '/obj/orcamento?limit=50&sort_field=Created+Date&descending=true', {
         headers: { Authorization: BUBBLE_TOKEN }
       }).then(function(r){ return r.json(); })
         .then(function(data){
