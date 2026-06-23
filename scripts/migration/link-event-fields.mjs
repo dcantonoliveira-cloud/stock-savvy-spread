@@ -1,6 +1,8 @@
 /**
  * Cruza eventos Bubble → Supabase e vincula location_id, organizer_id, decorator_id
- * Estratégia: match por event_name + event_date
+ *
+ * LocalDoEvento = referência à tabela Locais_eventos (ID do Bubble)
+ * Buscamos Locais_eventos para obter o nome real pelo ID
  */
 
 import https from 'https';
@@ -31,10 +33,10 @@ function fetchJson(url) {
   });
 }
 
-async function fetchAllBubble() {
+async function fetchAllBubble(type) {
   let cursor = 0, all = [];
   while (true) {
-    const data = await fetchJson(`${BUBBLE_BASE}/eventos?limit=100&cursor=${cursor}`);
+    const data = await fetchJson(`${BUBBLE_BASE}/${type}?limit=100&cursor=${cursor}`);
     all.push(...data.response.results);
     if (data.response.remaining === 0) break;
     cursor += 100;
@@ -56,50 +58,71 @@ async function fetchAllSupabase(table, select, filters = {}) {
   return rows;
 }
 
+const EMPTY = new Set(['não tem', 'nao tem', 'não tem ainda', '—', '-', '?', '??', '???', 'não', 'nao', 'indefinido', '']);
+
 async function main() {
   console.log('⏳ Carregando dados...');
 
-  const [bubbleEvents, sbEvents, locations, suppliers] = await Promise.all([
-    fetchAllBubble(),
+  const [bubbleEvents, bubbleLocais, sbEvents, locations, suppliers] = await Promise.all([
+    fetchAllBubble('eventos'),
+    fetchAllBubble('Locais_eventos'),
     fetchAllSupabase('events', 'id,event_name,event_date', { company_id: COMPANY_ID }),
     fetchAllSupabase('event_locations', 'id,name', { company_id: COMPANY_ID }),
     fetchAllSupabase('suppliers', 'id,name,type', { company_id: COMPANY_ID }),
   ]);
 
-  console.log(`  Bubble: ${bubbleEvents.length} | Supabase: ${sbEvents.length}`);
-  console.log(`  Locais: ${locations.length} | Fornecedores: ${suppliers.length}`);
+  console.log(`  Bubble eventos: ${bubbleEvents.length} | Bubble locais: ${bubbleLocais.length}`);
+  console.log(`  Supabase eventos: ${sbEvents.length} | Locais: ${locations.length} | Fornecedores: ${suppliers.length}`);
+
+  // Mapa: Bubble _id → nome do local
+  const bubbleLocMap = new Map(bubbleLocais.map(l => [l._id, l.Nome]));
 
   const organizers = suppliers.filter(s => s.type === 'organizer');
   const decorators = suppliers.filter(s => s.type === 'decorator');
 
-  // Mapas de lookup por nome normalizado
-  const locMap  = new Map(locations.map(r  => [norm(r.name), r.id]));
-  const orgMap  = new Map(organizers.map(r => [norm(r.name), r.id]));
-  const decMap  = new Map(decorators.map(r => [norm(r.name), r.id]));
+  // Mapas Supabase por nome normalizado
+  const locMap = new Map(locations.map(r  => [norm(r.name), r.id]));
+  const orgMap = new Map(organizers.map(r => [norm(r.name), r.id]));
+  const decMap = new Map(decorators.map(r => [norm(r.name), r.id]));
 
-  // Mapa de eventos Supabase: "nome|data" → id
+  // Mapa eventos Supabase: "nome|data" → id
   const sbMap = new Map(sbEvents.map(e => [`${norm(e.event_name)}|${e.event_date ?? ''}`, e.id]));
 
-  // Processar eventos do Bubble
-  const EMPTY = new Set(['não tem', 'nao tem', 'não tem ainda', '—', '-', '?', '??', '???', 'não', 'nao', 'indefinido', '']);
-
   let matched = 0, noMatch = 0, locLinked = 0, orgLinked = 0, decLinked = 0;
+  let locByRef = 0, locByTxt = 0;
   const updates = [];
 
   for (const bev of bubbleEvents) {
-    const name    = norm(bev['NomeDoEvento']);
-    const date    = toDate(bev['dataDoEvento']);
-    const key     = `${name}|${date ?? ''}`;
-    const sbId    = sbMap.get(key);
+    const name = norm(bev['NomeDoEvento']);
+    const date = toDate(bev['dataDoEvento']);
+    const key  = `${name}|${date ?? ''}`;
+    const sbId = sbMap.get(key);
 
     if (!sbId) { noMatch++; continue; }
     matched++;
 
-    const locText = bev['Local Do Evento_TXT'];
+    // LOCAL: prioridade para o campo linkado (LocalDoEvento → Locais_eventos.Nome)
+    let locId = null;
+    const bubbleLocId = bev['LocalDoEvento'];
+    if (bubbleLocId) {
+      const locName = bubbleLocMap.get(bubbleLocId);
+      if (locName && !EMPTY.has(norm(locName))) {
+        locId = locMap.get(norm(locName)) ?? null;
+        if (locId) locByRef++;
+      }
+    }
+    // Fallback: texto livre Local Do Evento_TXT
+    if (!locId) {
+      const locText = bev['Local Do Evento_TXT'];
+      if (locText && !EMPTY.has(norm(locText))) {
+        locId = locMap.get(norm(locText)) ?? null;
+        if (locId) locByTxt++;
+      }
+    }
+
     const orgText = bev['Organizador(a) escolhido'];
     const decText = bev['Decorador'];
 
-    const locId = (!locText || EMPTY.has(norm(locText))) ? null : locMap.get(norm(locText)) ?? null;
     const orgId = (!orgText || EMPTY.has(norm(orgText))) ? null : orgMap.get(norm(orgText)) ?? null;
     const decId = (!decText || EMPTY.has(norm(decText))) ? null : decMap.get(norm(decText)) ?? null;
 
@@ -111,7 +134,8 @@ async function main() {
   }
 
   console.log(`\n🔗 Match: ${matched} eventos | Sem match: ${noMatch}`);
-  console.log(`   Locais: ${locLinked} | Organizadoras: ${orgLinked} | Decoradores: ${decLinked}`);
+  console.log(`   Locais: ${locLinked} (por ref: ${locByRef}, por texto: ${locByTxt})`);
+  console.log(`   Organizadoras: ${orgLinked} | Decoradores: ${decLinked}`);
 
   if (updates.length === 0) { console.log('Nada a atualizar.'); return; }
 
