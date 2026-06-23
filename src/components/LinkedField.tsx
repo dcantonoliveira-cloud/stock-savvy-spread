@@ -7,26 +7,30 @@ interface Item { id: string; name: string }
 
 interface Props {
   label: string;
-  table: string;                      // 'event_locations' | 'event_products' | 'suppliers'
-  typeFilter?: string;                // for suppliers: 'organizer' | 'decorator' etc.
+  table: string;
+  typeFilter?: string;
   valueId: string | null;
-  valueName: string;                  // fallback text (legacy data)
+  valueName: string;
   onChangeId: (id: string | null) => void;
   onChangeName: (name: string) => void;
   createLabel?: string;
 }
 
+const inputCls =
+  'w-full h-10 pl-3 pr-8 text-sm bg-background border border-border rounded-lg ' +
+  'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors';
+
 export default function LinkedField({
   label, table, typeFilter, valueId, valueName, onChangeId, onChangeName, createLabel,
 }: Props) {
-  const [items, setItems] = useState<Item[]>([]);
-  const [query, setQuery] = useState(valueName);
-  const [open, setOpen] = useState(false);
+  const [items, setItems]       = useState<Item[]>([]);
+  const [search, setSearch]     = useState('');   // what user is actively typing
+  const [typing, setTyping]     = useState(false); // true while user has focus + typed
+  const [open, setOpen]         = useState(false);
   const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [newName, setNewName]   = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
-  // Load items
   const load = async () => {
     let q = supabase.from(table as any).select('id, name').order('name');
     if (typeFilter) q = (q as any).eq('type', typeFilter);
@@ -36,39 +40,53 @@ export default function LinkedField({
 
   useEffect(() => { load(); }, [table, typeFilter]);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setTyping(false);
+        setSearch('');
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Quando items carregam e há valueId mas sem nome, resolve o nome pelo id
-  useEffect(() => {
-    if (!valueId || query) return;
-    const found = items.find(i => i.id === valueId);
-    if (found) setQuery(found.name);
-  }, [items, valueId]);
-
-  // Sync external valueName → query
-  useEffect(() => { if (valueName) setQuery(valueName); }, [valueName]);
-
-  const filtered = items.filter(i => i.name.toLowerCase().includes(query.toLowerCase()));
+  // O valor resolvido: se há seleção, usa o nome do item; caso contrário usa valueName
   const selected = items.find(i => i.id === valueId);
+  const resolvedName = selected?.name ?? valueName ?? '';
+
+  // O que o input mostra: se o usuário está digitando, mostra o search; senão o nome resolvido
+  const displayValue = typing ? search : resolvedName;
+
+  // Filtragem do dropdown
+  const filterText = typing ? search : '';
+  const filtered = filterText
+    ? items.filter(i => i.name.toLowerCase().includes(filterText.toLowerCase()))
+    : items;
 
   const select = (item: Item) => {
     onChangeId(item.id);
     onChangeName(item.name);
-    setQuery(item.name);
+    setTyping(false);
+    setSearch('');
     setOpen(false);
   };
 
-  const clear = () => {
+  const clear = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onChangeId(null);
     onChangeName('');
-    setQuery('');
+    setSearch('');
+    setTyping(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setTyping(true);
+    setOpen(true);
+    // Limpa a seleção enquanto digita
+    if (valueId) { onChangeId(null); onChangeName(e.target.value); }
   };
 
   const create = async () => {
@@ -84,10 +102,6 @@ export default function LinkedField({
     toast.success(`${createLabel ?? label} criado(a)!`);
   };
 
-  const inputCls =
-    'w-full h-10 pl-3 pr-8 text-sm bg-background border border-border rounded-lg ' +
-    'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors';
-
   return (
     <div ref={ref} className="relative">
       <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70 mb-1.5">
@@ -95,28 +109,26 @@ export default function LinkedField({
       </label>
 
       <div className="flex gap-1.5">
-        {/* Input */}
         <div className="relative flex-1">
           <input
             type="text"
-            value={query}
-            onChange={e => { setQuery(e.target.value); setOpen(true); onChangeId(null); onChangeName(e.target.value); }}
+            value={displayValue}
+            onChange={handleInputChange}
             onFocus={() => setOpen(true)}
             placeholder={`Buscar ${label.toLowerCase()}...`}
-            className={inputCls}
+            className={inputCls + (selected ? ' font-medium' : '')}
           />
-          {/* Right icon */}
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-            {valueId && (
+            {(valueId || resolvedName) ? (
               <button type="button" onClick={clear} className="text-muted-foreground hover:text-destructive transition-colors">
                 <X className="w-3 h-3" />
               </button>
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50" />
             )}
-            {!valueId && <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50" />}
           </span>
         </div>
 
-        {/* Add new button */}
         <button
           type="button"
           onClick={() => { setCreating(true); setOpen(false); setNewName(''); }}
@@ -127,9 +139,8 @@ export default function LinkedField({
         </button>
       </div>
 
-      {/* Dropdown */}
       {open && (
-        <div className="absolute top-full left-0 right-10 z-50 mt-1 bg-white border border-border rounded-xl shadow-lg overflow-hidden max-h-52 overflow-y-auto">
+        <div className="absolute top-full left-0 right-10 z-50 mt-1 bg-white border border-border rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
           {filtered.length === 0 ? (
             <p className="px-3 py-2.5 text-xs text-muted-foreground">
               Nenhum resultado. Use <strong>+</strong> para criar.
@@ -150,7 +161,6 @@ export default function LinkedField({
         </div>
       )}
 
-      {/* Inline create form */}
       {creating && (
         <div className="mt-1.5 flex gap-1.5 p-3 bg-muted/30 border border-border rounded-xl">
           <input
