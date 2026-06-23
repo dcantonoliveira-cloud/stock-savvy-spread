@@ -45,7 +45,20 @@ interface EventDetail {
   bartender: string | null;
   other_professionals: string | null;
   extra_attractions: string | null;
-  clients: { id: string; name: string | null; phone: string | null; email: string | null } | null;
+  clients: {
+    id: string;
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+    cpf: string | null;
+    rg: string | null;
+    address: string | null;
+    zip_code: string | null;
+    source: string | null;
+  } | null;
+  witness_name: string | null;
+  witness_cpf: string | null;
+  witness_email: string | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -134,7 +147,7 @@ export default function EventDetailPage() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    supabase.from('events').select('*, clients(id, name, phone, email)').eq('id', id).single()
+    supabase.from('events').select('*, clients(id, name, phone, email, cpf, rg, address, zip_code, source)').eq('id', id).single()
       .then(({ data, error }) => {
         if (error || !data) { toast.error('Evento não encontrado'); navigate('/events'); return; }
         setEvent(data as EventDetail);
@@ -364,18 +377,84 @@ export default function EventDetailPage() {
 
         {/* ── DADOS DO CLIENTE ── */}
         {tab === 'Dados do Cliente' && (
-          <div className="bg-white border border-border rounded-2xl p-6">
-            <SectionTitle>Cliente vinculado</SectionTitle>
-            {event.clients ? (
-              <div className="grid grid-cols-4 gap-4">
-                <div><label className={labelCls}>Nome</label><p className="text-sm font-medium">{event.clients.name ?? '—'}</p></div>
-                <div><label className={labelCls}>Telefone</label><p className="text-sm">{event.clients.phone ?? '—'}</p></div>
-                <div><label className={labelCls}>E-mail</label><p className="text-sm">{event.clients.email ?? '—'}</p></div>
+          <>
+            {/* Dados do contratante */}
+            <div className="bg-white border border-border rounded-2xl p-6">
+              <SectionTitle>Dados do Contratante</SectionTitle>
+              {event.clients ? (
+                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                  <div className="col-span-2">
+                    <label className={labelCls}>Nome do Contratante</label>
+                    <p className="text-sm font-medium border-b border-border pb-2">{event.clients.name ?? '—'}</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Telefone com DDD</label>
+                    <p className="text-sm border-b border-border pb-2">{event.clients.phone ?? '—'}</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>CPF/CNPJ</label>
+                    <p className="text-sm border-b border-border pb-2">{event.clients.cpf ?? '—'}</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>RG</label>
+                    <p className="text-sm border-b border-border pb-2">{event.clients.rg ?? '—'}</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>E-mail</label>
+                    <p className="text-sm border-b border-border pb-2">{event.clients.email ?? '—'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <label className={labelCls}>Endereço Completo</label>
+                    <p className="text-sm border-b border-border pb-2">{event.clients.address ?? '—'}</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>CEP</label>
+                    <p className="text-sm border-b border-border pb-2">{event.clients.zip_code ?? '—'}</p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>De onde nos conheceu</label>
+                    <p className="text-sm border-b border-border pb-2">{event.clients.source ?? '—'}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhum cliente vinculado a este evento.</p>
+              )}
+            </div>
+
+            {/* Testemunha */}
+            <div className="bg-white border border-border rounded-2xl p-6">
+              <SectionTitle>Testemunha</SectionTitle>
+              <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                <div>
+                  <label className={labelCls}>Nome Completo</label>
+                  <input
+                    className={inputCls}
+                    value={s('witness_name')}
+                    onChange={e => setF('witness_name', e.target.value)}
+                    placeholder="Nome da testemunha"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>CPF</label>
+                  <input
+                    className={inputCls}
+                    value={s('witness_cpf')}
+                    onChange={e => setF('witness_cpf', e.target.value)}
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>E-mail</label>
+                  <input
+                    className={inputCls}
+                    value={s('witness_email')}
+                    onChange={e => setF('witness_email', e.target.value)}
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Nenhum cliente vinculado.</p>
-            )}
-          </div>
+            </div>
+          </>
         )}
 
         {/* ── EM CONSTRUÇÃO ── */}

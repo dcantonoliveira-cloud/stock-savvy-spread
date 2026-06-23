@@ -1,0 +1,4 @@
+ALTER TABLE events
+  ADD COLUMN IF NOT EXISTS witness_name  TEXT,
+  ADD COLUMN IF NOT EXISTS witness_cpf   TEXT,
+  ADD COLUMN IF NOT EXISTS witness_email TEXT;
