@@ -6,7 +6,8 @@ import {
   Users, LogOut, Brain, FolderOpen, ClipboardCheck, Building2, UtensilsCrossed,
   ArrowRightLeft, ChevronDown, Truck, ShoppingCart, Warehouse, ClipboardList,
   AlertTriangle, BookMarked, Tag, UserRound, CalendarDays, Coffee, Bell,
-  TrendingUp, DollarSign, Calendar,
+  TrendingUp, DollarSign, Calendar, LibraryBig, MapPin, Sparkles, UserCheck,
+  Palette, ScrollText, ChefHat,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -74,6 +75,18 @@ const navStructure: NavGroup[] = [
       { path: '/materiais/emprestimos', label: 'Por Evento', icon: ClipboardList },
       { path: '/materiais/lista-base', label: 'Lista Base', icon: BookMarked },
       { path: '/materiais/perdas', label: 'Perdas & Avarias', icon: AlertTriangle },
+    ]
+  },
+
+  {
+    label: 'Cadastros', icon: LibraryBig,
+    items: [
+      { path: '/cadastros/produtos', label: 'Produtos', icon: ChefHat },
+      { path: '/cadastros/saloes', label: 'Salões & Locais', icon: MapPin },
+      { path: '/cadastros/tipos-festa', label: 'Tipos de Festa', icon: Sparkles },
+      { path: '/cadastros/assessores', label: 'Assessores', icon: UserCheck },
+      { path: '/cadastros/decoradores', label: 'Decoradores', icon: Palette },
+      { path: '/cadastros/contratos', label: 'Contratos', icon: ScrollText },
     ]
   },
 
