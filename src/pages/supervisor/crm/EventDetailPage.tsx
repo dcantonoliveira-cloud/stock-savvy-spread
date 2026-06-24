@@ -11,6 +11,7 @@ import MenuSheetsTab from '@/components/MenuSheetsTab';
 import EventChecklistTab from '@/components/EventChecklistTab';
 import EventCronogramaTab from '@/components/EventCronogramaTab';
 import EventFinanceiroTab from '@/components/EventFinanceiroTab';
+import EventArquivosTab from '@/components/EventArquivosTab';
 import { generateFechamentoPDF } from '@/utils/generateFechamentoPDF';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -682,8 +683,36 @@ export default function EventDetailPage() {
           />
         )}
 
+        {tab === 'Arquivos' && id && event && (
+          <EventArquivosTab
+            eventId={id}
+            event={{
+              event_name: form.event_name ?? null,
+              event_date: form.event_date ?? null,
+              event_type: form.event_type ?? null,
+              ceremony_time: form.ceremony_time ?? null,
+              duration_hours: form.duration_hours ?? null,
+              location_text: form.location_text ?? null,
+              guest_count: form.guest_count ?? null,
+              price_per_person: form.price_per_person ?? null,
+              total_value: event.total_value ?? null,
+              product_name: form.product_name ?? null,
+              pricing_mode: form.pricing_mode ?? null,
+              contract_value: form.contract_value ?? null,
+              witness_name: form.witness_name ?? null,
+              witness_cpf: form.witness_cpf ?? null,
+              clients: event.clients ? {
+                name: event.clients.name ?? null,
+                cpf: event.clients.cpf ?? null,
+                rg: event.clients.rg ?? null,
+                address: event.clients.address ?? null,
+              } : null,
+            }}
+          />
+        )}
+
         {/* ── EM CONSTRUÇÃO ── */}
-        {['Arquivos','Equipe'].includes(tab) && (
+        {['Equipe'].includes(tab) && (
           <div className="bg-white border border-border rounded-2xl p-16 flex flex-col items-center gap-3 text-center">
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center text-2xl">🚧</div>
             <p className="font-semibold">Em construção</p>
