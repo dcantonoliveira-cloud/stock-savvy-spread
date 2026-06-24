@@ -43,6 +43,12 @@ const ShoppingListsPage        = lazy(() => import("./pages/supervisor/ShoppingL
 const ShoppingListDetailPage   = lazy(() => import("./pages/supervisor/ShoppingListDetailPage"));
 const MobileSupervisorApp      = lazy(() => import("./pages/supervisor/MobileSupervisorApp"));
 const ClientsPage              = lazy(() => import("./pages/supervisor/crm/ClientsPage"));
+const ProdutosPage             = lazy(() => import("./pages/supervisor/cadastros/ProdutosPage"));
+const SaloesPage               = lazy(() => import("./pages/supervisor/cadastros/SaloesPage"));
+const TiposFestPage            = lazy(() => import("./pages/supervisor/cadastros/TiposFestPage"));
+const AssessoresPage           = lazy(() => import("./pages/supervisor/cadastros/AssessoresPage"));
+const DecoradoresPage          = lazy(() => import("./pages/supervisor/cadastros/DecoradoresPage"));
+const ContratosPage            = lazy(() => import("./pages/supervisor/cadastros/ContratosPage"));
 const EventsPage               = lazy(() => import("./pages/supervisor/crm/EventsPage"));
 const EventDetailPage          = lazy(() => import("./pages/supervisor/crm/EventDetailPage"));
 const TastingsPage             = lazy(() => import("./pages/supervisor/crm/TastingsPage"));
@@ -119,6 +125,12 @@ function AppRoutes() {
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/events/:id" element={<EventDetailPage />} />
+            <Route path="/cadastros/produtos" element={<ProdutosPage />} />
+            <Route path="/cadastros/saloes" element={<SaloesPage />} />
+            <Route path="/cadastros/tipos-festa" element={<TiposFestPage />} />
+            <Route path="/cadastros/assessores" element={<AssessoresPage />} />
+            <Route path="/cadastros/decoradores" element={<DecoradoresPage />} />
+            <Route path="/cadastros/contratos" element={<ContratosPage />} />
             <Route path="/tastings" element={<TastingsPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/financeiro" element={<FinanceiroPage />} />
