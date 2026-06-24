@@ -228,10 +228,10 @@ export default function ContratosPage() {
         </div>
 
         {/* Layout esquerda / direita */}
-        <div className="flex" style={{ minHeight: 520 }}>
+        <div className="flex" style={{ height: 520 }}>
 
           {/* Esquerda — lista */}
-          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10" style={{ height: 520 }}>
+          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10 h-full">
             <div className="flex-1 min-h-0 p-2 overflow-y-auto space-y-0.5">
               {templates.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-8">Nenhum modelo ainda</p>
@@ -290,7 +290,7 @@ export default function ContratosPage() {
               </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground gap-3 p-10">
-                <span className="text-4xl">📄</span>
+                <span className="text-4xl opacity-20">◻</span>
                 <div>
                   <p className="text-sm font-semibold mb-1">Selecione um modelo</p>
                   <p className="text-xs">Escolha um modelo à esquerda para editar seu conteúdo,<br />ou crie um novo pelo campo abaixo da lista.</p>
@@ -319,10 +319,10 @@ export default function ContratosPage() {
           )}
         </div>
 
-        <div className="flex" style={{ minHeight: 380 }}>
+        <div className="flex" style={{ height: 380 }}>
 
           {/* Esquerda — lista */}
-          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10" style={{ height: 380 }}>
+          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10 h-full">
             <div className="flex-1 min-h-0 p-2 overflow-y-auto space-y-0.5">
               {annexes.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-8">Nenhum modelo ainda</p>
