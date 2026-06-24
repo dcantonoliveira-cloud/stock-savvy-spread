@@ -1,7 +1,32 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Check, X, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { Plus, Trash2, Check, X, ChevronDown, ChevronRight, Info, HelpCircle } from 'lucide-react';
+
+// ── SectionHeader ─────────────────────────────────────────────────────────────
+function SectionHeader({ title, tooltip }: { title: string; tooltip: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">{title}</span>
+      <div className="flex-1 h-px bg-border" />
+      <div className="relative">
+        <button
+          onMouseEnter={() => setShow(true)}
+          onMouseLeave={() => setShow(false)}
+          className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+        </button>
+        {show && (
+          <div className="absolute right-0 top-5 z-30 w-64 p-3 bg-foreground text-background text-xs rounded-xl shadow-lg leading-relaxed">
+            {tooltip}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -190,12 +215,25 @@ export default function EventFinanceiroTab({
   return (
     <div className="space-y-4">
 
+      {/* Banner informativo */}
+      <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-800">
+        <Info className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+        <div>
+          <p className="font-semibold mb-0.5">Como funciona o Financeiro</p>
+          <p className="text-blue-700/80">
+            O valor final é calculado automaticamente a partir dos dados da Ficha Técnica (convidados, preço/pax, profissionais)
+            somado aos valores adicionais. Os pagamentos registrados abaixo determinam o saldo em aberto e o percentual pago
+            que aparece na lista de eventos.
+          </p>
+        </div>
+      </div>
+
       {/* ── Modo de cobrança ── */}
       <div className="bg-white border border-border rounded-2xl p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Modo de Cobrança</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
+        <SectionHeader
+          title="Modo de Cobrança"
+          tooltip="Define como o valor base do evento é calculado. 'Por convidado' multiplica o preço/pax pelo número de convidados. 'Valor fixo' permite digitar diretamente o valor negociado do pacote."
+        />
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-muted rounded-xl p-1 gap-1">
             {(['per_person', 'fixed'] as const).map(mode => (
@@ -231,10 +269,10 @@ export default function EventFinanceiroTab({
 
       {/* ── Resumo financeiro ── */}
       <div className="bg-white border border-border rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-5">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Resumo Financeiro</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
+        <SectionHeader
+          title="Resumo Financeiro"
+          tooltip="Totalizadores calculados em tempo real. O saldo é o que ainda falta receber. O % pago é o mesmo indicador exibido na lista de eventos."
+        />
 
         <div className="grid grid-cols-4 gap-4 mb-5">
           <div className="p-4 rounded-xl bg-muted/40 border border-border">
@@ -306,86 +344,91 @@ export default function EventFinanceiroTab({
 
       {/* ── Valores Adicionais ── */}
       <div className="bg-white border border-border rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Valores Adicionais</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
+        <SectionHeader
+          title="Valores Adicionais"
+          tooltip="Itens cobrados além do contrato base: frete, aluguel de equipamentos, upgrades, taxa de deslocamento, etc. Cada item é somado ao valor final automaticamente."
+        />
         <p className="text-xs text-muted-foreground mb-4">Adicione valores além do contrato base, como frete, upgrades, entre outros.</p>
 
-        <div className="border border-border rounded-xl overflow-hidden">
-          <div className="grid grid-cols-[1fr_180px_40px] bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase text-muted-foreground/60 gap-3">
-            <span>Descrição</span><span>Valor</span><span />
+        <div className="border border-border rounded-xl overflow-hidden mb-3">
+          <div className="grid grid-cols-[1fr_200px_40px] bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase text-muted-foreground/60 gap-3">
+            <span>Descrição</span><span>Valor (R$)</span><span />
           </div>
           {additionals.map(a => (
-            <div key={a.id} className="group grid grid-cols-[1fr_180px_40px] px-4 py-2.5 border-t border-border/50 gap-3 items-center hover:bg-muted/20">
+            <div key={a.id} className="group grid grid-cols-[1fr_200px_40px] px-3 py-2 border-t border-border/50 gap-3 items-center hover:bg-muted/20">
               <input value={a.description} onChange={e => updateAdditional(a.id, 'description', e.target.value)}
-                className="bg-transparent text-sm focus:outline-none w-full" />
+                className={inputCls + ' w-full'} />
               <input type="number" value={a.value} onChange={e => updateAdditional(a.id, 'value', Number(e.target.value))}
-                className="bg-transparent text-sm font-medium text-right focus:outline-none w-full" />
+                className={inputCls + ' w-full text-right'} />
               <button onClick={() => deleteAdditional(a.id)}
                 className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
-          {/* New row */}
-          <div className="grid grid-cols-[1fr_180px_40px] px-4 py-2.5 border-t border-dashed border-border/50 gap-3 items-center">
-            <input value={newDesc} onChange={e => setNewDesc(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addAdditional(); }}
-              placeholder="Valor adicional..." className="bg-transparent text-sm focus:outline-none w-full placeholder:text-muted-foreground/30" />
-            <input type="number" value={newAddVal} onChange={e => setNewAddVal(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addAdditional(); }}
-              placeholder="0,00" className="bg-transparent text-sm text-right focus:outline-none w-full placeholder:text-muted-foreground/30" />
-            <button onClick={addAdditional} className="p-1 text-primary hover:text-primary/70 transition-colors">
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
+        </div>
+        {/* New row */}
+        <div className="flex gap-2 items-center">
+          <input value={newDesc} onChange={e => setNewDesc(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addAdditional(); }}
+            placeholder="Descrição do valor adicional..." className={inputCls + ' flex-1'} />
+          <input type="number" value={newAddVal} onChange={e => setNewAddVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addAdditional(); }}
+            placeholder="Valor" className={inputCls + ' w-36'} />
+          <button onClick={addAdditional}
+            className="h-9 px-3 flex items-center gap-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 whitespace-nowrap transition-colors">
+            <Plus className="w-3.5 h-3.5" />Adicionar
+          </button>
         </div>
       </div>
 
       {/* ── Pagamentos ── */}
       <div className="bg-white border border-border rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Pagamentos</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-        <p className="text-xs text-muted-foreground mb-4">Preencha os campos com data e valor do pagamento.</p>
+        <SectionHeader
+          title="Pagamentos"
+          tooltip="Registre cada pagamento recebido. O tipo ajuda a identificar a origem (entrada, degustação, parcela). Esses valores são somados no 'Valor Pago' do resumo."
+        />
+        <p className="text-xs text-muted-foreground mb-4">Registre os pagamentos já recebidos com data e valor.</p>
 
-        <div className="border border-border rounded-xl overflow-hidden">
-          <div className="grid grid-cols-[160px_1fr_160px_130px_40px] bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase text-muted-foreground/60 gap-3">
-            <span>Data</span><span>Observação</span><span>Valor</span><span>Tipo</span><span />
-          </div>
-          {confirmed.map(p => (
-            <div key={p.id} className="group grid grid-cols-[160px_1fr_160px_130px_40px] px-4 py-2.5 border-t border-border/50 gap-3 items-center hover:bg-muted/20">
-              <span className="text-sm">{fmtDate(p.payment_date)}</span>
-              <span className="text-sm text-muted-foreground truncate">{p.notes ?? '—'}</span>
-              <span className="text-sm font-medium">{fmtBRL(Number(p.value))}</span>
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border w-fit ${PAYMENT_TYPES[p.type]?.color ?? PAYMENT_TYPES.other.color}`}>
-                {PAYMENT_TYPES[p.type]?.label ?? p.type}
-              </span>
-              <button onClick={() => deletePayment(p.id)}
-                className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all">
-                <X className="w-3.5 h-3.5" />
-              </button>
+        {confirmed.length > 0 && (
+          <div className="border border-border rounded-xl overflow-hidden mb-3">
+            <div className="grid grid-cols-[160px_1fr_160px_130px_40px] bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase text-muted-foreground/60 gap-3">
+              <span>Data</span><span>Observação</span><span>Valor</span><span>Tipo</span><span />
             </div>
-          ))}
-          {/* New payment row */}
-          <div className="grid grid-cols-[160px_1fr_160px_130px_40px] px-4 py-2.5 border-t border-dashed border-border/50 gap-3 items-center">
-            <input type="date" value={newPayDate} onChange={e => setNewPayDate(e.target.value)}
-              className="bg-transparent text-sm focus:outline-none w-full text-muted-foreground" />
-            <input value={newPayNotes} onChange={e => setNewPayNotes(e.target.value)}
-              placeholder="Observação..." className="bg-transparent text-sm focus:outline-none w-full placeholder:text-muted-foreground/30" />
-            <input type="number" value={newPayVal} onChange={e => setNewPayVal(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') addPayment(); }}
-              placeholder="Valor" className="bg-transparent text-sm focus:outline-none w-full placeholder:text-muted-foreground/30" />
-            <select value={newPayType} onChange={e => setNewPayType(e.target.value)}
-              className="bg-transparent text-xs focus:outline-none w-full text-muted-foreground">
-              {Object.entries(PAYMENT_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-            <button onClick={() => addPayment()} className="p-1 text-primary hover:text-primary/70 transition-colors">
-              <Plus className="w-4 h-4" />
-            </button>
+            {confirmed.map(p => (
+              <div key={p.id} className="group grid grid-cols-[160px_1fr_160px_130px_40px] px-4 py-2.5 border-t border-border/50 gap-3 items-center hover:bg-muted/20">
+                <span className="text-sm">{fmtDate(p.payment_date)}</span>
+                <span className="text-sm text-muted-foreground truncate">{p.notes ?? '—'}</span>
+                <span className="text-sm font-medium">{fmtBRL(Number(p.value))}</span>
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border w-fit ${PAYMENT_TYPES[p.type]?.color ?? PAYMENT_TYPES.other.color}`}>
+                  {PAYMENT_TYPES[p.type]?.label ?? p.type}
+                </span>
+                <button onClick={() => deletePayment(p.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
+        )}
+
+        {/* New payment */}
+        <div className="flex gap-2 items-center flex-wrap">
+          <input type="date" value={newPayDate} onChange={e => setNewPayDate(e.target.value)}
+            className={inputCls + ' w-44'} />
+          <input value={newPayNotes} onChange={e => setNewPayNotes(e.target.value)}
+            placeholder="Observação..." className={inputCls + ' flex-1 min-w-[140px]'} />
+          <input type="number" value={newPayVal} onChange={e => setNewPayVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addPayment(); }}
+            placeholder="Valor (R$)" className={inputCls + ' w-36'} />
+          <select value={newPayType} onChange={e => setNewPayType(e.target.value)}
+            className={inputCls + ' w-36'}>
+            {Object.entries(PAYMENT_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <button onClick={() => addPayment()}
+            className="h-9 px-3 flex items-center gap-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 whitespace-nowrap transition-colors">
+            <Plus className="w-3.5 h-3.5" />Adicionar
+          </button>
         </div>
       </div>
 
@@ -396,10 +439,13 @@ export default function EventFinanceiroTab({
           className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/20 transition-colors"
         >
           <div className="text-left">
-            <p className="text-sm font-semibold">Agendamento de recebíveis</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold">Agendamento de recebíveis</p>
+              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/40" />
+            </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Cadastre pagamentos agendados. Fique atento: enquanto estiverem agendados, esses pagamentos não irão contar
-              como recebidos. Para confirmar o recebimento, clique em confirmar recebimento.
+              Cadastre pagamentos agendados. Enquanto estiverem agendados, não contam como recebidos.
+              Clique em <strong>Confirmar recebimento</strong> quando o valor entrar.
             </p>
           </div>
           {showScheduled ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 ml-4" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 ml-4" />}
@@ -433,16 +479,16 @@ export default function EventFinanceiroTab({
               </div>
             )}
 
-            <div className="grid grid-cols-[160px_1fr_160px_40px] gap-3 items-center mt-3">
+            <div className="flex gap-2 items-center flex-wrap mt-3">
               <input type="date" value={newSchedDate} onChange={e => setNewSchedDate(e.target.value)}
-                className={inputCls + ' w-full'} />
+                className={inputCls + ' w-44'} />
               <input value={newSchedNotes} onChange={e => setNewSchedNotes(e.target.value)}
-                placeholder="Observação..." className={inputCls + ' w-full'} />
+                placeholder="Observação..." className={inputCls + ' flex-1 min-w-[140px]'} />
               <input type="number" value={newSchedVal} onChange={e => setNewSchedVal(e.target.value)}
-                placeholder="Valor" className={inputCls + ' w-full'} />
+                placeholder="Valor (R$)" className={inputCls + ' w-36'} />
               <button onClick={() => addPayment(true)}
-                className="h-9 px-3 flex items-center gap-1.5 text-xs bg-primary text-white rounded-lg hover:bg-primary/90 whitespace-nowrap">
-                <Plus className="w-3.5 h-3.5" />
+                className="h-9 px-3 flex items-center gap-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 whitespace-nowrap transition-colors">
+                <Plus className="w-3.5 h-3.5" />Agendar
               </button>
             </div>
           </div>
