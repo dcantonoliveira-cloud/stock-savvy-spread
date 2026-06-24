@@ -21,7 +21,7 @@ type EventRow = {
   status: string;
   event_date: string | null;
   location_text: string | null;
-  event_locations: { name: string } | null;
+  event_locations: { name: string } | null | undefined;
   guest_count: number | null;
   children_50_pct: number | null;
   non_paying_guests: number | null;
@@ -108,10 +108,11 @@ export default function EventsPage() {
     setLoading(true);
     const [evRes, clRes] = await Promise.all([
       supabase.from('events')
-        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email), event_locations(name)')
+        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email), event_locations!location_id(name)')
         .order('event_date', { ascending: true }),
       supabase.from('clients').select('id, name, phone, email').order('name'),
     ]);
+    if (evRes.error) console.error('events query error:', evRes.error);
     setEvents((evRes.data as EventRow[]) ?? []);
     setClients((clRes.data as Client[]) ?? []);
     setLoading(false);
