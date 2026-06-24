@@ -118,12 +118,7 @@ export default function ChecklistsPage() {
   };
 
   return (
-    <div className="p-8 space-y-5 max-w-5xl">
-      <div>
-        <h1 className="text-xl font-bold">Modelos de Checklist</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Crie modelos reutilizáveis de tarefas para aplicar nos eventos.</p>
-      </div>
-
+    <div className="space-y-5">
       {/* Banner */}
       <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-800">
         <Info className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />

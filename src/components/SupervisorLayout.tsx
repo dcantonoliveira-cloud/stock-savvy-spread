@@ -31,6 +31,13 @@ const PAGE_TITLES: Record<string, string> = {
   '/analysis': 'Análise IA',
   '/notifications': 'Notificações',
   '/comparison': 'Comparativo',
+  '/cadastros/produtos': 'Produtos',
+  '/cadastros/saloes': 'Salões & Locais',
+  '/cadastros/tipos-festa': 'Tipos de Festa',
+  '/cadastros/assessores': 'Assessores',
+  '/cadastros/decoradores': 'Decoradores',
+  '/cadastros/contratos': 'Contratos',
+  '/cadastros/checklists': 'Checklists',
 };
 
 export default function SupervisorLayout({ children }: { children: ReactNode }) {
