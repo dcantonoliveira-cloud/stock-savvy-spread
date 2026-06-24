@@ -166,79 +166,24 @@ export default function ConfiguracoesPage() {
         </p>
       </div>
 
-      {/* Modelo de contrato */}
+      {/* Testemunha da empresa */}
       <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
-        <Section title="Modelo de contrato" />
-        <p className="text-xs text-muted-foreground -mt-2">
-          Use as tags entre colchetes para preencher automaticamente ao gerar o contrato de um evento.
-          Ex: <code className="bg-muted px-1 py-0.5 rounded text-[11px]">[NOME DO CLIENTE]</code>, <code className="bg-muted px-1 py-0.5 rounded text-[11px]">[DATA DO EVENTO]</code>, <code className="bg-muted px-1 py-0.5 rounded text-[11px]">[VALOR TOTAL DO EVENTO]</code>
-        </p>
-        <RichTextEditor
-          content={company.contract_template ?? ''}
-          onChange={html => save('contract_template', html)}
-          placeholder="Cole ou escreva o contrato base aqui..."
-        />
+        <Section title="Testemunha da empresa (Testemunha 1 nos contratos)" />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Nome</label>
+            <input className={inputCls} value={(company as any).witness_1_name ?? ''} onChange={e => save('witness_1_name', e.target.value)} placeholder="Nome completo" />
+          </div>
+          <div>
+            <label className={labelCls}>CPF</label>
+            <input className={inputCls} value={(company as any).witness_1_cpf ?? ''} onChange={e => save('witness_1_cpf', e.target.value)} placeholder="000.000.000-00" />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground/60">Substituída automaticamente na tag <code className="bg-muted px-1 rounded">[NOME DA TESTEMUNHA 1]</code> e <code className="bg-muted px-1 rounded">[CPF DA TESTEMUNHA 1]</code> ao gerar contratos.</p>
       </div>
 
-      {/* Modelos de anexo */}
-      <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <Section title="Modelos de anexo" />
-          <button
-            onClick={() => {
-              const models = [...(company.annex_models ?? []), { id: crypto.randomUUID(), name: 'Novo modelo', content: '' }];
-              setCompany(prev => prev ? { ...prev, annex_models: models } : prev);
-              supabase.from('companies').update({ annex_models: models }).eq('id', company.id);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />Novo modelo
-          </button>
-        </div>
-        {(company.annex_models ?? []).length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">Nenhum modelo de anexo ainda</p>
-        )}
-        {(company.annex_models ?? []).map((model, idx) => (
-          <div key={model.id} className="border border-border rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <input
-                className={inputCls + ' flex-1'}
-                value={model.name}
-                onChange={e => {
-                  const models = company.annex_models.map((m, i) => i === idx ? { ...m, name: e.target.value } : m);
-                  setCompany(prev => prev ? { ...prev, annex_models: models } : prev);
-                  clearTimeout(timers.current[`annex_name_${idx}`]);
-                  timers.current[`annex_name_${idx}`] = setTimeout(() => {
-                    supabase.from('companies').update({ annex_models: models }).eq('id', company.id);
-                  }, 1200);
-                }}
-                placeholder="Nome do modelo"
-              />
-              <button
-                onClick={() => {
-                  const models = company.annex_models.filter((_, i) => i !== idx);
-                  setCompany(prev => prev ? { ...prev, annex_models: models } : prev);
-                  supabase.from('companies').update({ annex_models: models }).eq('id', company.id);
-                }}
-                className="p-1.5 text-muted-foreground hover:text-destructive transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-            <RichTextEditor
-              content={model.content}
-              onChange={html => {
-                const models = company.annex_models.map((m, i) => i === idx ? { ...m, content: html } : m);
-                setCompany(prev => prev ? { ...prev, annex_models: models } : prev);
-                clearTimeout(timers.current[`annex_content_${idx}`]);
-                timers.current[`annex_content_${idx}`] = setTimeout(() => {
-                  supabase.from('companies').update({ annex_models: models }).eq('id', company.id);
-                }, 1500);
-              }}
-              placeholder="Conteúdo do anexo..."
-            />
-          </div>
-        ))}
+      <div className="bg-muted/30 border border-border rounded-2xl p-5 text-sm text-muted-foreground">
+        Os modelos de contrato e de anexo são gerenciados em <strong>Cadastros → Contratos</strong>.
       </div>
     </div>
   );
