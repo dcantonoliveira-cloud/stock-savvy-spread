@@ -9,6 +9,7 @@ import LinkedField from '@/components/LinkedField';
 import CustomFieldsSection from '@/components/CustomFieldsSection';
 import MenuSheetsTab from '@/components/MenuSheetsTab';
 import EventChecklistTab from '@/components/EventChecklistTab';
+import EventCronogramaTab from '@/components/EventCronogramaTab';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,11 @@ interface EventDetail {
   witness_email: string | null;
   menu_text: string | null;
   menu_mode: string | null;
+  schedule_text: string | null;
+  schedule_file_url: string | null;
+  schedule_file_name: string | null;
+  pricing_mode: string | null;
+  contract_value: number | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -207,6 +213,9 @@ export default function EventDetailPage() {
       witness_email: data.witness_email ?? null,
       menu_text: data.menu_text ?? null,
       menu_mode: data.menu_mode ?? 'text',
+      schedule_text: data.schedule_text ?? null,
+      pricing_mode: data.pricing_mode ?? 'per_person',
+      contract_value: toNum(data.contract_value),
     }).eq('id', eid);
     if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar: ' + error.message); return; }
     setSaveStatus('saved');
@@ -573,8 +582,19 @@ export default function EventDetailPage() {
         {/* ── CHECKLIST ── */}
         {tab === 'Checklist' && id && <EventChecklistTab eventId={id} />}
 
+        {/* ── CRONOGRAMA ── */}
+        {tab === 'Cronograma' && id && (
+          <EventCronogramaTab
+            eventId={id}
+            scheduleText={form.schedule_text ?? null}
+            scheduleFileUrl={form.schedule_file_url ?? null}
+            scheduleFileName={form.schedule_file_name ?? null}
+            onChangeText={v => setF('schedule_text', v)}
+          />
+        )}
+
         {/* ── EM CONSTRUÇÃO ── */}
-        {['Cronograma','Financeiro','Arquivos','Equipe'].includes(tab) && (
+        {['Financeiro','Arquivos','Equipe'].includes(tab) && (
           <div className="bg-white border border-border rounded-2xl p-16 flex flex-col items-center gap-3 text-center">
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center text-2xl">🚧</div>
             <p className="font-semibold">Em construção</p>
