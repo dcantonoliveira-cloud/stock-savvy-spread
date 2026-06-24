@@ -46,8 +46,7 @@ const REQUIRED_FIELDS: { key: string; label: string; getValue: (e: EventData) =>
   { key: 'event_type',    label: 'Tipo do evento',      getValue: e => e.event_type },
   { key: 'location',      label: 'Local do evento',     getValue: e => e.location_text },
   { key: 'guest_count',   label: 'Qtd. de convidados',  getValue: e => e.guest_count != null ? String(e.guest_count) : null },
-  { key: 'product_name',  label: 'Tipo do cardápio',    getValue: e => e.product_name },
-  { key: 'duration',      label: 'Tempo de festa',      getValue: e => e.duration_hours != null ? String(e.duration_hours) : null },
+  { key: 'duration',      label: 'Tempo de festa (horas)', getValue: e => e.duration_hours != null ? String(e.duration_hours) : null },
 ];
 
 function replaceTags(template: string, event: EventData, w1Name: string, w1Cpf: string): string {

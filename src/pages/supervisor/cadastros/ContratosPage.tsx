@@ -231,7 +231,7 @@ export default function ContratosPage() {
         <div className="flex" style={{ height: 520 }}>
 
           {/* Esquerda — lista */}
-          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10 h-full">
+          <div className="w-72 shrink-0 border-r border-border flex flex-col bg-muted/10 h-full">
             <div className="flex-1 min-h-0 p-2 overflow-y-auto space-y-0.5">
               {templates.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-8">Nenhum modelo ainda</p>
@@ -264,7 +264,7 @@ export default function ContratosPage() {
             {selected ? (
               <>
                 {/* Tags */}
-                <div className="px-5 py-3 border-b border-border bg-muted/10">
+                <div className="px-5 py-3 border-b border-border bg-muted/10 shrink-0">
                   <p className={labelCls}>Tags disponíveis — clique para copiar</p>
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {TAGS.map(tag => (
@@ -277,7 +277,7 @@ export default function ContratosPage() {
                   </div>
                 </div>
                 {/* Editor */}
-                <div className="flex-1 p-5">
+                <div className="flex-1 min-h-0 overflow-y-auto p-5">
                   <RichTextEditor
                     content={selected.content ?? ''}
                     onChange={html => {
@@ -322,7 +322,7 @@ export default function ContratosPage() {
         <div className="flex" style={{ height: 380 }}>
 
           {/* Esquerda — lista */}
-          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10 h-full">
+          <div className="w-72 shrink-0 border-r border-border flex flex-col bg-muted/10 h-full">
             <div className="flex-1 min-h-0 p-2 overflow-y-auto space-y-0.5">
               {annexes.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-8">Nenhum modelo ainda</p>
