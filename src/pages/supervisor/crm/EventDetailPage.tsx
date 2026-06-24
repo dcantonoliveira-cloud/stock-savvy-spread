@@ -201,8 +201,9 @@ export default function EventDetailPage() {
       menu_text: data.menu_text ?? null,
       menu_mode: data.menu_mode ?? 'text',
     }).eq('id', eid);
-    if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar'); return; }
+    if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar: ' + error.message); return; }
     setSaveStatus('saved');
+    toast.success('Salvo com sucesso');
     setTimeout(() => setSaveStatus('idle'), 2000);
   }, []);
 
@@ -213,8 +214,9 @@ export default function EventDetailPage() {
       cpf: data.cpf || null, rg: data.rg || null, address: data.address || null,
       zip_code: data.zip_code || null, source: data.source || null,
     }).eq('id', clientId);
-    if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar cliente'); return; }
+    if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar: ' + error.message); return; }
     setSaveStatus('saved');
+    toast.success('Salvo com sucesso');
     setTimeout(() => setSaveStatus('idle'), 2000);
   }, []);
 
