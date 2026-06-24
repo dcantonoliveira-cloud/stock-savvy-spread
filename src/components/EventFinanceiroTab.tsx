@@ -221,9 +221,9 @@ export default function EventFinanceiroTab({
         <div>
           <p className="font-semibold mb-0.5">Como funciona o Financeiro</p>
           <p className="text-blue-700/80">
-            O valor final é calculado automaticamente a partir dos dados da Ficha Técnica (convidados, preço/pax, profissionais)
-            somado aos valores adicionais. Os pagamentos registrados abaixo determinam o saldo em aberto e o percentual pago
-            que aparece na lista de eventos.
+            Há dois modos de cobrança: <strong>por convidado</strong> (preço/pax × quantidade) ou <strong>valor fixo</strong> (pacote negociado diretamente).
+            O modo é configurado na Ficha Técnica e afeta o cálculo aqui. Em ambos os casos, valores adicionais são somados por cima
+            e os pagamentos registrados abaixo determinam o saldo e o percentual pago exibido na lista de eventos.
           </p>
         </div>
       </div>
@@ -372,9 +372,12 @@ export default function EventFinanceiroTab({
           <input value={newDesc} onChange={e => setNewDesc(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') addAdditional(); }}
             placeholder="Descrição do valor adicional..." className={inputCls + ' flex-1'} />
-          <input type="number" value={newAddVal} onChange={e => setNewAddVal(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') addAdditional(); }}
-            placeholder="Valor" className={inputCls + ' w-36'} />
+          <div className="relative w-36">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">R$</span>
+            <input type="number" value={newAddVal} onChange={e => setNewAddVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') addAdditional(); }}
+              placeholder="0,00" className={inputCls + ' w-full pl-8'} />
+          </div>
           <button onClick={addAdditional}
             className="h-9 px-3 flex items-center gap-1.5 text-xs font-medium bg-primary text-white rounded-lg hover:bg-primary/90 whitespace-nowrap transition-colors">
             <Plus className="w-3.5 h-3.5" />Adicionar
