@@ -10,6 +10,7 @@ import CustomFieldsSection from '@/components/CustomFieldsSection';
 import MenuSheetsTab from '@/components/MenuSheetsTab';
 import EventChecklistTab from '@/components/EventChecklistTab';
 import EventCronogramaTab from '@/components/EventCronogramaTab';
+import EventFinanceiroTab from '@/components/EventFinanceiroTab';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -593,8 +594,25 @@ export default function EventDetailPage() {
           />
         )}
 
+        {/* ── FINANCEIRO ── */}
+        {tab === 'Financeiro' && id && (
+          <EventFinanceiroTab
+            eventId={id}
+            event={{
+              guest_count: form.guest_count ?? null,
+              children_50_pct: form.children_50_pct ?? null,
+              price_per_person: form.price_per_person ?? null,
+              professional_count: form.professional_count ?? null,
+              professional_meal_value: form.professional_meal_value ?? null,
+              pricing_mode: form.pricing_mode ?? 'per_person',
+              contract_value: form.contract_value ?? null,
+            }}
+            onUpdateEvent={(field, value) => setF(field as keyof EventDetail, value)}
+          />
+        )}
+
         {/* ── EM CONSTRUÇÃO ── */}
-        {['Financeiro','Arquivos','Equipe'].includes(tab) && (
+        {['Arquivos','Equipe'].includes(tab) && (
           <div className="bg-white border border-border rounded-2xl p-16 flex flex-col items-center gap-3 text-center">
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center text-2xl">🚧</div>
             <p className="font-semibold">Em construção</p>
