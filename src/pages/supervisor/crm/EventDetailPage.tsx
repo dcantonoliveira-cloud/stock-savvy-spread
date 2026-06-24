@@ -365,7 +365,7 @@ export default function EventDetailPage() {
                   createLabel="Produto"
                 />
 
-                <F label="Horário da cerimônia" value={s('ceremony_time')} onChange={v => setF('ceremony_time', v)} placeholder="15:30 hs" />
+                <F label="Horário de início" value={s('ceremony_time')} onChange={v => setF('ceremony_time', v)} placeholder="15:30 hs" />
                 <F label="Duração (horas)" value={s('duration_hours')} onChange={v => setF('duration_hours', v)} type="number" suffix="h" />
                 <F label="Convidados" value={s('guest_count')} onChange={v => setF('guest_count', v)} type="number" />
 
