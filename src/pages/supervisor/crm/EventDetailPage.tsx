@@ -660,6 +660,9 @@ export default function EventDetailPage() {
               contract_value: form.contract_value ?? null,
             }}
             onUpdateEvent={(field, value) => setF(field as keyof EventDetail, value)}
+            onTotalsChange={(total, paid) => {
+              setEvent(prev => prev ? { ...prev, total_value: total, paid_value: paid } : prev);
+            }}
           />
         )}
 
