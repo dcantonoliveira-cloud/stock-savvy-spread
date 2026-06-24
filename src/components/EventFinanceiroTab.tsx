@@ -84,10 +84,12 @@ export default function EventFinanceiroTab({
   eventId,
   event,
   onUpdateEvent,
+  onTotalsChange,
 }: {
   eventId: string;
   event: EventFinanceiro;
   onUpdateEvent: (field: string, value: any) => void;
+  onTotalsChange?: (totalValue: number, paidValue: number) => void;
 }) {
   const [additionals, setAdditionals] = useState<AdditionalValue[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -123,7 +125,8 @@ export default function EventFinanceiroTab({
     const total = base + adds.reduce((s, a) => s + Number(a.value), 0);
     const paid = pays.filter(p => p.is_confirmed).reduce((s, p) => s + Number(p.value), 0);
     await supabase.from('events').update({ total_value: total, paid_value: paid }).eq('id', eventId);
-  }, [eventId]);
+    onTotalsChange?.(total, paid);
+  }, [eventId, onTotalsChange]);
 
   useEffect(() => {
     (async () => {
