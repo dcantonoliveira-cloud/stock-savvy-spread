@@ -21,7 +21,7 @@ type EventRow = {
   status: string;
   event_date: string | null;
   location_text: string | null;
-  event_locations: { name: string } | null | undefined;
+  location_id: string | null;
   guest_count: number | null;
   children_50_pct: number | null;
   non_paying_guests: number | null;
@@ -84,6 +84,7 @@ export default function EventsPage() {
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [locationMap, setLocationMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [year, setYear] = useState(today.getFullYear());
@@ -106,15 +107,17 @@ export default function EventsPage() {
   // ── Load data ────────────────────────────────────────────────────
   const load = async () => {
     setLoading(true);
-    const [evRes, clRes] = await Promise.all([
+    const [evRes, clRes, locRes] = await Promise.all([
       supabase.from('events')
-        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email), event_locations!location_id(name)')
+        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
         .order('event_date', { ascending: true }),
       supabase.from('clients').select('id, name, phone, email').order('name'),
+      supabase.from('event_locations').select('id, name'),
     ]);
     if (evRes.error) console.error('events query error:', evRes.error);
     setEvents((evRes.data as EventRow[]) ?? []);
     setClients((clRes.data as Client[]) ?? []);
+    setLocationMap(new Map((locRes.data ?? []).map((l: any) => [l.id, l.name])));
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -616,7 +619,7 @@ export default function EventsPage() {
                     </td>
                     {/* LOCAL */}
                     <td className="px-4 py-2">
-                      <span className="text-sm text-muted-foreground truncate max-w-[130px] block">{ev.event_locations?.name || ev.location_text || '—'}</span>
+                      <span className="text-sm text-muted-foreground truncate max-w-[130px] block">{(ev.location_id ? locationMap.get(ev.location_id) : null) || ev.location_text || '—'}</span>
                     </td>
                     {/* TIPO */}
                     <td className="px-4 py-2">
