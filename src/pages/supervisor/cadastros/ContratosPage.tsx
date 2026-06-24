@@ -231,8 +231,8 @@ export default function ContratosPage() {
         <div className="flex" style={{ minHeight: 520 }}>
 
           {/* Esquerda — lista */}
-          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10">
-            <div className="flex-1 p-2 overflow-y-auto space-y-0.5">
+          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10" style={{ height: 520 }}>
+            <div className="flex-1 min-h-0 p-2 overflow-y-auto space-y-0.5">
               {templates.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-8">Nenhum modelo ainda</p>
               )}
@@ -248,7 +248,7 @@ export default function ContratosPage() {
                 </button>
               ))}
             </div>
-            <div className="p-2 border-t border-border flex gap-1.5">
+            <div className="p-2 border-t border-border flex gap-1.5 shrink-0">
               <input value={newName} onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addTemplate(); }}
                 placeholder="Novo modelo..." className={inputCls + ' flex-1'} />
@@ -322,8 +322,8 @@ export default function ContratosPage() {
         <div className="flex" style={{ minHeight: 380 }}>
 
           {/* Esquerda — lista */}
-          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10">
-            <div className="flex-1 p-2 overflow-y-auto space-y-0.5">
+          <div className="w-56 shrink-0 border-r border-border flex flex-col bg-muted/10" style={{ height: 380 }}>
+            <div className="flex-1 min-h-0 p-2 overflow-y-auto space-y-0.5">
               {annexes.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-8">Nenhum modelo ainda</p>
               )}
@@ -336,7 +336,7 @@ export default function ContratosPage() {
                 </button>
               ))}
             </div>
-            <div className="p-2 border-t border-border flex gap-1.5">
+            <div className="p-2 border-t border-border flex gap-1.5 shrink-0">
               <input value={newAnnexName} onChange={e => setNewAnnexName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addAnnex(); }}
                 placeholder="Novo modelo..." className={inputCls + ' flex-1'} />
