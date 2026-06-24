@@ -252,14 +252,16 @@ export default function EventDetailPage() {
 
   const handleFechamento = async () => {
     if (!event || !id) return;
-    const [{ data: payments }, { data: additionals }] = await Promise.all([
-      supabase.from('event_payments' as any).select('payment_date, value, notes, is_confirmed, payment_type').eq('event_id', id).order('payment_date'),
+    const [{ data: payments }, { data: additionals }, { data: companies }] = await Promise.all([
+      supabase.from('event_payments' as any).select('payment_date, value, notes, is_confirmed').eq('event_id', id).order('payment_date'),
       supabase.from('event_additional_values' as any).select('description, value').eq('event_id', id),
+      supabase.from('companies').select('name, logo_base64, razao_social, cnpj, banco, agencia, conta, endereco, telefone, website').limit(1),
     ]);
     await generateFechamentoPDF(
       { ...event, ...form },
       (payments ?? []) as any,
       (additionals ?? []) as any,
+      ((companies ?? [])[0] ?? null) as any,
     );
   };
 
