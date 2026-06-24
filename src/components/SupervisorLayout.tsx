@@ -113,10 +113,8 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
           </div>
         </header>
 
-        <main className="flex-1 p-8">
-          <div className="max-w-[1400px] mx-auto">
-            {children}
-          </div>
+        <main className="flex-1 p-8 min-w-0">
+          {children}
         </main>
       </div>
     </div>
