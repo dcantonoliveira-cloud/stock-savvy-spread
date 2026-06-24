@@ -11,6 +11,7 @@ import MenuSheetsTab from '@/components/MenuSheetsTab';
 import EventChecklistTab from '@/components/EventChecklistTab';
 import EventCronogramaTab from '@/components/EventCronogramaTab';
 import EventFinanceiroTab from '@/components/EventFinanceiroTab';
+import { generateFechamentoPDF } from '@/utils/generateFechamentoPDF';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -249,6 +250,19 @@ export default function EventDetailPage() {
 
   const s = (key: keyof EventDetail) => String(form[key] ?? '');
 
+  const handleFechamento = async () => {
+    if (!event || !id) return;
+    const [{ data: payments }, { data: additionals }] = await Promise.all([
+      supabase.from('event_payments' as any).select('payment_date, value, notes, is_confirmed, payment_type').eq('event_id', id).order('payment_date'),
+      supabase.from('event_additional_values' as any).select('description, value').eq('event_id', id),
+    ]);
+    await generateFechamentoPDF(
+      { ...event, ...form },
+      (payments ?? []) as any,
+      (additionals ?? []) as any,
+    );
+  };
+
   const setC = useCallback((key: string, val: string) => {
     const next = { ...clientFormRef.current, [key]: val };
     clientFormRef.current = next;
@@ -351,7 +365,7 @@ export default function EventDetailPage() {
             <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex">
               <Download className="w-3 h-3" />Ficha técnica
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex">
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
               <Download className="w-3 h-3" />Fechamento
             </Button>
             <button onClick={() => navigate('/events')}
