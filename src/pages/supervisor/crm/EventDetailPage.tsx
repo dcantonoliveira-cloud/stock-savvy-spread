@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
@@ -63,6 +63,8 @@ interface EventDetail {
   witness_name: string | null;
   witness_cpf: string | null;
   witness_email: string | null;
+  total_value: number | null;
+  paid_value: number | null;
   menu_text: string | null;
   menu_mode: string | null;
   schedule_text: string | null;
@@ -312,6 +314,32 @@ export default function EventDetailPage() {
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide border ${STATUS_CLASSES[event.status] ?? 'bg-muted text-muted-foreground border-border'}`}>
               {statusLabel}
             </span>
+            {/* Tag de pagamento */}
+            {(() => {
+              const total = event.total_value ?? 0;
+              const paid = event.paid_value ?? 0;
+              const pct = total > 0 ? Math.min(Math.round((paid / total) * 100), 100) : 0;
+              if (event.is_paid_in_full || pct >= 100)
+                return (
+                  <span className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <Check className="w-3 h-3" />QUITADO
+                  </span>
+                );
+              if (pct > 0)
+                return (
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                    {pct}% pago
+                    <span className="w-10 h-1.5 bg-amber-100 rounded-full overflow-hidden inline-block">
+                      <span className="h-full bg-amber-500 rounded-full block" style={{ width: `${pct}%` }} />
+                    </span>
+                  </span>
+                );
+              return (
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-red-50 text-red-600 border-red-200">
+                  Não quitado
+                </span>
+              );
+            })()}
             {saveStatus === 'saving' && (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" />
             )}
