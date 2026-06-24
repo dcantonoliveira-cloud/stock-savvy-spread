@@ -592,8 +592,8 @@ export default function EventsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl border border-border overflow-hidden flex-1">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl border border-border overflow-x-auto flex-1">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="border-b border-border bg-muted/20">
                 {['DATA','NOME DO EVENTO','LOCAL DO EVENTO','TIPO DO EVENTO','PREÇO/PAX','CONVIDADOS','STATUS','FECHAMENTO','PGTO %',''].map(h => (
