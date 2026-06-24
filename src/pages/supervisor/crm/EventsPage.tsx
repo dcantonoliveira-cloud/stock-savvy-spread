@@ -683,16 +683,26 @@ export default function EventsPage() {
                       {(() => {
                         const total = ev.total_value ?? 0;
                         const paid = ev.paid_value ?? 0;
-                        const pct = total > 0 ? Math.min(Math.round((paid / total) * 100), 100) : 0;
-                        if (ev.is_paid_in_full || pct >= 100)
+                        const rawPct = total > 0 ? Math.round((paid / total) * 100) : 0;
+                        // Pagou a mais
+                        if (rawPct > 100)
+                          return (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="inline-flex items-center gap-1 text-[12px] font-bold text-violet-600">
+                                <CheckCircle2 className="w-3 h-3"/>+{rawPct - 100}%
+                              </span>
+                              <span className="text-[10px] text-violet-400">a mais</span>
+                            </div>
+                          );
+                        if (ev.is_paid_in_full || rawPct >= 100)
                           return <span className="inline-flex items-center gap-1 text-[12px] font-bold text-emerald-600"><CheckCircle2 className="w-3 h-3"/>100%</span>;
-                        if (pct === 0)
+                        if (rawPct === 0)
                           return <span className="text-[12px] font-semibold text-amber-600">0%</span>;
                         return (
                           <div className="flex flex-col items-center gap-0.5">
-                            <span className="text-[12px] font-semibold text-amber-600">{pct}%</span>
+                            <span className="text-[12px] font-semibold text-amber-600">{rawPct}%</span>
                             <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-amber-400 rounded-full" style={{ width: `${pct}%` }} />
+                              <div className="h-full bg-amber-400 rounded-full" style={{ width: `${rawPct}%` }} />
                             </div>
                           </div>
                         );
