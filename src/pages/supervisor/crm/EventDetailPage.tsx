@@ -1,12 +1,13 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Save, Loader2, FileText, AlignLeft, BookOpen } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Check, Search, Trash2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
 import CustomFieldsSection from '@/components/CustomFieldsSection';
+import MenuSheetsTab from '@/components/MenuSheetsTab';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -141,13 +142,15 @@ export default function EventDetailPage() {
   const navigate = useNavigate();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [tab, setTab] = useState('Ficha Técnica');
   const [form, setForm] = useState<Partial<EventDetail>>({});
   const [clientForm, setClientForm] = useState<Record<string, string>>({});
-  const [clientDirty, setClientDirty] = useState(false);
-  const [savingClient, setSavingClient] = useState(false);
+  const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clientTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formRef = useRef<Partial<EventDetail>>({});
+  const clientFormRef = useRef<Record<string, string>>({});
+  const eventIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!id) return;
@@ -157,75 +160,83 @@ export default function EventDetailPage() {
         if (error || !data) { toast.error('Evento não encontrado'); navigate('/events'); return; }
         setEvent(data as EventDetail);
         setForm(data as EventDetail);
+        formRef.current = data as EventDetail;
+        eventIdRef.current = id;
         const c = (data as EventDetail).clients;
-        if (c) setClientForm({ name: c.name ?? '', phone: c.phone ?? '', email: c.email ?? '', cpf: c.cpf ?? '', rg: c.rg ?? '', address: c.address ?? '', zip_code: c.zip_code ?? '', source: c.source ?? '' });
+        if (c) {
+          const cf = { name: c.name ?? '', phone: c.phone ?? '', email: c.email ?? '', cpf: c.cpf ?? '', rg: c.rg ?? '', address: c.address ?? '', zip_code: c.zip_code ?? '', source: c.source ?? '' };
+          setClientForm(cf);
+          clientFormRef.current = cf;
+        }
         setLoading(false);
       });
   }, [id]);
 
-  const setF = useCallback(<K extends keyof EventDetail>(key: K, val: any) => {
-    setForm(prev => ({ ...prev, [key]: val }));
-    setDirty(true);
+  const toNum = (v: any) => (v === '' || v == null) ? null : Number(v);
+
+  const persistEvent = useCallback(async (data: Partial<EventDetail>) => {
+    const eid = eventIdRef.current;
+    if (!eid) return;
+    setSaveStatus('saving');
+    const { error } = await supabase.from('events').update({
+      event_name: data.event_name, event_type: data.event_type,
+      event_date: data.event_date || null,
+      location_text: data.location_text, location_id: data.location_id ?? null,
+      guest_count: toNum(data.guest_count), children_50_pct: toNum(data.children_50_pct),
+      non_paying_guests: toNum(data.non_paying_guests), price_per_person: toNum(data.price_per_person),
+      product_name: data.product_name, product_id: data.product_id ?? null,
+      duration_hours: toNum(data.duration_hours), ceremony_time: data.ceremony_time,
+      professional_count: toNum(data.professional_count),
+      professional_meal_value: toNum(data.professional_meal_value),
+      professional_meal_type: data.professional_meal_type,
+      additional_hours: toNum(data.additional_hours), notes: data.notes,
+      organizer: data.organizer, organizer_id: data.organizer_id ?? null,
+      decorator: data.decorator, decorator_id: data.decorator_id ?? null,
+      pastry_chef: data.pastry_chef, band_dj: data.band_dj,
+      photo_video: data.photo_video, bartender: data.bartender,
+      other_professionals: data.other_professionals, extra_attractions: data.extra_attractions,
+      witness_name: data.witness_name ?? null,
+      witness_cpf: data.witness_cpf ?? null,
+      witness_email: data.witness_email ?? null,
+      menu_text: data.menu_text ?? null,
+      menu_mode: data.menu_mode ?? 'text',
+    }).eq('id', eid);
+    if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar'); return; }
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 2000);
   }, []);
+
+  const persistClient = useCallback(async (data: Record<string, string>, clientId: string) => {
+    setSaveStatus('saving');
+    const { error } = await supabase.from('clients').update({
+      name: data.name || null, phone: data.phone || null, email: data.email || null,
+      cpf: data.cpf || null, rg: data.rg || null, address: data.address || null,
+      zip_code: data.zip_code || null, source: data.source || null,
+    }).eq('id', clientId);
+    if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar cliente'); return; }
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 2000);
+  }, []);
+
+  const setF = useCallback(<K extends keyof EventDetail>(key: K, val: any) => {
+    const next = { ...formRef.current, [key]: val };
+    formRef.current = next;
+    setForm(next);
+    if (eventTimerRef.current) clearTimeout(eventTimerRef.current);
+    eventTimerRef.current = setTimeout(() => persistEvent(formRef.current), 1500);
+  }, [persistEvent]);
 
   const s = (key: keyof EventDetail) => String(form[key] ?? '');
 
-  const setC = (key: string, val: string) => {
-    setClientForm(prev => ({ ...prev, [key]: val }));
-    setClientDirty(true);
-  };
-
-  const saveClient = async () => {
-    if (!event?.clients?.id || !clientDirty) return;
-    setSavingClient(true);
-    const { error } = await supabase.from('clients').update({
-      name: clientForm.name || null,
-      phone: clientForm.phone || null,
-      email: clientForm.email || null,
-      cpf: clientForm.cpf || null,
-      rg: clientForm.rg || null,
-      address: clientForm.address || null,
-      zip_code: clientForm.zip_code || null,
-      source: clientForm.source || null,
-    }).eq('id', event.clients.id);
-    setSavingClient(false);
-    if (error) { toast.error('Erro ao salvar cliente: ' + error.message); return; }
-    setClientDirty(false);
-    toast.success('Dados do cliente salvos!');
-  };
-
-  const save = async () => {
-    if (!id || !dirty) return;
-    setSaving(true);
-    const toNum = (v: any) => (v === '' || v == null) ? null : Number(v);
-    const { error } = await supabase.from('events').update({
-      event_name: form.event_name, event_type: form.event_type,
-      event_date: form.event_date || null,
-      location_text: form.location_text, location_id: form.location_id ?? null,
-      guest_count: toNum(form.guest_count), children_50_pct: toNum(form.children_50_pct),
-      non_paying_guests: toNum(form.non_paying_guests), price_per_person: toNum(form.price_per_person),
-      product_name: form.product_name, product_id: form.product_id ?? null,
-      duration_hours: toNum(form.duration_hours), ceremony_time: form.ceremony_time,
-      professional_count: toNum(form.professional_count),
-      professional_meal_value: toNum(form.professional_meal_value),
-      professional_meal_type: form.professional_meal_type,
-      additional_hours: toNum(form.additional_hours), notes: form.notes,
-      organizer: form.organizer, organizer_id: form.organizer_id ?? null,
-      decorator: form.decorator, decorator_id: form.decorator_id ?? null,
-      pastry_chef: form.pastry_chef, band_dj: form.band_dj,
-      photo_video: form.photo_video, bartender: form.bartender,
-      other_professionals: form.other_professionals, extra_attractions: form.extra_attractions,
-      witness_name: form.witness_name ?? null,
-      witness_cpf: form.witness_cpf ?? null,
-      witness_email: form.witness_email ?? null,
-      menu_text: form.menu_text ?? null,
-      menu_mode: form.menu_mode ?? 'text',
-    }).eq('id', id);
-    setSaving(false);
-    if (error) { toast.error('Erro ao salvar: ' + error.message); return; }
-    setDirty(false);
-    toast.success('Evento salvo!');
-  };
+  const setC = useCallback((key: string, val: string) => {
+    const next = { ...clientFormRef.current, [key]: val };
+    clientFormRef.current = next;
+    setClientForm(next);
+    const clientId = event?.clients?.id;
+    if (!clientId) return;
+    if (clientTimerRef.current) clearTimeout(clientTimerRef.current);
+    clientTimerRef.current = setTimeout(() => persistClient(clientFormRef.current, clientId), 1500);
+  }, [event?.clients?.id, persistClient]);
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -271,6 +282,17 @@ export default function EventDetailPage() {
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide border ${STATUS_CLASSES[event.status] ?? 'bg-muted text-muted-foreground border-border'}`}>
               {statusLabel}
             </span>
+            {/* Auto-save indicator */}
+            {saveStatus === 'saving' && (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />Salvando...
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="flex items-center gap-1.5 text-xs text-emerald-600">
+                <Check className="w-3 h-3" />Salvo
+              </span>
+            )}
             {!['confirmed', 'completed'].includes(event.status) && !event.is_paid_in_full && (
               <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex border-amber-200 text-amber-700 hover:bg-amber-50">
                 <FileText className="w-3 h-3" />Dados para contrato
@@ -282,18 +304,6 @@ export default function EventDetailPage() {
             <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex">
               <Download className="w-3 h-3" />Fechamento
             </Button>
-            {clientDirty && tab === 'Dados do Cliente' && (
-              <Button onClick={saveClient} disabled={savingClient} size="sm" variant="outline" className="gap-1.5 h-8">
-                {savingClient ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Salvar cliente
-              </Button>
-            )}
-            {dirty && (
-              <Button onClick={save} disabled={saving} size="sm" className="gap-1.5 h-8">
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Salvar
-              </Button>
-            )}
             <button onClick={() => navigate('/events')}
               className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
               <X className="w-4 h-4" />
@@ -540,22 +550,16 @@ export default function EventDetailPage() {
                 placeholder="Descreva o cardápio do evento..."
               />
             ) : (
-              <div className="flex flex-col items-center gap-3 py-12 text-center">
-                <BookOpen className="w-10 h-10 text-muted-foreground/30" />
-                <p className="text-sm font-medium text-muted-foreground">Montar cardápio por Fichas Técnicas</p>
-                <p className="text-xs text-muted-foreground/70 max-w-xs">
-                  Selecione receitas das fichas técnicas cadastradas para montar o cardápio deste evento.
-                </p>
-                <button className="mt-2 h-9 px-4 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
-                  + Adicionar receita
-                </button>
-              </div>
+              id && <MenuSheetsTab eventId={id} />
             )}
           </div>
         )}
 
+        {/* ── HISTÓRICO ── shown at bottom of every tab */}
+        {tab === 'Outros' && id && <EventHistorySection eventId={id} />}
+
         {/* ── EM CONSTRUÇÃO ── */}
-        {['Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'].includes(tab) && (
+        {['Checklist','Cronograma','Financeiro','Arquivos','Equipe'].includes(tab) && (
           <div className="bg-white border border-border rounded-2xl p-16 flex flex-col items-center gap-3 text-center">
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center text-2xl">🚧</div>
             <p className="font-semibold">Em construção</p>
@@ -565,6 +569,71 @@ export default function EventDetailPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Event History Section ────────────────────────────────────────────────────
+
+const FIELD_LABELS: Record<string, string> = {
+  event_name: 'Nome do Evento', event_type: 'Tipo', event_date: 'Data',
+  location_id: 'Local', product_id: 'Produto', guest_count: 'Convidados',
+  price_per_person: 'Preço/Pax', organizer_id: 'Assessora', decorator_id: 'Decoradora',
+  notes: 'Observações', menu_text: 'Cardápio (texto)', menu_mode: 'Modo Cardápio',
+  status: 'Status', ceremony_time: 'Horário Cerimônia',
+};
+
+function EventHistorySection({ eventId }: { eventId: string }) {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.from('event_history' as any)
+      .select('id, field_name, old_value, new_value, changed_at, profiles:user_id(display_name)')
+      .eq('event_id', eventId)
+      .order('changed_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => { setHistory(data ?? []); setLoading(false); });
+  }, [eventId]);
+
+  const fmtDT = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="bg-white border border-border rounded-2xl p-6">
+      <div className="flex items-center gap-3 mb-5">
+        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Histórico de Alterações</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      ) : history.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <Clock className="w-8 h-8 text-muted-foreground/20" />
+          <p className="text-sm text-muted-foreground">Nenhuma alteração registrada ainda.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {history.map(h => (
+            <div key={h.id} className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary/40 mt-2 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm">
+                  <span className="font-medium">{FIELD_LABELS[h.field_name] ?? h.field_name}</span>
+                  {h.old_value && (
+                    <span className="text-muted-foreground"> · de <span className="line-through text-muted-foreground/60">{h.old_value.slice(0, 60)}</span></span>
+                  )}
+                  {h.new_value && (
+                    <span className="text-muted-foreground"> para <span className="text-foreground">{h.new_value.slice(0, 60)}</span></span>
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                  {h.profiles?.display_name ?? 'Usuário'} · {fmtDT(h.changed_at)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
