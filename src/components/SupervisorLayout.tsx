@@ -76,7 +76,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
         <header className="sticky top-0 z-40 flex items-center justify-between px-8 h-14 bg-card border-b border-border">
           <div>
             {pageTitle && (
-              <h2 className="text-[15px] font-semibold text-foreground">{pageTitle}</h2>
+              <h2 className="text-[19px] font-bold text-foreground">{pageTitle}</h2>
             )}
           </div>
 

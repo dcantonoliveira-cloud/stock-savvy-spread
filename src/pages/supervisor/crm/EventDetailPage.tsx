@@ -157,11 +157,17 @@ export default function EventDetailPage() {
     if (!id) return;
     setLoading(true);
     supabase.from('events').select('*, clients(id, name, phone, email, cpf, rg, address, zip_code, source)').eq('id', id).single()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error || !data) { toast.error('Evento não encontrado'); navigate('/events'); return; }
-        setEvent(data as EventDetail);
-        setForm(data as EventDetail);
-        formRef.current = data as EventDetail;
+        // fallback: busca nome do local se location_text estiver vazio mas location_id existir
+        let eventData = data as EventDetail;
+        if (!eventData.location_text && eventData.location_id) {
+          const { data: loc } = await supabase.from('event_locations' as any).select('name').eq('id', eventData.location_id).single();
+          if (loc) eventData = { ...eventData, location_text: (loc as any).name };
+        }
+        setEvent(eventData);
+        setForm(eventData);
+        formRef.current = eventData;
         eventIdRef.current = id;
         const c = (data as EventDetail).clients;
         if (c) {
