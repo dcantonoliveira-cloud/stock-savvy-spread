@@ -137,10 +137,7 @@ export default function EventsPage() {
 
   const filtered = useMemo(() => events.filter(e => {
     if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
-    if (!e.event_date) return false;
-    const d = new Date(e.event_date + 'T12:00:00');
-    if (d.getFullYear() !== year) return false;
-    if (month !== null && d.getMonth() !== month) return false;
+    // Quando há busca ativa, ignora filtro de mês/ano
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -149,6 +146,10 @@ export default function EventsPage() {
         (e.location_text ?? '').toLowerCase().includes(q)
       );
     }
+    if (!e.event_date) return false;
+    const d = new Date(e.event_date + 'T12:00:00');
+    if (d.getFullYear() !== year) return false;
+    if (month !== null && d.getMonth() !== month) return false;
     return true;
   }), [events, year, month, search, statusFilter]);
 
