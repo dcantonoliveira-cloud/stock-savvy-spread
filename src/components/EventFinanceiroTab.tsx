@@ -350,23 +350,23 @@ export default function EventFinanceiroTab({
         />
         <p className="text-xs text-muted-foreground mb-4">Adicione valores além do contrato base, como frete, upgrades, entre outros.</p>
 
-        <div className="border border-border rounded-xl overflow-hidden mb-3">
-          <div className="grid grid-cols-[1fr_200px_40px] bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase text-muted-foreground/60 gap-3">
-            <span>Descrição</span><span>Valor (R$)</span><span />
-          </div>
-          {additionals.map(a => (
-            <div key={a.id} className="group grid grid-cols-[1fr_200px_40px] px-3 py-2 border-t border-border/50 gap-3 items-center hover:bg-muted/20">
-              <input value={a.description} onChange={e => updateAdditional(a.id, 'description', e.target.value)}
-                className={inputCls + ' w-full'} />
-              <input type="number" value={a.value} onChange={e => updateAdditional(a.id, 'value', Number(e.target.value))}
-                className={inputCls + ' w-full text-right'} />
-              <button onClick={() => deleteAdditional(a.id)}
-                className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all">
-                <X className="w-3.5 h-3.5" />
-              </button>
+        {additionals.length > 0 && (
+          <div className="border border-border rounded-xl overflow-hidden mb-3">
+            <div className="grid grid-cols-[1fr_200px_40px] bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase text-muted-foreground/60 gap-3">
+              <span>Descrição</span><span>Valor</span><span />
             </div>
-          ))}
-        </div>
+            {additionals.map(a => (
+              <div key={a.id} className="group grid grid-cols-[1fr_200px_40px] px-4 py-2.5 border-t border-border/50 gap-3 items-center hover:bg-muted/20">
+                <span className="text-sm">{a.description}</span>
+                <span className="text-sm font-medium">{fmtBRL(Number(a.value))}</span>
+                <button onClick={() => deleteAdditional(a.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {/* New row */}
         <div className="flex gap-2 items-center">
           <input value={newDesc} onChange={e => setNewDesc(e.target.value)}
