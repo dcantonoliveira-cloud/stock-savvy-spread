@@ -430,7 +430,7 @@ export default function EventDetailPage() {
             </div>
 
             {/* Card 3: Campos customizáveis */}
-            {id && <CustomFieldsSection eventId={id} onDirty={() => setDirty(true)} />}
+            {id && <CustomFieldsSection eventId={id} onSaveStatus={setSaveStatus} />}
           </>
         )}
 
