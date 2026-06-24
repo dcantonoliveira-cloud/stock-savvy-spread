@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Trash2, GripVertical, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface FieldDef { id: string; name: string; sort_order: number; is_active: boolean }
-interface FieldValue { field_id: string; value: string }
 
 interface Props {
   eventId: string;
-  onDirty?: () => void;
+  onSaveStatus?: (status: 'saving' | 'saved' | 'idle') => void;
 }
 
 const inputCls =
@@ -17,11 +16,13 @@ const inputCls =
 
 const labelCls = 'block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70 mb-1.5';
 
-export default function CustomFieldsSection({ eventId, onDirty }: Props) {
+export default function CustomFieldsSection({ eventId, onSaveStatus }: Props) {
   const [defs, setDefs] = useState<FieldDef[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [managing, setManaging] = useState(false);
   const [newFieldName, setNewFieldName] = useState('');
+  const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const valuesRef = useRef<Record<string, string>>({});
 
   const loadDefs = async () => {
     const { data } = await supabase
@@ -47,13 +48,23 @@ export default function CustomFieldsSection({ eventId, onDirty }: Props) {
     loadValues();
   }, [eventId]);
 
-  const saveValue = async (fieldId: string, value: string) => {
-    setValues(prev => ({ ...prev, [fieldId]: value }));
-    onDirty?.();
-    await supabase.from('event_field_values').upsert(
+  const persistValue = async (fieldId: string, value: string) => {
+    onSaveStatus?.('saving');
+    const { error } = await supabase.from('event_field_values').upsert(
       { event_id: eventId, field_id: fieldId, value },
       { onConflict: 'event_id,field_id' }
     );
+    if (error) { onSaveStatus?.('idle'); toast.error('Erro ao salvar: ' + error.message); return; }
+    onSaveStatus?.('saved');
+    toast.success('Salvo com sucesso');
+    setTimeout(() => onSaveStatus?.('idle'), 2000);
+  };
+
+  const saveValue = (fieldId: string, value: string) => {
+    valuesRef.current = { ...valuesRef.current, [fieldId]: value };
+    setValues(prev => ({ ...prev, [fieldId]: value }));
+    if (timersRef.current[fieldId]) clearTimeout(timersRef.current[fieldId]);
+    timersRef.current[fieldId] = setTimeout(() => persistValue(fieldId, valuesRef.current[fieldId]), 1500);
   };
 
   const addField = async () => {
