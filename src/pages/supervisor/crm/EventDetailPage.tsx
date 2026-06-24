@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Save, Loader2 } from 'lucide-react';
+import { Download, X, Save, Loader2, FileText, AlignLeft, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
@@ -59,6 +59,8 @@ interface EventDetail {
   witness_name: string | null;
   witness_cpf: string | null;
   witness_email: string | null;
+  menu_text: string | null;
+  menu_mode: string | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -143,6 +145,9 @@ export default function EventDetailPage() {
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState('Ficha Técnica');
   const [form, setForm] = useState<Partial<EventDetail>>({});
+  const [clientForm, setClientForm] = useState<Record<string, string>>({});
+  const [clientDirty, setClientDirty] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -152,6 +157,8 @@ export default function EventDetailPage() {
         if (error || !data) { toast.error('Evento não encontrado'); navigate('/events'); return; }
         setEvent(data as EventDetail);
         setForm(data as EventDetail);
+        const c = (data as EventDetail).clients;
+        if (c) setClientForm({ name: c.name ?? '', phone: c.phone ?? '', email: c.email ?? '', cpf: c.cpf ?? '', rg: c.rg ?? '', address: c.address ?? '', zip_code: c.zip_code ?? '', source: c.source ?? '' });
         setLoading(false);
       });
   }, [id]);
@@ -162,6 +169,30 @@ export default function EventDetailPage() {
   }, []);
 
   const s = (key: keyof EventDetail) => String(form[key] ?? '');
+
+  const setC = (key: string, val: string) => {
+    setClientForm(prev => ({ ...prev, [key]: val }));
+    setClientDirty(true);
+  };
+
+  const saveClient = async () => {
+    if (!event?.clients?.id || !clientDirty) return;
+    setSavingClient(true);
+    const { error } = await supabase.from('clients').update({
+      name: clientForm.name || null,
+      phone: clientForm.phone || null,
+      email: clientForm.email || null,
+      cpf: clientForm.cpf || null,
+      rg: clientForm.rg || null,
+      address: clientForm.address || null,
+      zip_code: clientForm.zip_code || null,
+      source: clientForm.source || null,
+    }).eq('id', event.clients.id);
+    setSavingClient(false);
+    if (error) { toast.error('Erro ao salvar cliente: ' + error.message); return; }
+    setClientDirty(false);
+    toast.success('Dados do cliente salvos!');
+  };
 
   const save = async () => {
     if (!id || !dirty) return;
@@ -187,6 +218,8 @@ export default function EventDetailPage() {
       witness_name: form.witness_name ?? null,
       witness_cpf: form.witness_cpf ?? null,
       witness_email: form.witness_email ?? null,
+      menu_text: form.menu_text ?? null,
+      menu_mode: form.menu_mode ?? 'text',
     }).eq('id', id);
     setSaving(false);
     if (error) { toast.error('Erro ao salvar: ' + error.message); return; }
@@ -238,12 +271,23 @@ export default function EventDetailPage() {
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide border ${STATUS_CLASSES[event.status] ?? 'bg-muted text-muted-foreground border-border'}`}>
               {statusLabel}
             </span>
+            {!['confirmed', 'completed'].includes(event.status) && !event.is_paid_in_full && (
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex border-amber-200 text-amber-700 hover:bg-amber-50">
+                <FileText className="w-3 h-3" />Dados para contrato
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex">
               <Download className="w-3 h-3" />Ficha técnica
             </Button>
             <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex">
               <Download className="w-3 h-3" />Fechamento
             </Button>
+            {clientDirty && tab === 'Dados do Cliente' && (
+              <Button onClick={saveClient} disabled={savingClient} size="sm" variant="outline" className="gap-1.5 h-8">
+                {savingClient ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Salvar cliente
+              </Button>
+            )}
             {dirty && (
               <Button onClick={save} disabled={saving} size="sm" className="gap-1.5 h-8">
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -385,38 +429,38 @@ export default function EventDetailPage() {
             <div className="bg-white border border-border rounded-2xl p-6">
               <SectionTitle>Dados do Contratante</SectionTitle>
               {event.clients ? (
-                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+                <div className="grid grid-cols-3 gap-x-6 gap-y-4">
                   <div className="col-span-2">
                     <label className={labelCls}>Nome do Contratante</label>
-                    <p className="text-sm font-medium border-b border-border pb-2">{event.clients.name ?? '—'}</p>
+                    <input className={inputCls} value={clientForm.name ?? ''} onChange={e => setC('name', e.target.value)} placeholder="Nome completo" />
                   </div>
                   <div>
                     <label className={labelCls}>Telefone com DDD</label>
-                    <p className="text-sm border-b border-border pb-2">{event.clients.phone ?? '—'}</p>
+                    <input className={inputCls} value={clientForm.phone ?? ''} onChange={e => setC('phone', e.target.value)} placeholder="(11) 99999-9999" />
                   </div>
                   <div>
                     <label className={labelCls}>CPF/CNPJ</label>
-                    <p className="text-sm border-b border-border pb-2">{event.clients.cpf ?? '—'}</p>
+                    <input className={inputCls} value={clientForm.cpf ?? ''} onChange={e => setC('cpf', e.target.value)} placeholder="000.000.000-00" />
                   </div>
                   <div>
                     <label className={labelCls}>RG</label>
-                    <p className="text-sm border-b border-border pb-2">{event.clients.rg ?? '—'}</p>
+                    <input className={inputCls} value={clientForm.rg ?? ''} onChange={e => setC('rg', e.target.value)} placeholder="00.000.000-0" />
                   </div>
                   <div>
                     <label className={labelCls}>E-mail</label>
-                    <p className="text-sm border-b border-border pb-2">{event.clients.email ?? '—'}</p>
+                    <input className={inputCls} value={clientForm.email ?? ''} onChange={e => setC('email', e.target.value)} placeholder="email@exemplo.com" />
                   </div>
                   <div className="col-span-2">
                     <label className={labelCls}>Endereço Completo</label>
-                    <p className="text-sm border-b border-border pb-2">{event.clients.address ?? '—'}</p>
+                    <input className={inputCls} value={clientForm.address ?? ''} onChange={e => setC('address', e.target.value)} placeholder="Rua, número, complemento, bairro, cidade" />
                   </div>
                   <div>
                     <label className={labelCls}>CEP</label>
-                    <p className="text-sm border-b border-border pb-2">{event.clients.zip_code ?? '—'}</p>
+                    <input className={inputCls} value={clientForm.zip_code ?? ''} onChange={e => setC('zip_code', e.target.value)} placeholder="00000-000" />
                   </div>
                   <div>
                     <label className={labelCls}>De onde nos conheceu</label>
-                    <p className="text-sm border-b border-border pb-2">{event.clients.source ?? '—'}</p>
+                    <input className={inputCls} value={clientForm.source ?? ''} onChange={e => setC('source', e.target.value)} placeholder="Instagram, indicação..." />
                   </div>
                 </div>
               ) : (
@@ -460,8 +504,58 @@ export default function EventDetailPage() {
           </>
         )}
 
+        {/* ── CARDÁPIO ── */}
+        {tab === 'Cardápio' && (
+          <div className="bg-white border border-border rounded-2xl p-6">
+            {/* Mode toggle */}
+            <div className="flex items-center gap-3 mb-5">
+              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Cardápio do Evento</span>
+              <div className="flex-1 h-px bg-border" />
+              <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+                <button
+                  onClick={() => setF('menu_mode', 'text')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    (form.menu_mode ?? 'text') === 'text' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <AlignLeft className="w-3.5 h-3.5" />
+                  Texto livre
+                </button>
+                <button
+                  onClick={() => setF('menu_mode', 'sheets')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    form.menu_mode === 'sheets' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  Fichas Técnicas
+                </button>
+              </div>
+            </div>
+
+            {(form.menu_mode ?? 'text') === 'text' ? (
+              <RichTextEditor
+                content={form.menu_text ?? ''}
+                onChange={val => setF('menu_text', val)}
+                placeholder="Descreva o cardápio do evento..."
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <BookOpen className="w-10 h-10 text-muted-foreground/30" />
+                <p className="text-sm font-medium text-muted-foreground">Montar cardápio por Fichas Técnicas</p>
+                <p className="text-xs text-muted-foreground/70 max-w-xs">
+                  Selecione receitas das fichas técnicas cadastradas para montar o cardápio deste evento.
+                </p>
+                <button className="mt-2 h-9 px-4 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                  + Adicionar receita
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── EM CONSTRUÇÃO ── */}
-        {['Cardápio','Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'].includes(tab) && (
+        {['Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'].includes(tab) && (
           <div className="bg-white border border-border rounded-2xl p-16 flex flex-col items-center gap-3 text-center">
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center text-2xl">🚧</div>
             <p className="font-semibold">Em construção</p>
