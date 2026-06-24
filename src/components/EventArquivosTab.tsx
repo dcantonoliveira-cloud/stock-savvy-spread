@@ -247,7 +247,19 @@ export default function EventArquivosTab({ eventId, event }: Props) {
     toast.success('Removido');
   };
 
-  const AnnexBlock = ({ n, content, show, onShow, onRemove }: { n: 1 | 2; content: string; show: boolean; onShow: () => void; onRemove: () => void }) => {
+  const saveAnnexAsModel = async (content: string) => {
+    const name = window.prompt('Nome para salvar como modelo de anexo:');
+    if (!name?.trim()) return;
+    const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
+    const { data, error } = await supabase.from('annex_models' as any)
+      .insert({ name: name.trim(), company_id: COMPANY_ID, content })
+      .select('id,name,content').single();
+    if (error) { toast.error('Erro ao salvar modelo'); return; }
+    setAnnexModels(prev => [...prev, data as AnnexModel]);
+    toast.success(`Modelo "${name.trim()}" salvo`);
+  };
+
+  const AnnexBlock = ({ n, content, show, onRemove }: { n: 1 | 2; content: string; show: boolean; onRemove: () => void }) => {
     if (!show) return null;
     return (
       <div className="mt-4 border-t border-border pt-4">
@@ -261,6 +273,12 @@ export default function EventArquivosTab({ eventId, event }: Props) {
                 <option value="" disabled>Usar modelo...</option>
                 {annexModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
+            )}
+            {content && (
+              <button onClick={() => saveAnnexAsModel(content)}
+                className="text-xs border border-border rounded-lg px-2 py-1.5 hover:bg-muted transition-colors text-muted-foreground whitespace-nowrap">
+                Salvar como modelo
+              </button>
             )}
             <button onClick={onRemove} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
               <Trash2 className="w-3.5 h-3.5" />
@@ -369,10 +387,8 @@ export default function EventArquivosTab({ eventId, event }: Props) {
                 </div>
               </div>
               <AnnexBlock n={1} content={annex1} show={showAnnex1}
-                onShow={() => setShowAnnex1(true)}
                 onRemove={() => { setShowAnnex1(false); handleAnnex(1, ''); }} />
               <AnnexBlock n={2} content={annex2} show={showAnnex2}
-                onShow={() => setShowAnnex2(true)}
                 onRemove={() => { setShowAnnex2(false); handleAnnex(2, ''); }} />
               {!showAnnex1 && <p className="text-xs text-muted-foreground mt-1">Nenhum anexo adicionado</p>}
             </div>

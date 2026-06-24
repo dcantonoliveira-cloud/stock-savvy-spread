@@ -176,6 +176,11 @@ export default function EventDetailPage() {
           const { data: loc } = await supabase.from('event_locations' as any).select('name').eq('id', eventData.location_id).single();
           if (loc) eventData = { ...eventData, location_text: (loc as any).name };
         }
+        // fallback: busca nome do produto se product_name estiver vazio mas product_id existir
+        if (!eventData.product_name && eventData.product_id) {
+          const { data: prod } = await supabase.from('event_products' as any).select('name').eq('id', eventData.product_id).single();
+          if (prod) eventData = { ...eventData, product_name: (prod as any).name };
+        }
         setEvent(eventData);
         setForm(eventData);
         formRef.current = eventData;
