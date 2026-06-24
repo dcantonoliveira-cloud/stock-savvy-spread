@@ -168,17 +168,21 @@ export default function ContratosPage() {
     <div className="space-y-5">
 
       {/* ── Explicação ─────────────────────────────────────────────── */}
-      <div className="bg-white border border-border rounded-2xl p-5 flex gap-4 items-start">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-xl">📝</div>
-        <div>
-          <p className="font-semibold text-sm mb-1">Como funciona</p>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Aqui você cria e edita os <strong>textos base</strong> dos contratos e anexos usados nos eventos.
-            Insira <strong>tags entre colchetes</strong> no texto — elas são substituídas automaticamente pelos dados do
-            evento ao gerar o documento (ex.: <code className="bg-muted px-1 rounded text-[11px]">[NOME DO CLIENTE]</code>,{' '}
-            <code className="bg-muted px-1 rounded text-[11px]">[DATA DO EVENTO]</code>).
-            Marque um contrato com <Star className="inline w-3 h-3 text-amber-400 mb-0.5" fill="currentColor" /> <strong>padrão</strong> para usá-lo automaticamente nos eventos.
-          </p>
+      <div className="bg-white border border-border rounded-2xl px-6 py-4">
+        <p className="text-sm font-semibold mb-2">Modelos de contrato e de anexo</p>
+        <div className="grid grid-cols-3 gap-6 text-xs text-muted-foreground">
+          <div className="flex gap-2.5">
+            <span className="text-primary font-bold text-base leading-none mt-0.5">1</span>
+            <p>Crie um <strong className="text-foreground">modelo de contrato</strong> e escreva o texto completo que será usado nos eventos.</p>
+          </div>
+          <div className="flex gap-2.5">
+            <span className="text-primary font-bold text-base leading-none mt-0.5">2</span>
+            <p>Insira <strong className="text-foreground">tags entre colchetes</strong> (ex.: <code className="bg-muted px-1 py-0.5 rounded font-mono">[NOME DO CLIENTE]</code>) — elas são substituídas automaticamente ao gerar o contrato de um evento.</p>
+          </div>
+          <div className="flex gap-2.5">
+            <span className="text-primary font-bold text-base leading-none mt-0.5">3</span>
+            <p>Marque um modelo como <strong className="text-foreground">padrão</strong> com a estrela — ele será usado automaticamente ao gerar contratos nos eventos.</p>
+          </div>
         </div>
       </div>
 
