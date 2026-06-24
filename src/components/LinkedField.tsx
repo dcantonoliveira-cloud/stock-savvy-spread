@@ -117,6 +117,7 @@ export default function LinkedField({
             onFocus={() => setOpen(true)}
             placeholder={`Buscar ${label.toLowerCase()}...`}
             className={inputCls + (selected ? ' font-medium' : '')}
+            style={{ fontSize: displayValue.length > 28 ? '11px' : displayValue.length > 20 ? '12px' : undefined }}
           />
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
             {(valueId || resolvedName) ? (
