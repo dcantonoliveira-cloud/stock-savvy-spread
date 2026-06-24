@@ -27,6 +27,7 @@ type EventRow = {
   non_paying_guests: number | null;
   price_per_person: number | null;
   total_value: number | null;
+  paid_value: number | null;
   is_paid_in_full: boolean | null;
   contract_signed: boolean | null;
   contract_signed_date: string | null;
@@ -110,7 +111,7 @@ export default function EventsPage() {
     setLoading(true);
     const [evRes, clRes, locRes] = await Promise.all([
       supabase.from('events')
-        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
+        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
         .order('event_date', { ascending: true }),
       supabase.from('clients').select('id, name, phone, email').order('name'),
       supabase.from('event_locations').select('id, name'),
@@ -678,13 +679,23 @@ export default function EventsPage() {
                     </td>
                     {/* PGTO % */}
                     <td className="px-4 py-2 text-center">
-                      {ev.status === 'confirmed' ? (
-                        ev.is_paid_in_full
-                          ? <span className="inline-flex items-center gap-1 text-[12px] font-bold text-emerald-600">
-                              <CheckCircle2 className="w-3 h-3"/>100%
-                            </span>
-                          : <span className="text-[12px] font-semibold text-amber-600">0%</span>
-                      ) : <span className="text-muted-foreground/30 text-xs">—</span>}
+                      {(() => {
+                        const total = ev.total_value ?? 0;
+                        const paid = ev.paid_value ?? 0;
+                        const pct = total > 0 ? Math.min(Math.round((paid / total) * 100), 100) : 0;
+                        if (ev.is_paid_in_full || pct >= 100)
+                          return <span className="inline-flex items-center gap-1 text-[12px] font-bold text-emerald-600"><CheckCircle2 className="w-3 h-3"/>100%</span>;
+                        if (pct === 0)
+                          return <span className="text-[12px] font-semibold text-amber-600">0%</span>;
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-[12px] font-semibold text-amber-600">{pct}%</span>
+                            <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-amber-400 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
                     {/* AÇÕES */}
                     <td className="px-2 py-2">
