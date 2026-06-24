@@ -2,12 +2,13 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Check, Search, Trash2, Clock } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
 import CustomFieldsSection from '@/components/CustomFieldsSection';
 import MenuSheetsTab from '@/components/MenuSheetsTab';
+import EventChecklistTab from '@/components/EventChecklistTab';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -261,20 +262,31 @@ export default function EventDetailPage() {
         <div className="px-8 py-3 flex items-center justify-between gap-4">
 
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
               <Link to="/events" className="hover:text-foreground transition-colors">Eventos</Link>
               <span>›</span>
               <span className="text-foreground truncate">{event.event_name ?? 'Sem nome'}</span>
             </div>
-            <h1 className="text-[17px] font-bold text-foreground truncate leading-tight flex items-center gap-2">
+            <h1 className="text-xl font-bold text-foreground truncate leading-tight">
               {event.event_name ?? 'Sem nome'}
+            </h1>
+            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
               {event.event_date && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  · {fmtDate(event.event_date)}
-                  {event.location_text && ` · ${event.location_text}`}
+                <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                  <CalendarDays className="w-3 h-3" />{fmtDate(event.event_date)}
                 </span>
               )}
-            </h1>
+              {event.location_text && (
+                <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                  <MapPin className="w-3 h-3" />{event.location_text}
+                </span>
+              )}
+              {event.guest_count && (
+                <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                  <Users className="w-3 h-3" />{event.guest_count} convidados
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -284,16 +296,8 @@ export default function EventDetailPage() {
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide border ${STATUS_CLASSES[event.status] ?? 'bg-muted text-muted-foreground border-border'}`}>
               {statusLabel}
             </span>
-            {/* Auto-save indicator */}
             {saveStatus === 'saving' && (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="w-3 h-3 animate-spin" />Salvando...
-              </span>
-            )}
-            {saveStatus === 'saved' && (
-              <span className="flex items-center gap-1.5 text-xs text-emerald-600">
-                <Check className="w-3 h-3" />Salvo
-              </span>
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" />
             )}
             {!['confirmed', 'completed'].includes(event.status) && !event.is_paid_in_full && (
               <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex border-amber-200 text-amber-700 hover:bg-amber-50">
@@ -327,8 +331,8 @@ export default function EventDetailPage() {
       </div>
 
       {/* ════ CONTENT ════ */}
-      {/* Espaçador para compensar o header fixo (topbar ~72px + tabs ~42px) */}
-      <div style={{ height: 114 }} />
+      {/* Espaçador para compensar o header fixo (topbar ~88px + tabs ~42px) */}
+      <div style={{ height: 130 }} />
 
       <div className="px-8 py-6 space-y-5">
 
@@ -560,8 +564,11 @@ export default function EventDetailPage() {
         {/* ── HISTÓRICO ── shown at bottom of every tab */}
         {tab === 'Outros' && id && <EventHistorySection eventId={id} />}
 
+        {/* ── CHECKLIST ── */}
+        {tab === 'Checklist' && id && <EventChecklistTab eventId={id} />}
+
         {/* ── EM CONSTRUÇÃO ── */}
-        {['Checklist','Cronograma','Financeiro','Arquivos','Equipe'].includes(tab) && (
+        {['Cronograma','Financeiro','Arquivos','Equipe'].includes(tab) && (
           <div className="bg-white border border-border rounded-2xl p-16 flex flex-col items-center gap-3 text-center">
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center text-2xl">🚧</div>
             <p className="font-semibold">Em construção</p>

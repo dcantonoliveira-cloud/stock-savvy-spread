@@ -49,6 +49,7 @@ const TiposFestPage            = lazy(() => import("./pages/supervisor/cadastros
 const AssessoresPage           = lazy(() => import("./pages/supervisor/cadastros/AssessoresPage"));
 const DecoradoresPage          = lazy(() => import("./pages/supervisor/cadastros/DecoradoresPage"));
 const ContratosPage            = lazy(() => import("./pages/supervisor/cadastros/ContratosPage"));
+const ChecklistsPage           = lazy(() => import("./pages/supervisor/cadastros/ChecklistsPage"));
 const EventsPage               = lazy(() => import("./pages/supervisor/crm/EventsPage"));
 const EventDetailPage          = lazy(() => import("./pages/supervisor/crm/EventDetailPage"));
 const TastingsPage             = lazy(() => import("./pages/supervisor/crm/TastingsPage"));
@@ -131,6 +132,7 @@ function AppRoutes() {
             <Route path="/cadastros/assessores" element={<AssessoresPage />} />
             <Route path="/cadastros/decoradores" element={<DecoradoresPage />} />
             <Route path="/cadastros/contratos" element={<ContratosPage />} />
+            <Route path="/cadastros/checklists" element={<ChecklistsPage />} />
             <Route path="/tastings" element={<TastingsPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/financeiro" element={<FinanceiroPage />} />
