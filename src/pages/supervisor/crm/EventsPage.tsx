@@ -54,7 +54,8 @@ const EMPTY_FORM = {
   client_id: '', event_name: '', event_type: 'Casamento', status: 'lead',
   event_date: '', location_text: '',
   guest_count: '', children_50_pct: '0', non_paying_guests: '0',
-  price_per_person: '', total_value: '',
+  price_per_person: '', contract_value: '', total_value: '',
+  pricing_mode: 'per_person',
   contract_signed: false, contract_signed_date: '', is_paid_in_full: false,
   notes: '',
 };
@@ -185,8 +186,12 @@ export default function EventsPage() {
       guest_count: parseInt(form.guest_count) || null,
       children_50_pct: parseInt(form.children_50_pct) || 0,
       non_paying_guests: parseInt(form.non_paying_guests) || 0,
-      price_per_person: parseFloat(form.price_per_person) || null,
-      total_value: autoTotal > 0 ? autoTotal : parseFloat(form.total_value) || null,
+      pricing_mode: form.pricing_mode,
+      price_per_person: form.pricing_mode === 'per_person' ? (parseFloat(form.price_per_person) || null) : null,
+      contract_value: form.pricing_mode === 'fixed' ? (parseFloat(form.contract_value) || null) : null,
+      total_value: form.pricing_mode === 'fixed'
+        ? (parseFloat(form.contract_value) || null)
+        : autoTotal > 0 ? autoTotal : parseFloat(form.total_value) || null,
       contract_signed: form.contract_signed,
       contract_signed_date: form.contract_signed_date || null,
       is_paid_in_full: form.is_paid_in_full,
@@ -343,16 +348,42 @@ export default function EventsPage() {
         </div>
       </div>
 
+      {/* Modo de cobrança */}
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Modo de Cobrança</label>
+        <div className="flex items-center bg-muted rounded-xl p-1 gap-1 w-fit">
+          {(['per_person', 'fixed'] as const).map(mode => (
+            <button key={mode} type="button" onClick={() => setF('pricing_mode', mode)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                form.pricing_mode === mode ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}>
+              {mode === 'per_person' ? 'Por convidado' : 'Valor fixo'}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Preço */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Preço por pessoa (R$)</label>
-          <Input type="number" min="0" step="0.01" value={form.price_per_person} onChange={e => setF('price_per_person', e.target.value)} placeholder="0,00" className="h-9" />
+          {form.pricing_mode === 'per_person' ? (
+            <>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Preço por pessoa (R$)</label>
+              <Input type="number" min="0" step="0.01" value={form.price_per_person} onChange={e => setF('price_per_person', e.target.value)} placeholder="0,00" className="h-9" />
+            </>
+          ) : (
+            <>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Valor do contrato (R$)</label>
+              <Input type="number" min="0" step="0.01" value={form.contract_value} onChange={e => setF('contract_value', e.target.value)} placeholder="0,00" className="h-9" />
+            </>
+          )}
         </div>
         <div>
           <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Valor Total</label>
           <div className="h-9 px-3 rounded-lg border border-border bg-muted/30 flex items-center text-sm font-semibold text-primary">
-            {autoTotal > 0 ? fmtBRL(autoTotal) : form.total_value ? fmtBRL(parseFloat(form.total_value)) : '—'}
+            {form.pricing_mode === 'fixed'
+              ? (form.contract_value ? fmtBRL(parseFloat(form.contract_value)) : '—')
+              : autoTotal > 0 ? fmtBRL(autoTotal) : form.total_value ? fmtBRL(parseFloat(form.total_value)) : '—'}
           </div>
         </div>
       </div>

@@ -357,7 +357,25 @@ export default function EventDetailPage() {
           <>
             {/* Card 1: Informações gerais */}
             <div className="bg-white border border-border rounded-2xl p-6">
-              <SectionTitle>Informações do Evento</SectionTitle>
+              <div className="flex items-center justify-between mb-5">
+                <SectionTitle>Informações do Evento</SectionTitle>
+                {/* Pricing mode toggle — inline no header do card */}
+                <div className="flex items-center gap-2 -mt-5">
+                  <span className="text-[11px] text-muted-foreground/60 font-medium">Cobrança:</span>
+                  <div className="flex items-center bg-muted rounded-lg p-0.5">
+                    {(['per_person', 'fixed'] as const).map(mode => (
+                      <button key={mode} onClick={() => setF('pricing_mode', mode)}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                          (form.pricing_mode ?? 'per_person') === mode
+                            ? 'bg-white shadow-sm text-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}>
+                        {mode === 'per_person' ? 'Por convidado' : 'Valor fixo'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-4 gap-4">
 
                 <F label="Nome do evento" value={s('event_name')} onChange={v => setF('event_name', v)} />
@@ -391,7 +409,13 @@ export default function EventDetailPage() {
                 <F label="Duração (horas)" value={s('duration_hours')} onChange={v => setF('duration_hours', v)} type="number" suffix="h" />
                 <F label="Convidados" value={s('guest_count')} onChange={v => setF('guest_count', v)} type="number" />
 
-                <F label="Preço / Pax" value={s('price_per_person')} onChange={v => setF('price_per_person', v)} type="number" suffix="R$" />
+                {/* Preço: muda conforme o modo */}
+                {(form.pricing_mode ?? 'per_person') === 'per_person' ? (
+                  <F label="Preço / Pax" value={s('price_per_person')} onChange={v => setF('price_per_person', v)} type="number" suffix="R$" />
+                ) : (
+                  <F label="Valor do contrato" value={s('contract_value')} onChange={v => setF('contract_value', v)} type="number" suffix="R$" />
+                )}
+
                 <F label="Crianças 50%" value={s('children_50_pct')} onChange={v => setF('children_50_pct', v)} type="number" />
                 <F label="Não pagantes" value={s('non_paying_guests')} onChange={v => setF('non_paying_guests', v)} type="number" />
                 <F label="Horas adicionais" value={s('additional_hours')} onChange={v => setF('additional_hours', v)} type="number" suffix="h" />
