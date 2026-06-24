@@ -107,6 +107,24 @@ export default function EventFinanceiroTab({
 
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  // Sincroniza total_value e paid_value no evento (lido na lista de eventos)
+  const syncEventTotals = useCallback(async (
+    adds: AdditionalValue[],
+    pays: Payment[],
+    evtData: EventFinanceiro,
+  ) => {
+    const base = evtData.pricing_mode === 'fixed'
+      ? (evtData.contract_value ?? 0)
+      : (
+          ((evtData.guest_count ?? 0) * (evtData.price_per_person ?? 0)) +
+          ((evtData.children_50_pct ?? 0) * (evtData.price_per_person ?? 0) * 0.5) +
+          ((evtData.professional_count ?? 0) * (evtData.professional_meal_value ?? 0))
+        );
+    const total = base + adds.reduce((s, a) => s + Number(a.value), 0);
+    const paid = pays.filter(p => p.is_confirmed).reduce((s, p) => s + Number(p.value), 0);
+    await supabase.from('events').update({ total_value: total, paid_value: paid }).eq('id', eventId);
+  }, [eventId]);
+
   useEffect(() => {
     (async () => {
       const [addRes, payRes] = await Promise.all([
@@ -119,9 +137,13 @@ export default function EventFinanceiroTab({
           .eq('event_id', eventId)
           .order('payment_date', { ascending: true }),
       ]);
-      setAdditionals(addRes.data ?? []);
-      setPayments(payRes.data ?? []);
+      const adds = addRes.data ?? [];
+      const pays = payRes.data ?? [];
+      setAdditionals(adds);
+      setPayments(pays);
       setLoadingData(false);
+      // Sincroniza ao abrir a aba
+      syncEventTotals(adds, pays, event);
     })();
   }, [eventId]);
 
@@ -155,22 +177,28 @@ export default function EventFinanceiroTab({
       .insert({ event_id: eventId, description: newDesc.trim(), value: Number(newAddVal), sort_order: maxOrder })
       .select('id, description, value, sort_order').single();
     if (error) { toast.error(error.message); return; }
-    setAdditionals(prev => [...prev, data as AdditionalValue]);
+    const next = [...additionals, data as AdditionalValue];
+    setAdditionals(next);
     setNewDesc(''); setNewAddVal('');
+    syncEventTotals(next, payments, event);
   };
 
   const updateAdditional = (id: string, field: string, value: any) => {
-    setAdditionals(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+    const next = additionals.map(a => a.id === id ? { ...a, [field]: value } : a);
+    setAdditionals(next);
     const key = 'add_' + id + field;
     if (timers.current[key]) clearTimeout(timers.current[key]);
     timers.current[key] = setTimeout(async () => {
       await supabase.from('event_additional_values' as any).update({ [field]: value }).eq('id', id);
+      syncEventTotals(next, payments, event);
     }, 800);
   };
 
   const deleteAdditional = async (id: string) => {
-    setAdditionals(prev => prev.filter(a => a.id !== id));
+    const next = additionals.filter(a => a.id !== id);
+    setAdditionals(next);
     await supabase.from('event_additional_values' as any).delete().eq('id', id);
+    syncEventTotals(next, payments, event);
   };
 
   // ── Handlers — payments ──────────────────────────────────────────────────────
@@ -191,21 +219,27 @@ export default function EventFinanceiroTab({
       })
       .select('id, payment_date, value, type, is_confirmed, notes').single();
     if (error) { toast.error(error.message); return; }
-    setPayments(prev => [...prev, data as Payment].sort((a, b) =>
-      (a.payment_date ?? '').localeCompare(b.payment_date ?? '')));
+    const next = [...payments, data as Payment].sort((a, b) =>
+      (a.payment_date ?? '').localeCompare(b.payment_date ?? ''));
+    setPayments(next);
     if (isScheduled) { setNewSchedDate(''); setNewSchedVal(''); setNewSchedNotes(''); }
     else { setNewPayDate(''); setNewPayVal(''); setNewPayNotes(''); setNewPayType('payment'); }
+    syncEventTotals(additionals, next, event);
   };
 
   const confirmPayment = async (p: Payment) => {
-    setPayments(prev => prev.map(x => x.id === p.id ? { ...x, is_confirmed: true } : x));
+    const next = payments.map(x => x.id === p.id ? { ...x, is_confirmed: true } : x);
+    setPayments(next);
     await supabase.from('event_payments' as any).update({ is_confirmed: true }).eq('id', p.id);
+    syncEventTotals(additionals, next, event);
     toast.success('Recebimento confirmado');
   };
 
   const deletePayment = async (id: string) => {
-    setPayments(prev => prev.filter(p => p.id !== id));
+    const next = payments.filter(p => p.id !== id);
+    setPayments(next);
     await supabase.from('event_payments' as any).delete().eq('id', id);
+    syncEventTotals(additionals, next, event);
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
