@@ -228,43 +228,22 @@ export default function EventFinanceiroTab({
         </div>
       </div>
 
-      {/* ── Modo de cobrança ── */}
-      <div className="bg-white border border-border rounded-2xl p-5">
-        <SectionHeader
-          title="Modo de Cobrança"
-          tooltip="Define como o valor base do evento é calculado. 'Por convidado' multiplica o preço/pax pelo número de convidados. 'Valor fixo' permite digitar diretamente o valor negociado do pacote."
-        />
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-muted rounded-xl p-1 gap-1">
-            {(['per_person', 'fixed'] as const).map(mode => (
-              <button key={mode}
-                onClick={() => onUpdateEvent('pricing_mode', mode)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  pricingMode === mode ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}>
-                {mode === 'per_person' ? 'Por convidado' : 'Valor fixo'}
-              </button>
-            ))}
-          </div>
-          {pricingMode === 'per_person' ? (
-            <p className="text-xs text-muted-foreground">
-              Base calculada: <strong>{event.guest_count ?? 0}</strong> conv × <strong>{fmtBRL(event.price_per_person ?? 0)}</strong>
-              {(event.children_50_pct ?? 0) > 0 && ` + ${event.children_50_pct} crianças (50%)`}
-              {(event.professional_count ?? 0) > 0 && ` + ${event.professional_count} prof.`}
-            </p>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Valor do contrato:</span>
-              <input
-                type="number"
-                value={event.contract_value ?? ''}
-                onChange={e => onUpdateEvent('contract_value', e.target.value)}
-                placeholder="0,00"
-                className={inputCls + ' w-40'}
-              />
-            </div>
-          )}
-        </div>
+      {/* ── Modo de cobrança (leitura — configurado na Ficha Técnica) ── */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-white border border-border rounded-xl text-sm">
+        <span className="text-muted-foreground/60 text-xs font-semibold uppercase tracking-wide">Modo de cobrança:</span>
+        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+          pricingMode === 'per_person'
+            ? 'bg-blue-50 text-blue-700 border-blue-200'
+            : 'bg-purple-50 text-purple-700 border-purple-200'
+        }`}>
+          {pricingMode === 'per_person' ? 'Por convidado' : 'Valor fixo'}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {pricingMode === 'per_person'
+            ? `${event.guest_count ?? 0} conv × ${fmtBRL(event.price_per_person ?? 0)}`
+            : `Pacote: ${fmtBRL(event.contract_value ?? 0)}`}
+        </span>
+        <span className="text-xs text-muted-foreground/50 ml-auto">Altere na aba Ficha Técnica</span>
       </div>
 
       {/* ── Resumo financeiro ── */}
