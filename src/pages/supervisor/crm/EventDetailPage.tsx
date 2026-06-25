@@ -340,18 +340,23 @@ export default function EventDetailPage() {
   const contractShort = event.contract_signed_date
     ? (() => { const [y, m] = event.contract_signed_date.split('-'); return `${m}/${y.slice(2)}`; })()
     : null;
+  const isClosed = ['confirmed', 'completed'].includes(event.status);
+  const isPipeline = ['lead', 'negotiating', 'tasting_scheduled'].includes(event.status);
+  const isLost = ['lost', 'cancelled'].includes(event.status);
   const statusLabel = event.is_paid_in_full ? 'Quitado' : STATUS_LABELS[event.status] ?? event.status;
+  const backPath = isClosed ? '/events' : '/orcamentos';
+  const backLabel = isClosed ? 'Eventos' : 'Orçamentos';
 
   return (
     <div className="-m-8">
 
-      {/* ════ TOP BAR — sticky abaixo do topbar global (h-14 = 56px) ════ */}
+      {/* ════ TOP BAR ════ */}
       <div className="sticky top-14 z-30 bg-white border-b border-border shadow-sm">
         <div className="px-8 py-3 flex items-center justify-between gap-4">
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
-              <Link to="/events" className="hover:text-foreground transition-colors">Eventos</Link>
+              <Link to={backPath} className="hover:text-foreground transition-colors">{backLabel}</Link>
               <span>›</span>
               <span className="text-foreground truncate">{event.event_name ?? 'Sem nome'}</span>
             </div>
@@ -378,14 +383,27 @@ export default function EventDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {contractShort && (
-              <span className="hidden md:block text-xs text-muted-foreground">Fechado em {contractShort}</span>
-            )}
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide border ${STATUS_CLASSES[event.status] ?? 'bg-muted text-muted-foreground border-border'}`}>
               {statusLabel}
             </span>
-            {/* Tag de pagamento */}
-            {(() => {
+
+            {/* Reservar data — só para orçamentos em pipeline */}
+            {isPipeline && (
+              <button
+                onClick={toggleDateReserved}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border uppercase tracking-wide transition-colors ${
+                  event.date_reserved
+                    ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200'
+                    : 'bg-muted text-muted-foreground border-border hover:bg-accent'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${event.date_reserved ? 'bg-violet-500' : 'bg-muted-foreground/40'}`} />
+                {event.date_reserved ? 'Reservado' : 'Reservar data'}
+              </button>
+            )}
+
+            {/* Tag de pagamento — só eventos fechados */}
+            {isClosed && (() => {
               const total = event.total_value ?? 0;
               const paid = event.paid_value ?? 0;
               const pct = total > 0 ? Math.min(Math.round((paid / total) * 100), 100) : 0;
@@ -410,21 +428,25 @@ export default function EventDetailPage() {
                 </span>
               );
             })()}
-            {saveStatus === 'saving' && (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" />
+
+            {saveStatus === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" />}
+            {contractShort && isClosed && (
+              <span className="hidden md:block text-xs text-muted-foreground">Fechado em {contractShort}</span>
             )}
-            {!['confirmed', 'completed'].includes(event.status) && !event.is_paid_in_full && (
-              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex border-amber-200 text-amber-700 hover:bg-amber-50">
-                <FileText className="w-3 h-3" />Dados para contrato
-              </Button>
+
+            {/* Botões de ação — só eventos fechados */}
+            {isClosed && (
+              <>
+                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFichaTecnica}>
+                  <Download className="w-3 h-3" />Ficha técnica
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
+                  <Download className="w-3 h-3" />Fechamento
+                </Button>
+              </>
             )}
-            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFichaTecnica}>
-              <Download className="w-3 h-3" />Ficha técnica
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
-              <Download className="w-3 h-3" />Fechamento
-            </Button>
-            <button onClick={() => navigate('/events')}
+
+            <button onClick={() => navigate(backPath)}
               className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
               <X className="w-4 h-4" />
             </button>
@@ -432,26 +454,13 @@ export default function EventDetailPage() {
         </div>
 
         {/* Banner: orçamento em andamento */}
-        {['lead', 'negotiating', 'tasting_scheduled'].includes(event.status) && (
-          <div className="mx-8 mb-3 flex items-center justify-between gap-4 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200">
-            <div className="flex items-center gap-2.5 text-amber-800 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-              Orçamento em negociação — contrato ainda não assinado. Confirme o evento antes de gerar fechamento.
-            </div>
-            <button
-              onClick={toggleDateReserved}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 ${
-                event.date_reserved
-                  ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200'
-                  : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-100'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${event.date_reserved ? 'bg-violet-500' : 'bg-amber-300'}`} />
-              {event.date_reserved ? 'Data reservada' : 'Reservar data'}
-            </button>
+        {isPipeline && (
+          <div className="mx-8 mb-3 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            Orçamento em negociação — contrato ainda não assinado. Confirme o evento antes de avançar.
           </div>
         )}
-        {event.status === 'lost' && (
+        {isLost && (
           <div className="mx-8 mb-3 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-500 text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0" />
             Orçamento não fechado — nenhum contrato foi assinado.
