@@ -415,8 +415,6 @@ export default function EventDetailPage() {
       </div>
 
       {/* ════ CONTENT ════ */}
-      {/* Espaçador para compensar o header fixo (topbar ~88px + tabs ~42px) */}
-      <div style={{ height: 130 }} />
 
       <div className="px-8 py-6 space-y-5">
 
