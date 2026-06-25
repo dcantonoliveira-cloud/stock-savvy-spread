@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Plus, ChevronDown } from 'lucide-react';
+import { Search, Plus, ChevronDown, Info } from 'lucide-react';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 interface Orcamento {
@@ -21,7 +21,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; b
   lead:              { label: '1° Contato', bg: 'bg-sky-50',    text: 'text-sky-700',    border: 'border-sky-200' },
   negotiating:       { label: 'Negociando', bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
   tasting_scheduled: { label: 'Degustação', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  cancelled:         { label: 'Cancelado',  bg: 'bg-red-50',    text: 'text-red-600',    border: 'border-red-200' },
+  lost:              { label: 'Não fechado', bg: 'bg-zinc-50',  text: 'text-zinc-500',   border: 'border-zinc-200' },
 };
 
 const fmtDate = (d: string | null) => {
@@ -42,14 +42,14 @@ export default function OrcamentosPage() {
   const [rows, setRows]       = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
-  const [filter, setFilter]   = useState<'all' | string>('all');
+  const [filter, setFilter]   = useState<string>('all');
 
   const load = async () => {
     setLoading(true);
     const { data } = await supabase
       .from('events')
       .select('id, event_name, location_text, organizer, event_date, created_at, status')
-      .in('status', [...PIPELINE_STATUSES, 'cancelled'])
+      .in('status', [...PIPELINE_STATUSES, 'lost'])
       .order('event_date', { ascending: true });
     setRows((data ?? []) as any);
     setLoading(false);
@@ -86,9 +86,26 @@ export default function OrcamentosPage() {
 
   return (
     <div>
+      {/* ── Descrição da página ── */}
+      <div className="mb-5 p-4 bg-white border border-border rounded-2xl flex gap-3">
+        <Info className="w-4 h-4 text-primary/60 shrink-0 mt-0.5" />
+        <div className="text-sm text-muted-foreground leading-relaxed space-y-1">
+          <p>
+            <span className="font-semibold text-foreground">Orçamentos</span> reúne todos os eventos que ainda estão
+            em processo comercial — desde o primeiro contato até a degustação.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Não fechado</span> — orçamento que não evoluiu e nenhum
+            contrato foi assinado. Diferente de <span className="font-medium text-foreground">Cancelado</span>, que é
+            um evento com contrato já assinado que foi encerrado (esses ficam na página de Eventos).
+          </p>
+        </div>
+      </div>
+
       {/* ── Filtros e busca ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-1.5 bg-white border border-border rounded-xl p-1">
+          {/* Pipeline */}
           <FilterBtn active={filter === 'all'} onClick={() => setFilter('all')}>
             Em aberto <Count n={countFor('all')} />
           </FilterBtn>
@@ -99,8 +116,9 @@ export default function OrcamentosPage() {
           ))}
           {/* Divisor */}
           <div className="w-px h-5 bg-border mx-0.5" />
-          <FilterBtn active={filter === 'cancelled'} onClick={() => setFilter('cancelled')} danger>
-            Cancelados <Count n={countFor('cancelled')} />
+          {/* Não fechados */}
+          <FilterBtn active={filter === 'lost'} onClick={() => setFilter('lost')} muted>
+            Não fechados <Count n={countFor('lost')} />
           </FilterBtn>
         </div>
 
@@ -191,20 +209,22 @@ function Th({ children }: { children?: React.ReactNode }) {
   );
 }
 
-function Td({ children, className = '', onClick }: { children?: React.ReactNode; className?: string; onClick?: (e: React.MouseEvent) => void }) {
+function Td({ children, className = '', onClick }: {
+  children?: React.ReactNode; className?: string; onClick?: (e: React.MouseEvent) => void;
+}) {
   return <td className={`px-4 py-3 text-sm ${className}`} onClick={onClick}>{children}</td>;
 }
 
-function FilterBtn({ active, onClick, children, danger }: {
-  active: boolean; onClick: () => void; children: React.ReactNode; danger?: boolean;
+function FilterBtn({ active, onClick, children, muted }: {
+  active: boolean; onClick: () => void; children: React.ReactNode; muted?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
         active
-          ? danger ? 'bg-red-500 text-white' : 'bg-primary text-primary-foreground'
-          : danger ? 'text-red-500 hover:bg-red-50' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+          ? muted ? 'bg-zinc-200 text-zinc-700' : 'bg-primary text-primary-foreground'
+          : muted ? 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
       }`}
     >
       {children}
@@ -216,12 +236,14 @@ function Count({ n }: { n: number }) {
   return <span className="ml-1 opacity-60">({n})</span>;
 }
 
+const ALL_STATUS_OPTIONS = [
+  ...PIPELINE_STATUSES.map(s => ({ key: s, ...STATUS_CONFIG[s] })),
+  { key: 'lost', ...STATUS_CONFIG.lost },
+];
+
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
   const [open, setOpen] = useState(false);
   const cfg = STATUS_CONFIG[status] ?? { label: status, bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-border' };
-  const options = status === 'cancelled'
-    ? [...PIPELINE_STATUSES.map(s => STATUS_CONFIG[s] ? { key: s, ...STATUS_CONFIG[s] } : null).filter(Boolean), { key: 'cancelled', ...STATUS_CONFIG.cancelled }]
-    : [...PIPELINE_STATUSES.map(s => ({ key: s, ...STATUS_CONFIG[s] })), { key: 'cancelled', ...STATUS_CONFIG.cancelled }];
 
   return (
     <div className="relative inline-block">
@@ -235,8 +257,8 @@ function StatusDropdown({ status, onChange }: { status: string; onChange: (s: st
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-7 z-20 bg-white border border-border rounded-xl shadow-lg py-1 min-w-[150px]">
-            {(options as any[]).map(o => (
+          <div className="absolute left-0 top-7 z-20 bg-white border border-border rounded-xl shadow-lg py-1 min-w-[160px]">
+            {ALL_STATUS_OPTIONS.map(o => (
               <button
                 key={o.key}
                 onClick={() => { onChange(o.key); setOpen(false); }}
