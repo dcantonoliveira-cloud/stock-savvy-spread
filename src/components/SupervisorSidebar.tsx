@@ -102,7 +102,7 @@ export default function SupervisorSidebar() {
     ?.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() || '?';
 
   return (
-    <aside className="fixed left-0 top-0 h-screen glass-sidebar flex flex-col z-50 w-[200px] xl:w-[232px]">
+    <aside className="fixed left-0 top-0 h-screen glass-sidebar flex flex-col z-50 w-[180px] xl:w-[210px]">
 
       {/* Logo */}
       <div className="px-4 pt-5 pb-4 flex items-center gap-2.5">
