@@ -82,7 +82,7 @@ interface EventDetail {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, string> = {
-  lead: 'Lead', negotiating: 'Negociando', tasting_scheduled: 'Degustação',
+  lead: '1° Contato', negotiating: 'Negociando', tasting_scheduled: 'Degustação',
   confirmed: 'Confirmado', completed: 'Concluído', cancelled: 'Cancelado',
   lost: 'Não fechado',
 };
