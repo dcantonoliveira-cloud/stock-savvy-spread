@@ -95,7 +95,8 @@ const STATUS_CLASSES: Record<string, string> = {
   cancelled: 'bg-red-50 text-red-700 border-red-200',
   lost: 'bg-zinc-100 text-zinc-500 border-zinc-200',
 };
-const TABS = ['Ficha Técnica','Dados do Cliente','Cardápio','Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'];
+const TABS_ALL = ['Ficha Técnica','Dados do Cliente','Cardápio','Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'];
+const TABS_CLOSED_ONLY = ['Cardápio','Checklist','Cronograma','Financeiro','Equipe'];
 const EVENT_TYPES = ['Casamento','Coorporativo','Formatura','Debutante','Confraternização','Outro'];
 
 function fmtDate(d: string | null) {
@@ -458,8 +459,12 @@ export default function EventDetailPage() {
         )}
 
         {/* Tabs (part of the white header block) */}
+        {(() => {
+          const isClosed = ['confirmed', 'completed'].includes(event.status);
+          const tabs = isClosed ? TABS_ALL : TABS_ALL.filter(t => !TABS_CLOSED_ONLY.includes(t));
+          return (
         <div className="px-8 flex gap-0 -mb-px">
-          {TABS.map(t => (
+          {tabs.map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -468,6 +473,8 @@ export default function EventDetailPage() {
             </button>
           ))}
         </div>
+          );
+        })()}
       </div>
 
       {/* ════ CONTENT ════ */}
