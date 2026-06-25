@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Plus, ChevronDown, Info } from 'lucide-react';
+import { Search, Plus, ChevronDown, Info, Trash2 } from 'lucide-react';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 interface Orcamento {
@@ -76,9 +76,17 @@ export default function OrcamentosPage() {
 
   useEffect(() => { load(); }, []);
 
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
   const updateStatus = async (id: string, status: string) => {
     setRows(prev => prev.map(r => r.id === id ? { ...r, status } : r));
     await supabase.from('events').update({ status }).eq('id', id);
+  };
+
+  const deleteRow = async (id: string) => {
+    setRows(prev => prev.filter(r => r.id !== id));
+    setConfirmDelete(null);
+    await supabase.from('events').delete().eq('id', id);
   };
 
   const filtered = useMemo(() => {
@@ -183,13 +191,14 @@ export default function OrcamentosPage() {
               <Th>Data do evento</Th>
               <Th>Em aberto</Th>
               <Th>Status</Th>
+              <Th></Th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="py-16 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+              <tr><td colSpan={7} className="py-16 text-center text-muted-foreground text-sm">Carregando...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} className="py-16 text-center text-muted-foreground text-sm">Nenhum orçamento encontrado.</td></tr>
+              <tr><td colSpan={7} className="py-16 text-center text-muted-foreground text-sm">Nenhum orçamento encontrado.</td></tr>
             ) : filtered.map((row, i) => (
               <tr
                 key={row.id}
@@ -207,6 +216,31 @@ export default function OrcamentosPage() {
                 <Td className="text-muted-foreground tabular-nums">{diasEmAberto(row.created_at)}</Td>
                 <Td onClick={e => e.stopPropagation()}>
                   <StatusDropdown status={row.status} onChange={s => updateStatus(row.id, s)} />
+                </Td>
+                <Td onClick={e => e.stopPropagation()}>
+                  {confirmDelete === row.id ? (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => deleteRow(row.id)}
+                        className="px-2 py-1 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors"
+                      >
+                        Confirmar
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="px-2 py-1 rounded-lg bg-muted text-muted-foreground text-xs font-medium hover:bg-muted/80 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(row.id)}
+                      className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </Td>
               </tr>
             ))}
