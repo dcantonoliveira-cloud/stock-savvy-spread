@@ -101,11 +101,8 @@ export function printFichaTecnica(
     { label: 'Convidados',            value: event.guest_count != null ? String(event.guest_count) : null },
     { label: 'Crianças (50%)',        value: event.children_50_pct ? String(event.children_50_pct) : null },
     { label: 'Não Pagantes',          value: event.non_paying_guests ? String(event.non_paying_guests) : null },
-    { label: isPpx ? 'Valor / Pax' : 'Valor do Contrato',
-      value: isPpx ? fmtBRL(event.price_per_person) : fmtBRL(event.contract_value) },
     { label: 'Qtd. Profissionais',    value: event.professional_count ? String(event.professional_count) : null },
     { label: 'Alim. Profissionais',   value: event.professional_meal_type },
-    { label: 'Valor Alim. Prof.',     value: event.professional_meal_value ? fmtBRL(event.professional_meal_value) : null },
   ]);
 
   // Seção 2: Equipe & Fornecedores
@@ -122,7 +119,6 @@ export function printFichaTecnica(
 
   // Seção 3: Detalhes (campos customizados)
   const customContent = customFields
-    .filter(f => f.value && f.value.trim())
     .map(f => `
       <div>
         <div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;margin-bottom:4px;">${f.name}</div>
@@ -130,7 +126,7 @@ export function printFichaTecnica(
       </div>`)
     .join('');
 
-  const detalhesSection = customContent ? `
+  const detalhesSection = customFields.length > 0 ? `
     <div style="margin-top:22px;">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
         <h2 style="font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;margin:0;">Detalhes da Festa</h2>
@@ -196,8 +192,6 @@ export function printFichaTecnica(
     </div>
   </div>
 
-  <!-- Cliente -->
-  ${event.clients?.name ? `<div style="margin-top:6px;font-size:11px;color:#6B6B6B;">Cliente: <strong style="color:#2B2B2B;">${event.clients.name}</strong>${event.clients.phone ? ` · ${event.clients.phone}` : ''}</div>` : ''}
 
   <div style="border-top:1px solid #E7E3DB;margin-top:16px;"></div>
 
