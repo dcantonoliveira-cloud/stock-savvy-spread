@@ -127,6 +127,7 @@ function AppRoutes() {
             <Route path="/" element={<SupervisorDashboard />} />
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/orcamentos" element={<OrcamentosPage />} />
+            <Route path="/orcamentos/:id" element={<EventDetailPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/events/:id" element={<EventDetailPage />} />
             <Route path="/cadastros/produtos" element={<ProdutosPage />} />
