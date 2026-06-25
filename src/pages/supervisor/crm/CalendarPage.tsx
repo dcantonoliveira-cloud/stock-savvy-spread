@@ -64,6 +64,8 @@ export default function CalendarPage() {
         .select('id, event_name, event_date, status, total_value, guest_count, event_type, location_text, date_reserved, clients(name)')
         .gte('event_date', first)
         .lte('event_date', last)
+        .not('event_name', 'is', null)
+        .neq('event_name', '')
         .order('event_date');
       // Filtro: só mostra confirmados/realizados OU com data reservada
       const visible = (data ?? []).filter((e: any) =>
