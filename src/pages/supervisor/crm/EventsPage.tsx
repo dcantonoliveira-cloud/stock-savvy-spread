@@ -107,22 +107,37 @@ export default function EventsPage() {
   const [clientDropOpen, setClientDropOpen] = useState(false);
 
   // ── Load data ────────────────────────────────────────────────────
-  const load = async () => {
+  const loadEvents = async (y: number) => {
     setLoading(true);
-    const [evRes, clRes, locRes] = await Promise.all([
-      supabase.from('events')
-        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
-        .order('event_date', { ascending: true }),
-      supabase.from('clients').select('id, name, phone, email').order('name'),
-      supabase.from('event_locations').select('id, name'),
-    ]);
-    if (evRes.error) console.error('events query error:', evRes.error);
-    setEvents((evRes.data as EventRow[]) ?? []);
-    setClients((clRes.data as Client[]) ?? []);
-    setLocationMap(new Map((locRes.data ?? []).map((l: any) => [l.id, l.name])));
+    const { data, error } = await supabase
+      .from('events')
+      .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
+      .gte('event_date', `${y}-01-01`)
+      .lte('event_date', `${y}-12-31`)
+      .order('event_date', { ascending: true });
+    if (error) console.error('events query error:', error);
+    setEvents((data as EventRow[]) ?? []);
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+
+  const loadClients = async () => {
+    if (clients.length > 0) return;
+    const { data } = await supabase.from('clients').select('id, name, phone, email').order('name');
+    setClients((data as Client[]) ?? []);
+  };
+
+  // Carrega locais uma vez + eventos do ano inicial
+  useEffect(() => {
+    Promise.all([
+      supabase.from('event_locations').select('id, name'),
+      loadEvents(year),
+    ]).then(([locRes]) => {
+      setLocationMap(new Map((locRes.data ?? []).map((l: any) => [l.id, l.name])));
+    });
+  }, []);
+
+  // Re-carrega eventos quando o ano muda
+  useEffect(() => { loadEvents(year); }, [year]);
 
   // ── Derived data ─────────────────────────────────────────────────
   const monthsWithEvents = useMemo(() => {
@@ -221,7 +236,7 @@ export default function EventsPage() {
     setSaving(false);
     setForm({ ...EMPTY_FORM });
     setClientQuery('');
-    load();
+    loadEvents(year);
   };
 
   const navigate = useNavigate();
@@ -230,6 +245,7 @@ export default function EventsPage() {
   };
 
   const openEdit = (event: EventRow) => {
+    loadClients();
     setDetailEvent(event);
     setEditMode(true);
     const c = clients.find(cl => cl.id === event.client_id);
@@ -258,7 +274,7 @@ export default function EventsPage() {
     await supabase.from('events').delete().eq('id', id);
     setDetailEvent(null);
     toast.success('Evento excluído');
-    load();
+    loadEvents(year);
   };
 
   // ── Form panel (shared for new + edit) ───────────────────────────
@@ -575,7 +591,7 @@ export default function EventsPage() {
               </>
             )}
           </div>
-          <Button onClick={() => { setForm({...EMPTY_FORM}); setClientQuery(''); setNewOpen(true); }}
+          <Button onClick={() => { setForm({...EMPTY_FORM}); setClientQuery(''); setNewOpen(true); loadClients(); }}
             className="gap-1.5 shrink-0 rounded-lg h-9 px-4">
             <Plus className="w-4 h-4" />
             Novo Evento
