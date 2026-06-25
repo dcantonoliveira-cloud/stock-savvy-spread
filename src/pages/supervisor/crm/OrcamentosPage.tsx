@@ -204,7 +204,7 @@ export default function OrcamentosPage() {
             ) : filtered.map((row, i) => (
               <tr
                 key={row.id}
-                onClick={() => navigate(`/events/${row.id}`)}
+                onClick={() => navigate(`/orcamentos/${row.id}`)}
                 className={`border-b border-border/50 hover:bg-slate-50 transition-colors cursor-pointer ${i === filtered.length - 1 ? 'border-0' : ''}`}
               >
                 <Td>
