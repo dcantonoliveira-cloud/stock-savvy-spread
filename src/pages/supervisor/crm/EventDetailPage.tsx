@@ -13,7 +13,7 @@ import EventCronogramaTab from '@/components/EventCronogramaTab';
 import EventFinanceiroTab from '@/components/EventFinanceiroTab';
 import EventArquivosTab from '@/components/EventArquivosTab';
 import EventOutrosTab from '@/components/EventOutrosTab';
-import { generateFechamentoPDF } from '@/utils/generateFechamentoPDF';
+import { printFechamento } from '@/utils/printFechamento';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -282,7 +282,7 @@ export default function EventDetailPage() {
       supabase.from('event_additional_values' as any).select('description, value').eq('event_id', id),
       supabase.from('companies').select('name, logo_base64, razao_social, cnpj, banco, agencia, conta, endereco, telefone, website').limit(1),
     ]);
-    await generateFechamentoPDF(
+    printFechamento(
       { ...event, ...form },
       (payments ?? []) as any,
       (additionals ?? []) as any,
