@@ -159,6 +159,9 @@ export default function EventsPage() {
     const balance = (e.total_value ?? 0) - (e.paid_value ?? 0);
     return s + (balance > 0 ? balance : 0);
   }, 0);
+  const totalGuests = confirmedFiltered.reduce((s,e) => s + (e.guest_count ?? 0), 0);
+  const avgPerGuest = totalGuests > 0 ? statsValue / totalGuests : 0;
+  const avgPerEvent = confirmedFiltered.length > 0 ? statsValue / confirmedFiltered.length : 0;
 
   // ── Form helpers ──────────────────────────────────────────────────
   const setF = (key: string, val: any) => setForm(f => ({ ...f, [key]: val }));
@@ -580,18 +583,36 @@ export default function EventsPage() {
         </div>
 
         {/* Stats strip */}
-        <div className="grid grid-cols-4 gap-3 mb-4">
-          {[
-            { label: 'Neste período', value: filtered.length, cls: 'text-foreground text-xl' },
-            { label: 'Confirmados', value: confirmedFiltered.length, cls: 'text-emerald-700 text-xl' },
-            { label: 'Valor confirmado', value: fmtBRL(statsValue), cls: 'text-primary text-base' },
-            { label: 'A receber', value: fmtBRL(statsReceivable), cls: 'text-amber-700 text-base' },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-border px-4 py-3">
-              <p className="text-[11px] text-muted-foreground mb-0.5">{s.label}</p>
-              <p className={`font-bold leading-tight ${s.cls}`}>{s.value}</p>
+        <div className="grid grid-cols-5 gap-3 mb-4">
+          <div className="bg-white rounded-xl border border-border px-4 py-3">
+            <p className="text-[11px] text-muted-foreground mb-0.5">Neste período</p>
+            <p className="font-bold text-xl text-foreground leading-tight">{filtered.length}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-border px-4 py-3">
+            <p className="text-[11px] text-muted-foreground mb-0.5">Convidados atendidos</p>
+            <p className="font-bold text-xl text-emerald-700 leading-tight">{totalGuests.toLocaleString('pt-BR')}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-border px-4 py-3">
+            <p className="text-[11px] text-muted-foreground mb-1">Ticket médio</p>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] text-muted-foreground">Por convidado</span>
+                <span className="font-bold text-sm text-primary">{fmtBRL(avgPerGuest)}</span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] text-muted-foreground">Por evento</span>
+                <span className="font-bold text-sm text-primary">{fmtBRL(avgPerEvent)}</span>
+              </div>
             </div>
-          ))}
+          </div>
+          <div className="bg-white rounded-xl border border-border px-4 py-3">
+            <p className="text-[11px] text-muted-foreground mb-0.5">Valor confirmado</p>
+            <p className="font-bold text-base text-primary leading-tight">{fmtBRL(statsValue)}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-border px-4 py-3">
+            <p className="text-[11px] text-muted-foreground mb-0.5">A receber</p>
+            <p className="font-bold text-base text-amber-700 leading-tight">{fmtBRL(statsReceivable)}</p>
+          </div>
         </div>
 
         {/* Table */}

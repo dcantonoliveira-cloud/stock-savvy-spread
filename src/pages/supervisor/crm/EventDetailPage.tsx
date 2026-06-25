@@ -298,7 +298,7 @@ export default function EventDetailPage() {
 
       {/* ════ TOP BAR — fixed, da borda do sidebar até a direita ════ */}
       <div className="fixed z-30 bg-white border-b border-border shadow-sm"
-           style={{ top: 56, left: 252, right: 0 }}>
+           style={{ top: 56, left: 200, right: 0 }}>
         <div className="px-8 py-3 flex items-center justify-between gap-4">
 
           <div className="min-w-0">
