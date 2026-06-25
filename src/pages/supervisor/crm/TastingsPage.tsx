@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Info } from 'lucide-react';
+import { Plus, Info, Pencil } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
+
+const TIPOS = ['Jantar', 'Almoço'];
 
 interface Session {
   id: string;
@@ -86,6 +88,11 @@ export default function TastingsPage() {
   const allSorted = [...sessions].sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date));
   const visible = allSorted.slice(0, visibleCount);
 
+  const updateTipo = async (id: string, tipo: string) => {
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, type: tipo } : s));
+    await supabase.from('tasting_sessions' as any).update({ type: tipo }).eq('id', id);
+  };
+
   return (
     <div>
       {/* Descrição */}
@@ -143,13 +150,21 @@ export default function TastingsPage() {
                   className={`border-b border-border/50 hover:bg-slate-50 cursor-pointer transition-colors ${i === visible.length - 1 ? 'border-0' : ''}`}
                 >
                   <Td className={`font-medium ${past ? 'text-muted-foreground/60' : 'text-foreground'}`}>{fmtDate(s.scheduled_date)}</Td>
-                  <Td className={dim}>{s.type ?? '—'}</Td>
-                  <Td center className={`font-semibold ${dim}`}>{st.total || ''}</Td>
-                  <Td center className={dim}>{st.novos || ''}</Td>
-                  <Td center className={dim}>{st.segundas || ''}</Td>
-                  <Td center className={dim}>{st.guests || ''}</Td>
+                  <Td>
+                    <TipoCell
+                      value={s.type}
+                      dim={dim}
+                      onChange={tipo => updateTipo(s.id, tipo)}
+                    />
+                  </Td>
+                  <Td center className={`font-semibold ${dim}`}>{st.total > 0 ? st.total : <span className="text-muted-foreground/30">0</span>}</Td>
+                  <Td center className={dim}>{st.novos > 0 ? st.novos : <span className="text-muted-foreground/30">0</span>}</Td>
+                  <Td center className={dim}>{st.segundas > 0 ? st.segundas : <span className="text-muted-foreground/30">0</span>}</Td>
+                  <Td center className={dim}>{st.guests > 0 ? st.guests : <span className="text-muted-foreground/30">—</span>}</Td>
                   <Td center className={st.emAberto > 0 ? 'text-red-500 font-semibold' : dim}>{st.emAberto}</Td>
-                  <Td center className={dim}>{st.conv !== null ? `${st.conv}%` : '—'}</Td>
+                  <Td center className={dim}>
+                    {past && st.conv !== null ? `${st.conv}%` : <span className="text-muted-foreground/30">—</span>}
+                  </Td>
                 </tr>
               );
             })}
@@ -185,6 +200,43 @@ export default function TastingsPage() {
         />
       )}
     </div>
+  );
+}
+
+function TipoCell({ value, dim, onChange }: { value: string | null; dim: string; onChange: (t: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, left: r.left });
+    setOpen(o => !o);
+  };
+
+  return (
+    <>
+      <div ref={ref} className={`flex items-center gap-1 group cursor-pointer ${dim}`} onClick={handleClick}>
+        <span>{value ?? '—'}</span>
+        <Pencil className="w-3 h-3 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
+      </div>
+      {open && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed z-50 bg-white border border-border rounded-xl shadow-lg py-1 min-w-[120px]"
+            style={{ top: pos.top, left: pos.left }}>
+            {TIPOS.map(t => (
+              <button key={t} onClick={(e) => { e.stopPropagation(); onChange(t); setOpen(false); }}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${value === t ? 'font-semibold text-primary' : 'text-foreground'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </>,
+        document.body
+      )}
+    </>
   );
 }
 
