@@ -13,6 +13,7 @@ interface Orcamento {
   event_date: string | null;
   created_at: string | null;
   status: string;
+  date_reserved: boolean | null;
   clients: { name: string | null } | null;
 }
 
@@ -58,7 +59,7 @@ export default function OrcamentosPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from('events')
-      .select('id, event_name, location_text, organizer, event_date, created_at, status, clients(name)')
+      .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, clients(name)')
       .in('status', [...PIPELINE_STATUSES, 'cancelled'])
       .not('event_name', 'is', null)
       .neq('event_name', '')
@@ -212,7 +213,14 @@ export default function OrcamentosPage() {
                 <Td className="text-muted-foreground">{row.location_text || '—'}</Td>
                 <Td className="text-muted-foreground">{row.organizer || '—'}</Td>
                 <Td className={`tabular-nums ${isExpired(row) ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
-                  {fmtDate(row.event_date)}
+                  <div className="flex items-center gap-1.5">
+                    {fmtDate(row.event_date)}
+                    {row.date_reserved && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-600 border border-violet-200 leading-none">
+                        Reservado
+                      </span>
+                    )}
+                  </div>
                 </Td>
                 <Td className="text-muted-foreground tabular-nums">{diasEmAberto(row.created_at)}</Td>
                 <Td onClick={e => e.stopPropagation()}>
