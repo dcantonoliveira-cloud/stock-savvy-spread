@@ -48,15 +48,15 @@ const fmtBRL = (v: number | null) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
 
 // Renderiza uma grade de campos
-function grid(fields: { label: string; value: string | null; wide?: boolean; html?: boolean }[]) {
+function grid(fields: { label: string; value: string | null; wide?: boolean; html?: boolean; skipIfEmpty?: boolean }[]) {
   return fields
-    .filter(f => f.value && f.value.trim())
+    .filter(f => !f.skipIfEmpty || (f.value && f.value.trim()))
     .map(f => `
       <div style="grid-column:${f.wide ? 'span 2' : 'span 1'};">
         <div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;margin-bottom:4px;">${f.label}</div>
         ${f.html
-          ? `<div style="font-size:11px;color:#2B2B2B;line-height:1.6;">${f.value}</div>`
-          : `<div style="font-size:12px;color:#0E2A45;font-weight:500;border-bottom:1px solid #EDEAE2;padding-bottom:4px;">${f.value}</div>`}
+          ? `<div style="font-size:11px;color:#2B2B2B;line-height:1.6;">${f.value || ''}</div>`
+          : `<div style="font-size:12px;color:${f.value ? '#0E2A45' : 'transparent'};font-weight:500;border-bottom:1px solid #EDEAE2;padding-bottom:4px;min-height:18px;">${f.value || '&nbsp;'}</div>`}
       </div>`)
     .join('');
 }
