@@ -48,15 +48,32 @@ export default function OrcamentosPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [filter, setFilter]   = useState<string>('all');
+  const [debug, setDebug]     = useState<{ total: number; error: string | null; statuses: string[] } | null>(null);
 
   const load = async () => {
     setLoading(true);
+
+    // 1. Query sem filtro para ver quantos eventos existem no total
+    const { data: allData, error: allError } = await supabase
+      .from('events')
+      .select('id, status')
+      .limit(200);
+
+    const statuses = [...new Set((allData ?? []).map((e: any) => e.status))];
+    setDebug({
+      total: allData?.length ?? 0,
+      error: allError?.message ?? null,
+      statuses,
+    });
+
+    // 2. Query principal
     const { data, error } = await supabase
       .from('events')
       .select('id, event_name, location_text, organizer, event_date, created_at, status, clients(name)')
       .in('status', [...PIPELINE_STATUSES, ...LOST_STATUSES])
       .order('created_at', { ascending: false });
-    if (error) console.error('[OrcamentosPage]', error);
+    if (error) console.error('[OrcamentosPage query]', error);
+
     const sorted = (data ?? []).sort((a: any, b: any) => {
       if (!a.event_date && !b.event_date) return 0;
       if (!a.event_date) return 1;
@@ -117,6 +134,16 @@ export default function OrcamentosPage() {
           </p>
         </div>
       </div>
+
+      {/* ── DEBUG (temporário) ── */}
+      {debug && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-xl text-xs font-mono space-y-1">
+          <p><strong>Total eventos (sem filtro):</strong> {debug.total}</p>
+          <p><strong>Erro:</strong> {debug.error ?? 'nenhum'}</p>
+          <p><strong>Status encontrados:</strong> {debug.statuses.join(', ') || '(nenhum)'}</p>
+          <p><strong>Rows carregados (com filtro):</strong> {rows.length}</p>
+        </div>
+      )}
 
       {/* ── Filtros e busca ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
