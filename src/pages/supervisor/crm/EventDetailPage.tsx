@@ -83,6 +83,7 @@ interface EventDetail {
 const STATUS_LABELS: Record<string, string> = {
   lead: 'Lead', negotiating: 'Negociando', tasting_scheduled: 'Degustação',
   confirmed: 'Confirmado', completed: 'Concluído', cancelled: 'Cancelado',
+  lost: 'Não fechado',
 };
 const STATUS_CLASSES: Record<string, string> = {
   lead: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -91,6 +92,7 @@ const STATUS_CLASSES: Record<string, string> = {
   confirmed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   completed: 'bg-blue-50 text-blue-700 border-blue-200',
   cancelled: 'bg-red-50 text-red-700 border-red-200',
+  lost: 'bg-zinc-100 text-zinc-500 border-zinc-200',
 };
 const TABS = ['Ficha Técnica','Dados do Cliente','Cardápio','Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'];
 const EVENT_TYPES = ['Casamento','Coorporativo','Formatura','Debutante','Confraternização','Outro'];
@@ -424,6 +426,12 @@ export default function EventDetailPage() {
           <div className="mx-8 mb-3 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
             Orçamento em negociação — contrato ainda não assinado. Confirme o evento antes de gerar fechamento.
+          </div>
+        )}
+        {event.status === 'lost' && (
+          <div className="mx-8 mb-3 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-500 text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0" />
+            Orçamento não fechado — nenhum contrato foi assinado.
           </div>
         )}
 
