@@ -583,7 +583,7 @@ export default function EventsPage() {
         </div>
 
         {/* Stats strip */}
-        <div className="grid grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
           <div className="bg-white rounded-xl border border-border px-4 py-3">
             <p className="text-[11px] text-muted-foreground mb-0.5">Neste período</p>
             <p className="font-bold text-xl text-foreground leading-tight">{filtered.length}</p>
