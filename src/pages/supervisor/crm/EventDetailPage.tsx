@@ -155,12 +155,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 const ALL_STATUS_OPTIONS: { key: string; label: string; cls: string }[] = [
-  { key: 'lead',              label: '1° Contato', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
-  { key: 'negotiating',       label: 'Negociando', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { key: 'tasting_scheduled', label: 'Degustação', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
-  { key: 'confirmed',         label: 'Confirmado ✓', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { key: 'completed',         label: 'Concluído',  cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { key: 'cancelled',         label: 'Não fechado', cls: 'bg-rose-50 text-rose-500 border-rose-200' },
+  { key: 'lead',        label: '1° Contato', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { key: 'negotiating', label: 'Negociando', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { key: 'confirmed',   label: 'Confirmado', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { key: 'cancelled',   label: 'Não fechado', cls: 'bg-rose-50 text-rose-500 border-rose-200' },
 ];
 
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
