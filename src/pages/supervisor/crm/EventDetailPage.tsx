@@ -419,6 +419,14 @@ export default function EventDetailPage() {
           </div>
         </div>
 
+        {/* Banner: orçamento em andamento */}
+        {['lead', 'negotiating', 'tasting_scheduled'].includes(event.status) && (
+          <div className="mx-8 mb-3 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+            Orçamento em negociação — contrato ainda não assinado. Confirme o evento antes de gerar fechamento.
+          </div>
+        )}
+
         {/* Tabs (part of the white header block) */}
         <div className="px-8 flex gap-0 -mb-px">
           {TABS.map(t => (
