@@ -155,7 +155,10 @@ export default function EventsPage() {
 
   const confirmedFiltered = filtered.filter(e => e.status === 'confirmed');
   const statsValue = confirmedFiltered.reduce((s,e) => s + (e.total_value ?? 0), 0);
-  const statsReceivable = confirmedFiltered.filter(e => !e.is_paid_in_full).reduce((s,e) => s + (e.total_value ?? 0), 0);
+  const statsReceivable = confirmedFiltered.reduce((s,e) => {
+    const balance = (e.total_value ?? 0) - (e.paid_value ?? 0);
+    return s + (balance > 0 ? balance : 0);
+  }, 0);
 
   // ── Form helpers ──────────────────────────────────────────────────
   const setF = (key: string, val: any) => setForm(f => ({ ...f, [key]: val }));
