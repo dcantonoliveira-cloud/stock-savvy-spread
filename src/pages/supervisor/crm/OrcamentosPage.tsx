@@ -219,29 +219,12 @@ export default function OrcamentosPage() {
                   <StatusDropdown status={row.status} onChange={s => updateStatus(row.id, s)} />
                 </Td>
                 <Td onClick={e => e.stopPropagation()}>
-                  {confirmDelete === row.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => deleteRow(row.id)}
-                        className="px-2 py-1 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors"
-                      >
-                        Confirmar
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(null)}
-                        className="px-2 py-1 rounded-lg bg-muted text-muted-foreground text-xs font-medium hover:bg-muted/80 transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmDelete(row.id)}
-                      className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setConfirmDelete(row.id)}
+                    className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </Td>
               </tr>
             ))}
@@ -253,6 +236,39 @@ export default function OrcamentosPage() {
         <p className="text-xs text-muted-foreground mt-3">
           {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
         </p>
+      )}
+
+      {/* ── Modal de confirmação de exclusão ── */}
+      {confirmDelete && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmDelete(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground">Excluir orçamento</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-5 pl-12">
+              Essa ação não pode ser desfeita. O orçamento será removido permanentemente.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => deleteRow(confirmDelete)}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
