@@ -12,6 +12,7 @@ import EventChecklistTab from '@/components/EventChecklistTab';
 import EventCronogramaTab from '@/components/EventCronogramaTab';
 import EventFinanceiroTab from '@/components/EventFinanceiroTab';
 import EventArquivosTab from '@/components/EventArquivosTab';
+import EventOutrosTab from '@/components/EventOutrosTab';
 import { generateFechamentoPDF } from '@/utils/generateFechamentoPDF';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -232,6 +233,24 @@ export default function EventDetailPage() {
     toast.success('Salvo com sucesso');
     setTimeout(() => setSaveStatus('idle'), 2000);
   }, []);
+
+  const cancelEvent = async () => {
+    if (!id) return;
+    if (!confirm('Cancelar este evento? O status será alterado para CANCELADO.')) return;
+    const { error } = await supabase.from('events').update({ status: 'cancelled' }).eq('id', id);
+    if (error) { toast.error('Erro ao cancelar'); return; }
+    setEvent(prev => prev ? { ...prev, status: 'cancelled' } : prev);
+    toast.success('Evento cancelado');
+  };
+
+  const deleteEvent = async () => {
+    if (!id) return;
+    if (!confirm('Deletar permanentemente este evento? Esta ação não pode ser revertida.')) return;
+    const { error } = await supabase.from('events').delete().eq('id', id);
+    if (error) { toast.error('Erro ao deletar: ' + error.message); return; }
+    toast.success('Evento deletado');
+    navigate('/events');
+  };
 
   const persistClient = useCallback(async (data: Record<string, string>, clientId: string) => {
     setSaveStatus('saving');
@@ -651,8 +670,16 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {/* ── HISTÓRICO ── shown at bottom of every tab */}
-        {tab === 'Outros' && id && <EventHistorySection eventId={id} />}
+        {/* ── OUTROS ── portal do cliente + ações + histórico */}
+        {tab === 'Outros' && id && (
+          <EventOutrosTab
+            eventId={id}
+            clientEmail={event.clients?.email ?? null}
+            clientWhatsapp={event.clients?.phone ?? null}
+            onCancelEvent={cancelEvent}
+            onDeleteEvent={deleteEvent}
+          />
+        )}
 
         {/* ── CHECKLIST ── */}
         {tab === 'Checklist' && id && <EventChecklistTab eventId={id} />}
