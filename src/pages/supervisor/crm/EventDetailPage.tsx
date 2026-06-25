@@ -14,6 +14,7 @@ import EventFinanceiroTab from '@/components/EventFinanceiroTab';
 import EventArquivosTab from '@/components/EventArquivosTab';
 import EventOutrosTab from '@/components/EventOutrosTab';
 import { printFechamento } from '@/utils/printFechamento';
+import { printFichaTecnica } from '@/utils/printFichaTecnica';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -275,6 +276,23 @@ export default function EventDetailPage() {
 
   const s = (key: keyof EventDetail) => String(form[key] ?? '');
 
+  const handleFichaTecnica = async () => {
+    if (!event || !id) return;
+    const [{ data: fieldDefs }, { data: fieldVals }, { data: companies }] = await Promise.all([
+      supabase.from('event_field_definitions' as any).select('id, name, sort_order').eq('is_active', true).order('sort_order'),
+      supabase.from('event_field_values' as any).select('field_id, value').eq('event_id', id),
+      supabase.from('companies').select('name, logo_base64, endereco, telefone, website').limit(1),
+    ]);
+    const valMap: Record<string, string> = {};
+    (fieldVals ?? []).forEach((r: any) => { valMap[r.field_id] = r.value ?? ''; });
+    const customFields = (fieldDefs ?? []).map((d: any) => ({ name: d.name, value: valMap[d.id] ?? '' }));
+    printFichaTecnica(
+      { ...event, ...form } as any,
+      customFields,
+      ((companies ?? [])[0] ?? null) as any,
+    );
+  };
+
   const handleFechamento = async () => {
     if (!event || !id) return;
     const [{ data: payments }, { data: additionals }, { data: companies }] = await Promise.all([
@@ -388,7 +406,7 @@ export default function EventDetailPage() {
                 <FileText className="w-3 h-3" />Dados para contrato
               </Button>
             )}
-            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex">
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFichaTecnica}>
               <Download className="w-3 h-3" />Ficha técnica
             </Button>
             <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
