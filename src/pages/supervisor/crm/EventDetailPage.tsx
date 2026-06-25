@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
@@ -153,6 +154,64 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+const ALL_STATUS_OPTIONS: { key: string; label: string; cls: string }[] = [
+  { key: 'lead',              label: '1° Contato', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
+  { key: 'negotiating',       label: 'Negociando', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { key: 'tasting_scheduled', label: 'Degustação', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { key: 'confirmed',         label: 'Confirmado ✓', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { key: 'completed',         label: 'Concluído',  cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { key: 'cancelled',         label: 'Não fechado', cls: 'bg-rose-50 text-rose-500 border-rose-200' },
+];
+
+function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const current = ALL_STATUS_OPTIONS.find(o => o.key === status);
+  const cls = current?.cls ?? STATUS_CLASSES[status] ?? 'bg-muted text-muted-foreground border-border';
+  const label = current?.label ?? STATUS_LABELS[status] ?? status;
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left });
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <div className="relative inline-block">
+      <button
+        ref={btnRef}
+        onClick={handleOpen}
+        className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide border transition-colors hover:opacity-80 ${cls}`}
+      >
+        {label}
+        <ChevronDown className="w-3 h-3 opacity-60" />
+      </button>
+      {open && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed z-50 bg-white border border-border rounded-xl shadow-xl py-1.5 min-w-[190px]"
+               style={{ top: pos.top, left: pos.left }}>
+            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Alterar status</p>
+            {ALL_STATUS_OPTIONS.map(o => (
+              <button
+                key={o.key}
+                onClick={() => { onChange(o.key); setOpen(false); }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium hover:bg-muted transition-colors ${o.key === status ? 'opacity-40 pointer-events-none' : ''}`}
+              >
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${o.cls}`}>{o.label}</span>
+              </button>
+            ))}
+          </div>
+        </>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 export default function EventDetailPage() {
@@ -245,6 +304,23 @@ export default function EventDetailPage() {
     setEvent(prev => prev ? { ...prev, date_reserved: next } : prev);
     await supabase.from('events').update({ date_reserved: next } as any).eq('id', id);
     toast.success(next ? 'Data marcada como reservada' : 'Reserva de data removida');
+  };
+
+  const changeStatus = async (newStatus: string) => {
+    if (!id) return;
+    const updates: Record<string, any> = { status: newStatus };
+    if (newStatus === 'confirmed') {
+      updates.contract_signed = true;
+      updates.contract_signed_date = new Date().toISOString().split('T')[0];
+      updates.date_reserved = false;
+    }
+    if (newStatus === 'cancelled' || newStatus === 'lost') {
+      updates.date_reserved = false;
+    }
+    const { error } = await supabase.from('events').update(updates).eq('id', id);
+    if (error) { toast.error('Erro ao alterar status: ' + error.message); return; }
+    setEvent(prev => prev ? { ...prev, ...updates } : prev);
+    toast.success(newStatus === 'confirmed' ? 'Evento confirmado — contrato registrado!' : 'Status atualizado');
   };
 
   const cancelEvent = async () => {
@@ -383,9 +459,7 @@ export default function EventDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide border ${STATUS_CLASSES[event.status] ?? 'bg-muted text-muted-foreground border-border'}`}>
-              {statusLabel}
-            </span>
+            <StatusDropdown status={event.status} onChange={changeStatus} />
 
             {/* Reservar data — só para orçamentos em pipeline */}
             {isPipeline && (
