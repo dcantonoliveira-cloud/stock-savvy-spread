@@ -76,6 +76,7 @@ interface EventDetail {
   schedule_file_name: string | null;
   pricing_mode: string | null;
   contract_value: number | null;
+  date_reserved: boolean | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -236,6 +237,14 @@ export default function EventDetailPage() {
     toast.success('Salvo com sucesso');
     setTimeout(() => setSaveStatus('idle'), 2000);
   }, []);
+
+  const toggleDateReserved = async () => {
+    if (!id || !event) return;
+    const next = !event.date_reserved;
+    setEvent(prev => prev ? { ...prev, date_reserved: next } : prev);
+    await supabase.from('events').update({ date_reserved: next } as any).eq('id', id);
+    toast.success(next ? 'Data marcada como reservada' : 'Reserva de data removida');
+  };
 
   const cancelEvent = async () => {
     if (!id) return;
@@ -423,9 +432,22 @@ export default function EventDetailPage() {
 
         {/* Banner: orçamento em andamento */}
         {['lead', 'negotiating', 'tasting_scheduled'].includes(event.status) && (
-          <div className="mx-8 mb-3 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            Orçamento em negociação — contrato ainda não assinado. Confirme o evento antes de gerar fechamento.
+          <div className="mx-8 mb-3 flex items-center justify-between gap-4 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200">
+            <div className="flex items-center gap-2.5 text-amber-800 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              Orçamento em negociação — contrato ainda não assinado. Confirme o evento antes de gerar fechamento.
+            </div>
+            <button
+              onClick={toggleDateReserved}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors shrink-0 ${
+                event.date_reserved
+                  ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200'
+                  : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-100'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${event.date_reserved ? 'bg-violet-500' : 'bg-amber-300'}`} />
+              {event.date_reserved ? 'Data reservada' : 'Reservar data'}
+            </button>
           </div>
         )}
         {event.status === 'lost' && (
