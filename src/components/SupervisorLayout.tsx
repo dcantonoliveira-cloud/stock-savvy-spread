@@ -71,7 +71,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     <div className="flex min-h-screen bg-background">
       <SupervisorSidebar />
 
-      <div className="flex-1 flex flex-col min-h-screen ml-[200px] xl:ml-[232px]">
+      <div className="flex-1 flex flex-col min-h-screen ml-[180px] xl:ml-[210px]">
 
         {/* Top bar */}
         <header className="sticky top-0 z-40 flex items-center justify-between px-4 lg:px-6 xl:px-8 h-14 bg-card border-b border-border">

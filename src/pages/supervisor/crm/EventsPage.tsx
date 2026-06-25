@@ -616,28 +616,32 @@ export default function EventsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl border border-border overflow-x-auto flex-1">
-          <table className="w-full text-sm min-w-[900px]">
+        <div className="bg-white rounded-xl border border-border flex-1">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/20">
-                {['DATA','NOME DO EVENTO','LOCAL DO EVENTO','TIPO DO EVENTO','PREÇO/PAX','CONVIDADOS','STATUS','FECHAMENTO','PGTO %',''].map(h => (
-                  <th key={h} className={`px-4 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide whitespace-nowrap ${
-                    h === 'PREÇO/PAX' || h === 'CONVIDADOS' ? 'text-right'
-                    : h === 'STATUS' || h === 'FECHAMENTO' || h === 'PGTO %' ? 'text-center'
-                    : 'text-left'
-                  }`}>
-                    {h}
-                  </th>
-                ))}
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-left whitespace-nowrap">DATA</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-left">NOME DO EVENTO</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-left hidden lg:table-cell">LOCAL</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-left hidden xl:table-cell">TIPO</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-right whitespace-nowrap">R$/PAX</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-right">PAX</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-center">STATUS</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-center hidden lg:table-cell">FECHAMENTO</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-center">PGTO</th>
+                <th className="w-4"></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 Array.from({length:8}).map((_,i) => (
                   <tr key={i} className="border-b border-border/50">
-                    {[50,32,25,18,14,12,14,10,10,4].map((w,j) => (
-                      <td key={j} className="px-4 py-2.5">
-                        <div className="h-3 bg-muted/40 rounded animate-pulse" style={{width:`${w}%`}} />
+                    {[
+                      'px-3 py-2.5','px-3 py-2.5','px-3 py-2.5 hidden lg:table-cell','px-3 py-2.5 hidden xl:table-cell',
+                      'px-3 py-2.5','px-3 py-2.5','px-3 py-2.5','px-3 py-2.5 hidden lg:table-cell','px-3 py-2.5','px-3 py-2.5'
+                    ].map((cls,j) => (
+                      <td key={j} className={cls}>
+                        <div className="h-3 bg-muted/40 rounded animate-pulse w-full" />
                       </td>
                     ))}
                   </tr>
@@ -662,48 +666,48 @@ export default function EventsPage() {
                     }`}
                   >
                     {/* DATA */}
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <span className={`text-sm ${isToday_ ? 'font-bold text-primary' : past ? 'text-muted-foreground' : 'font-semibold text-foreground'}`}>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span className={`text-xs ${isToday_ ? 'font-bold text-primary' : past ? 'text-muted-foreground' : 'font-semibold text-foreground'}`}>
                         {fmtDate(ev.event_date)}
                       </span>
-                      {isToday_ && <span className="ml-1.5 text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">Hoje</span>}
+                      {isToday_ && <span className="ml-1 text-[9px] font-bold text-primary bg-primary/10 px-1 py-0.5 rounded">Hoje</span>}
                     </td>
-                    {/* NOME DO EVENTO — só uma linha */}
-                    <td className="px-4 py-2">
-                      <span className={`text-sm font-medium truncate max-w-[200px] block ${past ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    {/* NOME DO EVENTO */}
+                    <td className="px-3 py-2 max-w-[160px]">
+                      <span className={`text-xs font-medium truncate block ${past ? 'text-muted-foreground' : 'text-foreground'}`}>
                         {ev.event_name ?? ev.clients?.name ?? '—'}
                       </span>
                     </td>
-                    {/* LOCAL */}
-                    <td className="px-4 py-2">
-                      <span className="text-sm text-muted-foreground truncate max-w-[130px] block">{(ev.location_id ? locationMap.get(ev.location_id) : null) || ev.location_text || '—'}</span>
+                    {/* LOCAL — oculto em telas pequenas */}
+                    <td className="px-3 py-2 hidden lg:table-cell max-w-[110px]">
+                      <span className="text-xs text-muted-foreground truncate block">{(ev.location_id ? locationMap.get(ev.location_id) : null) || ev.location_text || '—'}</span>
                     </td>
-                    {/* TIPO */}
-                    <td className="px-4 py-2">
-                      <span className="text-sm text-muted-foreground">{ev.event_type || '—'}</span>
+                    {/* TIPO — oculto abaixo de xl */}
+                    <td className="px-3 py-2 hidden xl:table-cell">
+                      <span className="text-xs text-muted-foreground">{ev.event_type || '—'}</span>
                     </td>
                     {/* PREÇO/PAX */}
-                    <td className="px-4 py-2 text-right font-medium text-foreground whitespace-nowrap text-sm">
+                    <td className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap text-xs">
                       {fmtBRL(ev.price_per_person)}
                     </td>
                     {/* CONVIDADOS */}
-                    <td className="px-4 py-2 text-right text-sm text-muted-foreground">
+                    <td className="px-3 py-2 text-right text-xs text-muted-foreground">
                       {ev.guest_count ?? '—'}
                     </td>
                     {/* STATUS */}
-                    <td className="px-4 py-2 text-center">
-                      <span className={`inline-flex text-[11px] font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${STATUS_CLASSES[ev.status] ?? 'bg-muted text-muted-foreground'}`}>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_CLASSES[ev.status] ?? 'bg-muted text-muted-foreground'}`}>
                         {STATUS_LABELS[ev.status] ?? ev.status}
                       </span>
                     </td>
-                    {/* FECHAMENTO — mês/ano do contrato */}
-                    <td className="px-4 py-2 text-center">
+                    {/* FECHAMENTO — oculto em telas pequenas */}
+                    <td className="px-3 py-2 text-center hidden lg:table-cell">
                       {contractShort
-                        ? <span className="text-[12px] font-mono text-muted-foreground">{contractShort}</span>
+                        ? <span className="text-[11px] font-mono text-muted-foreground">{contractShort}</span>
                         : <span className="text-muted-foreground/30 text-xs">—</span>}
                     </td>
                     {/* PGTO % */}
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-3 py-2 text-center">
                       {(() => {
                         const total = ev.total_value ?? 0;
                         const paid = ev.paid_value ?? 0;
