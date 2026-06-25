@@ -16,6 +16,7 @@ type EventRow = {
   guest_count: number | null;
   event_type: string | null;
   location_text: string | null;
+  date_reserved: boolean | null;
   clients: { name: string | null } | null;
 };
 
@@ -60,11 +61,15 @@ export default function CalendarPage() {
       const last  = new Date(year, month + 1, 0).toISOString().slice(0, 10);
       const { data } = await supabase
         .from('events')
-        .select('id, event_name, event_date, status, total_value, guest_count, event_type, location_text, clients(name)')
+        .select('id, event_name, event_date, status, total_value, guest_count, event_type, location_text, date_reserved, clients(name)')
         .gte('event_date', first)
         .lte('event_date', last)
         .order('event_date');
-      setEvents((data ?? []) as EventRow[]);
+      // Filtro: só mostra confirmados/realizados OU com data reservada
+      const visible = (data ?? []).filter((e: any) =>
+        e.status === 'confirmed' || e.status === 'completed' || e.date_reserved === true
+      );
+      setEvents(visible as EventRow[]);
       setLoading(false);
     };
     load();
@@ -253,24 +258,6 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          {/* Monthly count per status */}
-          {!loading && events.length > 0 && (
-            <div className="bg-white border border-border rounded-2xl p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">Este mês</p>
-              <div className="space-y-2">
-                {Object.entries(STATUS).map(([k, v]) => {
-                  const count = events.filter(e => e.status === k).length;
-                  if (count === 0) return null;
-                  return (
-                    <div key={k} className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{v.label}</span>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${v.badge}`}>{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
