@@ -51,11 +51,14 @@ export default function OrcamentosPage() {
   const load = async () => {
     setLoading(true);
 
-    // Query principal — só valores que existem na base ('lost' não existe como enum no Supabase)
+    // Query principal — só eventos com nome e data preenchidos
     const { data, error } = await supabase
       .from('events')
       .select('id, event_name, location_text, organizer, event_date, created_at, status, clients(name)')
       .in('status', [...PIPELINE_STATUSES, 'cancelled'])
+      .not('event_name', 'is', null)
+      .neq('event_name', '')
+      .not('event_date', 'is', null)
       .order('created_at', { ascending: false });
     if (error) console.error('[OrcamentosPage query]', error);
 
