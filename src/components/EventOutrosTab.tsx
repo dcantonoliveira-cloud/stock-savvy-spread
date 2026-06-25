@@ -326,10 +326,10 @@ function HistorySection({ eventId }: { eventId: string }) {
           .eq('event_id', eventId)
           .order('changed_at', { ascending: false })
           .limit(80),
-        supabase.from('profiles').select('id, display_name'),
+        supabase.from('profiles').select('id, user_id, display_name'),
       ]);
       const profileMap: Record<string, string> = {};
-      (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p.display_name; });
+      (profiles ?? []).forEach((p: any) => { profileMap[p.user_id ?? p.id] = p.display_name; });
       const merged = (rows ?? []).map((r: any) => ({
         ...r,
         profiles: r.user_id ? { display_name: profileMap[r.user_id] ?? 'Usuário' } : null,
