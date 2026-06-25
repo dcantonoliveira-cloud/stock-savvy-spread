@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
@@ -13,6 +13,7 @@ import EventCronogramaTab from '@/components/EventCronogramaTab';
 import EventFinanceiroTab from '@/components/EventFinanceiroTab';
 import EventArquivosTab from '@/components/EventArquivosTab';
 import EventOutrosTab from '@/components/EventOutrosTab';
+import EventFechamentoView from '@/components/EventFechamentoView';
 import { generateFechamentoPDF } from '@/utils/generateFechamentoPDF';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -91,7 +92,7 @@ const STATUS_CLASSES: Record<string, string> = {
   completed: 'bg-blue-50 text-blue-700 border-blue-200',
   cancelled: 'bg-red-50 text-red-700 border-red-200',
 };
-const TABS = ['Ficha Técnica','Dados do Cliente','Cardápio','Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'];
+const TABS = ['Ficha Técnica','Dados do Cliente','Cardápio','Checklist','Cronograma','Financeiro','Arquivos','Fechamento','Equipe','Outros'];
 const EVENT_TYPES = ['Casamento','Coorporativo','Formatura','Debutante','Confraternização','Outro'];
 
 function fmtDate(d: string | null) {
@@ -392,8 +393,8 @@ export default function EventDetailPage() {
             <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex">
               <Download className="w-3 h-3" />Ficha técnica
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
-              <Download className="w-3 h-3" />Fechamento
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={() => setTab('Fechamento')}>
+              <FileText className="w-3 h-3" />Fechamento
             </Button>
             <button onClick={() => navigate('/events')}
               className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
@@ -741,6 +742,38 @@ export default function EventDetailPage() {
               } : null,
             }}
           />
+        )}
+
+        {/* ── FECHAMENTO ── */}
+        {tab === 'Fechamento' && id && event && (
+          <div>
+            <div className="flex justify-end mb-4 no-print">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-8 text-xs"
+                onClick={() => window.print()}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Imprimir / Exportar PDF
+              </Button>
+            </div>
+            <EventFechamentoView
+              eventId={id}
+              event={{
+                event_name: form.event_name ?? null,
+                event_date: form.event_date ?? null,
+                guest_count: form.guest_count ?? null,
+                children_50_pct: form.children_50_pct ?? null,
+                price_per_person: form.price_per_person ?? null,
+                professional_count: form.professional_count ?? null,
+                professional_meal_value: form.professional_meal_value ?? null,
+                pricing_mode: form.pricing_mode ?? null,
+                contract_value: form.contract_value ?? null,
+                clients: event.clients ? { name: event.clients.name ?? null } : null,
+              }}
+            />
+          </div>
         )}
 
         {/* ── EM CONSTRUÇÃO ── */}
