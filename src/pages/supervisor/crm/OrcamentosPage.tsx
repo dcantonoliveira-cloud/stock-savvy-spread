@@ -46,12 +46,19 @@ export default function OrcamentosPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('events')
       .select('id, event_name, location_text, organizer, event_date, created_at, status')
       .in('status', [...PIPELINE_STATUSES, 'lost'])
-      .order('event_date', { ascending: true });
-    setRows((data ?? []) as any);
+      .order('created_at', { ascending: false });
+    if (error) console.error('[OrcamentosPage]', error);
+    const sorted = (data ?? []).sort((a: any, b: any) => {
+      if (!a.event_date && !b.event_date) return 0;
+      if (!a.event_date) return 1;
+      if (!b.event_date) return -1;
+      return a.event_date.localeCompare(b.event_date);
+    });
+    setRows(sorted as any);
     setLoading(false);
   };
 
