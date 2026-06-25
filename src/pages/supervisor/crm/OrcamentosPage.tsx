@@ -68,7 +68,7 @@ export default function OrcamentosPage() {
       if (!a.event_date && !b.event_date) return 0;
       if (!a.event_date) return 1;
       if (!b.event_date) return -1;
-      return a.event_date.localeCompare(b.event_date);
+      return b.event_date.localeCompare(a.event_date);
     });
     setRows(sorted as any);
     setLoading(false);
