@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, Printer } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
