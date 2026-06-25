@@ -19,12 +19,13 @@ type NavGroup = { label: string; icon: any; items: NavItem[] } | NavItem;
 const navStructure: NavGroup[] = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
 
+  { path: '/calendar', label: 'Calendário', icon: Calendar },
+
   { label: 'Comercial', icon: UserRound, items: [
     { path: '/orcamentos', label: 'Orçamentos', icon: FileText },
     { path: '/events', label: 'Eventos', icon: CalendarDays },
     { path: '/clients', label: 'Clientes', icon: UserRound },
     { path: '/tastings', label: 'Degustações', icon: Coffee },
-    { path: '/calendar', label: 'Calendário', icon: Calendar },
   ]},
 
   { label: 'Financeiro', icon: DollarSign, items: [
