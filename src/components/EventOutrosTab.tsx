@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Clock, Copy, Send, XCircle, Trash2, RefreshCw } from 'lucide-react';
@@ -195,6 +195,35 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
   );
 }
 
+// ── Modal de confirmação ──────────────────────────────────────────────────────
+
+function ConfirmModal({ title, description, confirmLabel, confirmCls, onConfirm, onClose }: {
+  title: string;
+  description: React.ReactNode;
+  confirmLabel: string;
+  confirmCls: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 animate-in fade-in zoom-in-95 duration-150">
+        <h3 className="text-[16px] font-semibold text-foreground mb-2">{title}</h3>
+        <p className="text-sm text-muted-foreground mb-6">{description}</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} className="h-9">
+            Cancelar
+          </Button>
+          <Button onClick={onConfirm} className={`h-9 ${confirmCls}`}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Ações perigosas ───────────────────────────────────────────────────────────
 
 function ActionsSection({ eventId, onCancel, onDelete }: {
@@ -203,10 +232,11 @@ function ActionsSection({ eventId, onCancel, onDelete }: {
   onDelete: () => void;
 }) {
   const [sendingReview, setSendingReview] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const sendReviewMessage = async () => {
     setSendingReview(true);
-    // placeholder — integrar com WhatsApp/email no futuro
     await new Promise(r => setTimeout(r, 800));
     toast.success('Mensagem de avaliação enviada!');
     setSendingReview(false);
@@ -214,6 +244,28 @@ function ActionsSection({ eventId, onCancel, onDelete }: {
 
   return (
     <div className="space-y-3">
+      {/* Modais */}
+      {showDeleteModal && (
+        <ConfirmModal
+          title="Deletar evento"
+          description={<>Tem certeza? Esta ação <strong>não pode ser revertida</strong>. O evento e todos os dados vinculados serão removidos permanentemente.</>}
+          confirmLabel="Sim, deletar"
+          confirmCls="bg-destructive hover:bg-destructive/90 text-white"
+          onConfirm={() => { setShowDeleteModal(false); onDelete(); }}
+          onClose={() => setShowDeleteModal(false)}
+        />
+      )}
+      {showCancelModal && (
+        <ConfirmModal
+          title="Cancelar evento"
+          description="O status do evento será alterado para CANCELADO. O evento continuará na base e pode ser revertido depois."
+          confirmLabel="Sim, cancelar evento"
+          confirmCls="bg-amber-600 hover:bg-amber-700 text-white"
+          onConfirm={() => { setShowCancelModal(false); onCancel(); }}
+          onClose={() => setShowCancelModal(false)}
+        />
+      )}
+
       {/* Avaliação */}
       <div className="bg-white border border-border rounded-2xl p-5 flex items-center justify-between gap-4">
         <div>
@@ -236,7 +288,7 @@ function ActionsSection({ eventId, onCancel, onDelete }: {
             Mantém o evento na base com status <strong>CANCELADO</strong>. Pode ser revertido.
           </p>
         </div>
-        <Button onClick={onCancel} variant="outline" className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-50">
+        <Button onClick={() => setShowCancelModal(true)} variant="outline" className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-50">
           <XCircle className="w-3.5 h-3.5 mr-1.5" />
           Cancelar evento
         </Button>
@@ -250,7 +302,7 @@ function ActionsSection({ eventId, onCancel, onDelete }: {
             Remove permanentemente o evento e todos os dados vinculados. <strong>Irreversível.</strong>
           </p>
         </div>
-        <Button onClick={onDelete} variant="outline" className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/5">
+        <Button onClick={() => setShowDeleteModal(true)} variant="outline" className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/5">
           <Trash2 className="w-3.5 h-3.5 mr-1.5" />
           Deletar evento
         </Button>
