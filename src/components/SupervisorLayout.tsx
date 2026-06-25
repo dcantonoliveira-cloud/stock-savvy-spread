@@ -74,7 +74,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
       <div className="flex-1 flex flex-col min-h-screen ml-[200px] xl:ml-[232px]">
 
         {/* Top bar */}
-        <header className="sticky top-0 z-40 flex items-center justify-between px-8 h-14 bg-card border-b border-border">
+        <header className="sticky top-0 z-40 flex items-center justify-between px-4 lg:px-6 xl:px-8 h-14 bg-card border-b border-border">
           <div>
             {pageTitle && (
               <h2 className="text-[19px] font-bold text-foreground">{pageTitle}</h2>
@@ -113,7 +113,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
           </div>
         </header>
 
-        <main className="flex-1 p-8 min-w-0">
+        <main className="flex-1 p-4 lg:p-6 xl:p-8 min-w-0">
           {children}
         </main>
       </div>
