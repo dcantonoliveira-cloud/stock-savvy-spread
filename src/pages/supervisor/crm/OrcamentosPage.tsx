@@ -17,12 +17,16 @@ interface Orcamento {
 
 // ── Status ─────────────────────────────────────────────────────────────────────
 const PIPELINE_STATUSES = ['lead', 'negotiating', 'tasting_scheduled'];
+// 'cancelled' aqui representa orçamentos não fechados (dados legados)
+// Quando migrarmos, será renomeado para 'lost' na base
+const LOST_STATUSES = ['cancelled', 'lost'];
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  lead:              { label: '1° Contato', bg: 'bg-sky-50',    text: 'text-sky-700',    border: 'border-sky-200' },
-  negotiating:       { label: 'Negociando', bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
-  tasting_scheduled: { label: 'Degustação', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  lost:              { label: 'Não fechado', bg: 'bg-zinc-50',  text: 'text-zinc-500',   border: 'border-zinc-200' },
+  lead:              { label: '1° Contato',  bg: 'bg-sky-50',    text: 'text-sky-700',    border: 'border-sky-200' },
+  negotiating:       { label: 'Negociando',  bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
+  tasting_scheduled: { label: 'Degustação',  bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  lost:              { label: 'Não fechado', bg: 'bg-zinc-50',   text: 'text-zinc-500',   border: 'border-zinc-200' },
+  cancelled:         { label: 'Não fechado', bg: 'bg-zinc-50',   text: 'text-zinc-500',   border: 'border-zinc-200' },
 };
 
 const fmtDate = (d: string | null) => {
@@ -50,7 +54,7 @@ export default function OrcamentosPage() {
     const { data, error } = await supabase
       .from('events')
       .select('id, event_name, location_text, organizer, event_date, created_at, status, clients(name)')
-      .in('status', [...PIPELINE_STATUSES, 'lost'])
+      .in('status', [...PIPELINE_STATUSES, ...LOST_STATUSES])
       .order('created_at', { ascending: false });
     if (error) console.error('[OrcamentosPage]', error);
     const sorted = (data ?? []).sort((a: any, b: any) => {
@@ -74,6 +78,8 @@ export default function OrcamentosPage() {
     let list = rows;
     if (filter === 'all') {
       list = list.filter(r => PIPELINE_STATUSES.includes(r.status));
+    } else if (filter === 'lost') {
+      list = list.filter(r => LOST_STATUSES.includes(r.status));
     } else {
       list = list.filter(r => r.status === filter);
     }
@@ -88,9 +94,11 @@ export default function OrcamentosPage() {
     return list;
   }, [rows, filter, search]);
 
-  const countFor = (s: string) => s === 'all'
-    ? rows.filter(r => PIPELINE_STATUSES.includes(r.status)).length
-    : rows.filter(r => r.status === s).length;
+  const countFor = (s: string) => {
+    if (s === 'all') return rows.filter(r => PIPELINE_STATUSES.includes(r.status)).length;
+    if (s === 'lost') return rows.filter(r => LOST_STATUSES.includes(r.status)).length;
+    return rows.filter(r => r.status === s).length;
+  };
 
   return (
     <div>
@@ -244,9 +252,10 @@ function Count({ n }: { n: number }) {
   return <span className="ml-1 opacity-60">({n})</span>;
 }
 
+// Opções do dropdown — "Não fechado" grava como 'cancelled' até migração
 const ALL_STATUS_OPTIONS = [
   ...PIPELINE_STATUSES.map(s => ({ key: s, ...STATUS_CONFIG[s] })),
-  { key: 'lost', ...STATUS_CONFIG.lost },
+  { key: 'cancelled', label: 'Não fechado', bg: 'bg-zinc-50', text: 'text-zinc-500', border: 'border-zinc-200' },
 ];
 
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
