@@ -18,41 +18,49 @@ type NavGroup = { label: string; icon: any; items: NavItem[] } | NavItem;
 
 const navStructure: NavGroup[] = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { label: 'CRM', icon: UserRound, items: [
-    { path: '/clients', label: 'Clientes', icon: UserRound },
+
+  { label: 'Comercial', icon: UserRound, items: [
+    { path: '/orcamentos', label: 'Orçamentos', icon: FileText },
     { path: '/events', label: 'Eventos', icon: CalendarDays },
+    { path: '/clients', label: 'Clientes', icon: UserRound },
     { path: '/tastings', label: 'Degustações', icon: Coffee },
     { path: '/calendar', label: 'Calendário', icon: Calendar },
   ]},
+
   { label: 'Financeiro', icon: DollarSign, items: [
     { path: '/financeiro', label: 'Visão Geral', icon: TrendingUp },
   ]},
+
   { label: 'Operações', icon: UtensilsCrossed, items: [
     { path: '/event-menus', label: 'Cardápios', icon: UtensilsCrossed },
     { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
     { path: '/shopping-lists', label: 'Compras', icon: ShoppingCart },
   ]},
+
   { label: 'Estoque', icon: Package, items: [
     { path: '/items', label: 'Estoque Geral', icon: Package },
     { path: '/inventory', label: 'Inventários', icon: ClipboardCheck },
-    { path: '/kitchens', label: 'Centros de Custo', icon: Building2 },
     { path: '/fornecedores', label: 'Fornecedores', icon: Truck },
     { path: '/categories', label: 'Insumos', icon: FolderOpen },
     { path: '/tags', label: 'Tags', icon: Tag },
+    { path: '/kitchens', label: 'Centros de Custo', icon: Building2 },
   ]},
+
   { label: 'Movimentações', icon: ArrowRightLeft, items: [
-    { path: '/batch-movement', label: 'Lançamento em Lote', icon: ArrowRightLeft },
+    { path: '/batch-movement', label: 'Em Lote', icon: ArrowRightLeft },
     { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
     { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
     { path: '/transfers', label: 'Transferências', icon: ArrowRightLeft },
   ]},
+
   { label: 'Materiais', icon: Warehouse, items: [
     { path: '/materiais', label: 'Inventário', icon: Package },
-    { path: '/materiais/categorias', label: 'Categorias', icon: FolderOpen },
     { path: '/materiais/emprestimos', label: 'Por Evento', icon: ClipboardList },
     { path: '/materiais/lista-base', label: 'Lista Base', icon: BookMarked },
     { path: '/materiais/perdas', label: 'Perdas & Avarias', icon: AlertTriangle },
+    { path: '/materiais/categorias', label: 'Categorias', icon: FolderOpen },
   ]},
+
   { label: 'Cadastros', icon: LibraryBig, items: [
     { path: '/cadastros/produtos', label: 'Produtos', icon: ChefHat },
     { path: '/cadastros/saloes', label: 'Salões & Locais', icon: MapPin },
@@ -62,6 +70,7 @@ const navStructure: NavGroup[] = [
     { path: '/cadastros/contratos', label: 'Contratos', icon: ScrollText },
     { path: '/cadastros/checklists', label: 'Checklists', icon: ListChecks },
   ]},
+
   { label: 'Administração', icon: Users, items: [
     { path: '/users', label: 'Funcionários', icon: Users },
     { path: '/analysis', label: 'Análise IA', icon: Brain },
