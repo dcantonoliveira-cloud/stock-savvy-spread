@@ -17,16 +17,20 @@ interface Orcamento {
 
 // ── Status ─────────────────────────────────────────────────────────────────────
 const PIPELINE_STATUSES = ['lead', 'negotiating', 'tasting_scheduled'];
-// 'cancelled' aqui representa orçamentos não fechados (dados legados)
-// Quando migrarmos, será renomeado para 'lost' na base
 const LOST_STATUSES = ['cancelled', 'lost'];
+
+const TODAY = new Date().toISOString().split('T')[0];
+
+const isExpired = (r: Orcamento) =>
+  PIPELINE_STATUSES.includes(r.status) && !!r.event_date && r.event_date < TODAY;
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
   lead:              { label: '1° Contato',  bg: 'bg-sky-50',    text: 'text-sky-700',    border: 'border-sky-200' },
   negotiating:       { label: 'Negociando',  bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
   tasting_scheduled: { label: 'Degustação',  bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  lost:              { label: 'Não fechado', bg: 'bg-zinc-50',   text: 'text-zinc-500',   border: 'border-zinc-200' },
-  cancelled:         { label: 'Não fechado', bg: 'bg-zinc-50',   text: 'text-zinc-500',   border: 'border-zinc-200' },
+  // Não fechado → vermelho claro
+  lost:              { label: 'Não fechado', bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200' },
+  cancelled:         { label: 'Não fechado', bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200' },
 };
 
 const fmtDate = (d: string | null) => {
@@ -48,10 +52,9 @@ export default function OrcamentosPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [filter, setFilter]   = useState<string>('all');
+
   const load = async () => {
     setLoading(true);
-
-    // Query principal — só eventos com nome e data preenchidos
     const { data, error } = await supabase
       .from('events')
       .select('id, event_name, location_text, organizer, event_date, created_at, status, clients(name)')
@@ -60,8 +63,7 @@ export default function OrcamentosPage() {
       .neq('event_name', '')
       .not('event_date', 'is', null)
       .order('created_at', { ascending: false });
-    if (error) console.error('[OrcamentosPage query]', error);
-
+    if (error) console.error('[OrcamentosPage]', error);
     const sorted = (data ?? []).sort((a: any, b: any) => {
       if (!a.event_date && !b.event_date) return 0;
       if (!a.event_date) return 1;
@@ -82,11 +84,15 @@ export default function OrcamentosPage() {
   const filtered = useMemo(() => {
     let list = rows;
     if (filter === 'all') {
-      list = list.filter(r => PIPELINE_STATUSES.includes(r.status));
+      // Em aberto: pipeline + data futura (ou sem data)
+      list = list.filter(r => PIPELINE_STATUSES.includes(r.status) && !isExpired(r));
     } else if (filter === 'lost') {
       list = list.filter(r => LOST_STATUSES.includes(r.status));
+    } else if (filter === 'vencidos') {
+      list = list.filter(r => isExpired(r));
     } else {
-      list = list.filter(r => r.status === filter);
+      // Sub-filtros de pipeline também excluem vencidos
+      list = list.filter(r => r.status === filter && !isExpired(r));
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -100,25 +106,22 @@ export default function OrcamentosPage() {
   }, [rows, filter, search]);
 
   const countFor = (s: string) => {
-    if (s === 'all') return rows.filter(r => PIPELINE_STATUSES.includes(r.status)).length;
-    if (s === 'lost') return rows.filter(r => LOST_STATUSES.includes(r.status)).length;
-    return rows.filter(r => r.status === s).length;
+    if (s === 'all')      return rows.filter(r => PIPELINE_STATUSES.includes(r.status) && !isExpired(r)).length;
+    if (s === 'lost')     return rows.filter(r => LOST_STATUSES.includes(r.status)).length;
+    if (s === 'vencidos') return rows.filter(r => isExpired(r)).length;
+    return rows.filter(r => r.status === s && !isExpired(r)).length;
   };
 
   return (
     <div>
-      {/* ── Descrição da página ── */}
+      {/* ── Descrição ── */}
       <div className="mb-5 p-4 bg-white border border-border rounded-2xl flex gap-3">
         <Info className="w-4 h-4 text-primary/60 shrink-0 mt-0.5" />
         <div className="text-sm text-muted-foreground leading-relaxed space-y-1">
           <p>
-            <span className="font-semibold text-foreground">Orçamentos</span> reúne todos os eventos que ainda estão
-            em processo comercial — desde o primeiro contato até a degustação.
-          </p>
-          <p>
-            <span className="font-medium text-foreground">Não fechado</span> — orçamento que não evoluiu e nenhum
-            contrato foi assinado. Diferente de <span className="font-medium text-foreground">Cancelado</span>, que é
-            um evento com contrato já assinado que foi encerrado (esses ficam na página de Eventos).
+            <span className="font-semibold text-foreground">Orçamentos</span> reúne eventos em processo comercial.
+            <span className="font-medium text-foreground"> Vencidos</span> são orçamentos com data já passada que ainda não tiveram uma definição.
+            <span className="font-medium text-foreground"> Não fechado</span> indica que nenhum contrato foi assinado.
           </p>
         </div>
       </div>
@@ -126,7 +129,7 @@ export default function OrcamentosPage() {
       {/* ── Filtros e busca ── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-1.5 bg-white border border-border rounded-xl p-1">
-          {/* Pipeline */}
+          {/* Pipeline ativo */}
           <FilterBtn active={filter === 'all'} onClick={() => setFilter('all')}>
             Em aberto <Count n={countFor('all')} />
           </FilterBtn>
@@ -135,11 +138,18 @@ export default function OrcamentosPage() {
               {STATUS_CONFIG[s].label} <Count n={countFor(s)} />
             </FilterBtn>
           ))}
+
           {/* Divisor */}
           <div className="w-px h-5 bg-border mx-0.5" />
-          {/* Não fechados */}
-          <FilterBtn active={filter === 'lost'} onClick={() => setFilter('lost')} muted>
-            Não fechados <Count n={countFor('lost')} />
+
+          {/* Vencidos — âmbar */}
+          <FilterBtn active={filter === 'vencidos'} onClick={() => setFilter('vencidos')} variant="amber">
+            Vencidos <Count n={countFor('vencidos')} />
+          </FilterBtn>
+
+          {/* Não fechados — vermelho claro, sem contagem */}
+          <FilterBtn active={filter === 'lost'} onClick={() => setFilter('lost')} variant="rose">
+            Não fechados
           </FilterBtn>
         </div>
 
@@ -177,17 +187,9 @@ export default function OrcamentosPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={6} className="py-16 text-center text-muted-foreground text-sm">
-                  Carregando...
-                </td>
-              </tr>
+              <tr><td colSpan={6} className="py-16 text-center text-muted-foreground text-sm">Carregando...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="py-16 text-center text-muted-foreground text-sm">
-                  Nenhum orçamento encontrado.
-                </td>
-              </tr>
+              <tr><td colSpan={6} className="py-16 text-center text-muted-foreground text-sm">Nenhum orçamento encontrado.</td></tr>
             ) : filtered.map((row, i) => (
               <tr
                 key={row.id}
@@ -195,13 +197,13 @@ export default function OrcamentosPage() {
                 className={`border-b border-border/50 hover:bg-slate-50 transition-colors cursor-pointer ${i === filtered.length - 1 ? 'border-0' : ''}`}
               >
                 <Td>
-                  <div className="font-medium text-foreground leading-tight">
-                    {row.event_name ?? '—'}
-                  </div>
+                  <div className="font-medium text-foreground leading-tight">{row.event_name ?? '—'}</div>
                 </Td>
                 <Td className="text-muted-foreground">{row.location_text || '—'}</Td>
                 <Td className="text-muted-foreground">{row.organizer || '—'}</Td>
-                <Td className="text-muted-foreground tabular-nums">{fmtDate(row.event_date)}</Td>
+                <Td className={`tabular-nums ${isExpired(row) ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
+                  {fmtDate(row.event_date)}
+                </Td>
                 <Td className="text-muted-foreground tabular-nums">{diasEmAberto(row.created_at)}</Td>
                 <Td onClick={e => e.stopPropagation()}>
                   <StatusDropdown status={row.status} onChange={s => updateStatus(row.id, s)} />
@@ -236,18 +238,20 @@ function Td({ children, className = '', onClick }: {
   return <td className={`px-4 py-3 text-sm ${className}`} onClick={onClick}>{children}</td>;
 }
 
-function FilterBtn({ active, onClick, children, muted }: {
-  active: boolean; onClick: () => void; children: React.ReactNode; muted?: boolean;
+function FilterBtn({ active, onClick, children, variant }: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  variant?: 'amber' | 'rose';
 }) {
+  const styles = {
+    amber: active ? 'bg-amber-400 text-white' : 'text-amber-600 hover:bg-amber-50',
+    rose:  active ? 'bg-rose-400 text-white'  : 'text-rose-400 hover:bg-rose-50',
+    default: active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+  };
+  const cls = variant ? styles[variant] : styles.default;
   return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
-        active
-          ? muted ? 'bg-zinc-200 text-zinc-700' : 'bg-primary text-primary-foreground'
-          : muted ? 'text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-      }`}
-    >
+    <button onClick={onClick} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${cls}`}>
       {children}
     </button>
   );
@@ -257,10 +261,9 @@ function Count({ n }: { n: number }) {
   return <span className="ml-1 opacity-60">({n})</span>;
 }
 
-// Opções do dropdown — "Não fechado" grava como 'cancelled' até migração
 const ALL_STATUS_OPTIONS = [
   ...PIPELINE_STATUSES.map(s => ({ key: s, ...STATUS_CONFIG[s] })),
-  { key: 'cancelled', label: 'Não fechado', bg: 'bg-zinc-50', text: 'text-zinc-500', border: 'border-zinc-200' },
+  { key: 'cancelled', label: 'Não fechado', bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200' },
 ];
 
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
