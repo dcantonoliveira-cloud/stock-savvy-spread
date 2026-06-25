@@ -424,7 +424,7 @@ export default function EventDetailPage() {
   return (
     <div className="-m-8">
 
-      {/* ════ TOP BAR ════ */}
+      {/* TOP BAR */}
       <div className="sticky top-14 z-30 bg-white border-b border-border shadow-sm">
         <div className="px-8 py-3 flex items-center justify-between gap-4">
 
@@ -558,7 +558,7 @@ export default function EventDetailPage() {
         })()}
       </div>
 
-      {/* ════ CONTENT ════ */}
+      {/* CONTENT */}
 
       <div className="px-8 py-6 space-y-5">
 
@@ -963,3 +963,4 @@ function EventHistorySection({ eventId }: { eventId: string }) {
     </div>
   );
 }
+
