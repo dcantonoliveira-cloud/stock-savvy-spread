@@ -317,6 +317,11 @@ function EventCard({ ev, showDate, onOpen }: { ev: EventRow; showDate?: boolean;
                   {st.label}
                 </span>
               )}
+              {ev.date_reserved && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-violet-50 text-violet-600 border-violet-200">
+                  Reservado
+                </span>
+              )}
             </div>
           </div>
         </div>
