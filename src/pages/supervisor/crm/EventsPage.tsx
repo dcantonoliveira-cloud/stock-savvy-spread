@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -83,6 +83,7 @@ const calcTotal = (guests: string, children: string, nonPaying: string, price: s
 export default function EventsPage() {
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
+  const location = useLocation();
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -95,7 +96,7 @@ export default function EventsPage() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   // Sheets
-  const [newOpen, setNewOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(() => !!(location.state as any)?.openNew);
   const [detailEvent, setDetailEvent] = useState<EventRow | null>(null);
   const [editMode, setEditMode] = useState(false);
 

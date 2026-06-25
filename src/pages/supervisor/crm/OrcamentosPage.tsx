@@ -12,6 +12,7 @@ interface Orcamento {
   event_date: string | null;
   created_at: string | null;
   status: string;
+  clients: { name: string | null } | null;
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────────
@@ -48,7 +49,7 @@ export default function OrcamentosPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from('events')
-      .select('id, event_name, location_text, organizer, event_date, created_at, status')
+      .select('id, event_name, location_text, organizer, event_date, created_at, status, clients(name)')
       .in('status', [...PIPELINE_STATUSES, 'lost'])
       .order('created_at', { ascending: false });
     if (error) console.error('[OrcamentosPage]', error);
@@ -140,7 +141,7 @@ export default function OrcamentosPage() {
         </div>
 
         <button
-          onClick={() => navigate('/events')}
+          onClick={() => navigate('/events', { state: { openNew: true } })}
           className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
