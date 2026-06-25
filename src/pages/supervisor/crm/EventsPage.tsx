@@ -660,9 +660,9 @@ export default function EventsPage() {
                     key={ev.id}
                     onClick={() => openDetail(ev)}
                     className={`border-b border-border/50 cursor-pointer group transition-colors ${
-                      isToday_ ? 'bg-primary/5 hover:bg-primary/8'
-                      : past ? 'opacity-55 hover:opacity-80 hover:bg-muted/20'
-                      : 'hover:bg-primary/4'
+                      isToday_ ? 'bg-primary/5 hover:bg-primary/15'
+                      : past ? 'opacity-55 hover:opacity-90 hover:bg-slate-100'
+                      : 'hover:bg-slate-50'
                     }`}
                   >
                     {/* DATA */}
