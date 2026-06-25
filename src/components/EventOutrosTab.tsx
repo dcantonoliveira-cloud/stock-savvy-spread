@@ -318,13 +318,26 @@ function HistorySection({ eventId }: { eventId: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (supabase as any)
-      .from('event_history')
-      .select('id, field_name, old_value, new_value, changed_at, profiles:user_id(display_name)')
-      .eq('event_id', eventId)
-      .order('changed_at', { ascending: false })
-      .limit(80)
-      .then(({ data }: any) => { setHistory(data ?? []); setLoading(false); });
+    const load = async () => {
+      const [{ data: rows }, { data: profiles }] = await Promise.all([
+        (supabase as any)
+          .from('event_history')
+          .select('id, field_name, old_value, new_value, changed_at, user_id')
+          .eq('event_id', eventId)
+          .order('changed_at', { ascending: false })
+          .limit(80),
+        supabase.from('profiles').select('id, display_name'),
+      ]);
+      const profileMap: Record<string, string> = {};
+      (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p.display_name; });
+      const merged = (rows ?? []).map((r: any) => ({
+        ...r,
+        profiles: r.user_id ? { display_name: profileMap[r.user_id] ?? 'Usuário' } : null,
+      }));
+      setHistory(merged);
+      setLoading(false);
+    };
+    load();
   }, [eventId]);
 
   return (
