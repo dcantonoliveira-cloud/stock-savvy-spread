@@ -106,10 +106,14 @@ function isGroup(item: NavGroup): item is { label: string; icon: any; items: Nav
   return 'items' in item;
 }
 
+const MINI_W = 56;
+const FULL_W = 252;
+
 export default function SupervisorSidebar() {
   const { pathname } = useLocation();
   const { signOut, profile } = useAuth();
   const onlineUsers = useOnlineUsers();
+  const [expanded, setExpanded] = useState(false);
 
   const getDefaultOpen = () => {
     const open = new Set<string>();
@@ -135,151 +139,170 @@ export default function SupervisorSidebar() {
   const initials = profile?.display_name
     ?.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() || '?';
 
+  const w = expanded ? FULL_W : MINI_W;
+
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[252px] glass-sidebar flex flex-col z-50">
+    <>
+      {/* Spacer so content doesn't go under sidebar */}
+      <div style={{ width: MINI_W, flexShrink: 0 }} />
 
-      {/* Logo */}
-      <div className="px-5 pt-5 pb-4 flex items-center gap-3">
-        <img src={logoRondello} alt="Rondello" className="h-8 object-contain" />
-        <div>
-          <p className="text-[10px] tracking-[0.18em] uppercase font-semibold"
-             style={{ color: 'hsl(220 40% 55%)' }}>
-            Sistema de Gestão
-          </p>
-        </div>
-      </div>
-
-      <div className="mx-4 h-px" style={{ background: 'hsl(220 40% 16%)' }} />
-
-      {/* Nav */}
-      <nav className="flex-1 px-2.5 py-3 overflow-y-auto space-y-0.5">
-        {navStructure.map((item) => {
-          if (!isGroup(item)) {
-            const active = pathname === item.path;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
-                  active ? 'nav-item-active' : 'hover:bg-white/5'
-                }`}
-                style={{ color: active ? undefined : 'hsl(220 20% 62%)' }}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                {item.label}
-              </Link>
-            );
-          }
-
-          const Icon = item.icon;
-          const isOpen = openGroups.has(item.label);
-          const isActiveGroup = item.items.some(i => pathname === i.path || pathname.startsWith(i.path + '/'));
-
-          return (
-            <div key={item.label}>
-              <button
-                onClick={() => toggleGroup(item.label)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
-                  isActiveGroup ? 'bg-white/5' : 'hover:bg-white/5'
-                }`}
-                style={{ color: isActiveGroup ? 'hsl(220 25% 75%)' : 'hsl(220 15% 55%)' }}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="flex-1 text-left">{item.label}</span>
-                <ChevronDown
-                  className="w-3.5 h-3.5 transition-transform duration-200"
-                  style={{
-                    opacity: 0.5,
-                    transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
-                  }}
-                />
-              </button>
-
-              {isOpen && (
-                <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2.5"
-                     style={{ borderColor: 'hsl(220 35% 20%)' }}>
-                  {item.items.map(sub => {
-                    const SubIcon = sub.icon;
-                    const active = pathname === sub.path || pathname.startsWith(sub.path + '/');
-                    return (
-                      <Link
-                        key={sub.path}
-                        to={sub.path}
-                        className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] font-medium transition-colors ${
-                          active ? 'nav-item-active' : 'hover:bg-white/5'
-                        }`}
-                        style={{ color: active ? undefined : 'hsl(220 15% 52%)' }}
-                      >
-                        <SubIcon className="w-3.5 h-3.5 shrink-0" />
-                        {sub.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* Online users */}
-      {onlineUsers.length > 0 && (
-        <div className="mx-2.5 mb-2 px-3 py-2.5 rounded-lg" style={{ background: 'hsl(220 45% 15%)' }}>
-          <div className="flex items-center gap-1.5 mb-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(220 20% 48%)' }}>
-              Online · {onlineUsers.length}
-            </span>
+      <aside
+        onMouseEnter={() => setExpanded(true)}
+        onMouseLeave={() => setExpanded(false)}
+        className="fixed left-0 top-0 h-screen glass-sidebar flex flex-col z-50 overflow-hidden"
+        style={{ width: w, transition: 'width 200ms ease' }}
+      >
+        {/* Logo */}
+        <div className="px-3 pt-5 pb-4 flex items-center gap-3 shrink-0">
+          <img src={logoRondello} alt="Rondello" className="h-8 object-contain shrink-0" style={{ minWidth: 32 }} />
+          <div style={{ opacity: expanded ? 1 : 0, transition: 'opacity 150ms ease', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <p className="text-[10px] tracking-[0.18em] uppercase font-semibold"
+               style={{ color: 'hsl(220 40% 55%)' }}>
+              Sistema de Gestão
+            </p>
           </div>
-          <div className="space-y-1.5">
-            {onlineUsers.map(u => {
-              const uInitials = u.display_name.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+        </div>
+
+        <div className="mx-3 h-px shrink-0" style={{ background: 'hsl(220 40% 16%)' }} />
+
+        {/* Nav */}
+        <nav className="flex-1 px-1.5 py-3 overflow-y-auto overflow-x-hidden space-y-0.5">
+          {navStructure.map((item) => {
+            if (!isGroup(item)) {
+              const active = pathname === item.path;
+              const Icon = item.icon;
               return (
-                <div key={u.user_id} className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0"
-                       style={{ background: 'hsl(220 55% 28% / 0.6)', color: 'hsl(220 80% 72%)' }}>
-                    {uInitials}
-                  </div>
-                  <span className="text-[11px] truncate" style={{ color: 'hsl(220 20% 58%)' }}>
-                    {u.display_name}
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  title={!expanded ? item.label : undefined}
+                  className={`relative flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
+                    active ? 'nav-item-active' : 'hover:bg-white/5'
+                  }`}
+                  style={{ color: active ? undefined : 'hsl(220 20% 62%)' }}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span style={{ opacity: expanded ? 1 : 0, transition: 'opacity 100ms ease', whiteSpace: 'nowrap' }}>
+                    {item.label}
                   </span>
-                </div>
+                </Link>
               );
-            })}
-          </div>
-        </div>
-      )}
+            }
 
-      <div className="mx-4 h-px" style={{ background: 'hsl(220 40% 16%)' }} />
+            const Icon = item.icon;
+            const isOpen = openGroups.has(item.label);
+            const isActiveGroup = item.items.some(i => pathname === i.path || pathname.startsWith(i.path + '/'));
 
-      {/* User footer */}
-      <div className="p-3 space-y-1">
-        <div className="flex items-center gap-2.5 px-2 py-1.5">
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-               style={{ background: 'hsl(220 60% 28%)', color: 'hsl(220 80% 82%)' }}>
-            {initials}
+            return (
+              <div key={item.label}>
+                <button
+                  onClick={() => expanded && toggleGroup(item.label)}
+                  title={!expanded ? item.label : undefined}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
+                    isActiveGroup ? 'bg-white/5' : 'hover:bg-white/5'
+                  }`}
+                  style={{ color: isActiveGroup ? 'hsl(220 25% 75%)' : 'hsl(220 15% 55%)' }}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="flex-1 text-left" style={{ opacity: expanded ? 1 : 0, transition: 'opacity 100ms ease', whiteSpace: 'nowrap' }}>
+                    {item.label}
+                  </span>
+                  {expanded && (
+                    <ChevronDown
+                      className="w-3.5 h-3.5 shrink-0 transition-transform duration-200"
+                      style={{ opacity: 0.5, transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+                    />
+                  )}
+                </button>
+
+                {expanded && isOpen && (
+                  <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2.5"
+                       style={{ borderColor: 'hsl(220 35% 20%)' }}>
+                    {item.items.map(sub => {
+                      const SubIcon = sub.icon;
+                      const active = pathname === sub.path || pathname.startsWith(sub.path + '/');
+                      return (
+                        <Link
+                          key={sub.path}
+                          to={sub.path}
+                          className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] font-medium transition-colors ${
+                            active ? 'nav-item-active' : 'hover:bg-white/5'
+                          }`}
+                          style={{ color: active ? undefined : 'hsl(220 15% 52%)', whiteSpace: 'nowrap' }}
+                        >
+                          <SubIcon className="w-3.5 h-3.5 shrink-0" />
+                          {sub.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* Online users — só quando expandido */}
+        {expanded && onlineUsers.length > 0 && (
+          <div className="mx-2 mb-2 px-3 py-2.5 rounded-lg shrink-0" style={{ background: 'hsl(220 45% 15%)' }}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'hsl(220 20% 48%)', whiteSpace: 'nowrap' }}>
+                Online · {onlineUsers.length}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {onlineUsers.map(u => {
+                const uInitials = u.display_name.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+                return (
+                  <div key={u.user_id} className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0"
+                         style={{ background: 'hsl(220 55% 28% / 0.6)', color: 'hsl(220 80% 72%)' }}>
+                      {uInitials}
+                    </div>
+                    <span className="text-[11px] truncate" style={{ color: 'hsl(220 20% 58%)', whiteSpace: 'nowrap' }}>
+                      {u.display_name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold truncate" style={{ color: 'hsl(220 25% 82%)' }}>
-              {profile?.display_name}
-            </p>
-            <p className="text-[11px] truncate" style={{ color: 'hsl(220 15% 48%)' }}>
-              {profile?.email}
-            </p>
+        )}
+
+        <div className="mx-3 h-px shrink-0" style={{ background: 'hsl(220 40% 16%)' }} />
+
+        {/* User footer */}
+        <div className="p-2 space-y-1 shrink-0">
+          <div className="flex items-center gap-2.5 px-2 py-1.5">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                 style={{ background: 'hsl(220 60% 28%)', color: 'hsl(220 80% 82%)' }}>
+              {initials}
+            </div>
+            {expanded && (
+              <div className="flex-1 min-w-0" style={{ whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                <p className="text-[13px] font-semibold truncate" style={{ color: 'hsl(220 25% 82%)' }}>
+                  {profile?.display_name}
+                </p>
+                <p className="text-[11px] truncate" style={{ color: 'hsl(220 15% 48%)' }}>
+                  {profile?.email}
+                </p>
+              </div>
+            )}
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            title={!expanded ? 'Sair da conta' : undefined}
+            className="w-full justify-start rounded-lg text-[12px] h-8 hover:bg-red-500/10 hover:text-red-400"
+            style={{ color: 'hsl(220 15% 45%)' }}
+            onClick={signOut}
+          >
+            <LogOut className="w-3.5 h-3.5 shrink-0" />
+            {expanded && <span className="ml-2 whitespace-nowrap">Sair da conta</span>}
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start rounded-lg text-[12px] h-8 hover:bg-red-500/10 hover:text-red-400"
-          style={{ color: 'hsl(220 15% 45%)' }}
-          onClick={signOut}
-        >
-          <LogOut className="w-3.5 h-3.5 mr-2" />
-          Sair da conta
-        </Button>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
