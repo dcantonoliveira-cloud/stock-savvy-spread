@@ -92,7 +92,7 @@ export default function TastingDetailPage() {
   const [menuText, setMenuText]       = useState('');
   const [notes, setNotes]             = useState('');
   const [maxCouples, setMaxCouples]   = useState<number | null>(null);
-  const [location, setLocation]       = useState('');
+  const [venue, setVenue]             = useState('');
   const [responsible, setResponsible] = useState('');
   const [costPerCouple, setCostPerCouple] = useState<number | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,7 +131,7 @@ export default function TastingDetailPage() {
     setMenuText(parsedMenu);
     setNotes(parsedNotes);
     setMaxCouples(s.max_couples ?? null);
-    setLocation(s.location ?? '');
+    setVenue(s.location ?? '');
     setResponsible(s.responsible ?? '');
     setCostPerCouple(s.cost_per_couple ?? null);
     fields.current = {
@@ -314,8 +314,8 @@ export default function TastingDetailPage() {
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">Sessão</p>
               <div className="grid grid-cols-2 gap-4">
                 <InfoField label="Local / salão">
-                  <input value={location}
-                    onChange={e => { setLocation(e.target.value); fields.current.location = e.target.value; scheduleAutoSave(); }}
+                  <input value={venue}
+                    onChange={e => { setVenue(e.target.value); fields.current.location = e.target.value; scheduleAutoSave(); }}
                     className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
                     placeholder="Ex: Salão Jardim" />
                 </InfoField>
