@@ -213,7 +213,6 @@ export default function TastingDetailPage() {
                   <Th>Assessor(a)</Th>
                   <Th>Data do evento</Th>
                   <Th>Situação</Th>
-                  <Th center>2ª deg.</Th>
                   <Th>Status atual</Th>
                   <Th center>Qtd pessoas</Th>
                   <Th>Valor pago</Th>
@@ -346,14 +345,6 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       <Td className="text-muted-foreground tabular-nums">{fmtDate(ev?.event_date ?? null)}</Td>
       <Td>
         {sit ? <span className={`text-xs ${sit.cls}`}>{sit.label}</span> : '—'}
-      </Td>
-      <Td center>
-        <button
-          onClick={() => onUpdate({ is_second_tasting: !row.is_second_tasting })}
-          className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${row.is_second_tasting ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-transparent hover:border-primary/50'}`}
-        >
-          <Check className="w-3 h-3" />
-        </button>
       </Td>
       <Td>
         {st ? <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${st.cls}`}>{st.label}</span> : '—'}
