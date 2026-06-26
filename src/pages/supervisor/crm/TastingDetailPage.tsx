@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, ExternalLink, Search, Loader2 } from 'lucide-react';
+import { X, Plus, Trash2, ExternalLink, Search, Loader2, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -66,7 +66,9 @@ export default function TastingDetailPage() {
   const [allocOpen, setAllocOpen] = useState(false);
   const [menuText, setMenuText] = useState('');
   const [notes, setNotes]       = useState('');
+  const [maxCouples, setMaxCouples] = useState<number | null>(null);
   const [saving, setSaving]     = useState(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
