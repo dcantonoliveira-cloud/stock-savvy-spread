@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { X, Plus, Trash2, ExternalLink, Search, Loader2, AlertTriangle } from 'lucide-react';
@@ -81,6 +81,9 @@ function parseBubbleContent(text: string): string {
 export default function TastingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const stateFrom  = (location.state as any)?.from  ?? '/tastings';
+  const stateLabel = (location.state as any)?.fromLabel ?? 'Degustações';
   const [session, setSession]   = useState<Session | null>(null);
   const [rows, setRows]         = useState<SessionEvent[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -168,13 +171,14 @@ export default function TastingDetailPage() {
   }, [saveSession]);
 
   // Stats
-  const total    = rows.length;
-  const novos    = rows.filter(r => r.situation_snapshot === 'new').length;
-  const segundas = rows.filter(r => r.is_second_tasting).length;
-  const guests   = rows.reduce((s, r) => s + (r.guest_count ?? 0), 0);
-  const emAberto = rows.filter(r => r.situation_snapshot === 'new' && r.events && PIPELINE.includes(r.events.status)).length;
-  const fechados = rows.filter(r => r.situation_snapshot === 'new' && r.events && CLOSED.includes(r.events.status)).length;
-  const conv     = novos > 0 ? Math.round((fechados / novos) * 100) : null;
+  const total      = rows.length;
+  const novos      = rows.filter(r => r.situation_snapshot === 'new').length;
+  const guests     = rows.reduce((s, r) => s + (r.guest_count ?? 0), 0);
+  const totalPago  = rows.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
+  const emAberto   = rows.filter(r => r.situation_snapshot === 'new' && r.events && PIPELINE.includes(r.events.status)).length;
+  const fechados   = rows.filter(r => r.situation_snapshot === 'new' && r.events && CLOSED.includes(r.events.status)).length;
+  const conv       = novos > 0 ? Math.round((fechados / novos) * 100) : null;
+  const fmtMoney   = (v: number) => v === 0 ? 'R$ 0' : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -190,7 +194,7 @@ export default function TastingDetailPage() {
         <div className="px-8 py-3 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
-              <Link to="/tastings" className="hover:text-foreground transition-colors">Degustações</Link>
+              <Link to={stateFrom} className="hover:text-foreground transition-colors">{stateLabel}</Link>
               <span>›</span>
               <span className="text-foreground">{fmtDate(session.scheduled_date)}</span>
             </div>
@@ -207,7 +211,7 @@ export default function TastingDetailPage() {
               <Plus className="w-4 h-4" />
               Alocar clientes
             </button>
-            <button onClick={() => navigate('/tastings')}
+            <button onClick={() => navigate(stateFrom)}
               className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
               <X className="w-4 h-4" />
             </button>
@@ -222,8 +226,8 @@ export default function TastingDetailPage() {
           <StatCard label="Em aberto"      value={emAberto} danger={emAberto > 0} />
           {conv !== null && <StatCard label="Conversão" value={`${conv}%`} accent />}
           <StatDivider />
-          <StatCard label="2ª deg."    value={segundas} muted />
-          <StatCard label="Convidados" value={guests}   muted />
+          <StatCard label="Total pago"  value={fmtMoney(totalPago)} muted />
+          <StatCard label="Convidados" value={guests} muted />
         </div>
 
         {/* Tabs */}
@@ -270,7 +274,7 @@ export default function TastingDetailPage() {
                       sessionDate={session.scheduled_date}
                       onUpdate={patch => updateRow(row.id, patch)}
                       onRemove={() => removeRow(row.id)}
-                      onNavigate={() => navigate(`/events/${row.event_id}`)}
+                      onNavigate={() => navigate(`/events/${row.event_id}`, { state: { from: `/tastings/${session.id}`, fromLabel: `Degustação ${fmtDate(session.scheduled_date)}` } })}
                     />
                   ))}
                 </tbody>

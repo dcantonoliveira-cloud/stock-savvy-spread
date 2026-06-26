@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, ChevronDown } from 'lucide-react';
@@ -215,6 +215,7 @@ function StatusDropdown({ status, onChange }: { status: string; onChange: (s: st
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -418,8 +419,10 @@ export default function EventDetailPage() {
   const isPipeline = ['lead', 'negotiating', 'tasting_scheduled'].includes(event.status);
   const isLost = ['lost', 'cancelled'].includes(event.status);
   const statusLabel = event.is_paid_in_full ? 'Quitado' : STATUS_LABELS[event.status] ?? event.status;
-  const backPath = isClosed ? '/events' : '/orcamentos';
-  const backLabel = isClosed ? 'Eventos' : 'Orçamentos';
+  const stateFrom = (location.state as any)?.from;
+  const stateLabel = (location.state as any)?.fromLabel;
+  const backPath = stateFrom ?? (isClosed ? '/events' : '/orcamentos');
+  const backLabel = stateLabel ?? (isClosed ? 'Eventos' : 'Orçamentos');
 
   return (
     <div className="-m-8">
