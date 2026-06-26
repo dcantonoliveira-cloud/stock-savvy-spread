@@ -64,6 +64,10 @@ export default function SupervisorDashboard() {
         ...((ev2.data ?? []) as EventRow[]),
         ...((ev3.data ?? []) as EventRow[]),
       ];
+      console.log('[dashboard] ev1', ev1.data?.length, ev1.error);
+      console.log('[dashboard] ev2', ev2.data?.length, ev2.error);
+      console.log('[dashboard] ev3', ev3.data?.length, ev3.error);
+      console.log('[dashboard] total events', allEvents.length);
       setEvents(allEvents);
       setTastings((tsRes.data ?? []) as TastingRow[]);
       setLoading(false);
