@@ -96,83 +96,142 @@ export default function TastingsPage() {
     await supabase.from('tasting_sessions' as any).update({ type: tipo }).eq('id', id);
   };
 
+  const cols = 'grid-cols-[140px_90px_1fr_1fr_1fr_1fr_1fr_1fr_1fr]';
+
+  const TableHeader = () => (
+    <div className={`px-5 py-2.5 grid ${cols} gap-3 bg-muted/30`}>
+      {['Data','Tipo','Eventos','Novos','Contratos fechados','Em aberto','Convidados','Conversão','Total pago'].map((h, i) => (
+        <span key={h} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center ${i <= 1 ? 'text-left' : ''} ${i === 7 ? 'border-l border-border pl-3' : ''}`}>{h}</span>
+      ))}
+    </div>
+  );
+
+  const SessionRow = ({ s }: { s: Session }) => {
+    const evs   = sessionEvts[s.id] ?? [];
+    const st    = sessionStats(evs);
+    const money = fmtMoney(st.totalPago);
+    return (
+      <div
+        onClick={() => navigate(`/tastings/${s.id}`)}
+        className={`px-5 py-2.5 grid ${cols} gap-3 items-center hover:bg-slate-50 cursor-pointer transition-colors`}
+      >
+        <span className="text-sm font-semibold tabular-nums text-foreground">{fmtDate(s.scheduled_date)}</span>
+        <TipoCell value={s.type} isPast={false} onChange={tipo => updateTipo(s.id, tipo)} />
+        <Cell v={st.total} bold />
+        <Cell v={st.novos} />
+        <Cell v={st.fechados} />
+        <Cell v={st.emAberto > 0 ? st.emAberto : null} danger={st.emAberto > 0} />
+        <Cell v={st.guests > 0 ? st.guests : null} />
+        <div className="text-center border-l border-border/50 pl-3">
+          <span className="text-muted-foreground/25 text-sm">—</span>
+        </div>
+        <div className="text-center">
+          {money ? <span className="text-sm tabular-nums text-foreground">{money}</span> : <span className="text-muted-foreground/25 text-sm">—</span>}
+        </div>
+      </div>
+    );
+  };
+
+  const PastRow = ({ s }: { s: Session }) => {
+    const evs   = sessionEvts[s.id] ?? [];
+    const st    = sessionStats(evs);
+    const money = fmtMoney(st.totalPago);
+    return (
+      <div
+        onClick={() => navigate(`/tastings/${s.id}`)}
+        className={`px-5 py-2 grid ${cols} gap-3 items-center hover:bg-slate-50/60 cursor-pointer transition-colors`}
+      >
+        <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(s.scheduled_date)}</span>
+        <TipoCell value={s.type} isPast onChange={tipo => updateTipo(s.id, tipo)} />
+        <Cell v={st.total} bold muted />
+        <Cell v={st.novos} muted />
+        <Cell v={st.fechados} muted />
+        <Cell v={st.emAberto > 0 ? st.emAberto : null} danger={st.emAberto > 0} muted />
+        <Cell v={st.guests > 0 ? st.guests : null} muted />
+        <div className="text-center border-l border-border/50 pl-3">
+          {st.conv !== null
+            ? <span className={`text-sm font-medium ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-500' : 'text-muted-foreground/60'}`}>{st.conv}%</span>
+            : <span className="text-muted-foreground/25 text-sm">—</span>}
+        </div>
+        <div className="text-center">
+          {money ? <span className="text-sm tabular-nums text-muted-foreground">{money}</span> : <span className="text-muted-foreground/25 text-sm">—</span>}
+        </div>
+      </div>
+    );
+  };
+
+  const visiblePast = past.slice(0, Math.max(0, visibleCount - upcoming.length));
+
   return (
     <div>
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <CalendarDays className="w-4 h-4" />
-          <span>{allSorted.length} sessões · {upcoming.length} futuras</span>
+      {/* Intro */}
+      <div className="mb-6 flex items-start justify-between gap-6">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground mb-1">Degustações</h1>
+          <p className="text-sm text-muted-foreground max-w-xl">
+            Sessões de degustação são o principal canal de conversão do Rondello. Acompanhe quantos casais novos participam, quantos fecham contrato e quanto já foi pago em cada sessão.
+          </p>
         </div>
         <button
           onClick={() => setNewOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Nova degustação
         </button>
       </div>
 
-      {/* Lista */}
-      <div className="bg-white border border-border rounded-2xl divide-y divide-border/50">
-        {/* Header */}
-        <div className="px-5 py-2.5 grid grid-cols-[140px_90px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 bg-muted/30 rounded-t-2xl">
-          {['Data','Tipo','Eventos','Novos','Contratos fechados','Em aberto','Convidados','Conversão','Total pago'].map((h, i) => (
-            <span key={h} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center ${i === 0 ? 'text-left' : ''} ${i === 1 ? 'text-left' : ''} ${i === 7 ? 'border-l border-border pl-3' : ''}`}>{h}</span>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="py-16 text-center text-muted-foreground text-sm">Carregando...</div>
-        ) : allSorted.length === 0 ? (
-          <div className="py-16 text-center text-muted-foreground text-sm">Nenhuma degustação cadastrada.</div>
-        ) : visible.map(s => {
-          const evs    = sessionEvts[s.id] ?? [];
-          const st     = sessionStats(evs);
-          const isPast = s.scheduled_date < now;
-          const money  = fmtMoney(st.totalPago);
-
-          return (
-            <div
-              key={s.id}
-              onClick={() => navigate(`/tastings/${s.id}`)}
-              className={`px-5 py-2.5 grid grid-cols-[140px_90px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 items-center hover:bg-slate-50 cursor-pointer transition-colors ${isPast ? 'opacity-55' : ''}`}
-            >
-              <span className={`text-sm font-medium tabular-nums ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>
-                {fmtDate(s.scheduled_date)}
-              </span>
-
-              <TipoCell value={s.type} isPast={isPast} onChange={tipo => updateTipo(s.id, tipo)} />
-
-              <Cell v={st.total} bold />
-              <Cell v={st.novos} />
-              <Cell v={st.fechados} />
-              <Cell v={st.emAberto > 0 ? st.emAberto : null} danger={st.emAberto > 0} />
-              <Cell v={st.guests > 0 ? st.guests : null} />
-
-              <div className="text-center border-l border-border/50 pl-3">
-                {isPast && st.conv !== null
-                  ? <span className={`text-sm font-medium ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-500' : 'text-muted-foreground/60'}`}>{st.conv}%</span>
-                  : <span className="text-muted-foreground/25 text-sm">—</span>}
-              </div>
-
-              <div className="text-center">
-                {money
-                  ? <span className="text-sm tabular-nums text-foreground">{money}</span>
-                  : <span className="text-muted-foreground/25 text-sm">—</span>}
-              </div>
-            </div>
-          );
-        })}
+      {/* Stats rápido */}
+      <div className="flex items-center gap-2 text-muted-foreground text-sm mb-5">
+        <CalendarDays className="w-4 h-4" />
+        <span>{allSorted.length} sessões · {upcoming.length} agendadas</span>
       </div>
 
-      {/* Paginação */}
-      {allOrdered.length > 15 && (
+      {loading ? (
+        <div className="bg-white border border-border rounded-2xl py-16 text-center text-muted-foreground text-sm">Carregando...</div>
+      ) : allSorted.length === 0 ? (
+        <div className="bg-white border border-border rounded-2xl py-16 text-center text-muted-foreground text-sm">Nenhuma degustação cadastrada.</div>
+      ) : (
+        <div className="space-y-4">
+
+          {/* Próximas */}
+          {upcoming.length > 0 && (
+            <div className="bg-white border-2 border-primary/20 rounded-2xl overflow-hidden">
+              <div className="px-5 py-2 bg-primary/5 border-b border-primary/15 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-primary/70">Próximas sessões</span>
+                <span className="ml-auto text-xs text-primary/50">{upcoming.length} agendada{upcoming.length > 1 ? 's' : ''}</span>
+              </div>
+              <TableHeader />
+              <div className="divide-y divide-border/50">
+                {upcoming.map(s => <SessionRow key={s.id} s={s} />)}
+              </div>
+            </div>
+          )}
+
+          {/* Histórico */}
+          {past.length > 0 && (
+            <div className="bg-white border border-border rounded-2xl overflow-hidden">
+              <div className="px-5 py-2 bg-muted/20 border-b border-border/60 flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">Histórico</span>
+                <span className="ml-auto text-xs text-muted-foreground/40">{past.length} sessão{past.length > 1 ? 'ões' : ''}</span>
+              </div>
+              <TableHeader />
+              <div className="divide-y divide-border/40">
+                {visiblePast.map(s => <PastRow key={s.id} s={s} />)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Paginação histórico */}
+      {past.length > 15 && (
         <div className="flex items-center gap-3 mt-3 justify-center">
-          {visibleCount < allOrdered.length && (
+          {visibleCount < past.length + upcoming.length && (
             <button onClick={() => setVisibleCount(v => v + 15)}
               className="px-4 py-1.5 rounded-xl border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
-              Mostrar mais
+              Mostrar mais sessões
             </button>
           )}
           {visibleCount > 15 && (
@@ -230,11 +289,11 @@ function TipoCell({ value, isPast, onChange }: { value: string | null; isPast: b
   );
 }
 
-function Cell({ v, bold, danger }: { v: number | null | undefined; bold?: boolean; danger?: boolean }) {
+function Cell({ v, bold, danger, muted }: { v: number | null | undefined; bold?: boolean; danger?: boolean; muted?: boolean }) {
   return (
     <div className="text-center">
       {v != null && v > 0
-        ? <span className={`text-sm ${bold ? 'font-semibold' : 'font-normal'} ${danger ? 'text-red-500 font-semibold' : 'text-foreground'}`}>{v}</span>
+        ? <span className={`text-sm ${bold ? 'font-semibold' : 'font-normal'} ${danger ? 'text-red-500 font-semibold' : muted ? 'text-muted-foreground' : 'text-foreground'}`}>{v}</span>
         : <span className="text-muted-foreground/25 text-sm">—</span>}
     </div>
   );
