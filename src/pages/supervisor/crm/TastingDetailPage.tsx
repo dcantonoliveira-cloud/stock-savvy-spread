@@ -13,6 +13,9 @@ interface Session {
   max_couples: number | null;
   menu_text: string | null;
   notes: string | null;
+  location: string | null;
+  responsible: string | null;
+  cost_per_couple: number | null;
 }
 
 interface SessionEvent {
@@ -64,11 +67,16 @@ export default function TastingDetailPage() {
   const [loading, setLoading]   = useState(true);
   const [tab, setTab]           = useState<'guests' | 'menu' | 'info'>('guests');
   const [allocOpen, setAllocOpen] = useState(false);
-  const [menuText, setMenuText] = useState('');
-  const [notes, setNotes]       = useState('');
-  const [maxCouples, setMaxCouples] = useState<number | null>(null);
-  const [saving, setSaving]     = useState(false);
+  const [menuText, setMenuText]       = useState('');
+  const [notes, setNotes]             = useState('');
+  const [maxCouples, setMaxCouples]   = useState<number | null>(null);
+  const [location, setLocation]       = useState('');
+  const [responsible, setResponsible] = useState('');
+  const [costPerCouple, setCostPerCouple] = useState<number | null>(null);
+  const [saving, setSaving]           = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ref to always have latest field values when auto-save fires
+  const fields = useRef({ menu_text: '', notes: '', max_couples: null as number | null, location: '', responsible: '', cost_per_couple: null as number | null });
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -86,6 +94,17 @@ export default function TastingDetailPage() {
     setMenuText(s.menu_text ?? '');
     setNotes(s.notes ?? '');
     setMaxCouples(s.max_couples ?? null);
+    setLocation(s.location ?? '');
+    setResponsible(s.responsible ?? '');
+    setCostPerCouple(s.cost_per_couple ?? null);
+    fields.current = {
+      menu_text: s.menu_text ?? '',
+      notes: s.notes ?? '',
+      max_couples: s.max_couples ?? null,
+      location: s.location ?? '',
+      responsible: s.responsible ?? '',
+      cost_per_couple: s.cost_per_couple ?? null,
+    };
     setRows((evts ?? []) as SessionEvent[]);
     setLoading(false);
   }, [id, navigate]);
@@ -110,9 +129,9 @@ export default function TastingDetailPage() {
     toast.success('Salvo', { duration: 1500 });
   }, [id]);
 
-  const scheduleAutoSave = useCallback((patch: Partial<Session>) => {
+  const scheduleAutoSave = useCallback(() => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => saveSession(patch), 1200);
+    autoSaveTimer.current = setTimeout(() => saveSession(fields.current as Partial<Session>), 1200);
   }, [saveSession]);
 
   // Stats
@@ -226,7 +245,7 @@ export default function TastingDetailPage() {
           <div className="bg-white border border-border rounded-2xl p-6 space-y-4 max-w-2xl">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Cardápio</label>
-              <textarea value={menuText} onChange={e => { setMenuText(e.target.value); scheduleAutoSave({ menu_text: e.target.value, notes }); }} rows={16}
+              <textarea value={menuText} onChange={e => { setMenuText(e.target.value); fields.current.menu_text = e.target.value; scheduleAutoSave(); }} rows={16}
                 className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                 placeholder="Descreva o cardápio..." />
             </div>
@@ -234,21 +253,33 @@ export default function TastingDetailPage() {
         )}
 
         {tab === 'info' && (
-          <div className="bg-white border border-border rounded-2xl p-6 space-y-5 max-w-2xl">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Máx. de casais</label>
-              <input type="number" min={1} value={maxCouples ?? ''}
-                onChange={e => {
-                  const v = e.target.value ? parseInt(e.target.value) : null;
-                  setMaxCouples(v);
-                  scheduleAutoSave({ max_couples: v, notes, menu_text: menuText });
-                }}
-                className="w-28 px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="—" />
+          <div className="max-w-2xl space-y-4">
+            <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">Sessão</p>
+              <div className="grid grid-cols-2 gap-4">
+                <InfoField label="Local / salão">
+                  <input value={location} onChange={e => { setLocation(e.target.value); fields.current.location = e.target.value; scheduleAutoSave(); }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="Ex: Salão Jardim" />
+                </InfoField>
+                <InfoField label="Assessora responsável">
+                  <input value={responsible} onChange={e => { setResponsible(e.target.value); fields.current.responsible = e.target.value; scheduleAutoSave(); }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="Nome da assessora" />
+                </InfoField>
+                <InfoField label="Máx. de casais">
+                  <input type="number" min={1} value={maxCouples ?? ''}
+                    onChange={e => { const v = e.target.value ? parseInt(e.target.value) : null; setMaxCouples(v); fields.current.max_couples = v; scheduleAutoSave(); }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="—" />
+                </InfoField>
+                <InfoField label="Custo por casal (R$)">
+                  <input type="number" min={0} step={0.01} value={costPerCouple ?? ''}
+                    onChange={e => { const v = e.target.value ? parseFloat(e.target.value) : null; setCostPerCouple(v); fields.current.cost_per_couple = v; scheduleAutoSave(); }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="0,00" />
+                </InfoField>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Observações importantes</label>
-              <textarea value={notes} onChange={e => { setNotes(e.target.value); scheduleAutoSave({ notes: e.target.value, menu_text: menuText, max_couples: maxCouples }); }} rows={10}
+            <div className="bg-white border border-border rounded-2xl p-6">
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Observações importantes</label>
+              <textarea value={notes} onChange={e => { setNotes(e.target.value); fields.current.notes = e.target.value; scheduleAutoSave(); }} rows={10}
                 className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                 placeholder="Alergias, restrições, observações por casal..." />
             </div>
@@ -451,6 +482,15 @@ function Th({ children, center }: { children?: React.ReactNode; center?: boolean
 
 function Td({ children, className = '', center }: { children?: React.ReactNode; className?: string; center?: boolean }) {
   return <td className={`px-4 py-3 text-sm ${center ? 'text-center' : ''} ${className}`}>{children}</td>;
+}
+
+function InfoField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
 }
 
 function Stat({ label, value, danger }: { label: string; value: string | number; danger?: boolean }) {
