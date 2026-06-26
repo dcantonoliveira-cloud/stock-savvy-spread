@@ -132,12 +132,9 @@ export default function TastingsPage() {
     <div>
       {/* Intro */}
       <div className="mb-6 flex items-start justify-between gap-6">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground mb-1">Degustações</h1>
-          <p className="text-sm text-muted-foreground max-w-xl">
-            Sessões de degustação são o principal canal de conversão do Rondello. Acompanhe quantos casais novos participam, quantos fecham contrato e quanto já foi pago em cada sessão.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Sessões de degustação são o principal canal de conversão do Rondello. Acompanhe quantos casais novos participam, quantos fecham contrato e quanto já foi pago em cada sessão.
+        </p>
         <button
           onClick={() => setNewOpen(true)}
           className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
