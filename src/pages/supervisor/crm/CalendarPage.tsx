@@ -3,10 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ChevronLeft, ChevronRight, Users, CalendarCheck,
-  TrendingUp, Clock, ExternalLink,
+  TrendingUp, Clock, ExternalLink, UtensilsCrossed,
 } from 'lucide-react';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
+type TastingRow = {
+  id: string;
+  scheduled_date: string;
+  type: string | null;
+  max_couples: number | null;
+};
+
 type EventRow = {
   id: string;
   event_name: string | null;
@@ -47,8 +54,9 @@ export default function CalendarPage() {
   const today      = new Date();
   const [year, setYear]         = useState(today.getFullYear());
   const [month, setMonth]       = useState(today.getMonth());
-  const [events, setEvents]     = useState<EventRow[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [events,   setEvents]   = useState<EventRow[]>([]);
+  const [tastings, setTastings] = useState<TastingRow[]>([]);
+  const [loading,  setLoading]  = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -59,19 +67,27 @@ export default function CalendarPage() {
       setSelected(null);
       const first = `${year}-${String(month + 1).padStart(2, '0')}-01`;
       const last  = new Date(year, month + 1, 0).toISOString().slice(0, 10);
-      const { data } = await supabase
-        .from('events')
-        .select('id, event_name, event_date, status, total_value, guest_count, event_type, location_text, date_reserved, clients(name)')
-        .gte('event_date', first)
-        .lte('event_date', last)
-        .not('event_name', 'is', null)
-        .neq('event_name', '')
-        .order('event_date');
-      // Filtro: só mostra confirmados/realizados OU com data reservada
+      const [{ data }, { data: tsData }] = await Promise.all([
+        supabase
+          .from('events')
+          .select('id, event_name, event_date, status, total_value, guest_count, event_type, location_text, date_reserved, clients(name)')
+          .gte('event_date', first)
+          .lte('event_date', last)
+          .not('event_name', 'is', null)
+          .neq('event_name', '')
+          .order('event_date'),
+        supabase
+          .from('tasting_sessions' as any)
+          .select('id, scheduled_date, type, max_couples')
+          .gte('scheduled_date', first)
+          .lte('scheduled_date', last)
+          .order('scheduled_date'),
+      ]);
       const visible = (data ?? []).filter((e: any) =>
         e.status === 'confirmed' || e.status === 'completed' || e.date_reserved === true
       );
       setEvents(visible as EventRow[]);
+      setTastings((tsData ?? []) as TastingRow[]);
       setLoading(false);
     };
     load();
@@ -90,6 +106,12 @@ export default function CalendarPage() {
     return acc;
   }, {});
 
+  const tastingsByDay = tastings.reduce<Record<number, TastingRow[]>>((acc, t) => {
+    const d = new Date(t.scheduled_date + 'T12:00:00').getDate();
+    (acc[d] ??= []).push(t);
+    return acc;
+  }, {});
+
   const confirmed = events.filter(e => e.status === 'confirmed' || e.status === 'completed');
   const totalRevenue = confirmed.reduce((s, e) => s + (e.total_value ?? 0), 0);
   const totalGuests  = confirmed.reduce((s, e) => s + (e.guest_count ?? 0), 0);
@@ -100,7 +122,8 @@ export default function CalendarPage() {
   while (cells.length % 7 !== 0) cells.push(null);
 
   const isToday = (d: number) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-  const selectedEvents = selected ? (byDay[selected] ?? []) : [];
+  const selectedEvents   = selected ? (byDay[selected]       ?? []) : [];
+  const selectedTastings = selected ? (tastingsByDay[selected] ?? []) : [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -162,9 +185,11 @@ export default function CalendarPage() {
               {cells.map((day, idx) => {
                 if (day === null) return <div key={`e${idx}`} className="h-28 bg-muted/20" />;
 
-                const evs = byDay[day] ?? [];
+                const evs  = byDay[day] ?? [];
+                const tsgs = tastingsByDay[day] ?? [];
                 const isTod = isToday(day);
                 const isSel = selected === day;
+                const total = evs.length + tsgs.length;
 
                 return (
                   <div
@@ -174,20 +199,18 @@ export default function CalendarPage() {
                       ${isSel ? 'bg-primary/5 ring-1 ring-inset ring-primary/20' : 'hover:bg-slate-50'}
                     `}
                   >
-                    {/* Day number */}
                     <span className={`self-start w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold shrink-0
                       ${isTod ? 'bg-primary text-white' : 'text-foreground group-hover:bg-muted'}
                     `}>
                       {day}
                     </span>
 
-                    {/* Events */}
                     <div className="flex flex-col gap-0.5 overflow-hidden flex-1 mt-0.5">
-                      {evs.slice(0, 3).map(ev => {
+                      {/* Events */}
+                      {evs.slice(0, 2).map(ev => {
                         const st = STATUS[ev.status ?? ''];
                         return (
-                          <div key={ev.id}
-                               className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${st?.bg ?? 'bg-muted'} min-w-0`}>
+                          <div key={ev.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${st?.bg ?? 'bg-muted'} min-w-0`}>
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${st?.dot ?? 'bg-muted-foreground'}`} />
                             <span className={`text-[10px] font-medium truncate leading-tight ${st?.text ?? 'text-muted-foreground'}`}>
                               {ev.event_name ?? '—'}
@@ -195,10 +218,17 @@ export default function CalendarPage() {
                           </div>
                         );
                       })}
-                      {evs.length > 3 && (
-                        <span className="text-[10px] text-muted-foreground px-1">
-                          +{evs.length - 3} mais
-                        </span>
+                      {/* Tastings */}
+                      {tsgs.slice(0, evs.length >= 2 ? 1 : 2).map(t => (
+                        <div key={t.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-50 min-w-0">
+                          <UtensilsCrossed className="w-2.5 h-2.5 shrink-0 text-violet-500" />
+                          <span className="text-[10px] font-medium truncate leading-tight text-violet-700">
+                            Deg. {t.type ?? ''}
+                          </span>
+                        </div>
+                      ))}
+                      {total > 3 && (
+                        <span className="text-[10px] text-muted-foreground px-1">+{total - 3} mais</span>
                       )}
                     </div>
                   </div>
@@ -221,13 +251,31 @@ export default function CalendarPage() {
 
             {selected ? (
               <div className="divide-y divide-border/50">
-                {selectedEvents.length === 0 ? (
+                {selectedEvents.length === 0 && selectedTastings.length === 0 ? (
                   <p className="px-4 py-6 text-sm text-muted-foreground text-center">
-                    Nenhum evento neste dia.
+                    Nenhum item neste dia.
                   </p>
-                ) : selectedEvents.map(ev => (
-                  <EventCard key={ev.id} ev={ev} onOpen={() => navigate(`/events/${ev.id}`)} />
-                ))}
+                ) : (
+                  <>
+                    {selectedEvents.map(ev => (
+                      <EventCard key={ev.id} ev={ev} onOpen={() => navigate(`/events/${ev.id}`)} />
+                    ))}
+                    {selectedTastings.map(t => (
+                      <div key={t.id}
+                        onClick={() => navigate(`/tastings/${t.id}`)}
+                        className="px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer group/card flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+                          <UtensilsCrossed className="w-3.5 h-3.5 text-violet-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-foreground">Degustação — {t.type ?? 'Sem tipo'}</p>
+                          {t.max_couples && <p className="text-xs text-muted-foreground mt-0.5">Até {t.max_couples} casais</p>}
+                        </div>
+                        <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover/card:opacity-100 shrink-0 transition-opacity" />
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-border/50">
@@ -257,6 +305,10 @@ export default function CalendarPage() {
                   <span className="text-xs text-muted-foreground">{v.label}</span>
                 </div>
               ))}
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-violet-400" />
+                <span className="text-xs text-muted-foreground">Degustação</span>
+              </div>
             </div>
           </div>
 
