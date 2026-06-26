@@ -63,14 +63,15 @@ export default function TastingsPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data: sess } = await supabase
-      .from('tasting_sessions' as any)
-      .select('*')
-      .order('scheduled_date', { ascending: false });
-
-    const { data: evts } = await supabase
-      .from('tasting_session_events' as any)
-      .select('*, events(status)');
+    const [{ data: sess }, { data: evts }] = await Promise.all([
+      supabase
+        .from('tasting_sessions' as any)
+        .select('id, scheduled_date, type, max_couples, created_at')
+        .order('scheduled_date', { ascending: false }),
+      supabase
+        .from('tasting_session_events' as any)
+        .select('id, session_id, event_id, situation_snapshot, guest_count, paid_amount, is_second_tasting, events(status)'),
+    ]);
 
     setSessions((sess ?? []) as Session[]);
     const map: Record<string, SessionEvent[]> = {};
@@ -116,7 +117,7 @@ export default function TastingsPage() {
         className={`px-5 py-2.5 grid ${cols} gap-3 items-center hover:bg-slate-50 cursor-pointer transition-colors`}
       >
         <span className="text-sm font-semibold tabular-nums text-foreground">{fmtDate(s.scheduled_date)}</span>
-        <TipoCell value={s.type} isPast={false} onChange={tipo => updateTipo(s.id, tipo)} />
+        <span className="text-sm text-foreground">{s.type ?? '—'}</span>
         <Cell v={st.total} bold />
         <Cell v={st.novos} />
         <Cell v={st.fechados} />
@@ -142,7 +143,7 @@ export default function TastingsPage() {
         className={`px-5 py-2 grid ${cols} gap-3 items-center hover:bg-slate-50/60 cursor-pointer transition-colors`}
       >
         <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(s.scheduled_date)}</span>
-        <TipoCell value={s.type} isPast onChange={tipo => updateTipo(s.id, tipo)} />
+        <span className="text-sm text-muted-foreground">{s.type ?? '—'}</span>
         <Cell v={st.total} bold muted />
         <Cell v={st.novos} muted />
         <Cell v={st.fechados} muted />
@@ -211,7 +212,7 @@ export default function TastingsPage() {
 
           {/* Histórico */}
           {past.length > 0 && (
-            <div className="bg-white border border-border rounded-2xl overflow-hidden">
+            <div className="bg-white border border-border rounded-2xl overflow-hidden mt-8">
               <div className="px-5 py-2 bg-muted/20 border-b border-border/60 flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">Histórico</span>
                 <span className="ml-auto text-xs text-muted-foreground/40">{past.length} sessão{past.length > 1 ? 'ões' : ''}</span>
