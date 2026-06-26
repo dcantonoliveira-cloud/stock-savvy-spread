@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Info, Pencil } from 'lucide-react';
+import { Plus, Pencil, CalendarDays } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
@@ -35,16 +35,11 @@ const CLOSED   = ['confirmed', 'completed'];
 function sessionStats(evs: SessionEvent[]) {
   const total    = evs.length;
   const novos    = evs.filter(e => e.situation_snapshot === 'new').length;
-  const segundas = evs.filter(e => e.is_second_tasting).length;
-  const guests   = evs.reduce((s, e) => s + (e.guest_count ?? 0), 0);
-  const emAberto = evs.filter(
-    e => e.situation_snapshot === 'new' && e.events && PIPELINE.includes(e.events.status)
-  ).length;
-  const fechados = evs.filter(
-    e => e.situation_snapshot === 'new' && e.events && CLOSED.includes(e.events.status)
-  ).length;
-  const conv = novos > 0 ? Math.round((fechados / novos) * 100) : null;
-  return { total, novos, segundas, guests, emAberto, conv };
+  const emAberto = evs.filter(e => e.situation_snapshot === 'new' && e.events && PIPELINE.includes(e.events.status)).length;
+  const fechados = evs.filter(e => e.situation_snapshot === 'new' && e.events && CLOSED.includes(e.events.status)).length;
+  const conv     = novos > 0 ? Math.round((fechados / novos) * 100) : null;
+  const totalPago = evs.reduce((s, e) => s + (e.paid_amount ?? 0), 0);
+  return { total, novos, emAberto, conv, totalPago };
 }
 
 const fmtDate = (d: string | null) => {
@@ -53,12 +48,15 @@ const fmtDate = (d: string | null) => {
   return `${day}/${m}/${String(y).slice(2)}`;
 };
 
+const fmtMoney = (v: number) =>
+  v === 0 ? null : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
 export default function TastingsPage() {
   const navigate = useNavigate();
   const [sessions, setSessions]       = useState<Session[]>([]);
   const [sessionEvts, setSessionEvts] = useState<Record<string, SessionEvent[]>>({});
   const [loading, setLoading]         = useState(true);
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [visibleCount, setVisibleCount] = useState(15);
   const [newOpen, setNewOpen]         = useState(false);
 
   const load = async () => {
@@ -86,7 +84,10 @@ export default function TastingsPage() {
 
   const now = new Date().toISOString().split('T')[0];
   const allSorted = [...sessions].sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date));
-  const visible = allSorted.slice(0, visibleCount);
+  const upcoming  = allSorted.filter(s => s.scheduled_date >= now);
+  const past      = allSorted.filter(s => s.scheduled_date < now);
+  const allOrdered = [...upcoming, ...past];
+  const visible = allOrdered.slice(0, visibleCount);
 
   const updateTipo = async (id: string, tipo: string) => {
     setSessions(prev => prev.map(s => s.id === id ? { ...s, type: tipo } : s));
@@ -95,20 +96,12 @@ export default function TastingsPage() {
 
   return (
     <div>
-      {/* Descrição */}
-      <div className="mb-5 p-4 bg-white border border-border rounded-2xl flex gap-3">
-        <Info className="w-4 h-4 text-primary/60 shrink-0 mt-0.5" />
-        <div className="text-sm text-muted-foreground leading-relaxed">
-          <p>
-            <span className="font-semibold text-foreground">Degustações</span> são sessões onde casais conhecem o buffet.
-            A coluna <span className="font-medium text-foreground">Em aberto</span> indica novos clientes que ainda não fecharam contrato.
-            <span className="font-medium text-foreground"> Conversão</span> mostra o percentual de novos que confirmaram.
-          </p>
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <CalendarDays className="w-4 h-4" />
+          <span>{allSorted.length} sessões · {upcoming.length} futuras</span>
         </div>
-      </div>
-
-      {/* Ações */}
-      <div className="flex items-center justify-end mb-4">
         <button
           onClick={() => setNewOpen(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -127,43 +120,65 @@ export default function TastingsPage() {
               <Th>Tipo</Th>
               <Th center>Eventos</Th>
               <Th center>Novos</Th>
-              <Th center>2ª Deg.</Th>
-              <Th center>Convidados</Th>
               <Th center>Em aberto</Th>
               <Th center>Conversão</Th>
+              <Th right>Total pago</Th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">Carregando...</td></tr>
-            ) : sessions.length === 0 ? (
-              <tr><td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">Nenhuma degustação cadastrada.</td></tr>
+              <tr><td colSpan={7} className="py-16 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+            ) : allSorted.length === 0 ? (
+              <tr><td colSpan={7} className="py-16 text-center text-muted-foreground text-sm">Nenhuma degustação cadastrada.</td></tr>
             ) : visible.map((s, i) => {
-              const evs  = sessionEvts[s.id] ?? [];
-              const st   = sessionStats(evs);
-              const past = s.scheduled_date < now;
-              const dim  = past ? 'text-muted-foreground/50' : '';
+              const evs   = sessionEvts[s.id] ?? [];
+              const st    = sessionStats(evs);
+              const isPast = s.scheduled_date < now;
+              const isLast = i === visible.length - 1;
+              const money  = fmtMoney(st.totalPago);
+
               return (
                 <tr
                   key={s.id}
                   onClick={() => navigate(`/tastings/${s.id}`)}
-                  className={`border-b border-border/50 hover:bg-slate-50 cursor-pointer transition-colors ${i === visible.length - 1 ? 'border-0' : ''}`}
+                  className={`${isLast ? '' : 'border-b border-border/50'} hover:bg-slate-50 cursor-pointer transition-colors ${isPast ? 'opacity-60' : ''}`}
                 >
-                  <Td className={`font-medium ${past ? 'text-muted-foreground/60' : 'text-foreground'}`}>{fmtDate(s.scheduled_date)}</Td>
+                  <Td>
+                    <span className={`font-medium ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>
+                      {fmtDate(s.scheduled_date)}
+                    </span>
+                  </Td>
                   <Td>
                     <TipoCell
                       value={s.type}
-                      dim={dim}
+                      isPast={isPast}
                       onChange={tipo => updateTipo(s.id, tipo)}
                     />
                   </Td>
-                  <Td center className={`font-semibold ${dim}`}>{st.total > 0 ? st.total : <span className="text-muted-foreground/30">0</span>}</Td>
-                  <Td center className={dim}>{st.novos > 0 ? st.novos : <span className="text-muted-foreground/30">0</span>}</Td>
-                  <Td center className={dim}>{st.segundas > 0 ? st.segundas : <span className="text-muted-foreground/30">0</span>}</Td>
-                  <Td center className={dim}>{st.guests > 0 ? st.guests : <span className="text-muted-foreground/30">—</span>}</Td>
-                  <Td center className={st.emAberto > 0 ? 'text-red-500 font-semibold' : dim}>{st.emAberto}</Td>
-                  <Td center className={dim}>
-                    {past && st.conv !== null ? `${st.conv}%` : <span className="text-muted-foreground/30">—</span>}
+                  <Td center>
+                    {st.total > 0
+                      ? <span className="font-semibold text-foreground">{st.total}</span>
+                      : <span className="text-muted-foreground/30">—</span>}
+                  </Td>
+                  <Td center>
+                    {st.novos > 0
+                      ? <span>{st.novos}</span>
+                      : <span className="text-muted-foreground/30">—</span>}
+                  </Td>
+                  <Td center>
+                    {st.emAberto > 0
+                      ? <span className="font-semibold text-red-500">{st.emAberto}</span>
+                      : <span className="text-muted-foreground/30">—</span>}
+                  </Td>
+                  <Td center>
+                    {isPast && st.conv !== null
+                      ? <span className={st.conv > 0 ? 'text-emerald-600 font-medium' : 'text-muted-foreground'}>{st.conv}%</span>
+                      : <span className="text-muted-foreground/30">—</span>}
+                  </Td>
+                  <Td right>
+                    {money
+                      ? <span className="text-foreground tabular-nums">{money}</span>
+                      : <span className="text-muted-foreground/30">—</span>}
                   </Td>
                 </tr>
               );
@@ -172,25 +187,22 @@ export default function TastingsPage() {
         </table>
       </div>
 
-      {allSorted.length > 10 && (
+      {/* Paginação */}
+      {allOrdered.length > 15 && (
         <div className="flex items-center gap-3 mt-3 justify-center">
-          {visibleCount < allSorted.length && (
-            <button onClick={() => setVisibleCount(v => v + 10)}
+          {visibleCount < allOrdered.length && (
+            <button onClick={() => setVisibleCount(v => v + 15)}
               className="px-4 py-1.5 rounded-xl border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
               Mostrar mais
             </button>
           )}
-          {visibleCount > 10 && (
-            <button onClick={() => setVisibleCount(10)}
+          {visibleCount > 15 && (
+            <button onClick={() => setVisibleCount(15)}
               className="px-4 py-1.5 rounded-xl border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
               Mostrar menos
             </button>
           )}
         </div>
-      )}
-
-      {!loading && (
-        <p className="text-xs text-muted-foreground mt-3">{allSorted.length} degustação{allSorted.length !== 1 ? 'ões' : ''}</p>
       )}
 
       {newOpen && (
@@ -203,7 +215,7 @@ export default function TastingsPage() {
   );
 }
 
-function TipoCell({ value, dim, onChange }: { value: string | null; dim: string; onChange: (t: string) => void }) {
+function TipoCell({ value, isPast, onChange }: { value: string | null; isPast: boolean; onChange: (t: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -217,7 +229,7 @@ function TipoCell({ value, dim, onChange }: { value: string | null; dim: string;
 
   return (
     <>
-      <div ref={ref} className={`flex items-center gap-1 group cursor-pointer ${dim}`} onClick={handleClick}>
+      <div ref={ref} className={`flex items-center gap-1 group cursor-pointer ${isPast ? 'text-muted-foreground' : 'text-foreground'}`} onClick={handleClick}>
         <span>{value ?? '—'}</span>
         <Pencil className="w-3 h-3 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
       </div>
@@ -296,14 +308,14 @@ function NewSessionModal({ onClose, onCreated }: { onClose: () => void; onCreate
   );
 }
 
-function Th({ children, center }: { children?: React.ReactNode; center?: boolean }) {
+function Th({ children, center, right }: { children?: React.ReactNode; center?: boolean; right?: boolean }) {
   return (
-    <th className={`px-4 py-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap ${center ? 'text-center' : 'text-left'}`}>
+    <th className={`px-4 py-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap ${center ? 'text-center' : right ? 'text-right' : 'text-left'}`}>
       {children}
     </th>
   );
 }
 
-function Td({ children, className = '', center }: { children?: React.ReactNode; className?: string; center?: boolean }) {
-  return <td className={`px-4 py-3 text-sm ${center ? 'text-center' : ''} ${className}`}>{children}</td>;
+function Td({ children, className = '', center, right }: { children?: React.ReactNode; className?: string; center?: boolean; right?: boolean }) {
+  return <td className={`px-4 py-3 text-sm ${center ? 'text-center' : right ? 'text-right' : ''} ${className}`}>{children}</td>;
 }
