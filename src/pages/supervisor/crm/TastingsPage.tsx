@@ -41,7 +41,7 @@ function sessionStats(evs: SessionEvent[]) {
   const fechados  = evs.filter(e => e.situation_snapshot === 'new' && e.events && CLOSED.includes(e.events.status)).length;
   const conv      = novos > 0 ? Math.round((fechados / novos) * 100) : null;
   const totalPago = evs.reduce((s, e) => s + (e.paid_amount ?? 0), 0);
-  return { total, novos, segundas, guests, emAberto, conv, totalPago };
+  return { total, novos, segundas, guests, emAberto, fechados, conv, totalPago };
 }
 
 const fmtDate = (d: string | null) => {
@@ -117,8 +117,8 @@ export default function TastingsPage() {
       <div className="bg-white border border-border rounded-2xl divide-y divide-border/50">
         {/* Header */}
         <div className="px-5 py-2.5 grid grid-cols-[140px_90px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 bg-muted/30 rounded-t-2xl">
-          {['Data','Tipo','Eventos','Novos','2ª Deg.','Convidados','Em aberto','Conversão','Total pago'].map(h => (
-            <span key={h} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center first:text-left [&:nth-child(2)]:text-left">{h}</span>
+          {['Data','Tipo','Eventos','Novos','Contratos fechados','Em aberto','Convidados','Conversão','Total pago'].map((h, i) => (
+            <span key={h} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center ${i === 0 ? 'text-left' : ''} ${i === 1 ? 'text-left' : ''} ${i === 7 ? 'border-l border-border pl-3' : ''}`}>{h}</span>
           ))}
         </div>
 
@@ -146,11 +146,11 @@ export default function TastingsPage() {
 
               <Cell v={st.total} bold />
               <Cell v={st.novos} />
-              <Cell v={st.segundas} />
-              <Cell v={st.guests > 0 ? st.guests : null} />
+              <Cell v={st.fechados} />
               <Cell v={st.emAberto > 0 ? st.emAberto : null} danger={st.emAberto > 0} />
+              <Cell v={st.guests > 0 ? st.guests : null} />
 
-              <div className="text-center">
+              <div className="text-center border-l border-border/50 pl-3">
                 {isPast && st.conv !== null
                   ? <span className={`text-sm font-medium ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-500' : 'text-muted-foreground/60'}`}>{st.conv}%</span>
                   : <span className="text-muted-foreground/25 text-sm">—</span>}
