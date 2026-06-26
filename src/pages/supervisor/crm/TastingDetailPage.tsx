@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, ExternalLink, Search, Loader2, Check } from 'lucide-react';
+import { X, Plus, Trash2, ExternalLink, Search, Loader2, AlertTriangle } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import RichTextEditor from '@/components/RichTextEditor';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Session {
@@ -48,8 +49,8 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
 };
 
 const SITUATION_CFG: Record<string, { label: string; cls: string }> = {
-  new:       { label: 'Cliente novo',    cls: 'text-muted-foreground' },
-  confirmed: { label: 'Evento fechado',  cls: 'text-emerald-600 font-semibold' },
+  new:       { label: 'Cliente novo',   cls: 'text-muted-foreground' },
+  confirmed: { label: 'Evento fechado', cls: 'text-emerald-600 font-semibold' },
 };
 
 const fmtDate = (d: string | null) => {
@@ -57,6 +58,24 @@ const fmtDate = (d: string | null) => {
   const [y, m, day] = d.split('T')[0].split('-');
   return `${day}/${m}/${String(y).slice(2)}`;
 };
+
+// Converts Bubble BB-code format to HTML for the rich text editor
+function parseBubbleContent(text: string): string {
+  if (!text || !text.includes('[')) return text;
+  return text
+    .replace(/\[ml\]/gi, '').replace(/\[\/ml\]/gi, '')
+    .replace(/\[h2\]\[b\]/gi, '<h2><strong>').replace(/\[\/b\]\[\/h2\]/gi, '</strong></h2>')
+    .replace(/\[h1\]\[b\]/gi, '<h1><strong>').replace(/\[\/b\]\[\/h1\]/gi, '</strong></h1>')
+    .replace(/\[h2\]/gi, '<h2>').replace(/\[\/h2\]/gi, '</h2>')
+    .replace(/\[h1\]/gi, '<h1>').replace(/\[\/h1\]/gi, '</h1>')
+    .replace(/\[b\]/gi, '<strong>').replace(/\[\/b\]/gi, '</strong>')
+    .replace(/\[i\]/gi, '<em>').replace(/\[\/i\]/gi, '</em>')
+    .replace(/\[ul\]/gi, '<ul>').replace(/\[\/ul\]/gi, '</ul>')
+    .replace(/\[ol\]/gi, '<ol>').replace(/\[\/ol\]/gi, '</ol>')
+    .replace(/\[li[^\]]*\]/gi, '<li>').replace(/\[\/li\]/gi, '</li>')
+    .replace(/\[highlight=([^\]]+)\]/gi, '<mark style="background:$1">').replace(/\[\/highlight\]/gi, '</mark>')
+    .replace(/\n/g, '<br>');
+}
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function TastingDetailPage() {
@@ -73,10 +92,13 @@ export default function TastingDetailPage() {
   const [location, setLocation]       = useState('');
   const [responsible, setResponsible] = useState('');
   const [costPerCouple, setCostPerCouple] = useState<number | null>(null);
-  const [saving, setSaving]           = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // ref to always have latest field values when auto-save fires
-  const fields = useRef({ menu_text: '', notes: '', max_couples: null as number | null, location: '', responsible: '', cost_per_couple: null as number | null });
+  const fields = useRef({
+    menu_text: '', notes: '',
+    max_couples: null as number | null,
+    location: '', responsible: '',
+    cost_per_couple: null as number | null,
+  });
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -90,19 +112,29 @@ export default function TastingDetailPage() {
 
     if (!sess) { navigate('/tastings'); return; }
     const s = sess as Session;
+
+    // Parse Bubble BB-code on first load and save HTML back
+    const rawMenu  = s.menu_text ?? '';
+    const rawNotes = s.notes ?? '';
+    const parsedMenu  = parseBubbleContent(rawMenu);
+    const parsedNotes = parseBubbleContent(rawNotes);
+    const needsSave = parsedMenu !== rawMenu || parsedNotes !== rawNotes;
+    if (needsSave) {
+      await supabase.from('tasting_sessions' as any)
+        .update({ menu_text: parsedMenu, notes: parsedNotes }).eq('id', id);
+    }
+
     setSession(s);
-    setMenuText(s.menu_text ?? '');
-    setNotes(s.notes ?? '');
+    setMenuText(parsedMenu);
+    setNotes(parsedNotes);
     setMaxCouples(s.max_couples ?? null);
     setLocation(s.location ?? '');
     setResponsible(s.responsible ?? '');
     setCostPerCouple(s.cost_per_couple ?? null);
     fields.current = {
-      menu_text: s.menu_text ?? '',
-      notes: s.notes ?? '',
+      menu_text: parsedMenu, notes: parsedNotes,
       max_couples: s.max_couples ?? null,
-      location: s.location ?? '',
-      responsible: s.responsible ?? '',
+      location: s.location ?? '', responsible: s.responsible ?? '',
       cost_per_couple: s.cost_per_couple ?? null,
     };
     setRows((evts ?? []) as SessionEvent[]);
@@ -113,7 +145,10 @@ export default function TastingDetailPage() {
 
   const updateRow = async (rowId: string, patch: Partial<SessionEvent>) => {
     setRows(prev => prev.map(r => r.id === rowId ? { ...r, ...patch } : r));
-    await supabase.from('tasting_session_events' as any).update(patch).eq('id', rowId);
+    const { events: _, ...dbPatch } = patch as any;
+    if (Object.keys(dbPatch).length > 0) {
+      await supabase.from('tasting_session_events' as any).update(dbPatch).eq('id', rowId);
+    }
   };
 
   const removeRow = async (rowId: string) => {
@@ -123,9 +158,7 @@ export default function TastingDetailPage() {
 
   const saveSession = useCallback(async (patch: Partial<Session>) => {
     if (!id) return;
-    setSaving(true);
     await supabase.from('tasting_sessions' as any).update(patch).eq('id', id);
-    setSaving(false);
     toast.success('Salvo', { duration: 1500 });
   }, [id]);
 
@@ -183,10 +216,10 @@ export default function TastingDetailPage() {
 
         {/* Stats bar */}
         <div className="px-8 py-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
-          <StatCard label="Eventos"    value={total} />
+          <StatCard label="Eventos"       value={total} />
           <StatDivider />
           <StatCard label="Clientes novos" value={novos} />
-          <StatCard label="Em aberto"  value={emAberto} danger={emAberto > 0} />
+          <StatCard label="Em aberto"      value={emAberto} danger={emAberto > 0} />
           {conv !== null && <StatCard label="Conversão" value={`${conv}%`} accent />}
           <StatDivider />
           <StatCard label="2ª deg."    value={segundas} muted />
@@ -195,7 +228,7 @@ export default function TastingDetailPage() {
 
         {/* Tabs */}
         <div className="px-8 flex gap-0">
-          {(['guests','menu','info'] as const).map(t => (
+          {(['guests', 'menu', 'info'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
               {t === 'guests' ? 'Lista de convidados' : t === 'menu' ? 'Cardápio' : 'Informações'}
@@ -206,83 +239,101 @@ export default function TastingDetailPage() {
 
       {/* CONTENT */}
       <div className="px-8 py-6">
-        {tab === 'guests' && (
-          <div className="bg-white border border-border rounded-2xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <Th>Evento</Th>
-                  <Th>Assessor(a)</Th>
-                  <Th>Data do evento</Th>
-                  <Th>Situação</Th>
-                  <Th>Status atual</Th>
-                  <Th center>Qtd pessoas</Th>
-                  <Th>Valor pago</Th>
-                  <Th></Th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr><td colSpan={8} className="py-12 text-center text-muted-foreground text-sm">
-                    Nenhum evento alocado. Clique em "Alocar clientes" para adicionar.
-                  </td></tr>
-                ) : rows.map((row, i) => (
-                  <GuestRow
-                    key={row.id}
-                    row={row}
-                    isLast={i === rows.length - 1}
-                    sessionDate={session.scheduled_date}
-                    onUpdate={patch => updateRow(row.id, patch)}
-                    onRemove={() => removeRow(row.id)}
-                    onNavigate={() => navigate(`/events/${row.event_id}`)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        {tab === 'menu' && (
-          <div className="bg-white border border-border rounded-2xl p-6 space-y-4 max-w-2xl">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Cardápio</label>
-              <textarea value={menuText} onChange={e => { setMenuText(e.target.value); fields.current.menu_text = e.target.value; scheduleAutoSave(); }} rows={16}
-                className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                placeholder="Descreva o cardápio..." />
+        {/* ── Guests tab ── */}
+        {tab === 'guests' && (
+          <div className="space-y-4">
+            <div className="bg-white border border-border rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <Th>Evento</Th>
+                    <Th>Assessor(a)</Th>
+                    <Th>Data do evento</Th>
+                    <Th>Situação</Th>
+                    <Th>Status atual</Th>
+                    <Th center>Qtd pessoas</Th>
+                    <Th>Valor pago</Th>
+                    <Th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr><td colSpan={8} className="py-12 text-center text-muted-foreground text-sm">
+                      Nenhum evento alocado. Clique em "Alocar clientes" para adicionar.
+                    </td></tr>
+                  ) : rows.map((row, i) => (
+                    <GuestRow
+                      key={row.id}
+                      row={row}
+                      isLast={i === rows.length - 1}
+                      sessionDate={session.scheduled_date}
+                      onUpdate={patch => updateRow(row.id, patch)}
+                      onRemove={() => removeRow(row.id)}
+                      onNavigate={() => navigate(`/events/${row.event_id}`)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Observações below table */}
+            <div className="bg-white border border-border rounded-2xl p-6">
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">
+                Observações importantes
+              </label>
+              <RichTextEditor
+                content={notes}
+                onChange={html => { setNotes(html); fields.current.notes = html; scheduleAutoSave(); }}
+                placeholder="Alergias, restrições, observações por casal..."
+              />
             </div>
           </div>
         )}
 
+        {/* ── Menu tab ── */}
+        {tab === 'menu' && (
+          <div className="bg-white border border-border rounded-2xl p-6">
+            <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Cardápio</label>
+            <RichTextEditor
+              content={menuText}
+              onChange={html => { setMenuText(html); fields.current.menu_text = html; scheduleAutoSave(); }}
+              placeholder="Descreva o cardápio..."
+            />
+          </div>
+        )}
+
+        {/* ── Info tab ── */}
         {tab === 'info' && (
-          <div className="max-w-2xl space-y-4">
+          <div className="space-y-4 max-w-3xl">
             <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">Sessão</p>
               <div className="grid grid-cols-2 gap-4">
                 <InfoField label="Local / salão">
-                  <input value={location} onChange={e => { setLocation(e.target.value); fields.current.location = e.target.value; scheduleAutoSave(); }}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="Ex: Salão Jardim" />
+                  <input value={location}
+                    onChange={e => { setLocation(e.target.value); fields.current.location = e.target.value; scheduleAutoSave(); }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Ex: Salão Jardim" />
                 </InfoField>
                 <InfoField label="Assessora responsável">
-                  <input value={responsible} onChange={e => { setResponsible(e.target.value); fields.current.responsible = e.target.value; scheduleAutoSave(); }}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="Nome da assessora" />
+                  <input value={responsible}
+                    onChange={e => { setResponsible(e.target.value); fields.current.responsible = e.target.value; scheduleAutoSave(); }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="Nome da assessora" />
                 </InfoField>
                 <InfoField label="Máx. de casais">
                   <input type="number" min={1} value={maxCouples ?? ''}
                     onChange={e => { const v = e.target.value ? parseInt(e.target.value) : null; setMaxCouples(v); fields.current.max_couples = v; scheduleAutoSave(); }}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="—" />
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="—" />
                 </InfoField>
                 <InfoField label="Custo por casal (R$)">
                   <input type="number" min={0} step={0.01} value={costPerCouple ?? ''}
                     onChange={e => { const v = e.target.value ? parseFloat(e.target.value) : null; setCostPerCouple(v); fields.current.cost_per_couple = v; scheduleAutoSave(); }}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="0,00" />
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="0,00" />
                 </InfoField>
               </div>
-            </div>
-            <div className="bg-white border border-border rounded-2xl p-6">
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Observações importantes</label>
-              <textarea value={notes} onChange={e => { setNotes(e.target.value); fields.current.notes = e.target.value; scheduleAutoSave(); }} rows={10}
-                className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                placeholder="Alergias, restrições, observações por casal..." />
             </div>
           </div>
         )}
@@ -292,6 +343,8 @@ export default function TastingDetailPage() {
         <AllocModal
           sessionId={session.id}
           existingEventIds={rows.map(r => r.event_id ?? '')}
+          maxCouples={maxCouples}
+          currentCount={total}
           onClose={() => setAllocOpen(false)}
           onAdded={() => { setAllocOpen(false); load(); }}
         />
@@ -309,11 +362,10 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
   onRemove: () => void;
   onNavigate: () => void;
 }) {
-  const [paid, setPaid]           = useState(row.paid_amount != null ? String(row.paid_amount) : '');
+  const [paid, setPaid]             = useState(row.paid_amount != null ? String(row.paid_amount) : '');
   const [guestCount, setGuestCount] = useState<string>(row.guest_count != null ? String(row.guest_count) : '');
   const guestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ev  = row.events;
-  const st  = ev ? STATUS_CFG[ev.status] : null;
   const sit = SITUATION_CFG[row.situation_snapshot ?? ''];
 
   const handlePaidBlur = async () => {
@@ -322,12 +374,9 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
     onUpdate({ paid_amount: v });
     if (ev?.id && v > 0) {
       await supabase.from('event_payments' as any).upsert({
-        event_id: ev.id,
-        value: v,
-        notes: 'Pagamento de degustação',
-        source: 'degustacao',
-        payment_date: sessionDate,
-        is_confirmed: true,
+        event_id: ev.id, value: v,
+        notes: 'Pagamento de degustação', source: 'degustacao',
+        payment_date: sessionDate, is_confirmed: true,
       });
       toast.success('Valor registrado no evento');
     }
@@ -353,15 +402,12 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
           value={ev?.status ?? ''}
           onChange={async (next) => {
             onUpdate({ events: ev ? { ...ev, status: next } : ev });
-            if (ev?.id) {
-              await supabase.from('events').update({ status: next }).eq('id', ev.id);
-            }
+            if (ev?.id) await supabase.from('events').update({ status: next }).eq('id', ev.id);
           }}
         />
       </Td>
       <Td center>
-        <input type="number" min={0}
-          value={guestCount}
+        <input type="number" min={0} value={guestCount}
           onChange={e => {
             setGuestCount(e.target.value);
             if (guestTimer.current) clearTimeout(guestTimer.current);
@@ -374,8 +420,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       <Td>
         <div className="flex items-center gap-1">
           <span className="text-muted-foreground text-xs">R$</span>
-          <input type="text"
-            value={paid}
+          <input type="text" value={paid}
             onChange={e => setPaid(e.target.value)}
             onBlur={handlePaidBlur}
             className="w-24 text-sm border border-border rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -392,15 +437,18 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
 }
 
 // ── AllocModal ─────────────────────────────────────────────────────────────────
-function AllocModal({ sessionId, existingEventIds, onClose, onAdded }: {
+function AllocModal({ sessionId, existingEventIds, maxCouples, currentCount, onClose, onAdded }: {
   sessionId: string;
   existingEventIds: string[];
+  maxCouples: number | null;
+  currentCount: number;
   onClose: () => void;
   onAdded: () => void;
 }) {
   const [search, setSearch]   = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmEv, setConfirmEv] = useState<any | null>(null);
 
   useEffect(() => {
     if (!search.trim()) { setResults([]); return; }
@@ -425,41 +473,89 @@ function AllocModal({ sessionId, existingEventIds, onClose, onAdded }: {
     onAdded();
   };
 
+  const handleClick = (ev: any) => {
+    if (maxCouples !== null && currentCount >= maxCouples) {
+      setConfirmEv(ev);
+    } else {
+      alloc(ev);
+    }
+  };
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <h3 className="font-semibold text-foreground">Alocar evento</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="p-4">
-          <div className="flex items-center gap-2 px-3 py-2 border border-border rounded-xl bg-muted/30 mb-3">
-            <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <input autoFocus className="bg-transparent outline-none flex-1 text-sm"
-              placeholder="Buscar evento..." value={search} onChange={e => setSearch(e.target.value)} />
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <h3 className="font-semibold text-foreground">Alocar evento</h3>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <div className="space-y-1 max-h-72 overflow-y-auto">
-            {loading && <p className="text-sm text-muted-foreground text-center py-4">Buscando...</p>}
-            {!loading && search && results.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento encontrado.</p>
+          <div className="p-4">
+            <div className="flex items-center gap-2 px-3 py-2 border border-border rounded-xl bg-muted/30 mb-3">
+              <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <input autoFocus className="bg-transparent outline-none flex-1 text-sm"
+                placeholder="Buscar evento..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            {maxCouples !== null && currentCount >= maxCouples && (
+              <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                Limite de {maxCouples} casais atingido. Você ainda pode adicionar mais.
+              </div>
             )}
-            {results.map(ev => (
-              <button key={ev.id} onClick={() => alloc(ev)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{ev.event_name}</p>
-                  <p className="text-xs text-muted-foreground">{fmtDate(ev.event_date)}</p>
-                </div>
-                <span className={`text-xs font-medium ${STATUS_CFG[ev.status]?.cls ?? ''}`}>
-                  {STATUS_CFG[ev.status]?.label ?? ev.status}
-                </span>
-              </button>
-            ))}
+            <div className="space-y-1 max-h-72 overflow-y-auto">
+              {loading && <p className="text-sm text-muted-foreground text-center py-4">Buscando...</p>}
+              {!loading && search && results.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento encontrado.</p>
+              )}
+              {results.map(ev => (
+                <button key={ev.id} onClick={() => handleClick(ev)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{ev.event_name}</p>
+                    <p className="text-xs text-muted-foreground">{fmtDate(ev.event_date)}</p>
+                  </div>
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_CFG[ev.status]?.cls ?? 'bg-muted border-border text-muted-foreground'}`}>
+                    {STATUS_CFG[ev.status]?.label ?? ev.status}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>,
+
+      {/* Over-limit confirmation */}
+      {confirmEv && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmEv(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-50 shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">Limite atingido</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Esta sessão já tem {maxCouples} casais definidos como limite. Deseja adicionar <strong>{confirmEv.event_name}</strong> mesmo assim?
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmEv(null)}
+                className="px-4 py-2 rounded-xl border border-border text-sm hover:bg-muted transition-colors">
+                Cancelar
+              </button>
+              <button onClick={() => { alloc(confirmEv); setConfirmEv(null); }}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+                Adicionar mesmo assim
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>,
     document.body
   );
 }
@@ -482,18 +578,15 @@ const STATUS_OPTIONS = Object.entries(STATUS_CFG).map(([value, { label }]) => ({
 function StatusSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const cfg = STATUS_CFG[value];
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className={`appearance-none text-[11px] font-medium px-2.5 py-0.5 pr-6 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 ${cfg?.cls ?? 'bg-muted text-muted-foreground border-border'}`}
-      >
-        {STATUS_OPTIONS.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-      <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] opacity-50">▾</span>
-    </div>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 ${cfg?.cls ?? 'bg-muted text-muted-foreground border-border'}`}
+    >
+      {STATUS_OPTIONS.map(o => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
   );
 }
 
@@ -522,4 +615,3 @@ function InfoField({ label, children }: { label: string; children: React.ReactNo
     </div>
   );
 }
-
