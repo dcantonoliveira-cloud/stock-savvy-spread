@@ -151,28 +151,28 @@ export default function TastingsPage() {
               {/* Eventos */}
               <div className="text-center">
                 {st.total > 0
-                  ? <span className="text-[22px] font-bold text-foreground leading-none">{st.total}</span>
+                  ? <span className="text-base font-semibold text-foreground leading-none">{st.total}</span>
                   : <span className="text-muted-foreground/25">—</span>}
               </div>
 
               {/* Novos */}
               <div className="text-center">
                 {st.novos > 0
-                  ? <span className="text-[22px] font-bold text-foreground leading-none">{st.novos}</span>
+                  ? <span className="text-base font-semibold text-foreground leading-none">{st.novos}</span>
                   : <span className="text-muted-foreground/25">—</span>}
               </div>
 
               {/* Em aberto */}
               <div className="text-center">
                 {st.emAberto > 0
-                  ? <span className="text-[22px] font-bold text-red-500 leading-none">{st.emAberto}</span>
+                  ? <span className="text-base font-semibold text-red-500 leading-none">{st.emAberto}</span>
                   : <span className="text-muted-foreground/25">—</span>}
               </div>
 
               {/* Conversão */}
               <div className="text-center">
                 {isPast && st.conv !== null
-                  ? <span className={`text-[22px] font-bold leading-none ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-500' : 'text-muted-foreground/50'}`}>
+                  ? <span className={`text-base font-semibold leading-none ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-500' : 'text-muted-foreground/50'}`}>
                       {st.conv}%
                     </span>
                   : <span className="text-muted-foreground/25">—</span>}
