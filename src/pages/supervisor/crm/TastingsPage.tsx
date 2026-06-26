@@ -18,30 +18,14 @@ interface Session {
   created_at: string;
 }
 
-interface SessionEvent {
-  id: string;
+interface SessionStats {
   session_id: string;
-  event_id: string | null;
-  situation_snapshot: string | null;
-  guest_count: number | null;
-  paid_amount: number | null;
-  is_second_tasting: boolean | null;
-  events: { status: string } | null;
-}
-
-const PIPELINE = ['lead', 'negotiating', 'tasting_scheduled'];
-const CLOSED   = ['confirmed', 'completed'];
-
-function sessionStats(evs: SessionEvent[]) {
-  const total     = evs.length;
-  const novos     = evs.filter(e => e.situation_snapshot === 'new').length;
-  const segundas  = evs.filter(e => e.is_second_tasting).length;
-  const guests    = evs.reduce((s, e) => s + (e.guest_count ?? 0), 0);
-  const emAberto  = evs.filter(e => e.situation_snapshot === 'new' && e.events && PIPELINE.includes(e.events.status)).length;
-  const fechados  = evs.filter(e => e.situation_snapshot === 'new' && e.events && CLOSED.includes(e.events.status)).length;
-  const conv      = novos > 0 ? Math.round((fechados / novos) * 100) : null;
-  const totalPago = evs.reduce((s, e) => s + (e.paid_amount ?? 0), 0);
-  return { total, novos, segundas, guests, emAberto, fechados, conv, totalPago };
+  total: number;
+  novos: number;
+  em_aberto: number;
+  fechados: number;
+  guests: number;
+  total_pago: number;
 }
 
 const fmtDate = (d: string | null) => {
@@ -55,31 +39,28 @@ const fmtMoney = (v: number) =>
 
 export default function TastingsPage() {
   const navigate = useNavigate();
-  const [sessions, setSessions]       = useState<Session[]>([]);
-  const [sessionEvts, setSessionEvts] = useState<Record<string, SessionEvent[]>>({});
-  const [loading, setLoading]         = useState(true);
+  const [sessions, setSessions]   = useState<Session[]>([]);
+  const [statsMap, setStatsMap]   = useState<Record<string, SessionStats>>({});
+  const [loading, setLoading]     = useState(true);
   const [visibleCount, setVisibleCount] = useState(15);
-  const [newOpen, setNewOpen]         = useState(false);
+  const [newOpen, setNewOpen]     = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const [{ data: sess }, { data: evts }] = await Promise.all([
+    const [{ data: sess }, { data: stats }] = await Promise.all([
       supabase
         .from('tasting_sessions' as any)
         .select('id, scheduled_date, type, max_couples, created_at')
         .order('scheduled_date', { ascending: false }),
       supabase
-        .from('tasting_session_events' as any)
-        .select('id, session_id, event_id, situation_snapshot, guest_count, paid_amount, is_second_tasting, events(status)'),
+        .from('tasting_session_stats' as any)
+        .select('*'),
     ]);
 
     setSessions((sess ?? []) as Session[]);
-    const map: Record<string, SessionEvent[]> = {};
-    for (const e of (evts ?? []) as SessionEvent[]) {
-      if (!map[e.session_id]) map[e.session_id] = [];
-      map[e.session_id].push(e);
-    }
-    setSessionEvts(map);
+    const map: Record<string, SessionStats> = {};
+    for (const r of (stats ?? []) as SessionStats[]) map[r.session_id] = r;
+    setStatsMap(map);
     setLoading(false);
   };
 
@@ -107,55 +88,39 @@ export default function TastingsPage() {
     </div>
   );
 
-  const SessionRow = ({ s }: { s: Session }) => {
-    const evs   = sessionEvts[s.id] ?? [];
-    const st    = sessionStats(evs);
-    const money = fmtMoney(st.totalPago);
-    return (
-      <div
-        onClick={() => navigate(`/tastings/${s.id}`)}
-        className={`px-5 py-2.5 grid ${cols} gap-3 items-center hover:bg-slate-50 cursor-pointer transition-colors`}
-      >
-        <span className="text-sm font-semibold tabular-nums text-foreground">{fmtDate(s.scheduled_date)}</span>
-        <span className="text-sm text-foreground">{s.type ?? '—'}</span>
-        <Cell v={st.total} bold />
-        <Cell v={st.novos} />
-        <Cell v={st.fechados} />
-        <Cell v={st.emAberto > 0 ? st.emAberto : null} danger={st.emAberto > 0} />
-        <Cell v={st.guests > 0 ? st.guests : null} />
-        <div className="text-center border-l border-border/50 pl-3">
-          <span className="text-muted-foreground/25 text-sm">—</span>
-        </div>
-        <div className="text-center">
-          {money ? <span className="text-sm tabular-nums text-foreground">{money}</span> : <span className="text-muted-foreground/25 text-sm">—</span>}
-        </div>
-      </div>
-    );
-  };
+  const SessionRow = ({ s, past }: { s: Session; past?: boolean }) => {
+    const st    = statsMap[s.id];
+    const total    = st?.total    ?? 0;
+    const novos    = st?.novos    ?? 0;
+    const fechados = st?.fechados ?? 0;
+    const emAberto = st?.em_aberto ?? 0;
+    const guests   = st?.guests   ?? 0;
+    const totalPago = st?.total_pago ?? 0;
+    const conv     = novos > 0 ? Math.round((fechados / novos) * 100) : null;
+    const money    = fmtMoney(totalPago);
+    const muted    = !!past;
 
-  const PastRow = ({ s }: { s: Session }) => {
-    const evs   = sessionEvts[s.id] ?? [];
-    const st    = sessionStats(evs);
-    const money = fmtMoney(st.totalPago);
     return (
       <div
         onClick={() => navigate(`/tastings/${s.id}`)}
-        className={`px-5 py-2 grid ${cols} gap-3 items-center hover:bg-slate-50/60 cursor-pointer transition-colors`}
+        className={`px-5 ${past ? 'py-2' : 'py-2.5'} grid ${cols} gap-3 items-center hover:bg-slate-50 cursor-pointer transition-colors`}
       >
-        <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(s.scheduled_date)}</span>
-        <span className="text-sm text-muted-foreground">{s.type ?? '—'}</span>
-        <Cell v={st.total} bold muted />
-        <Cell v={st.novos} muted />
-        <Cell v={st.fechados} muted />
-        <Cell v={st.emAberto > 0 ? st.emAberto : null} danger={st.emAberto > 0} muted />
-        <Cell v={st.guests > 0 ? st.guests : null} muted />
+        <span className={`text-sm tabular-nums ${past ? 'text-muted-foreground' : 'font-semibold text-foreground'}`}>{fmtDate(s.scheduled_date)}</span>
+        <span className={`text-sm ${past ? 'text-muted-foreground' : 'text-foreground'}`}>{s.type ?? '—'}</span>
+        <Cell v={total}    bold muted={muted} />
+        <Cell v={novos}         muted={muted} />
+        <Cell v={fechados}      muted={muted} />
+        <Cell v={emAberto > 0 ? emAberto : null} danger={emAberto > 0} muted={muted} />
+        <Cell v={guests > 0 ? guests : null}     muted={muted} />
         <div className="text-center border-l border-border/50 pl-3">
-          {st.conv !== null
-            ? <span className={`text-sm font-medium ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-500' : 'text-muted-foreground/60'}`}>{st.conv}%</span>
+          {past && conv !== null
+            ? <span className={`text-sm font-medium ${conv >= 50 ? 'text-emerald-600' : conv > 0 ? 'text-amber-500' : 'text-muted-foreground/60'}`}>{conv}%</span>
             : <span className="text-muted-foreground/25 text-sm">—</span>}
         </div>
         <div className="text-center">
-          {money ? <span className="text-sm tabular-nums text-muted-foreground">{money}</span> : <span className="text-muted-foreground/25 text-sm">—</span>}
+          {money
+            ? <span className={`text-sm tabular-nums ${past ? 'text-muted-foreground' : 'text-foreground'}`}>{money}</span>
+            : <span className="text-muted-foreground/25 text-sm">—</span>}
         </div>
       </div>
     );
@@ -206,6 +171,7 @@ export default function TastingsPage() {
               <TableHeader />
               <div className="divide-y divide-border/50">
                 {upcoming.map(s => <SessionRow key={s.id} s={s} />)}
+
               </div>
             </div>
           )}
@@ -219,7 +185,7 @@ export default function TastingsPage() {
               </div>
               <TableHeader />
               <div className="divide-y divide-border/40">
-                {visiblePast.map(s => <PastRow key={s.id} s={s} />)}
+                {visiblePast.map(s => <SessionRow key={s.id} s={s} past />)}
               </div>
             </div>
           )}
