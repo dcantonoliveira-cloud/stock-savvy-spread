@@ -85,6 +85,7 @@ export default function TastingDetailPage() {
     setSession(s);
     setMenuText(s.menu_text ?? '');
     setNotes(s.notes ?? '');
+    setMaxCouples(s.max_couples ?? null);
     setRows((evts ?? []) as SessionEvent[]);
     setLoading(false);
   }, [id, navigate]);
@@ -101,13 +102,18 @@ export default function TastingDetailPage() {
     await supabase.from('tasting_session_events' as any).delete().eq('id', rowId);
   };
 
-  const saveTexts = async () => {
+  const saveSession = useCallback(async (patch: Partial<Session>) => {
     if (!id) return;
     setSaving(true);
-    await supabase.from('tasting_sessions' as any).update({ menu_text: menuText, notes }).eq('id', id);
+    await supabase.from('tasting_sessions' as any).update(patch).eq('id', id);
     setSaving(false);
-    toast.success('Salvo');
-  };
+    toast.success('Salvo', { duration: 1500 });
+  }, [id]);
+
+  const scheduleAutoSave = useCallback((patch: Partial<Session>) => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => saveSession(patch), 1200);
+  }, [saveSession]);
 
   // Stats
   const total    = rows.length;
@@ -188,6 +194,7 @@ export default function TastingDetailPage() {
                   <Th>Assessor(a)</Th>
                   <Th>Data do evento</Th>
                   <Th>Situação</Th>
+                  <Th center>2ª deg.</Th>
                   <Th>Status atual</Th>
                   <Th center>Qtd pessoas</Th>
                   <Th>Valor pago</Th>
@@ -218,30 +225,39 @@ export default function TastingDetailPage() {
         {tab === 'menu' && (
           <div className="bg-white border border-border rounded-2xl p-6 space-y-4 max-w-2xl">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Cardápio</label>
-              <textarea value={menuText} onChange={e => setMenuText(e.target.value)} rows={16}
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">
+                Cardápio
+                {saving && <span className="ml-2 text-[10px] font-normal text-muted-foreground normal-case tracking-normal">Salvando...</span>}
+              </label>
+              <textarea value={menuText} onChange={e => { setMenuText(e.target.value); scheduleAutoSave({ menu_text: e.target.value, notes }); }} rows={16}
                 className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                 placeholder="Descreva o cardápio..." />
             </div>
-            <button onClick={saveTexts} disabled={saving}
-              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60 transition-colors">
-              {saving ? 'Salvando...' : 'Salvar'}
-            </button>
           </div>
         )}
 
         {tab === 'info' && (
-          <div className="bg-white border border-border rounded-2xl p-6 space-y-4 max-w-2xl">
+          <div className="bg-white border border-border rounded-2xl p-6 space-y-5 max-w-2xl">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Observações importantes</label>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={10}
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Máx. de casais</label>
+              <input type="number" min={1} value={maxCouples ?? ''}
+                onChange={e => {
+                  const v = e.target.value ? parseInt(e.target.value) : null;
+                  setMaxCouples(v);
+                  scheduleAutoSave({ max_couples: v, notes, menu_text: menuText });
+                }}
+                className="w-28 px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="—" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">
+                Observações importantes
+                {saving && <span className="ml-2 text-[10px] font-normal text-muted-foreground normal-case tracking-normal">Salvando...</span>}
+              </label>
+              <textarea value={notes} onChange={e => { setNotes(e.target.value); scheduleAutoSave({ notes: e.target.value, menu_text: menuText, max_couples: maxCouples }); }} rows={10}
                 className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                 placeholder="Alergias, restrições, observações por casal..." />
             </div>
-            <button onClick={saveTexts} disabled={saving}
-              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-60 transition-colors">
-              {saving ? 'Salvando...' : 'Salvar'}
-            </button>
           </div>
         )}
       </div>
@@ -267,7 +283,9 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
   onRemove: () => void;
   onNavigate: () => void;
 }) {
-  const [paid, setPaid] = useState(row.paid_amount != null ? String(row.paid_amount) : '');
+  const [paid, setPaid]           = useState(row.paid_amount != null ? String(row.paid_amount) : '');
+  const [guestCount, setGuestCount] = useState<string>(row.guest_count != null ? String(row.guest_count) : '');
+  const guestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ev  = row.events;
   const st  = ev ? STATUS_CFG[ev.status] : null;
   const sit = SITUATION_CFG[row.situation_snapshot ?? ''];
@@ -302,15 +320,37 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       <Td className="text-muted-foreground">{ev?.organizer || '—'}</Td>
       <Td className="text-muted-foreground tabular-nums">{fmtDate(ev?.event_date ?? null)}</Td>
       <Td>
-        {sit ? <span className={`text-xs font-medium ${sit.cls}`}>{sit.label}</span> : '—'}
+        {sit ? (
+          <button
+            onClick={() => onUpdate({ situation_snapshot: row.situation_snapshot === 'new' ? 'confirmed' : 'new' })}
+            className={`text-xs font-medium ${sit.cls} hover:opacity-70 transition-opacity`}
+            title="Clique para alternar"
+          >
+            {sit.label}
+          </button>
+        ) : '—'}
+      </Td>
+      <Td center>
+        <button
+          onClick={() => onUpdate({ is_second_tasting: !row.is_second_tasting })}
+          className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${row.is_second_tasting ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-transparent hover:border-primary/50'}`}
+        >
+          <Check className="w-3 h-3" />
+        </button>
       </Td>
       <Td>
         {st ? <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${st.cls}`}>{st.label}</span> : '—'}
       </Td>
       <Td center>
         <input type="number" min={0}
-          value={row.guest_count ?? ''}
-          onChange={e => onUpdate({ guest_count: e.target.value ? parseInt(e.target.value) : null })}
+          value={guestCount}
+          onChange={e => {
+            setGuestCount(e.target.value);
+            if (guestTimer.current) clearTimeout(guestTimer.current);
+            guestTimer.current = setTimeout(() => {
+              onUpdate({ guest_count: e.target.value ? parseInt(e.target.value) : null });
+            }, 800);
+          }}
           className="w-14 text-center text-sm border border-border rounded-lg px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/20" />
       </Td>
       <Td>
