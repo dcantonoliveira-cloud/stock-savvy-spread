@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Pencil, CalendarDays } from 'lucide-react';
+import { Plus, CalendarDays } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
@@ -229,9 +229,8 @@ function TipoCell({ value, isPast, onChange }: { value: string | null; isPast: b
 
   return (
     <>
-      <div ref={ref} className={`flex items-center gap-1 group cursor-pointer ${isPast ? 'text-muted-foreground' : 'text-foreground'}`} onClick={handleClick}>
+      <div ref={ref} className={`cursor-pointer ${isPast ? 'text-muted-foreground' : 'text-foreground'}`} onClick={handleClick}>
         <span>{value ?? '—'}</span>
-        <Pencil className="w-3 h-3 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
       </div>
       {open && createPortal(
         <>
