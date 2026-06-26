@@ -7,8 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 // ── types ──────────────────────────────────────────────────────────────────
 type EventRow = {
   id: string; event_name: string; event_date: string | null;
-  status: string; responsible_person: string | null; guest_count: number | null;
-  created_at: string;
+  status: string; guest_count: number | null; created_at: string;
 };
 type TastingRow = { id: string; scheduled_date: string; type: string | null };
 
@@ -48,13 +47,13 @@ export default function SupervisorDashboard() {
     const load = async () => {
       // Load 3 years of events (prev + current + next) — same pattern as EventsPage
       const [ev1, ev2, ev3, tsRes] = await Promise.all([
-        supabase.from('events').select('id, event_name, event_date, status, responsible_person, guest_count, created_at')
+        supabase.from('events').select('id, event_name, event_date, status, guest_count, created_at')
           .gte('event_date', `${now.getFullYear() - 1}-01-01`).lte('event_date', `${now.getFullYear() - 1}-12-31`)
           .not('event_name', 'is', null).neq('event_name', ''),
-        supabase.from('events').select('id, event_name, event_date, status, responsible_person, guest_count, created_at')
+        supabase.from('events').select('id, event_name, event_date, status, guest_count, created_at')
           .gte('event_date', `${now.getFullYear()}-01-01`).lte('event_date', `${now.getFullYear()}-12-31`)
           .not('event_name', 'is', null).neq('event_name', ''),
-        supabase.from('events').select('id, event_name, event_date, status, responsible_person, guest_count, created_at')
+        supabase.from('events').select('id, event_name, event_date, status, guest_count, created_at')
           .gte('event_date', `${now.getFullYear() + 1}-01-01`).lte('event_date', `${now.getFullYear() + 1}-12-31`)
           .not('event_name', 'is', null).neq('event_name', ''),
         supabase.from('tasting_sessions' as any).select('id, scheduled_date, type').order('scheduled_date', { ascending: true }),
@@ -404,7 +403,6 @@ export default function SupervisorDashboard() {
                   e.status === 'negotiating' ? 'border-amber-200 text-amber-700 bg-amber-50' : 'border-border text-muted-foreground bg-muted/40'
                 }`}>{STATUS_LABEL[e.status]}</span>
                 <p className="flex-1 text-sm font-medium text-foreground truncate">{e.event_name}</p>
-                {e.responsible_person && <p className="text-xs text-muted-foreground shrink-0 hidden md:block">{e.responsible_person}</p>}
                 <p className="text-xs text-muted-foreground tabular-nums shrink-0">{fmtDate(e.event_date)}</p>
                 <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground shrink-0 transition-colors" />
               </div>
