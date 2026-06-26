@@ -48,8 +48,8 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
 };
 
 const SITUATION_CFG: Record<string, { label: string; cls: string }> = {
-  new:       { label: 'Cliente novo',  cls: 'text-sky-600' },
-  confirmed: { label: 'Já confirmado', cls: 'text-emerald-600' },
+  new:       { label: 'Cliente novo',    cls: 'text-muted-foreground' },
+  confirmed: { label: 'Evento fechado',  cls: 'text-emerald-600 font-semibold' },
 };
 
 const fmtDate = (d: string | null) => {
@@ -345,15 +345,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       <Td className="text-muted-foreground">{ev?.organizer || '—'}</Td>
       <Td className="text-muted-foreground tabular-nums">{fmtDate(ev?.event_date ?? null)}</Td>
       <Td>
-        {sit ? (
-          <button
-            onClick={() => onUpdate({ situation_snapshot: row.situation_snapshot === 'new' ? 'confirmed' : 'new' })}
-            className={`text-xs font-medium ${sit.cls} hover:opacity-70 transition-opacity`}
-            title="Clique para alternar"
-          >
-            {sit.label}
-          </button>
-        ) : '—'}
+        {sit ? <span className={`text-xs ${sit.cls}`}>{sit.label}</span> : '—'}
       </Td>
       <Td center>
         <button
