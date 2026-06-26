@@ -182,13 +182,15 @@ export default function TastingDetailPage() {
         </div>
 
         {/* Stats bar */}
-        <div className="px-8 py-2.5 border-t border-border/50 bg-muted/10 flex items-center gap-6 flex-wrap">
-          <Stat label="Eventos"   value={total} />
-          <Stat label="Novos"     value={novos} />
-          <Stat label="2ª deg."   value={segundas} />
-          <Stat label="Convidados" value={guests} />
-          <Stat label="Em aberto" value={emAberto} danger={emAberto > 0} />
-          {conv !== null && <Stat label="Conversão" value={`${conv}%`} />}
+        <div className="px-8 py-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
+          <StatCard label="Eventos"    value={total} />
+          <StatDivider />
+          <StatCard label="Clientes novos" value={novos} />
+          <StatCard label="Em aberto"  value={emAberto} danger={emAberto > 0} />
+          {conv !== null && <StatCard label="Conversão" value={`${conv}%`} accent />}
+          <StatDivider />
+          <StatCard label="2ª deg."    value={segundas} muted />
+          <StatCard label="Convidados" value={guests}   muted />
         </div>
 
         {/* Tabs */}
@@ -347,7 +349,15 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
         {sit ? <span className={`text-xs ${sit.cls}`}>{sit.label}</span> : '—'}
       </Td>
       <Td>
-        {st ? <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${st.cls}`}>{st.label}</span> : '—'}
+        <StatusSelect
+          value={ev?.status ?? ''}
+          onChange={async (next) => {
+            onUpdate({ events: ev ? { ...ev, status: next } : ev });
+            if (ev?.id) {
+              await supabase.from('events').update({ status: next }).eq('id', ev.id);
+            }
+          }}
+        />
       </Td>
       <Td center>
         <input type="number" min={0}
@@ -467,6 +477,43 @@ function Td({ children, className = '', center }: { children?: React.ReactNode; 
   return <td className={`px-4 py-3 text-sm ${center ? 'text-center' : ''} ${className}`}>{children}</td>;
 }
 
+const STATUS_OPTIONS = Object.entries(STATUS_CFG).map(([value, { label }]) => ({ value, label }));
+
+function StatusSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const cfg = STATUS_CFG[value];
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className={`appearance-none text-[11px] font-medium px-2.5 py-0.5 pr-6 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 ${cfg?.cls ?? 'bg-muted text-muted-foreground border-border'}`}
+      >
+        {STATUS_OPTIONS.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] opacity-50">▾</span>
+    </div>
+  );
+}
+
+function StatCard({ label, value, danger, accent, muted }: {
+  label: string; value: string | number; danger?: boolean; accent?: boolean; muted?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center px-3 py-1.5 rounded-xl bg-muted/40 min-w-[64px]">
+      <span className={`text-base font-bold leading-none mb-0.5 ${danger ? 'text-red-500' : accent ? 'text-primary' : muted ? 'text-muted-foreground' : 'text-foreground'}`}>
+        {value}
+      </span>
+      <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">{label}</span>
+    </div>
+  );
+}
+
+function StatDivider() {
+  return <div className="w-px h-8 bg-border mx-1" />;
+}
+
 function InfoField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -476,11 +523,3 @@ function InfoField({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function Stat({ label, value, danger }: { label: string; value: string | number; danger?: boolean }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className={`text-sm font-semibold ${danger ? 'text-red-500' : 'text-foreground'}`}>{value}</span>
-    </div>
-  );
-}
