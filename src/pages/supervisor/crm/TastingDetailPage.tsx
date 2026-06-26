@@ -225,10 +225,7 @@ export default function TastingDetailPage() {
         {tab === 'menu' && (
           <div className="bg-white border border-border rounded-2xl p-6 space-y-4 max-w-2xl">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">
-                Cardápio
-                {saving && <span className="ml-2 text-[10px] font-normal text-muted-foreground normal-case tracking-normal">Salvando...</span>}
-              </label>
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Cardápio</label>
               <textarea value={menuText} onChange={e => { setMenuText(e.target.value); scheduleAutoSave({ menu_text: e.target.value, notes }); }} rows={16}
                 className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                 placeholder="Descreva o cardápio..." />
@@ -250,10 +247,7 @@ export default function TastingDetailPage() {
                 placeholder="—" />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">
-                Observações importantes
-                {saving && <span className="ml-2 text-[10px] font-normal text-muted-foreground normal-case tracking-normal">Salvando...</span>}
-              </label>
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-2">Observações importantes</label>
               <textarea value={notes} onChange={e => { setNotes(e.target.value); scheduleAutoSave({ notes: e.target.value, menu_text: menuText, max_couples: maxCouples }); }} rows={10}
                 className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                 placeholder="Alergias, restrições, observações por casal..." />
