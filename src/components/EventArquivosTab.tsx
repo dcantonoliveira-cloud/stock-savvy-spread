@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -10,8 +11,12 @@ import jsPDF from 'jspdf';
 
 // ── tipos ─────────────────────────────────────────────────────────────────────
 interface Tasting {
-  id: string; scheduled_date: string | null; status: string | null;
-  confirmed: boolean; guest_count: number | null; menu_notes: string | null;
+  id: string;
+  session_id: string;
+  scheduled_date: string | null;
+  type: string | null;
+  situation_snapshot: string | null;
+  paid_amount: number | null;
 }
 interface AnnexModel { id: string; name: string; content: string | null }
 interface EventFile { id: string; name: string; url: string; created_at: string }
@@ -129,6 +134,7 @@ function SectionDivider({ title }: { title: string }) {
 
 // ── componente ─────────────────────────────────────────────────────────────────
 export default function EventArquivosTab({ eventId, event }: Props) {
+  const navigate = useNavigate();
   const [tastings, setTastings]           = useState<Tasting[]>([]);
   const [contractTemplate, setContractTemplate] = useState('');
   const [contractText, setContractText]   = useState('');
@@ -150,13 +156,22 @@ export default function EventArquivosTab({ eventId, event }: Props) {
   useEffect(() => {
     const load = async () => {
       const [{ data: tData }, { data: evData }, { data: compData }, { data: axData }, { data: fData }] = await Promise.all([
-        supabase.from('tastings').select('id,scheduled_date,status,confirmed,guest_count,menu_notes').eq('event_id', eventId).order('scheduled_date'),
+        supabase.from('tasting_session_events' as any)
+          .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
+          .eq('event_id', eventId),
         supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text').eq('id', eventId).single(),
         supabase.from('companies').select('witness_1_name,witness_1_cpf').limit(1).single(),
         supabase.from('annex_models' as any).select('id,name,content').order('name'),
         supabase.from('event_files' as any).select('id,name,url,created_at').eq('event_id', eventId).order('created_at'),
       ]);
-      setTastings((tData ?? []) as Tasting[]);
+      setTastings(((tData ?? []) as any[]).map(r => ({
+        id: r.id,
+        session_id: r.session_id,
+        scheduled_date: (r.tasting_sessions as any)?.scheduled_date ?? null,
+        type: (r.tasting_sessions as any)?.type ?? null,
+        situation_snapshot: r.situation_snapshot,
+        paid_amount: r.paid_amount,
+      })));
       if (evData) {
         const d = evData as any;
         if (d.contract_text) { setContractText(d.contract_text); setContractGenerated(true); }
@@ -302,7 +317,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                {['Data','Status','Confirmada','Convidados','Observações'].map(h => (
+                {['Data', 'Tipo', 'Situação', 'Valor pago', ''].map(h => (
                   <th key={h} className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60 pb-2 pr-4">{h}</th>
                 ))}
               </tr>
@@ -310,15 +325,27 @@ export default function EventArquivosTab({ eventId, event }: Props) {
             <tbody>
               {tastings.map(t => (
                 <tr key={t.id} className="border-b border-border/40 last:border-0">
-                  <td className="py-2.5 pr-4 font-medium">{t.scheduled_date ? new Date(t.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</td>
-                  <td className="py-2.5 pr-4">
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${t.confirmed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-muted text-muted-foreground border-border'}`}>
-                      {t.confirmed ? 'Confirmada' : (t.status ?? 'Agendada')}
-                    </span>
+                  <td className="py-2.5 pr-4 font-medium">
+                    {t.scheduled_date ? new Date(t.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}
                   </td>
-                  <td className="py-2.5 pr-4 text-muted-foreground">{t.confirmed ? 'Sim' : 'Não'}</td>
-                  <td className="py-2.5 pr-4 text-muted-foreground">{t.guest_count ?? '—'}</td>
-                  <td className="py-2.5 text-muted-foreground text-xs truncate max-w-[200px]">{t.menu_notes ?? '—'}</td>
+                  <td className="py-2.5 pr-4 text-muted-foreground">{t.type ?? '—'}</td>
+                  <td className="py-2.5 pr-4">
+                    {t.situation_snapshot === 'confirmed'
+                      ? <span className="text-[11px] px-2 py-0.5 rounded-full font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">Evento fechado</span>
+                      : <span className="text-xs text-muted-foreground">Cliente novo</span>}
+                  </td>
+                  <td className="py-2.5 pr-4 text-muted-foreground">
+                    {t.paid_amount ? `R$ ${t.paid_amount.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
+                  </td>
+                  <td className="py-2.5">
+                    <button
+                      onClick={() => navigate(`/tastings/${t.session_id}`, { state: { from: `/events/${eventId}`, fromLabel: event.event_name ?? 'Evento' } })}
+                      className="flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Ver sessão
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
