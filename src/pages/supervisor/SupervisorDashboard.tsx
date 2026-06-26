@@ -51,7 +51,9 @@ export default function SupervisorDashboard() {
       const [evRes, tsRes] = await Promise.all([
         supabase.from('events')
           .select('id, event_name, event_date, status, responsible_person, guest_count, created_at')
-          .not('status', 'eq', 'cancelled'),
+          .not('event_name', 'is', null)
+          .neq('event_name', '')
+          .neq('status', 'cancelled'),
         supabase.from('tasting_sessions' as any)
           .select('id, scheduled_date, type')
           .order('scheduled_date', { ascending: true }),
