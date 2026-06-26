@@ -33,13 +33,15 @@ const PIPELINE = ['lead', 'negotiating', 'tasting_scheduled'];
 const CLOSED   = ['confirmed', 'completed'];
 
 function sessionStats(evs: SessionEvent[]) {
-  const total    = evs.length;
-  const novos    = evs.filter(e => e.situation_snapshot === 'new').length;
-  const emAberto = evs.filter(e => e.situation_snapshot === 'new' && e.events && PIPELINE.includes(e.events.status)).length;
-  const fechados = evs.filter(e => e.situation_snapshot === 'new' && e.events && CLOSED.includes(e.events.status)).length;
-  const conv     = novos > 0 ? Math.round((fechados / novos) * 100) : null;
+  const total     = evs.length;
+  const novos     = evs.filter(e => e.situation_snapshot === 'new').length;
+  const segundas  = evs.filter(e => e.is_second_tasting).length;
+  const guests    = evs.reduce((s, e) => s + (e.guest_count ?? 0), 0);
+  const emAberto  = evs.filter(e => e.situation_snapshot === 'new' && e.events && PIPELINE.includes(e.events.status)).length;
+  const fechados  = evs.filter(e => e.situation_snapshot === 'new' && e.events && CLOSED.includes(e.events.status)).length;
+  const conv      = novos > 0 ? Math.round((fechados / novos) * 100) : null;
   const totalPago = evs.reduce((s, e) => s + (e.paid_amount ?? 0), 0);
-  return { total, novos, emAberto, conv, totalPago };
+  return { total, novos, segundas, guests, emAberto, conv, totalPago };
 }
 
 const fmtDate = (d: string | null) => {
@@ -114,14 +116,10 @@ export default function TastingsPage() {
       {/* Lista */}
       <div className="bg-white border border-border rounded-2xl divide-y divide-border/50">
         {/* Header */}
-        <div className="px-5 py-2.5 grid grid-cols-[160px_100px_1fr_1fr_1fr_1fr_1fr] gap-4 bg-muted/30 rounded-t-2xl">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Data</span>
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Tipo</span>
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center">Eventos</span>
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center">Novos</span>
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center">Em aberto</span>
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center">Conversão</span>
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center">Total pago</span>
+        <div className="px-5 py-2.5 grid grid-cols-[140px_90px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 bg-muted/30 rounded-t-2xl">
+          {['Data','Tipo','Eventos','Novos','2ª Deg.','Convidados','Em aberto','Conversão','Total pago'].map(h => (
+            <span key={h} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center first:text-left [&:nth-child(2)]:text-left">{h}</span>
+          ))}
         </div>
 
         {loading ? (
@@ -138,51 +136,30 @@ export default function TastingsPage() {
             <div
               key={s.id}
               onClick={() => navigate(`/tastings/${s.id}`)}
-              className={`px-5 py-3.5 grid grid-cols-[160px_100px_1fr_1fr_1fr_1fr_1fr] gap-4 items-center hover:bg-slate-50 cursor-pointer transition-colors ${isPast ? 'opacity-60' : ''}`}
+              className={`px-5 py-2.5 grid grid-cols-[140px_90px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-3 items-center hover:bg-slate-50 cursor-pointer transition-colors ${isPast ? 'opacity-55' : ''}`}
             >
-              {/* Data */}
-              <span className={`text-[15px] font-semibold tabular-nums ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>
+              <span className={`text-sm font-medium tabular-nums ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>
                 {fmtDate(s.scheduled_date)}
               </span>
 
-              {/* Tipo */}
               <TipoCell value={s.type} isPast={isPast} onChange={tipo => updateTipo(s.id, tipo)} />
 
-              {/* Eventos */}
-              <div className="text-center">
-                {st.total > 0
-                  ? <span className="text-base font-semibold text-foreground leading-none">{st.total}</span>
-                  : <span className="text-muted-foreground/25">—</span>}
-              </div>
+              <Cell v={st.total} bold />
+              <Cell v={st.novos} />
+              <Cell v={st.segundas} />
+              <Cell v={st.guests > 0 ? st.guests : null} />
+              <Cell v={st.emAberto > 0 ? st.emAberto : null} danger={st.emAberto > 0} />
 
-              {/* Novos */}
-              <div className="text-center">
-                {st.novos > 0
-                  ? <span className="text-base font-semibold text-foreground leading-none">{st.novos}</span>
-                  : <span className="text-muted-foreground/25">—</span>}
-              </div>
-
-              {/* Em aberto */}
-              <div className="text-center">
-                {st.emAberto > 0
-                  ? <span className="text-base font-semibold text-red-500 leading-none">{st.emAberto}</span>
-                  : <span className="text-muted-foreground/25">—</span>}
-              </div>
-
-              {/* Conversão */}
               <div className="text-center">
                 {isPast && st.conv !== null
-                  ? <span className={`text-base font-semibold leading-none ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-500' : 'text-muted-foreground/50'}`}>
-                      {st.conv}%
-                    </span>
-                  : <span className="text-muted-foreground/25">—</span>}
+                  ? <span className={`text-sm font-medium ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-500' : 'text-muted-foreground/60'}`}>{st.conv}%</span>
+                  : <span className="text-muted-foreground/25 text-sm">—</span>}
               </div>
 
-              {/* Total pago */}
               <div className="text-center">
                 {money
-                  ? <span className="text-sm font-semibold tabular-nums text-foreground">{money}</span>
-                  : <span className="text-muted-foreground/25">—</span>}
+                  ? <span className="text-sm tabular-nums text-foreground">{money}</span>
+                  : <span className="text-muted-foreground/25 text-sm">—</span>}
               </div>
             </div>
           );
@@ -250,6 +227,16 @@ function TipoCell({ value, isPast, onChange }: { value: string | null; isPast: b
         document.body
       )}
     </>
+  );
+}
+
+function Cell({ v, bold, danger }: { v: number | null | undefined; bold?: boolean; danger?: boolean }) {
+  return (
+    <div className="text-center">
+      {v != null && v > 0
+        ? <span className={`text-sm ${bold ? 'font-semibold' : 'font-normal'} ${danger ? 'text-red-500 font-semibold' : 'text-foreground'}`}>{v}</span>
+        : <span className="text-muted-foreground/25 text-sm">—</span>}
+    </div>
   );
 }
 
