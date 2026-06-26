@@ -113,16 +113,16 @@ export default function TastingsPage() {
 
       {/* Tabela */}
       <div className="bg-white border border-border rounded-2xl overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              <Th>Data</Th>
-              <Th>Tipo</Th>
-              <Th center>Eventos</Th>
-              <Th center>Novos</Th>
-              <Th center>Em aberto</Th>
-              <Th center>Conversão</Th>
-              <Th right>Total pago</Th>
+              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 w-32">Data</th>
+              <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 w-28">Tipo</th>
+              <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 w-24">Eventos</th>
+              <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 w-24">Novos</th>
+              <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 w-28">Em aberto</th>
+              <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 w-28">Conversão</th>
+              <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">Total pago</th>
             </tr>
           </thead>
           <tbody>
@@ -131,8 +131,8 @@ export default function TastingsPage() {
             ) : allSorted.length === 0 ? (
               <tr><td colSpan={7} className="py-16 text-center text-muted-foreground text-sm">Nenhuma degustação cadastrada.</td></tr>
             ) : visible.map((s, i) => {
-              const evs   = sessionEvts[s.id] ?? [];
-              const st    = sessionStats(evs);
+              const evs    = sessionEvts[s.id] ?? [];
+              const st     = sessionStats(evs);
               const isPast = s.scheduled_date < now;
               const isLast = i === visible.length - 1;
               const money  = fmtMoney(st.totalPago);
@@ -141,45 +141,54 @@ export default function TastingsPage() {
                 <tr
                   key={s.id}
                   onClick={() => navigate(`/tastings/${s.id}`)}
-                  className={`${isLast ? '' : 'border-b border-border/50'} hover:bg-slate-50 cursor-pointer transition-colors ${isPast ? 'opacity-60' : ''}`}
+                  className={`${isLast ? '' : 'border-b border-border/50'} hover:bg-slate-50 cursor-pointer transition-colors group`}
                 >
-                  <Td>
-                    <span className={`font-medium ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>
+                  {/* Data */}
+                  <td className="px-5 py-4">
+                    <span className={`text-base font-semibold tabular-nums ${isPast ? 'text-muted-foreground/60' : 'text-foreground'}`}>
                       {fmtDate(s.scheduled_date)}
                     </span>
-                  </Td>
-                  <Td>
-                    <TipoCell
-                      value={s.type}
-                      isPast={isPast}
-                      onChange={tipo => updateTipo(s.id, tipo)}
-                    />
-                  </Td>
-                  <Td center>
+                  </td>
+
+                  {/* Tipo */}
+                  <td className="px-3 py-4">
+                    <TipoCell value={s.type} isPast={isPast} onChange={tipo => updateTipo(s.id, tipo)} />
+                  </td>
+
+                  {/* Eventos */}
+                  <td className="px-3 py-4 text-center">
                     {st.total > 0
-                      ? <span className="font-semibold text-foreground">{st.total}</span>
-                      : <span className="text-muted-foreground/30">—</span>}
-                  </Td>
-                  <Td center>
+                      ? <span className={`text-lg font-bold ${isPast ? 'text-foreground/60' : 'text-foreground'}`}>{st.total}</span>
+                      : <span className="text-muted-foreground/25 text-lg">—</span>}
+                  </td>
+
+                  {/* Novos */}
+                  <td className="px-3 py-4 text-center">
                     {st.novos > 0
-                      ? <span>{st.novos}</span>
-                      : <span className="text-muted-foreground/30">—</span>}
-                  </Td>
-                  <Td center>
+                      ? <span className={`text-lg font-semibold ${isPast ? 'text-foreground/60' : 'text-foreground'}`}>{st.novos}</span>
+                      : <span className="text-muted-foreground/25 text-lg">—</span>}
+                  </td>
+
+                  {/* Em aberto */}
+                  <td className="px-3 py-4 text-center">
                     {st.emAberto > 0
-                      ? <span className="font-semibold text-red-500">{st.emAberto}</span>
-                      : <span className="text-muted-foreground/30">—</span>}
-                  </Td>
-                  <Td center>
+                      ? <span className="text-lg font-bold text-red-500">{st.emAberto}</span>
+                      : <span className="text-muted-foreground/25 text-lg">—</span>}
+                  </td>
+
+                  {/* Conversão */}
+                  <td className="px-3 py-4 text-center">
                     {isPast && st.conv !== null
-                      ? <span className={st.conv > 0 ? 'text-emerald-600 font-medium' : 'text-muted-foreground'}>{st.conv}%</span>
-                      : <span className="text-muted-foreground/30">—</span>}
-                  </Td>
-                  <Td right>
+                      ? <span className={`text-lg font-bold ${st.conv >= 50 ? 'text-emerald-600' : st.conv > 0 ? 'text-amber-600' : 'text-muted-foreground/60'}`}>{st.conv}%</span>
+                      : <span className="text-muted-foreground/25 text-lg">—</span>}
+                  </td>
+
+                  {/* Total pago */}
+                  <td className="px-5 py-4 text-right">
                     {money
-                      ? <span className="text-foreground tabular-nums">{money}</span>
-                      : <span className="text-muted-foreground/30">—</span>}
-                  </Td>
+                      ? <span className={`text-sm font-medium tabular-nums ${isPast ? 'text-foreground/60' : 'text-foreground'}`}>{money}</span>
+                      : <span className="text-muted-foreground/25">—</span>}
+                  </td>
                 </tr>
               );
             })}
