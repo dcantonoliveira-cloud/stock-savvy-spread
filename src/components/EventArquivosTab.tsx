@@ -116,7 +116,7 @@ async function downloadContractPDF(html: string, eventName: string) {
     remaining -= thisH; srcY += srcH;
     if (remaining > 0) pdf.addPage();
   }
-  pdf.save(`Contrato_${(eventName ?? 'Evento').replace(/[^a-zA-Z0-9 ]/g, '').trim()}.pdf`);
+  pdf.save(`CONTRATO RONDELLO BUFFET - ${(eventName ?? 'Evento').trim()}.pdf`);
 }
 
 // ── estilos compartilhados ─────────────────────────────────────────────────────
