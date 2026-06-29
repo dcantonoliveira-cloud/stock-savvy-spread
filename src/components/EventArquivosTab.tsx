@@ -104,9 +104,19 @@ function findSafeCut(data: Uint8ClampedArray, width: number, idealY: number, sea
   return idealY;
 }
 
-async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = []) {
+async function renderSection(innerHtml: string, widthPx: number, scale: number) {
   const { default: html2canvas } = await import('html2canvas');
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;left:-9999px;top:0;width:${widthPx}px;background:white;padding:0;margin:0;`;
+  el.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:12.5pt;line-height:1.8;color:#111;word-break:break-word;">${innerHtml}</div>`;
+  document.body.appendChild(el);
+  await new Promise(r => setTimeout(r, 200));
+  const canvas = await html2canvas(el, { scale, useCORS: true, backgroundColor: '#fff' });
+  document.body.removeChild(el);
+  return canvas;
+}
 
+async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = []) {
   const SCALE = 2;
   const PW_MM = 210; const PH_MM = 297;
   const MX_MM = 12; const HEADER_MM = 34; const FOOTER_MM = 16;
@@ -114,36 +124,33 @@ async function downloadContractPDF(html: string, eventName: string, logoBase64: 
   const CONTENT_H_MM = PH_MM - HEADER_MM - FOOTER_MM;
   const PX_PER_MM = 3.7795;
   const CONTAINER_W_PX = Math.round(CONTENT_W_MM * PX_PER_MM);
-
-  const container = document.createElement('div');
-  container.style.cssText = `position:fixed;left:-9999px;top:0;width:${CONTAINER_W_PX}px;background:white;padding:0;margin:0;`;
-  const annexHtml = annexes.filter(Boolean).map((a, i) =>
-    `<div style="page-break-before:always;margin-top:32px;"><h2 style="text-align:center;font-size:13pt;margin-bottom:16px;">ANEXO ${i + 1}</h2>${a}</div>`
-  ).join('');
-  container.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:12.5pt;line-height:1.8;color:#111;word-break:break-word;">${html}${annexHtml}</div>`;
-  document.body.appendChild(container);
-  await new Promise(r => setTimeout(r, 250));
-
-  const fullCanvas = await html2canvas(container, { scale: SCALE, useCORS: true, backgroundColor: '#fff' });
-  document.body.removeChild(container);
-
-  const ctx = fullCanvas.getContext('2d')!;
-  const imgData = ctx.getImageData(0, 0, fullCanvas.width, fullCanvas.height).data;
   const pageHeightPx = Math.round(CONTENT_H_MM * PX_PER_MM * SCALE);
 
-  // Fatia com corte inteligente
-  const pages: { srcY: number; srcH: number }[] = [];
-  let srcY = 0;
-  while (srcY < fullCanvas.height) {
-    const ideal = srcY + pageHeightPx;
-    const cut = ideal >= fullCanvas.height ? fullCanvas.height : findSafeCut(imgData, fullCanvas.width, ideal, 100 * SCALE);
-    pages.push({ srcY, srcH: cut - srcY });
-    srcY = cut;
-  }
+  // Renderiza contrato + cada anexo separadamente
+  const sections = [html, ...annexes.filter(Boolean).map((a, i) =>
+    `<h2 style="text-align:center;font-size:13pt;margin-bottom:20px;">ANEXO ${i + 1}</h2>${a}`
+  )];
+  const canvases = await Promise.all(sections.map(s => renderSection(s, CONTAINER_W_PX, SCALE)));
 
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  let totalPages = 0;
 
-  const addHeaderFooter = (pageNum: number, total: number) => {
+  // Pré-calcula total de páginas
+  const sectionPages = canvases.map(canvas => {
+    const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    const pages: { srcY: number; srcH: number }[] = [];
+    let srcY = 0;
+    while (srcY < canvas.height) {
+      const ideal = srcY + pageHeightPx;
+      const cut = ideal >= canvas.height ? canvas.height : findSafeCut(data, canvas.width, ideal, 100 * SCALE);
+      pages.push({ srcY, srcH: cut - srcY });
+      srcY = cut;
+    }
+    return pages;
+  });
+  totalPages = sectionPages.reduce((s, p) => s + p.length, 0);
+
+  const addHeaderFooter = (pageNum: number) => {
     if (logoBase64) {
       try { pdf.addImage(logoBase64, 'PNG', MX_MM, 5, 0, 22); } catch {}
     }
@@ -158,18 +165,28 @@ async function downloadContractPDF(html: string, eventName: string, logoBase64: 
     pdf.setFontSize(7.5);
     pdf.setTextColor(140, 130, 110);
     pdf.text((companyName ?? '').trim(), MX_MM, PH_MM - FOOTER_MM + 7);
-    pdf.text(`Página ${pageNum} de ${total}`, PW_MM - MX_MM, PH_MM - FOOTER_MM + 7, { align: 'right' });
+    pdf.text(`Página ${pageNum} de ${totalPages}`, PW_MM - MX_MM, PH_MM - FOOTER_MM + 7, { align: 'right' });
     pdf.setTextColor(17, 17, 17);
   };
 
-  pages.forEach(({ srcY, srcH }, i) => {
-    if (i > 0) pdf.addPage();
-    const slice = document.createElement('canvas');
-    slice.width = fullCanvas.width; slice.height = srcH;
-    slice.getContext('2d')!.drawImage(fullCanvas, 0, srcY, fullCanvas.width, srcH, 0, 0, fullCanvas.width, srcH);
-    const imgH = srcH / (PX_PER_MM * SCALE);
-    pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', MX_MM, HEADER_MM, CONTENT_W_MM, imgH);
-    addHeaderFooter(i + 1, pages.length);
+  let globalPage = 0;
+  canvases.forEach((canvas, si) => {
+    sectionPages[si].forEach(({ srcY, srcH }, pi) => {
+      if (globalPage > 0) pdf.addPage();
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width; slice.height = srcH;
+      slice.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+      const imgH = srcH / (PX_PER_MM * SCALE);
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', MX_MM, HEADER_MM, CONTENT_W_MM, imgH);
+      addHeaderFooter(globalPage + 1);
+      globalPage++;
+      // Força nova página entre seções (exceto no último slice da última seção)
+      if (pi === sectionPages[si].length - 1 && si < canvases.length - 1) {
+        pdf.addPage();
+        addHeaderFooter(globalPage + 1);
+        globalPage++;
+      }
+    });
   });
 
   const co = (companyName ?? '').trim().toUpperCase();
