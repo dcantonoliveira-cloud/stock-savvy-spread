@@ -54,6 +54,8 @@ export default function OrcamentosPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [filter, setFilter]   = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'orcamentos' | 'gerador'>('orcamentos');
+  const [showGerador, setShowGerador] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -76,7 +78,12 @@ export default function OrcamentosPage() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    supabase.from('companies').select('features').limit(1).single().then(({ data }) => {
+      if ((data as any)?.features?.gerador_orcamentos) setShowGerador(true);
+    });
+  }, []);
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
@@ -124,6 +131,38 @@ export default function OrcamentosPage() {
 
   return (
     <div>
+      {/* ── Tabs (só aparecem se gerador estiver habilitado) ── */}
+      {showGerador && (
+        <div className="flex gap-1 mb-5 border-b border-border">
+          {(['orcamentos', 'gerador'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === tab
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab === 'orcamentos' ? 'Orçamentos' : 'Gerador de Orçamentos'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Gerador (iframe) ── */}
+      {activeTab === 'gerador' && (
+        <iframe
+          src="/orcamento.html"
+          className="w-full rounded-2xl border border-border"
+          style={{ height: 'calc(100vh - 160px)' }}
+          title="Gerador de Orçamentos"
+        />
+      )}
+
+      {/* ── Lista de orçamentos ── */}
+      {activeTab === 'orcamentos' && <>
+
       {/* ── Descrição ── */}
       <div className="mb-5 p-4 bg-white border border-border rounded-2xl flex gap-3">
         <Info className="w-4 h-4 text-primary/60 shrink-0 mt-0.5" />
@@ -278,6 +317,7 @@ export default function OrcamentosPage() {
         </div>,
         document.body
       )}
+      </>}
     </div>
   );
 }
