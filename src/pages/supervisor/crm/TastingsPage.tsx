@@ -92,20 +92,22 @@ export default function TastingsPage() {
     const eventIds = [...new Set((tse ?? []).map((r: any) => r.event_id).filter(Boolean))];
     if (eventIds.length === 0) { setSegundaRows([]); setSegundaLoading(false); return; }
 
-    const { data: evts } = await supabase
+    const { data: evts, error } = await supabase
       .from('events')
-      .select('id, event_name, event_date, status, organizer, location_text')
+      .select('id, event_name, event_date, status, location_text, clients(name)')
       .in('id', eventIds)
       .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
       .gte('event_date', today)
       .order('event_date', { ascending: true });
+
+    if (error) console.error('[segunda]', error);
 
     setSegundaRows((evts ?? []).map((e: any) => ({
       event_id:      e.id,
       event_name:    e.event_name,
       event_date:    e.event_date,
       status:        e.status,
-      organizer:     e.organizer ?? null,
+      organizer:     e.clients?.name ?? null,
       location_text: e.location_text ?? null,
     })));
     setSegundaLoading(false);
@@ -333,7 +335,7 @@ function SegundaDegustacaoTab({ rows, loading, onNavigate }: {
         <div className="bg-white border border-border rounded-2xl overflow-hidden">
           {/* Header */}
           <div className="px-5 py-2.5 grid grid-cols-[1fr_160px_140px_120px_110px] gap-3 bg-muted/30 border-b border-border">
-            {['Evento', 'Assessor(a)', 'Local', 'Data do evento', 'Urgência'].map(h => (
+            {['Evento', 'Cliente', 'Local', 'Data do evento', 'Urgência'].map(h => (
               <span key={h} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
             ))}
           </div>
