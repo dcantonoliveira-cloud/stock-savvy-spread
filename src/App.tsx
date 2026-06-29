@@ -58,6 +58,7 @@ const TastingsPage             = lazy(() => import("./pages/supervisor/crm/Tasti
 const TastingDetailPage        = lazy(() => import("./pages/supervisor/crm/TastingDetailPage"));
 const CalendarPage             = lazy(() => import("./pages/supervisor/crm/CalendarPage"));
 const FinanceiroPage           = lazy(() => import("./pages/supervisor/FinanceiroPage"));
+const FluxoCaixaPage           = lazy(() => import("./pages/supervisor/FluxoCaixaPage"));
 const MateriaisInventarioPage  = lazy(() => import("./pages/supervisor/materiais/MateriaisInventarioPage"));
 const MateriaisCategoriasPage  = lazy(() => import("./pages/supervisor/materiais/MateriaisCategoriasPage"));
 const EmprestimosPage          = lazy(() => import("./pages/supervisor/materiais/EmprestimosPage"));
@@ -143,6 +144,7 @@ function AppRoutes() {
             <Route path="/tastings/:id" element={<TastingDetailPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/financeiro" element={<FinanceiroPage />} />
+            <Route path="/financeiro/fluxo" element={<FluxoCaixaPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/categories/:name" element={<CategoryDetailPage />} />
             <Route path="/tags" element={<TagsPage />} />
