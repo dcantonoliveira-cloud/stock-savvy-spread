@@ -94,12 +94,6 @@ async function main() {
       continue;
     }
 
-    // Pula se já tem contrato salvo
-    if (match.contract_text && match.annex_1_text) {
-      skipped++;
-      continue;
-    }
-
     await doUpdate(match.id, bev, supabase);
     updated++;
     console.log(`  ✓ ${bev.NomeDoEvento}`);
@@ -108,10 +102,45 @@ async function main() {
   console.log(`\nConcluído: ${updated} atualizados | ${skipped} já tinham contrato | ${notFound} não encontrados`);
 }
 
+function bubbleToHtml(text) {
+  if (!text) return '';
+  let s = text;
+
+  // Remove [ml]...[/ml] wrapper
+  s = s.replace(/\[ml\]/g, '').replace(/\[\/ml\]/g, '');
+
+  // Block tags
+  s = s.replace(/\[center\]([\s\S]*?)\[\/center\]/g, '<div style="text-align:center">$1</div>');
+  s = s.replace(/\[h1\]([\s\S]*?)\[\/h1\]/g, '<h1>$1</h1>');
+  s = s.replace(/\[h2\]([\s\S]*?)\[\/h2\]/g, '<h2>$1</h2>');
+  s = s.replace(/\[h3\]([\s\S]*?)\[\/h3\]/g, '<h3>$1</h3>');
+  s = s.replace(/\[h4\]([\s\S]*?)\[\/h4\]/g, '<h4>$1</h4>');
+  s = s.replace(/\[quote\]([\s\S]*?)\[\/quote\]/g, '<blockquote>$1</blockquote>');
+  s = s.replace(/\[ul\]([\s\S]*?)\[\/ul\]/g, '<ul>$1</ul>');
+  s = s.replace(/\[li[^\]]*\]([\s\S]*?)\[\/li\]/g, '<li>$1</li>');
+
+  // Inline tags
+  s = s.replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<strong>$1</strong>');
+  s = s.replace(/\[i\]([\s\S]*?)\[\/i\]/g, '<em>$1</em>');
+  s = s.replace(/\[u\]([\s\S]*?)\[\/u\]/g, '<u>$1</u>');
+  s = s.replace(/\[s\]([\s\S]*?)\[\/s\]/g, '<s>$1</s>');
+  s = s.replace(/\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/g, '<span style="color:$1">$2</span>');
+  s = s.replace(/\[highlight=([^\]]+)\]([\s\S]*?)\[\/highlight\]/g, '<span style="background-color:$1">$2</span>');
+  s = s.replace(/\[size=\d+\]([\s\S]*?)\[\/size\]/g, '$1');
+
+  // Remove any remaining unknown tags
+  s = s.replace(/\[[^\]]*\]/g, '');
+
+  // Newlines to <br> (outside block tags)
+  s = s.replace(/\n/g, '<br>');
+
+  return s;
+}
+
 async function doUpdate(eventId, bev, supabase) {
   const payload = {};
-  if (bev.txt_contrato) payload.contract_text = bev.txt_contrato;
-  if (bev['Anexo 1'])   payload.annex_1_text  = bev['Anexo 1'];
+  if (bev.txt_contrato) payload.contract_text = bubbleToHtml(bev.txt_contrato);
+  if (bev['Anexo 1'])   payload.annex_1_text  = bubbleToHtml(bev['Anexo 1']);
 
   const { error } = await supabase.from('events').update(payload).eq('id', eventId);
   if (error) console.error(`  Erro ao atualizar ${eventId}:`, error.message);
