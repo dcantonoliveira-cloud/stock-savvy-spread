@@ -88,88 +88,90 @@ function replaceTags(template: string, event: EventData, w1Name: string, w1Cpf: 
 }
 
 // ── PDF ────────────────────────────────────────────────────────────────────────
-async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string) {
-  const MX = 12; // margem horizontal mm
-  const MY_TOP = 38; // espaço para cabeçalho
-  const MY_BOT = 18; // espaço para rodapé
-  const PW = 210;
-  const contentW = PW - MX * 2; // 186mm
+function isRowBlank(data: Uint8ClampedArray, width: number, y: number): boolean {
+  for (let x = 0; x < width; x++) {
+    const i = (y * width + x) * 4;
+    if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) return false;
+  }
+  return true;
+}
 
-  // Monta conteúdo HTML estilizado para jsPDF.html()
-  const bodyHtml = `
-    <div style="
-      font-family:'Times New Roman',Times,serif;
-      font-size:11.5pt;
-      line-height:1.75;
-      color:#111;
-      width:${contentW * 3.7795}px;
-      word-break:break-word;
-    ">
-      ${html}
-    </div>
-  `;
+function findSafeCut(data: Uint8ClampedArray, width: number, idealY: number, searchPx = 120): number {
+  for (let dy = 0; dy <= searchPx; dy++) {
+    const y = idealY - dy;
+    if (y >= 0 && isRowBlank(data, width, y)) return y;
+  }
+  return idealY;
+}
+
+async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string) {
+  const { default: html2canvas } = await import('html2canvas');
+
+  const SCALE = 2;
+  const PW_MM = 210; const PH_MM = 297;
+  const MX_MM = 12; const HEADER_MM = 34; const FOOTER_MM = 16;
+  const CONTENT_W_MM = PW_MM - MX_MM * 2;
+  const CONTENT_H_MM = PH_MM - HEADER_MM - FOOTER_MM;
+  const PX_PER_MM = 3.7795;
+  const CONTAINER_W_PX = Math.round(CONTENT_W_MM * PX_PER_MM);
 
   const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;background:white;';
-  container.innerHTML = bodyHtml;
+  container.style.cssText = `position:fixed;left:-9999px;top:0;width:${CONTAINER_W_PX}px;background:white;padding:0;margin:0;`;
+  container.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:12.5pt;line-height:1.8;color:#111;word-break:break-word;">${html}</div>`;
   document.body.appendChild(container);
-  await new Promise(r => setTimeout(r, 100));
+  await new Promise(r => setTimeout(r, 250));
+
+  const fullCanvas = await html2canvas(container, { scale: SCALE, useCORS: true, backgroundColor: '#fff' });
+  document.body.removeChild(container);
+
+  const ctx = fullCanvas.getContext('2d')!;
+  const imgData = ctx.getImageData(0, 0, fullCanvas.width, fullCanvas.height).data;
+  const pageHeightPx = Math.round(CONTENT_H_MM * PX_PER_MM * SCALE);
+
+  // Fatia com corte inteligente
+  const pages: { srcY: number; srcH: number }[] = [];
+  let srcY = 0;
+  while (srcY < fullCanvas.height) {
+    const ideal = srcY + pageHeightPx;
+    const cut = ideal >= fullCanvas.height ? fullCanvas.height : findSafeCut(imgData, fullCanvas.width, ideal, 100 * SCALE);
+    pages.push({ srcY, srcH: cut - srcY });
+    srcY = cut;
+  }
 
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const PH = pdf.internal.pageSize.getHeight();
 
-  const addHeaderFooter = (pageNum: number, totalPages: number) => {
-    // Linha topo
-    pdf.setDrawColor(180, 160, 120);
-    pdf.setLineWidth(0.4);
-    pdf.line(MX, 28, PW - MX, 28);
-
-    // Logo ou nome da empresa
+  const addHeaderFooter = (pageNum: number, total: number) => {
     if (logoBase64) {
-      try { pdf.addImage(logoBase64, 'PNG', MX, 6, 0, 18); } catch {}
+      try { pdf.addImage(logoBase64, 'PNG', MX_MM, 5, 0, 22); } catch {}
     }
-
-    // Nome do evento à direita no cabeçalho
+    pdf.setDrawColor(160, 140, 100);
+    pdf.setLineWidth(0.35);
+    pdf.line(MX_MM, HEADER_MM - 4, PW_MM - MX_MM, HEADER_MM - 4);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
     pdf.setTextColor(120, 110, 90);
-    pdf.text(eventName, PW - MX, 14, { align: 'right' });
-
-    // Linha rodapé
-    pdf.line(MX, PH - 14, PW - MX, PH - 14);
-
-    // Texto rodapé
+    pdf.text(eventName, PW_MM - MX_MM, 14, { align: 'right' });
+    pdf.line(MX_MM, PH_MM - FOOTER_MM + 2, PW_MM - MX_MM, PH_MM - FOOTER_MM + 2);
     pdf.setFontSize(7.5);
-    pdf.setTextColor(150, 140, 120);
-    pdf.text('Paulmaris Sorocaba Ltda · CNPJ 02.646.036/0001-72', MX, PH - 9);
-    pdf.text(`Página ${pageNum} de ${totalPages}`, PW - MX, PH - 9, { align: 'right' });
-
+    pdf.setTextColor(140, 130, 110);
+    pdf.text((companyName ?? '').trim(), MX_MM, PH_MM - FOOTER_MM + 7);
+    pdf.text(`Página ${pageNum} de ${total}`, PW_MM - MX_MM, PH_MM - FOOTER_MM + 7, { align: 'right' });
     pdf.setTextColor(17, 17, 17);
   };
 
-  await new Promise<void>((resolve) => {
-    pdf.html(container, {
-      callback: (doc) => {
-        const total = doc.getNumberOfPages();
-        for (let i = 1; i <= total; i++) {
-          doc.setPage(i);
-          addHeaderFooter(i, total);
-        }
-        const co = (companyName ?? '').trim().toUpperCase();
-        const ev = (eventName ?? 'Evento').trim();
-        doc.save(`CONTRATO ${co} - ${ev}.pdf`);
-        resolve();
-      },
-      x: MX,
-      y: MY_TOP,
-      width: contentW,
-      windowWidth: Math.round(contentW * 3.7795),
-      autoPaging: 'text',
-      margin: [MY_TOP, MX, MY_BOT, MX],
-    });
+  pages.forEach(({ srcY, srcH }, i) => {
+    if (i > 0) pdf.addPage();
+    const slice = document.createElement('canvas');
+    slice.width = fullCanvas.width; slice.height = srcH;
+    slice.getContext('2d')!.drawImage(fullCanvas, 0, srcY, fullCanvas.width, srcH, 0, 0, fullCanvas.width, srcH);
+    const imgH = srcH / (PX_PER_MM * SCALE);
+    pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', MX_MM, HEADER_MM, CONTENT_W_MM, imgH);
+    addHeaderFooter(i + 1, pages.length);
   });
 
-  document.body.removeChild(container);
+  const co = (companyName ?? '').trim().toUpperCase();
+  const ev = (eventName ?? 'Evento').trim();
+  pdf.save(`CONTRATO ${co} - ${ev}.pdf`);
 }
 
 // ── estilos compartilhados ─────────────────────────────────────────────────────
