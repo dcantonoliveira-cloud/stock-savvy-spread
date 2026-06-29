@@ -77,7 +77,7 @@ export default function TastingsPage() {
     const map: Record<string, SessionStats> = {};
     for (const r of (stats ?? []) as SessionStats[]) map[r.session_id] = r;
     setStatsMap(map);
-    const feats = (company?.data as any)?.features ?? {};
+    const feats = (company as any)?.features ?? {};
     setShowSegunda(!!feats.segunda_degustacao);
     setLoading(false);
   };
