@@ -1,12 +1,23 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, CalendarDays } from 'lucide-react';
+import { Plus, CalendarDays, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
 
 const TIPOS = ['Jantar', 'Almoço'];
+
+type ActiveTab = 'degustacoes' | 'segunda';
+
+interface SegundaRow {
+  event_id: string;
+  event_name: string;
+  event_date: string;
+  status: string;
+  organizer: string | null;
+  location_text: string | null;
+}
 
 interface Session {
   id: string;
@@ -39,15 +50,19 @@ const fmtMoney = (v: number) =>
 
 export default function TastingsPage() {
   const navigate = useNavigate();
-  const [sessions, setSessions]   = useState<Session[]>([]);
-  const [statsMap, setStatsMap]   = useState<Record<string, SessionStats>>({});
-  const [loading, setLoading]     = useState(true);
-  const [visibleCount, setVisibleCount] = useState(15);
-  const [newOpen, setNewOpen]     = useState(false);
+  const [tab,          setTab]         = useState<ActiveTab>('degustacoes');
+  const [sessions,     setSessions]    = useState<Session[]>([]);
+  const [statsMap,     setStatsMap]    = useState<Record<string, SessionStats>>({});
+  const [loading,      setLoading]     = useState(true);
+  const [visibleCount, setVisibleCount]= useState(15);
+  const [newOpen,      setNewOpen]     = useState(false);
+  const [showSegunda,  setShowSegunda] = useState(false);
+  const [segundaRows,  setSegundaRows] = useState<SegundaRow[]>([]);
+  const [segundaLoading, setSegundaLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const [{ data: sess }, { data: stats }] = await Promise.all([
+    const [{ data: sess }, { data: stats }, { data: company }] = await Promise.all([
       supabase
         .from('tasting_sessions' as any)
         .select('id, scheduled_date, type, max_couples, created_at')
@@ -55,16 +70,49 @@ export default function TastingsPage() {
       supabase
         .from('tasting_session_stats' as any)
         .select('*'),
+      supabase.from('companies').select('features').limit(1).single(),
     ]);
 
     setSessions((sess ?? []) as Session[]);
     const map: Record<string, SessionStats> = {};
     for (const r of (stats ?? []) as SessionStats[]) map[r.session_id] = r;
     setStatsMap(map);
+    const feats = (company?.data as any)?.features ?? {};
+    setShowSegunda(!!feats.segunda_degustacao);
     setLoading(false);
   };
 
+  const loadSegunda = async () => {
+    setSegundaLoading(true);
+    const today = new Date().toISOString().split('T')[0];
+    // Fetch distinct event_ids that have been in a tasting session
+    const { data: tse } = await supabase
+      .from('tasting_session_events' as any)
+      .select('event_id');
+    const eventIds = [...new Set((tse ?? []).map((r: any) => r.event_id).filter(Boolean))];
+    if (eventIds.length === 0) { setSegundaRows([]); setSegundaLoading(false); return; }
+
+    const { data: evts } = await supabase
+      .from('events')
+      .select('id, event_name, event_date, status, organizer, location_text')
+      .in('id', eventIds)
+      .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
+      .gte('event_date', today)
+      .order('event_date', { ascending: true });
+
+    setSegundaRows((evts ?? []).map((e: any) => ({
+      event_id:      e.id,
+      event_name:    e.event_name,
+      event_date:    e.event_date,
+      status:        e.status,
+      organizer:     e.organizer ?? null,
+      location_text: e.location_text ?? null,
+    })));
+    setSegundaLoading(false);
+  };
+
   useEffect(() => { load(); }, []);
+  useEffect(() => { if (tab === 'segunda') loadSegunda(); }, [tab]);
 
   const now = new Date().toISOString().split('T')[0];
   const allSorted = [...sessions].sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date));
@@ -130,11 +178,14 @@ export default function TastingsPage() {
 
   return (
     <div>
-      {/* Intro */}
-      <div className="mb-6 flex items-start justify-between gap-6">
-        <p className="text-sm text-muted-foreground">
-          Sessões de degustação são o principal canal de conversão do Rondello. Acompanhe quantos casais novos participam, quantos fecham contrato e quanto já foi pago em cada sessão.
-        </p>
+      {/* Header */}
+      <div className="mb-5 flex items-center justify-between gap-6">
+        <div className="flex items-center gap-1 border-b border-border">
+          <TabBtn active={tab === 'degustacoes'} onClick={() => setTab('degustacoes')}>Degustações</TabBtn>
+          {showSegunda && (
+            <TabBtn active={tab === 'segunda'} onClick={() => setTab('segunda')}>2ª Degustação</TabBtn>
+          )}
+        </div>
         <button
           onClick={() => setNewOpen(true)}
           className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -143,6 +194,19 @@ export default function TastingsPage() {
           Nova degustação
         </button>
       </div>
+
+      {/* ── Aba: 2ª Degustação ──────────────────────────────────────── */}
+      {tab === 'segunda' && (
+        <SegundaDegustacaoTab rows={segundaRows} loading={segundaLoading} onNavigate={id => navigate(`/events/${id}`)} />
+      )}
+
+      {/* ── Aba: Degustações ────────────────────────────────────────── */}
+      {tab === 'degustacoes' && (
+      <>
+      {/* Intro */}
+      <p className="text-sm text-muted-foreground mb-5">
+        Sessões de degustação são o principal canal de conversão do Rondello. Acompanhe quantos casais novos participam, quantos fecham contrato e quanto já foi pago em cada sessão.
+      </p>
 
       {/* Stats rápido */}
       <div className="flex items-center gap-2 text-muted-foreground text-sm mb-5">
@@ -207,11 +271,103 @@ export default function TastingsPage() {
         </div>
       )}
 
+      </>
+      )}
+
       {newOpen && (
         <NewSessionModal
           onClose={() => setNewOpen(false)}
           onCreated={(s) => { setSessions(prev => [s, ...prev]); setNewOpen(false); navigate(`/tastings/${s.id}`); }}
         />
+      )}
+    </div>
+  );
+}
+
+// ── Tab button ────────────────────────────────────────────────────────────────
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick}
+      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+        active
+          ? 'border-primary text-primary'
+          : 'border-transparent text-muted-foreground hover:text-foreground'
+      }`}>
+      {children}
+    </button>
+  );
+}
+
+// ── Urgency badge ─────────────────────────────────────────────────────────────
+function urgency(eventDate: string): { label: string; color: string; Icon: any } | null {
+  const days = Math.ceil((new Date(eventDate).getTime() - Date.now()) / 86_400_000);
+  if (days > 90) return null;
+  if (days > 60) return { label: 'Baixa',  color: 'text-emerald-700 bg-emerald-50 border-emerald-200', Icon: CheckCircle2 };
+  if (days > 30) return { label: 'Média',  color: 'text-amber-700  bg-amber-50  border-amber-200',   Icon: AlertCircle   };
+  return           { label: 'Alta',   color: 'text-red-700    bg-red-50    border-red-200',     Icon: AlertTriangle };
+}
+
+// ── 2ª Degustação Tab ─────────────────────────────────────────────────────────
+function SegundaDegustacaoTab({ rows, loading, onNavigate }: {
+  rows: SegundaRow[];
+  loading: boolean;
+  onNavigate: (id: string) => void;
+}) {
+  if (loading) return (
+    <div className="bg-white border border-border rounded-2xl py-16 text-center text-muted-foreground text-sm">
+      Carregando...
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Eventos confirmados que já participaram de uma degustação mas ainda estão com orçamento em aberto. Agende a segunda degustação para aumentar as chances de conversão.
+      </p>
+
+      {rows.length === 0 ? (
+        <div className="bg-white border border-border rounded-2xl py-16 text-center text-muted-foreground text-sm">
+          Nenhum evento em aberto com degustação realizada.
+        </div>
+      ) : (
+        <div className="bg-white border border-border rounded-2xl overflow-hidden">
+          {/* Header */}
+          <div className="px-5 py-2.5 grid grid-cols-[1fr_160px_140px_120px_110px] gap-3 bg-muted/30 border-b border-border">
+            {['Evento', 'Assessor(a)', 'Local', 'Data do evento', 'Urgência'].map(h => (
+              <span key={h} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
+            ))}
+          </div>
+
+          <div className="divide-y divide-border/50">
+            {rows.map(row => {
+              const u = urgency(row.event_date);
+              const days = Math.ceil((new Date(row.event_date).getTime() - Date.now()) / 86_400_000);
+              return (
+                <div key={row.event_id}
+                  onClick={() => onNavigate(row.event_id)}
+                  className="px-5 py-3 grid grid-cols-[1fr_160px_140px_120px_110px] gap-3 items-center hover:bg-slate-50 cursor-pointer transition-colors">
+                  <span className="text-sm font-medium text-foreground truncate">{row.event_name ?? '—'}</span>
+                  <span className="text-sm text-muted-foreground truncate">{row.organizer ?? '—'}</span>
+                  <span className="text-sm text-muted-foreground truncate">{row.location_text ?? '—'}</span>
+                  <div>
+                    <span className="text-sm tabular-nums text-foreground">{fmtDate(row.event_date)}</span>
+                    <span className="ml-1.5 text-xs text-muted-foreground/60">{days}d</span>
+                  </div>
+                  <div>
+                    {u ? (
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${u.color}`}>
+                        <u.Icon className="w-3 h-3" />
+                        {u.label}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40">+90 dias</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
