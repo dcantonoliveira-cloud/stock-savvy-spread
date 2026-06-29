@@ -7,7 +7,6 @@ import {
   Loader2, Download, Upload, File, X, AlertTriangle,
 } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
-import jsPDF from 'jspdf';
 
 // ── tipos ─────────────────────────────────────────────────────────────────────
 interface Tasting {
@@ -88,35 +87,42 @@ function replaceTags(template: string, event: EventData, w1Name: string, w1Cpf: 
 }
 
 // ── PDF ────────────────────────────────────────────────────────────────────────
-async function downloadContractPDF(html: string, eventName: string) {
-  const { default: html2canvas } = await import('html2canvas');
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;font-family:serif;font-size:13px;line-height:1.8;color:#111;padding:72px;background:white;';
-  container.innerHTML = html;
-  document.body.appendChild(container);
-  await new Promise(r => setTimeout(r, 150));
-  const canvas = await html2canvas(container, { scale: 2, useCORS: true });
-  document.body.removeChild(container);
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const PW = pdf.internal.pageSize.getWidth();
-  const PH = pdf.internal.pageSize.getHeight();
-  const M = 12;
-  const contentW = PW - M * 2;
-  const contentH = (canvas.height * contentW) / canvas.width;
-  const pageContentH = PH - M * 2;
-  let srcY = 0;
-  let remaining = contentH;
-  while (remaining > 0) {
-    const thisH = Math.min(pageContentH, remaining);
-    const srcH = (thisH / contentH) * canvas.height;
-    const pc = document.createElement('canvas');
-    pc.width = canvas.width; pc.height = srcH;
-    pc.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
-    pdf.addImage(pc.toDataURL('image/jpeg', 0.92), 'JPEG', M, M, contentW, thisH);
-    remaining -= thisH; srcY += srcH;
-    if (remaining > 0) pdf.addPage();
-  }
-  pdf.save(`CONTRATO RONDELLO BUFFET - ${(eventName ?? 'Evento').trim()}.pdf`);
+function printContractPDF(html: string, eventName: string, logoBase64: string | null) {
+  const logoHtml = logoBase64
+    ? `<div style="text-align:center;margin-bottom:24px;"><img src="${logoBase64}" style="max-height:80px;max-width:220px;object-fit:contain;" /></div>`
+    : '';
+
+  const win = window.open('', '_blank');
+  if (!win) return;
+
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="utf-8">
+    <title>CONTRATO RONDELLO BUFFET - ${eventName}</title>
+    <style>
+      @page { size: A4; margin: 25mm 20mm; }
+      * { box-sizing: border-box; }
+      body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.7; color: #111; margin: 0; }
+      h1 { font-size: 14pt; text-align: center; margin: 12pt 0 8pt; }
+      h2 { font-size: 13pt; text-align: center; margin: 10pt 0 6pt; }
+      h3 { font-size: 12pt; margin: 8pt 0 4pt; }
+      h4 { font-size: 12pt; margin: 6pt 0 4pt; }
+      blockquote { margin: 0 0 6pt 0; padding: 0; border: none; }
+      ul { margin: 4pt 0 4pt 20pt; padding: 0; }
+      li { margin-bottom: 2pt; }
+      strong { font-weight: bold; }
+      em { font-style: italic; }
+      p { margin: 0 0 6pt; }
+      div { margin-bottom: 4pt; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    </style>
+  </head><body>
+    ${logoHtml}
+    ${html}
+    <script>window.onload = function() { window.print(); }<\/script>
+  </body></html>`);
+  win.document.close();
 }
 
 // ── estilos compartilhados ─────────────────────────────────────────────────────
@@ -150,6 +156,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
   const [files, setFiles]                 = useState<EventFile[]>([]);
   const [uploading, setUploading]         = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [companyLogo, setCompanyLogo]     = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -160,7 +167,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
           .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
           .eq('event_id', eventId),
         supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text').eq('id', eventId).single(),
-        supabase.from('companies').select('witness_1_name,witness_1_cpf').limit(1).single(),
+        supabase.from('companies').select('witness_1_name,witness_1_cpf,logo_base64').limit(1).single(),
         supabase.from('annex_models' as any).select('id,name,content').order('name'),
         supabase.from('event_files' as any).select('id,name,url,created_at').eq('event_id', eventId).order('created_at'),
       ]);
@@ -183,6 +190,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
         const c = compData as any;
         setWitness1Name(c.witness_1_name ?? '');
         setWitness1Cpf(c.witness_1_cpf ?? '');
+        if (c.logo_base64) setCompanyLogo(c.logo_base64);
       }
 
       // buscar contract_template do modelo padrão
@@ -368,11 +376,8 @@ export default function EventArquivosTab({ eventId, event }: Props) {
                 <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">
                   Contrato gerado
                 </span>
-                <button onClick={async () => {
-                  setGeneratingPdf(true);
-                  try { await downloadContractPDF(contractText, event.event_name ?? 'Contrato'); }
-                  catch { toast.error('Erro ao gerar PDF'); }
-                  setGeneratingPdf(false);
+                <button onClick={() => {
+                  printContractPDF(contractText, event.event_name ?? 'Contrato', companyLogo);
                 }} disabled={generatingPdf}
                   className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
                   title="Baixar PDF do contrato">
