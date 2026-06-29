@@ -100,9 +100,8 @@ export default function SupervisorSidebar() {
 
   const toggleGroup = (label: string) => {
     setOpenGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label); else next.add(label);
-      return next;
+      if (prev.has(label)) return new Set<string>();
+      return new Set([label]);
     });
   };
 
