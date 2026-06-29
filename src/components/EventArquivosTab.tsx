@@ -104,7 +104,7 @@ function findSafeCut(data: Uint8ClampedArray, width: number, idealY: number, sea
   return idealY;
 }
 
-async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string) {
+async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = []) {
   const { default: html2canvas } = await import('html2canvas');
 
   const SCALE = 2;
@@ -117,7 +117,10 @@ async function downloadContractPDF(html: string, eventName: string, logoBase64: 
 
   const container = document.createElement('div');
   container.style.cssText = `position:fixed;left:-9999px;top:0;width:${CONTAINER_W_PX}px;background:white;padding:0;margin:0;`;
-  container.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:12.5pt;line-height:1.8;color:#111;word-break:break-word;">${html}</div>`;
+  const annexHtml = annexes.filter(Boolean).map((a, i) =>
+    `<div style="page-break-before:always;margin-top:32px;"><h2 style="text-align:center;font-size:13pt;margin-bottom:16px;">ANEXO ${i + 1}</h2>${a}</div>`
+  ).join('');
+  container.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:12.5pt;line-height:1.8;color:#111;word-break:break-word;">${html}${annexHtml}</div>`;
   document.body.appendChild(container);
   await new Promise(r => setTimeout(r, 250));
 
@@ -429,7 +432,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
                 </span>
                 <button onClick={async () => {
                   setGeneratingPdf(true);
-                  try { await downloadContractPDF(contractText, event.event_name ?? 'Contrato', companyLogo, companyName); }
+                  try { await downloadContractPDF(contractText, event.event_name ?? 'Contrato', companyLogo, companyName, [annex1, annex2].filter(Boolean)); }
                   catch (e) { console.error(e); toast.error('Erro ao gerar PDF'); }
                   finally { setGeneratingPdf(false); }
                 }} disabled={generatingPdf}
