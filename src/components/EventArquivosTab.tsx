@@ -88,7 +88,7 @@ function replaceTags(template: string, event: EventData, w1Name: string, w1Cpf: 
 }
 
 // ── PDF ────────────────────────────────────────────────────────────────────────
-async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null) {
+async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string) {
   const MX = 12; // margem horizontal mm
   const MY_TOP = 38; // espaço para cabeçalho
   const MY_BOT = 18; // espaço para rodapé
@@ -155,7 +155,9 @@ async function downloadContractPDF(html: string, eventName: string, logoBase64: 
           doc.setPage(i);
           addHeaderFooter(i, total);
         }
-        doc.save(`CONTRATO RONDELLO BUFFET - ${(eventName ?? 'Evento').trim()}.pdf`);
+        const co = (companyName ?? '').trim().toUpperCase();
+        const ev = (eventName ?? 'Evento').trim();
+        doc.save(`CONTRATO ${co} - ${ev}.pdf`);
         resolve();
       },
       x: MX,
@@ -202,6 +204,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
   const [uploading, setUploading]         = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [companyLogo, setCompanyLogo]     = useState<string | null>(null);
+  const [companyName, setCompanyName]     = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -212,7 +215,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
           .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
           .eq('event_id', eventId),
         supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text').eq('id', eventId).single(),
-        supabase.from('companies').select('witness_1_name,witness_1_cpf,logo_base64').limit(1).single(),
+        supabase.from('companies').select('witness_1_name,witness_1_cpf,logo_base64,name').limit(1).single(),
         supabase.from('annex_models' as any).select('id,name,content').order('name'),
         supabase.from('event_files' as any).select('id,name,url,created_at').eq('event_id', eventId).order('created_at'),
       ]);
@@ -236,6 +239,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
         setWitness1Name(c.witness_1_name ?? '');
         setWitness1Cpf(c.witness_1_cpf ?? '');
         if (c.logo_base64) setCompanyLogo(c.logo_base64);
+        if (c.name) setCompanyName(c.name);
       }
 
       // buscar contract_template do modelo padrão
@@ -423,7 +427,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
                 </span>
                 <button onClick={async () => {
                   setGeneratingPdf(true);
-                  try { await downloadContractPDF(contractText, event.event_name ?? 'Contrato', companyLogo); }
+                  try { await downloadContractPDF(contractText, event.event_name ?? 'Contrato', companyLogo, companyName); }
                   catch (e) { console.error(e); toast.error('Erro ao gerar PDF'); }
                   finally { setGeneratingPdf(false); }
                 }} disabled={generatingPdf}
