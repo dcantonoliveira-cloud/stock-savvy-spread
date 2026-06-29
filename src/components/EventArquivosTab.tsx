@@ -89,79 +89,85 @@ function replaceTags(template: string, event: EventData, w1Name: string, w1Cpf: 
 
 // ── PDF ────────────────────────────────────────────────────────────────────────
 async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null) {
-  const { default: html2canvas } = await import('html2canvas');
+  const MX = 12; // margem horizontal mm
+  const MY_TOP = 38; // espaço para cabeçalho
+  const MY_BOT = 18; // espaço para rodapé
+  const PW = 210;
+  const contentW = PW - MX * 2; // 186mm
 
-  const logoHtml = logoBase64
-    ? `<div style="text-align:center;margin-bottom:28px;"><img src="${logoBase64}" style="max-height:90px;max-width:240px;object-fit:contain;" /></div>`
-    : '';
+  // Monta conteúdo HTML estilizado para jsPDF.html()
+  const bodyHtml = `
+    <div style="
+      font-family:'Times New Roman',Times,serif;
+      font-size:11.5pt;
+      line-height:1.75;
+      color:#111;
+      width:${contentW * 3.7795}px;
+      word-break:break-word;
+    ">
+      ${html}
+    </div>
+  `;
 
   const container = document.createElement('div');
-  container.style.cssText = [
-    'position:fixed;left:-9999px;top:0;',
-    'width:794px;',
-    'font-family:"Times New Roman",Times,serif;',
-    'font-size:13pt;',
-    'line-height:1.8;',
-    'color:#111;',
-    'padding:72px 80px;',
-    'background:white;',
-    'word-break:break-word;',
-    'white-space:pre-wrap;',
-  ].join('');
-  container.innerHTML = logoHtml + html;
-
-  // fix inline styles for block elements
-  container.querySelectorAll('h1,h2').forEach(el => {
-    (el as HTMLElement).style.cssText += 'font-size:14pt;text-align:center;margin:12px 0 8px;';
-  });
-  container.querySelectorAll('h3,h4').forEach(el => {
-    (el as HTMLElement).style.cssText += 'font-size:13pt;margin:10px 0 6px;';
-  });
-  container.querySelectorAll('ul').forEach(el => {
-    (el as HTMLElement).style.cssText += 'margin:6px 0 6px 24px;padding:0;';
-  });
-  container.querySelectorAll('li').forEach(el => {
-    (el as HTMLElement).style.cssText += 'margin-bottom:3px;';
-  });
-  container.querySelectorAll('blockquote').forEach(el => {
-    (el as HTMLElement).style.cssText += 'margin:0 0 8px 0;padding:0;border:none;';
-  });
-
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;background:white;';
+  container.innerHTML = bodyHtml;
   document.body.appendChild(container);
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 100));
 
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const PW = pdf.internal.pageSize.getWidth();   // 210
-  const PH = pdf.internal.pageSize.getHeight();  // 297
-  const MX = 15; const MY = 15;
-  const contentW = PW - MX * 2;
-  const PAGE_H_PX = container.scrollHeight;
-  const SCALE = 2;
+  const PH = pdf.internal.pageSize.getHeight();
 
-  // Render em blocos de página para evitar cortes no meio de linha
-  const pxPerMm = (794 / contentW);
-  const pageHeightPx = Math.floor((PH - MY * 2) * pxPerMm);
+  const addHeaderFooter = (pageNum: number, totalPages: number) => {
+    // Linha topo
+    pdf.setDrawColor(180, 160, 120);
+    pdf.setLineWidth(0.4);
+    pdf.line(MX, 28, PW - MX, 28);
 
-  let srcY = 0;
-  let first = true;
-  while (srcY < PAGE_H_PX) {
-    const sliceH = Math.min(pageHeightPx, PAGE_H_PX - srcY);
-    const canvas = await html2canvas(container, {
-      scale: SCALE,
-      useCORS: true,
-      y: srcY,
-      height: sliceH,
-      windowHeight: PAGE_H_PX,
+    // Logo ou nome da empresa
+    if (logoBase64) {
+      try { pdf.addImage(logoBase64, 'PNG', MX, 6, 0, 18); } catch {}
+    }
+
+    // Nome do evento à direita no cabeçalho
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(120, 110, 90);
+    pdf.text(eventName, PW - MX, 14, { align: 'right' });
+
+    // Linha rodapé
+    pdf.line(MX, PH - 14, PW - MX, PH - 14);
+
+    // Texto rodapé
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(150, 140, 120);
+    pdf.text('Paulmaris Sorocaba Ltda · CNPJ 02.646.036/0001-72', MX, PH - 9);
+    pdf.text(`Página ${pageNum} de ${totalPages}`, PW - MX, PH - 9, { align: 'right' });
+
+    pdf.setTextColor(17, 17, 17);
+  };
+
+  await new Promise<void>((resolve) => {
+    pdf.html(container, {
+      callback: (doc) => {
+        const total = doc.getNumberOfPages();
+        for (let i = 1; i <= total; i++) {
+          doc.setPage(i);
+          addHeaderFooter(i, total);
+        }
+        doc.save(`CONTRATO RONDELLO BUFFET - ${(eventName ?? 'Evento').trim()}.pdf`);
+        resolve();
+      },
+      x: MX,
+      y: MY_TOP,
+      width: contentW,
+      windowWidth: Math.round(contentW * 3.7795),
+      autoPaging: 'text',
+      margin: [MY_TOP, MX, MY_BOT, MX],
     });
-    const imgH = (sliceH / pxPerMm);
-    if (!first) pdf.addPage();
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', MX, MY, contentW, imgH);
-    srcY += sliceH;
-    first = false;
-  }
+  });
 
   document.body.removeChild(container);
-  pdf.save(`CONTRATO RONDELLO BUFFET - ${(eventName ?? 'Evento').trim()}.pdf`);
 }
 
 // ── estilos compartilhados ─────────────────────────────────────────────────────
