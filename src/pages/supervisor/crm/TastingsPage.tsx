@@ -36,7 +36,7 @@ interface AbertoRow {
   event_date: string;
   status: string;
   assessor: string | null;
-  notes: string | null;
+  budget_note: string | null;
   last_tasting_date: string | null;
 }
 
@@ -60,12 +60,11 @@ const fmtMoney = (v: number) =>
   v === 0 ? null : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 const STATUS_OPTIONS = [
-  { value: 'lead',               label: '1º Contato',    color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { value: 'negotiating',        label: 'Negociando',    color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { value: 'tasting_scheduled',  label: 'Deg. Agendada', color: 'bg-violet-100 text-violet-700 border-violet-200' },
-  { value: 'confirmed',          label: 'Confirmado',    color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  { value: 'completed',          label: 'Realizado',     color: 'bg-slate-100 text-slate-600 border-slate-200' },
-  { value: 'cancelled',          label: 'Cancelado',     color: 'bg-red-100 text-red-700 border-red-200' },
+  { value: 'lead',              label: '1º Contato',    color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { value: 'negotiating',       label: 'Negociando',    color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { value: 'tasting_scheduled', label: 'Deg. Agendada', color: 'bg-violet-100 text-violet-700 border-violet-200' },
+  { value: 'confirmed',         label: 'Confirmado',    color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  { value: 'cancelled',         label: 'Cancelado',     color: 'bg-red-100 text-red-700 border-red-200' },
 ];
 
 function getStatus(value: string) {
@@ -128,7 +127,7 @@ export default function TastingsPage() {
 
     const { data: evts, error } = await supabase
       .from('events')
-      .select('id, event_name, event_date, status, notes, clients(name)')
+      .select('id, event_name, event_date, status, budget_note, clients(name)')
       .in('id', eventIds)
       .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
       .order('event_date', { ascending: true });
@@ -136,12 +135,12 @@ export default function TastingsPage() {
     if (error) console.error('[aberto]', error);
 
     setAbertoRows((evts ?? []).map((e: any) => ({
-      event_id:         e.id,
-      event_name:       e.event_name,
-      event_date:       e.event_date,
-      status:           e.status,
-      assessor:         e.clients?.name ?? null,
-      notes:            e.notes ?? null,
+      event_id:          e.id,
+      event_name:        e.event_name,
+      event_date:        e.event_date,
+      status:            e.status,
+      assessor:          e.clients?.name ?? null,
+      budget_note:       e.budget_note ?? null,
       last_tasting_date: tastingDateMap[e.id] ?? null,
     })));
     setAbertoLoading(false);
@@ -330,6 +329,12 @@ export default function TastingsPage() {
               if (error) toast.error('Erro ao atualizar status');
             });
           }}
+          onNoteChange={(id, note) => {
+            setAbertoRows(prev => prev.map(r => r.event_id === id ? { ...r, budget_note: note } : r));
+            supabase.from('events').update({ budget_note: note } as any).eq('id', id).then(({ error }) => {
+              if (error) toast.error('Erro ao salvar');
+            });
+          }}
         />
       )}
 
@@ -400,12 +405,47 @@ function StatusBadge({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
+// ─── Note inline editor ───────────────────────────────────────────────────────
+function NoteCell({ value, onSave }: { value: string | null; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value ?? '');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    if (text !== (value ?? '')) onSave(text);
+  };
+
+  if (editing) {
+    return (
+      <input ref={inputRef} value={text}
+        onChange={e => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setText(value ?? ''); setEditing(false); } }}
+        className="w-full text-sm border-0 border-b border-primary bg-transparent outline-none py-0.5 text-foreground"
+        onClick={e => e.stopPropagation()}
+      />
+    );
+  }
+
+  return (
+    <span onClick={e => { e.stopPropagation(); setEditing(true); }}
+      title={text || 'Clique para adicionar anotação'}
+      className={`text-sm truncate cursor-text block ${text ? 'text-muted-foreground hover:text-foreground' : 'text-muted-foreground/30 italic hover:text-muted-foreground/60'} transition-colors`}>
+      {text || 'Adicionar anotação…'}
+    </span>
+  );
+}
+
 // ─── Lista em aberto tab ──────────────────────────────────────────────────────
-function ListaAbertoTab({ rows, loading, onNavigate, onStatusChange }: {
+function ListaAbertoTab({ rows, loading, onNavigate, onStatusChange, onNoteChange }: {
   rows: AbertoRow[];
   loading: boolean;
   onNavigate: (id: string) => void;
   onStatusChange: (id: string, status: string) => void;
+  onNoteChange: (id: string, note: string) => void;
 }) {
   if (loading) return <div className="bg-white border border-border rounded-2xl py-16 text-center text-muted-foreground text-sm">Carregando...</div>;
 
@@ -437,7 +477,7 @@ function ListaAbertoTab({ rows, loading, onNavigate, onStatusChange }: {
                 </div>
                 <span className="text-sm tabular-nums text-foreground">{fmtDate(row.event_date)}</span>
                 <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(row.last_tasting_date)}</span>
-                <span className="text-sm text-muted-foreground/60 truncate">{row.notes ?? 'Observações sobre o orçamento'}</span>
+                <NoteCell value={row.budget_note} onSave={note => onNoteChange(row.event_id, note)} />
               </div>
             ))}
           </div>
