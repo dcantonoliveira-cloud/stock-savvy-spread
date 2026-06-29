@@ -7,6 +7,7 @@ import {
   Loader2, Download, Upload, File, X, AlertTriangle,
 } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
+import jsPDF from 'jspdf';
 
 // ── tipos ─────────────────────────────────────────────────────────────────────
 interface Tasting {
@@ -87,42 +88,80 @@ function replaceTags(template: string, event: EventData, w1Name: string, w1Cpf: 
 }
 
 // ── PDF ────────────────────────────────────────────────────────────────────────
-function printContractPDF(html: string, eventName: string, logoBase64: string | null) {
+async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null) {
+  const { default: html2canvas } = await import('html2canvas');
+
   const logoHtml = logoBase64
-    ? `<div style="text-align:center;margin-bottom:24px;"><img src="${logoBase64}" style="max-height:80px;max-width:220px;object-fit:contain;" /></div>`
+    ? `<div style="text-align:center;margin-bottom:28px;"><img src="${logoBase64}" style="max-height:90px;max-width:240px;object-fit:contain;" /></div>`
     : '';
 
-  const win = window.open('', '_blank');
-  if (!win) return;
+  const container = document.createElement('div');
+  container.style.cssText = [
+    'position:fixed;left:-9999px;top:0;',
+    'width:794px;',
+    'font-family:"Times New Roman",Times,serif;',
+    'font-size:13pt;',
+    'line-height:1.8;',
+    'color:#111;',
+    'padding:72px 80px;',
+    'background:white;',
+    'word-break:break-word;',
+    'white-space:pre-wrap;',
+  ].join('');
+  container.innerHTML = logoHtml + html;
 
-  win.document.write(`<!DOCTYPE html><html><head>
-    <meta charset="utf-8">
-    <title>CONTRATO RONDELLO BUFFET - ${eventName}</title>
-    <style>
-      @page { size: A4; margin: 25mm 20mm; }
-      * { box-sizing: border-box; }
-      body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.7; color: #111; margin: 0; }
-      h1 { font-size: 14pt; text-align: center; margin: 12pt 0 8pt; }
-      h2 { font-size: 13pt; text-align: center; margin: 10pt 0 6pt; }
-      h3 { font-size: 12pt; margin: 8pt 0 4pt; }
-      h4 { font-size: 12pt; margin: 6pt 0 4pt; }
-      blockquote { margin: 0 0 6pt 0; padding: 0; border: none; }
-      ul { margin: 4pt 0 4pt 20pt; padding: 0; }
-      li { margin-bottom: 2pt; }
-      strong { font-weight: bold; }
-      em { font-style: italic; }
-      p { margin: 0 0 6pt; }
-      div { margin-bottom: 4pt; }
-      @media print {
-        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      }
-    </style>
-  </head><body>
-    ${logoHtml}
-    ${html}
-    <script>window.onload = function() { window.print(); }<\/script>
-  </body></html>`);
-  win.document.close();
+  // fix inline styles for block elements
+  container.querySelectorAll('h1,h2').forEach(el => {
+    (el as HTMLElement).style.cssText += 'font-size:14pt;text-align:center;margin:12px 0 8px;';
+  });
+  container.querySelectorAll('h3,h4').forEach(el => {
+    (el as HTMLElement).style.cssText += 'font-size:13pt;margin:10px 0 6px;';
+  });
+  container.querySelectorAll('ul').forEach(el => {
+    (el as HTMLElement).style.cssText += 'margin:6px 0 6px 24px;padding:0;';
+  });
+  container.querySelectorAll('li').forEach(el => {
+    (el as HTMLElement).style.cssText += 'margin-bottom:3px;';
+  });
+  container.querySelectorAll('blockquote').forEach(el => {
+    (el as HTMLElement).style.cssText += 'margin:0 0 8px 0;padding:0;border:none;';
+  });
+
+  document.body.appendChild(container);
+  await new Promise(r => setTimeout(r, 200));
+
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const PW = pdf.internal.pageSize.getWidth();   // 210
+  const PH = pdf.internal.pageSize.getHeight();  // 297
+  const MX = 15; const MY = 15;
+  const contentW = PW - MX * 2;
+  const PAGE_H_PX = container.scrollHeight;
+  const SCALE = 2;
+
+  // Render em blocos de página para evitar cortes no meio de linha
+  const pxPerMm = (794 / contentW);
+  const pageHeightPx = Math.floor((PH - MY * 2) * pxPerMm);
+
+  let srcY = 0;
+  let first = true;
+  while (srcY < PAGE_H_PX) {
+    const sliceH = Math.min(pageHeightPx, PAGE_H_PX - srcY);
+    const canvas = await html2canvas(container, {
+      scale: SCALE,
+      useCORS: true,
+      y: srcY,
+      height: sliceH,
+      windowHeight: PAGE_H_PX,
+    });
+    const imgH = (sliceH / pxPerMm);
+    if (!first) pdf.addPage();
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', MX, MY, contentW, imgH);
+    srcY += sliceH;
+    first = false;
+  }
+
+  document.body.removeChild(container);
+  pdf.save(`CONTRATO RONDELLO BUFFET - ${(eventName ?? 'Evento').trim()}.pdf`);
 }
 
 // ── estilos compartilhados ─────────────────────────────────────────────────────
@@ -376,8 +415,11 @@ export default function EventArquivosTab({ eventId, event }: Props) {
                 <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">
                   Contrato gerado
                 </span>
-                <button onClick={() => {
-                  printContractPDF(contractText, event.event_name ?? 'Contrato', companyLogo);
+                <button onClick={async () => {
+                  setGeneratingPdf(true);
+                  try { await downloadContractPDF(contractText, event.event_name ?? 'Contrato', companyLogo); }
+                  catch (e) { console.error(e); toast.error('Erro ao gerar PDF'); }
+                  finally { setGeneratingPdf(false); }
                 }} disabled={generatingPdf}
                   className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
                   title="Baixar PDF do contrato">
