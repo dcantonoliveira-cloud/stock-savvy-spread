@@ -30,6 +30,7 @@ const navStructure: NavGroup[] = [
 
   { label: 'Financeiro', icon: DollarSign, items: [
     { path: '/financeiro', label: 'Visão Geral', icon: TrendingUp },
+    { path: '/financeiro/fluxo', label: 'Fluxo de Caixa', icon: DollarSign },
   ]},
 
   { label: 'Operações', icon: UtensilsCrossed, items: [
@@ -41,17 +42,14 @@ const navStructure: NavGroup[] = [
   { label: 'Estoque', icon: Package, items: [
     { path: '/items', label: 'Estoque Geral', icon: Package },
     { path: '/inventory', label: 'Inventários', icon: ClipboardCheck },
+    { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
+    { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
+    { path: '/batch-movement', label: 'Em Lote', icon: ArrowRightLeft },
+    { path: '/transfers', label: 'Transferências', icon: ArrowRightLeft },
     { path: '/fornecedores', label: 'Fornecedores', icon: Truck },
     { path: '/categories', label: 'Insumos', icon: FolderOpen },
     { path: '/tags', label: 'Tags', icon: Tag },
     { path: '/kitchens', label: 'Centros de Custo', icon: Building2 },
-  ]},
-
-  { label: 'Movimentações', icon: ArrowRightLeft, items: [
-    { path: '/batch-movement', label: 'Em Lote', icon: ArrowRightLeft },
-    { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
-    { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
-    { path: '/transfers', label: 'Transferências', icon: ArrowRightLeft },
   ]},
 
   { label: 'Materiais', icon: Warehouse, items: [
