@@ -41,7 +41,7 @@ async function fetchAllBubble() {
 async function fetchSupabaseEvents() {
   const { data, error } = await supabase
     .from('events')
-    .select('id, name, event_date, contract_text, annex_1_text')
+    .select('id, event_name, event_date, contract_text, annex_1_text')
     .order('event_date');
   if (error) throw error;
   return data;
@@ -76,12 +76,12 @@ async function main() {
 
     // Match por nome + data
     const match = supaEvents.find(s =>
-      normalize(s.name) === bName && sameDate(bDate, s.event_date)
+      normalize(s.event_name) === bName && sameDate(bDate, s.event_date)
     );
 
     if (!match) {
       // Tenta só pelo nome (data pode estar diferente)
-      const byName = supaEvents.filter(s => normalize(s.name) === bName);
+      const byName = supaEvents.filter(s => normalize(s.event_name) === bName);
       if (byName.length === 1) {
         const s = byName[0];
         await doUpdate(s.id, bev, supabase);
