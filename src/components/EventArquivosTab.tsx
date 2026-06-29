@@ -434,29 +434,6 @@ export default function EventArquivosTab({ eventId, event }: Props) {
         )}
       </div>
 
-      {/* 3. LINK DO CONTRATO ASSINADO */}
-      <div className="bg-white border border-border rounded-2xl p-6">
-        <SectionDivider title="Link do contrato assinado" />
-        <p className="text-xs text-muted-foreground mb-3">Cole o link gerado após assinatura eletrônica (ClickSign, DocuSign, etc.)</p>
-        <div className="flex gap-2">
-          <input className={inputCls} value={signedUrl}
-            onChange={e => { setSignedUrl(e.target.value); autoSave('contract_signed_url', e.target.value); }}
-            placeholder="https://..." />
-          {signedUrl && (
-            <>
-              <a href={signedUrl} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center w-9 h-9 border border-border rounded-lg text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors shrink-0">
-                <ExternalLink className="w-4 h-4" />
-              </a>
-              <button onClick={() => { navigator.clipboard.writeText(signedUrl); toast.success('Copiado'); }}
-                className="flex items-center justify-center w-9 h-9 border border-border rounded-lg text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors shrink-0">
-                <Copy className="w-4 h-4" />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
       {/* 4. ARQUIVOS DO EVENTO */}
       <div className="bg-white border border-border rounded-2xl p-6">
         <div className="flex items-center justify-between mb-1">
