@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2, Check, X, ChevronDown, ChevronRight, Info, HelpCircle } from 'lucide-react';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
+import { buildMessage } from '@/lib/whatsapp';
 
 // ── SectionHeader ─────────────────────────────────────────────────────────────
 function SectionHeader({ title, tooltip }: { title: string; tooltip: string }) {
@@ -240,11 +241,8 @@ export default function EventFinanceiroTab({
     // Popup WhatsApp
     if (clientPhone) {
       const fmtVal = Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      setWaTrigger({
-        phone: clientPhone,
-        clientName: clientName ?? 'Cliente',
-        message: `Olá, ${clientName ?? 'tudo bem'}! 😊\n\nRegistramos seu pagamento de *${fmtVal}* referente ao evento *${eventName ?? 'seu evento'}*.\n\nQualquer dúvida, estamos à disposição! 🎉\n\n— Rondello Buffet`,
-      });
+      buildMessage('payment', { clientName: clientName ?? '', value: fmtVal, eventName: eventName ?? '' })
+        .then(text => setWaTrigger({ phone: clientPhone, clientName: clientName ?? 'Cliente', message: text }));
     }
   };
 

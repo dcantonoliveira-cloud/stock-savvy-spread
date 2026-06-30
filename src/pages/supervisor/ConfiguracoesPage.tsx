@@ -3,8 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Upload, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle,
-  User, Building2, Plug, Camera, Lock,
+  User, Building2, Plug, Camera, Lock, MessageCircle, Save, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import {
+  DEFAULT_TEMPLATES, TEMPLATE_LABELS, TEMPLATE_VARS,
+  MessageTemplateKey, MessageTemplates, invalidateTemplateCache,
+} from '@/lib/whatsapp';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Company {
@@ -371,6 +375,90 @@ function AvatarBlock({ profile, onUpload, onRemove, uploading }: {
   );
 }
 
+// ─── WhatsApp Templates Card ──────────────────────────────────────────────────
+function WhatsAppTemplatesCard({ savedJson, onSave }: {
+  savedJson: string | null;
+  onSave: (json: string) => Promise<void>;
+}) {
+  const parsed: Partial<MessageTemplates> = (() => {
+    try { return savedJson ? JSON.parse(savedJson) : {}; } catch { return {}; }
+  })();
+
+  const [templates, setTemplates] = useState<MessageTemplates>({
+    ...DEFAULT_TEMPLATES,
+    ...parsed,
+  });
+  const [saving, setSaving]       = useState(false);
+  const [open, setOpen]           = useState(false);
+
+  const KEYS: MessageTemplateKey[] = ['payment', 'file', 'tasting', 'review'];
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(JSON.stringify(templates));
+    setSaving(false);
+    toast.success('Modelos salvos');
+  };
+
+  return (
+    <div className="bg-white border border-border rounded-2xl overflow-hidden">
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#25D366' }}>
+            <MessageCircle className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-bold text-foreground leading-none">Modelos de Mensagem WhatsApp</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Configure o texto enviado em cada gatilho automático</p>
+          </div>
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-border px-5 py-5 space-y-5">
+          <div className="text-xs text-muted-foreground bg-muted/40 rounded-xl p-3 leading-relaxed">
+            Use variáveis entre chaves duplas para personalizar. Cada modelo tem as variáveis disponíveis indicadas abaixo.
+          </div>
+
+          {KEYS.map(key => (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  {TEMPLATE_LABELS[key]}
+                </label>
+                <div className="flex gap-1 flex-wrap justify-end">
+                  {TEMPLATE_VARS[key].map(v => (
+                    <span key={v} className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{v}</span>
+                  ))}
+                </div>
+              </div>
+              <textarea
+                value={templates[key]}
+                onChange={e => setTemplates(prev => ({ ...prev, [key]: e.target.value }))}
+                rows={4}
+                className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none font-mono leading-relaxed"
+              />
+              <button
+                onClick={() => setTemplates(prev => ({ ...prev, [key]: DEFAULT_TEMPLATES[key] }))}
+                className="text-[11px] text-muted-foreground hover:text-foreground mt-1 hover:underline">
+                Restaurar padrão
+              </button>
+            </div>
+          ))}
+
+          <button onClick={handleSave} disabled={saving}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60">
+            <Save className="w-4 h-4" />
+            {saving ? 'Salvando...' : 'Salvar modelos'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ConfiguracoesPage() {
   const [tab,             setTab]           = useState<Tab>('perfil');
@@ -701,6 +789,11 @@ export default function ConfiguracoesPage() {
             <ZapiConnectorCard
               integration={integrations.find(i => i.provider === 'zapi') ?? null}
               onSave={(key, enabled) => saveIntegration('zapi', key, enabled)}
+            />
+
+            <WhatsAppTemplatesCard
+              savedJson={integrations.find(i => i.provider === 'whatsapp_messages')?.api_key ?? null}
+              onSave={async (json) => { await saveIntegration('whatsapp_messages', json, true); invalidateTemplateCache(); }}
             />
 
             <div className="border border-border rounded-2xl p-5 bg-muted/20">

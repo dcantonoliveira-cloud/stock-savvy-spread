@@ -6,6 +6,7 @@ import { X, Plus, Trash2, ExternalLink, Search, Loader2, AlertTriangle } from 'l
 import { createPortal } from 'react-dom';
 import RichTextEditor from '@/components/RichTextEditor';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
+import { buildMessage } from '@/lib/whatsapp';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Session {
@@ -486,11 +487,8 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
     if (client?.phone) {
       const [y, m, d] = sessionDate.split('-');
       const dateFmt = `${d}/${m}/${y}`;
-      setWaTrigger({
-        phone: client.phone,
-        clientName: client.name ?? 'Cliente',
-        message: `Olá, ${client.name ?? 'tudo bem'}! 🍽️\n\nSua degustação foi agendada para o dia *${dateFmt}*.\n\nAguardamos vocês com muito carinho para essa experiência especial!\n\n— Rondello Buffet`,
-      });
+      buildMessage('tasting', { clientName: client.name ?? '', date: dateFmt })
+        .then(text => setWaTrigger({ phone: client.phone, clientName: client.name ?? 'Cliente', message: text }));
     } else {
       onAdded();
     }

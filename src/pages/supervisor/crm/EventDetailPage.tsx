@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, ChevronDown, Star } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
@@ -520,17 +520,6 @@ export default function EventDetailPage() {
                 <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
                   <Download className="w-3 h-3" />Fechamento
                 </Button>
-                {event.clients?.phone && (
-                  <Button variant="outline" size="sm"
-                    className="gap-1.5 h-8 text-xs hidden md:flex text-amber-600 border-amber-200 hover:bg-amber-50"
-                    onClick={() => setWaTrigger({
-                      phone: event.clients!.phone!,
-                      clientName: event.clients?.name ?? 'Cliente',
-                      message: `Olá, ${event.clients?.name ?? 'tudo bem'}! ⭐\n\nFoi uma honra realizar o *${form.event_name ?? 'seu evento'}*!\n\nGostaríamos muito de saber sua opinião sobre nossos serviços. Sua avaliação é muito importante para nós!\n\nObrigado pela confiança!\n— Rondello Buffet`,
-                    })}>
-                    <Star className="w-3 h-3" />Pedir avaliação
-                  </Button>
-                )}
               </>
             )}
 
@@ -833,6 +822,8 @@ export default function EventDetailPage() {
             eventId={id}
             clientEmail={event.clients?.email ?? null}
             clientWhatsapp={event.clients?.phone ?? null}
+            clientName={event.clients?.name ?? null}
+            eventName={form.event_name ?? null}
             onCancelEvent={cancelEvent}
             onDeleteEvent={deleteEvent}
           />
