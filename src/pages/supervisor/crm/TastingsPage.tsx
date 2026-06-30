@@ -326,7 +326,12 @@ export default function TastingsPage() {
           loading={abertoLoading}
           onNavigate={id => navigate(`/events/${id}`)}
           onStatusChange={(id, status) => {
-            setAbertoRows(prev => prev.map(r => r.event_id === id ? { ...r, status } : r));
+            const OPEN = ['lead', 'negotiating'];
+            if (!OPEN.includes(status)) {
+              setAbertoRows(prev => prev.filter(r => r.event_id !== id));
+            } else {
+              setAbertoRows(prev => prev.map(r => r.event_id === id ? { ...r, status } : r));
+            }
             supabase.from('events').update({ status }).eq('id', id).then(({ error }) => {
               if (error) toast.error('Erro ao atualizar status');
             });
