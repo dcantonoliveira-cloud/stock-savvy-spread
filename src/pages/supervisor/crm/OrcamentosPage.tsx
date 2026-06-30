@@ -368,7 +368,11 @@ function StatusDropdown({ status, onChange }: { status: string; onChange: (s: st
   const handleOpen = () => {
     if (btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left });
+      const dropH = ALL_STATUS_OPTIONS.length * 36 + 8;
+      const below = r.bottom + 4 + dropH < window.innerHeight;
+      setPos(below
+        ? { top: r.bottom + 4, left: r.left }
+        : { top: r.top - dropH - 4, left: r.left });
     }
     setOpen(o => !o);
   };
