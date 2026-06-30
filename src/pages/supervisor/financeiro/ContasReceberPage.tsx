@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { ExternalLink, TrendingUp, Clock, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { ExternalLink, TrendingUp, Clock, AlertTriangle, ChevronDown, ChevronRight, CheckCircle2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { createPortal } from 'react-dom';
 
 // Para cada evento: total_value - soma dos pagamentos confirmados = saldo devedor
 type EventBalance = {
@@ -34,6 +35,9 @@ export default function ContasReceberPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab]         = useState<'aberto' | 'vencido'>('aberto');
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
+  const [confirmEvent, setConfirmEvent] = useState<EventBalance | null>(null);
+  const [receiveDate, setReceiveDate]   = useState(today);
+  const [marking, setMarking]           = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -90,6 +94,24 @@ export default function ContasReceberPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const markReceived = async () => {
+    if (!confirmEvent) return;
+    setMarking(confirmEvent.id);
+    const { error } = await supabase.from('event_payments' as any).insert({
+      event_id: confirmEvent.id,
+      payment_date: receiveDate,
+      value: confirmEvent.outstanding,
+      type: 'payment',
+      is_confirmed: true,
+      notes: 'Saldo quitado via Contas a Receber',
+    });
+    if (error) { toast.error('Erro ao registrar recebimento'); setMarking(null); return; }
+    toast.success(`${fmtBRL(confirmEvent.outstanding)} recebido e registrado`);
+    setEvents(prev => prev.filter(e => e.id !== confirmEvent.id));
+    setConfirmEvent(null);
+    setMarking(null);
+  };
 
   const isPastEvent = (e: EventBalance) =>
     e.event_date !== null && e.event_date < today;
@@ -206,7 +228,7 @@ export default function ContasReceberPage() {
                 {isOpen && (
                   <>
                     {/* Header row */}
-                    <div className="px-5 py-2 bg-muted/20 border-t border-border grid grid-cols-[110px_1fr_110px_110px_110px] gap-3">
+                    <div className="px-5 py-2 bg-muted/20 border-t border-border grid grid-cols-[110px_1fr_110px_110px_160px] gap-3">
                       {['Data do evento','Evento / Cliente','Valor total','Pago','Saldo'].map((h, i) => (
                         <span key={i} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 ${i >= 2 ? 'text-right' : ''}`}>{h}</span>
                       ))}
@@ -216,14 +238,13 @@ export default function ContasReceberPage() {
                       {monthEvents.map(e => {
                         const pct = e.total_value > 0 ? Math.round((e.paid / e.total_value) * 100) : 0;
                         return (
-                          <div key={e.id} className="px-5 py-3 grid grid-cols-[110px_1fr_110px_110px_110px] gap-3 items-center hover:bg-slate-50 transition-colors group">
+                          <div key={e.id} className="px-5 py-3 grid grid-cols-[110px_1fr_110px_110px_160px] gap-3 items-center hover:bg-slate-50 transition-colors group">
                             <span className="text-sm tabular-nums text-muted-foreground">
                               {e.event_date ? fmtDate(e.event_date) : '—'}
                             </span>
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-foreground truncate">{e.event_name}</p>
                               {e.client_name && <p className="text-xs text-muted-foreground truncate">{e.client_name}</p>}
-                              {/* Barra de progresso */}
                               <div className="flex items-center gap-2 mt-1.5">
                                 <div className="h-1 flex-1 bg-muted rounded-full overflow-hidden max-w-[100px]">
                                   <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
@@ -237,7 +258,15 @@ export default function ContasReceberPage() {
                             </div>
                             <span className="text-sm tabular-nums text-right text-muted-foreground">{fmtBRL(e.total_value)}</span>
                             <span className="text-sm tabular-nums text-right text-emerald-600">+{fmtBRL(e.paid)}</span>
-                            <span className="text-sm font-bold tabular-nums text-right text-amber-600">{fmtBRL(e.outstanding)}</span>
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-sm font-bold tabular-nums text-amber-600">{fmtBRL(e.outstanding)}</span>
+                              <button
+                                onClick={() => { setConfirmEvent(e); setReceiveDate(today); }}
+                                disabled={marking === e.id}
+                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                                <CheckCircle2 className="w-3 h-3" />Receber
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -254,6 +283,46 @@ export default function ContasReceberPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Modal confirmar recebimento */}
+      {confirmEvent && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmEvent(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-foreground">Confirmar recebimento</h3>
+              <button onClick={() => setConfirmEvent(null)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+              <p className="text-xs text-emerald-700 font-semibold uppercase tracking-widest mb-0.5">Saldo a receber</p>
+              <p className="text-2xl font-bold text-emerald-700 tabular-nums">{fmtBRL(confirmEvent.outstanding)}</p>
+              <p className="text-xs text-emerald-600 mt-0.5">{confirmEvent.event_name}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Data do recebimento</label>
+              <input type="date" value={receiveDate} onChange={e => setReceiveDate(e.target.value)}
+                className="w-full h-10 px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Será criado um registro de pagamento confirmado de {fmtBRL(confirmEvent.outstanding)} na aba Financeiro do evento.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmEvent(null)}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
+                Cancelar
+              </button>
+              <button onClick={markReceived} disabled={!!marking}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                {marking ? 'Salvando…' : 'Confirmar recebimento'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
