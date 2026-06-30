@@ -830,8 +830,24 @@ export default function ConfiguracoesPage() {
             </div>
 
             <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
-              <Section title="Testemunha da empresa (nos contratos)" />
+              <Section title="Assinante da empresa (ZapSign)" />
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Field label="Nome">
+                    <input className={inputCls} value={(company as any).signer_name ?? ''} onChange={e => saveCompany('signer_name', e.target.value)} placeholder="Nome do responsável" />
+                  </Field>
+                </div>
+                <div>
+                  <Field label="E-mail">
+                    <input className={inputCls} type="email" value={(company as any).signer_email ?? ''} onChange={e => saveCompany('signer_email', e.target.value)} placeholder="email@empresa.com" />
+                  </Field>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
+              <Section title="Testemunha da empresa (nos contratos)" />
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Field label="Nome">
                     <input className={inputCls} value={(company as any).witness_1_name ?? ''} onChange={e => saveCompany('witness_1_name', e.target.value)} placeholder="Nome completo" />
@@ -840,6 +856,11 @@ export default function ConfiguracoesPage() {
                 <div>
                   <Field label="CPF">
                     <input className={inputCls} value={(company as any).witness_1_cpf ?? ''} onChange={e => saveCompany('witness_1_cpf', e.target.value)} placeholder="000.000.000-00" />
+                  </Field>
+                </div>
+                <div>
+                  <Field label="E-mail (ZapSign)">
+                    <input className={inputCls} type="email" value={(company as any).witness_1_email ?? ''} onChange={e => saveCompany('witness_1_email', e.target.value)} placeholder="testemunha@empresa.com" />
                   </Field>
                 </div>
               </div>
