@@ -889,11 +889,15 @@ export default function EventDetailPage() {
               contract_value: form.contract_value ?? null,
               witness_name: form.witness_name ?? null,
               witness_cpf: form.witness_cpf ?? null,
+              witness_email: (form as any).witness_email ?? null,
+              witness_2_name: (form as any).witness_2_name ?? null,
+              witness_2_email: (form as any).witness_2_email ?? null,
               clients: event.clients ? {
                 name: event.clients.name ?? null,
                 cpf: event.clients.cpf ?? null,
                 rg: event.clients.rg ?? null,
                 address: event.clients.address ?? null,
+                email: event.clients.email ?? null,
               } : null,
             }}
           />
