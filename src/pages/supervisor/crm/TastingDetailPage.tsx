@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import RichTextEditor from '@/components/RichTextEditor';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 import { buildMessage } from '@/lib/whatsapp';
+import { EVENT_STATUS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Session {
@@ -41,14 +42,9 @@ interface SessionEvent {
 const PIPELINE = ['lead', 'negotiating', 'tasting_scheduled'];
 const CLOSED   = ['confirmed', 'completed'];
 
-const STATUS_CFG: Record<string, { label: string; cls: string }> = {
-  lead:              { label: '1° Contato', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
-  negotiating:       { label: 'Negociando', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  tasting_scheduled: { label: 'Degustação', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
-  confirmed:         { label: 'Confirmado', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  completed:         { label: 'Concluído',  cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-  cancelled:         { label: 'Cancelado',  cls: 'bg-red-50 text-red-500 border-red-200' },
-};
+const STATUS_CFG: Record<string, { label: string; cls: string }> = Object.fromEntries(
+  ALL_STATUS_KEYS.map(k => [k, { label: EVENT_STATUS[k].label, cls: EVENT_STATUS[k].cls }])
+);
 
 const SITUATION_CFG: Record<string, { label: string; cls: string }> = {
   new:       { label: 'Cliente novo',   cls: 'text-muted-foreground' },
