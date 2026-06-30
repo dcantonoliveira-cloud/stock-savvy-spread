@@ -5,6 +5,7 @@ import { Plus, CalendarDays, AlertTriangle, AlertCircle, CheckCircle2, ChevronDo
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
+import { EVENT_STATUS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
 
 const TIPOS = ['Jantar', 'Almoço'];
 
@@ -59,16 +60,16 @@ const fmtDate = (d: string | null) => {
 const fmtMoney = (v: number) =>
   v === 0 ? null : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-const STATUS_OPTIONS = [
-  { value: 'lead',              label: '1º Contato',    color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { value: 'negotiating',       label: 'Negociando',    color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { value: 'tasting_scheduled', label: 'Deg. Agendada', color: 'bg-violet-100 text-violet-700 border-violet-200' },
-  { value: 'confirmed',         label: 'Confirmado',    color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  { value: 'cancelled',         label: 'Cancelado',     color: 'bg-red-100 text-red-700 border-red-200' },
-];
+const STATUS_OPTIONS = ALL_STATUS_KEYS.map(k => ({
+  value: k,
+  label: EVENT_STATUS[k].label,
+  color: EVENT_STATUS[k].cls,
+}));
 
 function getStatus(value: string) {
-  return STATUS_OPTIONS.find(s => s.value === value) ?? { label: value, color: 'bg-muted text-muted-foreground border-border' };
+  const s = EVENT_STATUS[value as keyof typeof EVENT_STATUS];
+  if (s) return { label: s.label, color: s.cls };
+  return { label: value, color: 'bg-muted text-muted-foreground border-border' };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
