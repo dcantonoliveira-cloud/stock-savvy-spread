@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, ChevronDown } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, ChevronDown, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
@@ -14,6 +14,7 @@ import EventCronogramaTab from '@/components/EventCronogramaTab';
 import EventFinanceiroTab from '@/components/EventFinanceiroTab';
 import EventArquivosTab from '@/components/EventArquivosTab';
 import EventOutrosTab from '@/components/EventOutrosTab';
+import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 import { printFechamento } from '@/utils/printFechamento';
 import { printFichaTecnica } from '@/utils/printFichaTecnica';
 
@@ -220,6 +221,7 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [tab, setTab] = useState('Ficha Técnica');
+  const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
   const [form, setForm] = useState<Partial<EventDetail>>({});
   const [clientForm, setClientForm] = useState<Record<string, string>>({});
   const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -518,6 +520,17 @@ export default function EventDetailPage() {
                 <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
                   <Download className="w-3 h-3" />Fechamento
                 </Button>
+                {event.clients?.phone && (
+                  <Button variant="outline" size="sm"
+                    className="gap-1.5 h-8 text-xs hidden md:flex text-amber-600 border-amber-200 hover:bg-amber-50"
+                    onClick={() => setWaTrigger({
+                      phone: event.clients!.phone!,
+                      clientName: event.clients?.name ?? 'Cliente',
+                      message: `Olá, ${event.clients?.name ?? 'tudo bem'}! ⭐\n\nFoi uma honra realizar o *${form.event_name ?? 'seu evento'}*!\n\nGostaríamos muito de saber sua opinião sobre nossos serviços. Sua avaliação é muito importante para nós!\n\nObrigado pela confiança!\n— Rondello Buffet`,
+                    })}>
+                    <Star className="w-3 h-3" />Pedir avaliação
+                  </Button>
+                )}
               </>
             )}
 
@@ -843,6 +856,9 @@ export default function EventDetailPage() {
         {tab === 'Financeiro' && id && (
           <EventFinanceiroTab
             eventId={id}
+            clientPhone={event.clients?.phone ?? null}
+            clientName={event.clients?.name ?? null}
+            eventName={form.event_name ?? null}
             event={{
               guest_count: form.guest_count ?? null,
               children_50_pct: form.children_50_pct ?? null,
@@ -862,6 +878,7 @@ export default function EventDetailPage() {
         {tab === 'Arquivos' && id && event && (
           <EventArquivosTab
             eventId={id}
+            clientPhone={event.clients?.phone ?? null}
             event={{
               event_name: form.event_name ?? null,
               event_date: form.event_date ?? null,
@@ -962,6 +979,10 @@ function EventHistorySection({ eventId }: { eventId: string }) {
             </div>
           ))}
         </div>
+      )}
+
+      {waTrigger && (
+        <WhatsAppConfirmModal trigger={waTrigger} onClose={() => setWaTrigger(null)} />
       )}
     </div>
   );
