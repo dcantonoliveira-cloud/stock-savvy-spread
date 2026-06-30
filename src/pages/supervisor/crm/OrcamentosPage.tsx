@@ -26,14 +26,8 @@ const TODAY = new Date().toISOString().split('T')[0];
 const isExpired = (r: Orcamento) =>
   PIPELINE_STATUSES.includes(r.status) && !!r.event_date && r.event_date < TODAY;
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  lead:              { label: '1° Contato',  bg: 'bg-sky-50',    text: 'text-sky-700',    border: 'border-sky-200' },
-  negotiating:       { label: 'Negociando',  bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
-  tasting_scheduled: { label: 'Degustação',  bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  // Não fechado → vermelho claro
-  lost:              { label: 'Não fechado', bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200' },
-  cancelled:         { label: 'Não fechado', bg: 'bg-rose-50',   text: 'text-rose-500',   border: 'border-rose-200' },
-};
+import { EVENT_STATUS, getStatus } from '@/lib/eventStatus';
+const STATUS_CONFIG = EVENT_STATUS;
 
 const fmtDate = (d: string | null) => {
   if (!d) return '—';
@@ -369,7 +363,7 @@ function StatusDropdown({ status, onChange }: { status: string; onChange: (s: st
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
-  const cfg = STATUS_CONFIG[status] ?? { label: status, bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-border' };
+  const cfg = getStatus(status);
 
   const handleOpen = () => {
     if (btnRef.current) {
