@@ -22,6 +22,29 @@ const inputCls =
   'w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white';
 const labelCls = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5';
 
+const maskCpfCnpj = (v: string) => {
+  const d = v.replace(/\D/g, '').slice(0, 14);
+  if (d.length <= 11)
+    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, (_,a,b,c,e) => [a,b,c].filter(Boolean).join('.') + (e ? '-'+e : ''));
+  return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/, (_,a,b,c,e,f) => `${a}.${b}.${c}/${e}` + (f ? '-'+f : ''));
+};
+
+const maskPhone = (v: string) => {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 10) return d.replace(/(\d{2})(\d{4})(\d{0,4})/, (_,a,b,c) => `(${a}) ${b}` + (c ? '-'+c : ''));
+  return d.replace(/(\d{2})(\d{5})(\d{0,4})/, (_,a,b,c) => `(${a}) ${b}` + (c ? '-'+c : ''));
+};
+
+const maskCep = (v: string) => {
+  const d = v.replace(/\D/g, '').slice(0, 8);
+  return d.replace(/(\d{5})(\d{0,3})/, (_,a,b) => a + (b ? '-'+b : ''));
+};
+
+const maskRg = (v: string) => {
+  const d = v.replace(/[^\dXx]/g, '').slice(0, 9);
+  return d.replace(/(\d{2})(\d{3})(\d{3})([0-9Xx]{0,1})/, (_,a,b,c,e) => `${a}.${b}.${c}` + (e ? '-'+e : ''));
+};
+
 const BLANK: FormData = {
   name: '', cpf: '', rg: '', address: '', zip_code: '',
   phone: '', email: '', witness_name: '', witness_cpf: '', witness_email: '',
@@ -72,8 +95,9 @@ export default function ContractFormPage() {
       });
   }, [token]);
 
-  const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm(prev => ({ ...prev, [k]: e.target.value }));
+  const set = (k: keyof FormData, mask?: (v: string) => string) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm(prev => ({ ...prev, [k]: mask ? mask(e.target.value) : e.target.value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,11 +192,11 @@ export default function ContractFormPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>CPF / CNPJ</label>
-                  <input className={inputCls} value={form.cpf} onChange={set('cpf')} placeholder="000.000.000-00" />
+                  <input className={inputCls} value={form.cpf} onChange={set('cpf', maskCpfCnpj)} placeholder="000.000.000-00" inputMode="numeric" />
                 </div>
                 <div>
                   <label className={labelCls}>RG</label>
-                  <input className={inputCls} value={form.rg} onChange={set('rg')} placeholder="00.000.000-0" />
+                  <input className={inputCls} value={form.rg} onChange={set('rg', maskRg)} placeholder="00.000.000-0" inputMode="numeric" />
                 </div>
               </div>
               <div>
@@ -181,11 +205,11 @@ export default function ContractFormPage() {
               </div>
               <div>
                 <label className={labelCls}>CEP</label>
-                <input className={inputCls} value={form.zip_code} onChange={set('zip_code')} placeholder="00000-000" />
+                <input className={inputCls} value={form.zip_code} onChange={set('zip_code', maskCep)} placeholder="00000-000" inputMode="numeric" />
               </div>
               <div>
                 <label className={labelCls}>Telefone com DDD (Whatsapp)</label>
-                <input className={inputCls} value={form.phone} onChange={set('phone')} placeholder="(11) 99999-9999" />
+                <input className={inputCls} value={form.phone} onChange={set('phone', maskPhone)} placeholder="(11) 99999-9999" inputMode="numeric" />
               </div>
               <div>
                 <label className={labelCls}>Email</label>
@@ -205,7 +229,7 @@ export default function ContractFormPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>CPF</label>
-                  <input className={inputCls} value={form.witness_cpf} onChange={set('witness_cpf')} placeholder="000.000.000-00" />
+                  <input className={inputCls} value={form.witness_cpf} onChange={set('witness_cpf', maskCpfCnpj)} placeholder="000.000.000-00" inputMode="numeric" />
                 </div>
                 <div>
                   <label className={labelCls}>Email</label>
