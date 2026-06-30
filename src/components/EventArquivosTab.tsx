@@ -477,7 +477,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
             {contractOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground/40 shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />}
           </button>
           <div className="flex items-center gap-2 shrink-0 ml-4">
-            {contractGenerated && contractOpen && (
+            {contractGenerated && (
               <>
                 <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">Contrato gerado</span>
                 <button onClick={async()=>{setGeneratingPdf(true);try{await downloadContractPDF(contractText,event.event_name??'Contrato',companyLogo,companyName,[annex1,annex2].filter(Boolean));}catch(e){toast.error('Erro ao gerar PDF');}finally{setGeneratingPdf(false);}}}
