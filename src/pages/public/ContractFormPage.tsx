@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle2 } from 'lucide-react';
 
+interface Company { name: string | null; logo_base64: string | null }
+
 interface FormData {
   name: string;
   cpf: string;
@@ -20,21 +22,45 @@ const inputCls =
   'w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white';
 const labelCls = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5';
 
+const BLANK: FormData = {
+  name: '', cpf: '', rg: '', address: '', zip_code: '',
+  phone: '', email: '', witness_name: '', witness_cpf: '', witness_email: '',
+};
+
+function CompanyHeader({ company }: { company: Company | null }) {
+  return (
+    <div className="text-center mb-8">
+      {company?.logo_base64 ? (
+        <img src={company.logo_base64} alt={company.name ?? 'Logo'} className="h-16 mx-auto mb-3 object-contain" />
+      ) : (
+        <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center mx-auto mb-3">
+          <span className="text-white font-bold text-xl">{(company?.name ?? 'R')[0]}</span>
+        </div>
+      )}
+      {company?.name && <h1 className="text-xl font-bold text-gray-800">{company.name}</h1>}
+      <p className="text-gray-500 text-sm mt-1">Dados para elaboração de contrato</p>
+    </div>
+  );
+}
+
 export default function ContractFormPage() {
   const { token } = useParams<{ token: string }>();
   const [state, setState] = useState<'loading' | 'form' | 'submitted' | 'invalid' | 'done'>('loading');
   const [eventId, setEventId] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<FormData>({
-    name: '', cpf: '', rg: '', address: '', zip_code: '',
-    phone: '', email: '', witness_name: '', witness_cpf: '', witness_email: '',
-  });
+  const [company, setCompany] = useState<Company | null>(null);
+  const [form, setForm] = useState<FormData>(BLANK);
 
   useEffect(() => {
     if (!token) { setState('invalid'); return; }
+
+    // Fetch company logo (public, no auth needed)
+    supabase.from('companies').select('name, logo_base64').limit(1).single()
+      .then(({ data }) => { if (data) setCompany(data as Company); });
+
     (supabase.from as any)('events')
-      .select('id, contract_form_submitted, client_id, clients(id, name, phone, email, cpf, rg, address, zip_code)')
+      .select('id, contract_form_submitted, client_id, clients(id)')
       .eq('contract_form_token', token)
       .maybeSingle()
       .then(({ data }: any) => {
@@ -42,16 +68,6 @@ export default function ContractFormPage() {
         if (data.contract_form_submitted) { setState('submitted'); return; }
         setEventId(data.id);
         setClientId(data.clients?.id ?? null);
-        setForm(prev => ({
-          ...prev,
-          name:      data.clients?.name      ?? '',
-          cpf:       data.clients?.cpf       ?? '',
-          rg:        data.clients?.rg        ?? '',
-          address:   data.clients?.address   ?? '',
-          zip_code:  data.clients?.zip_code  ?? '',
-          phone:     data.clients?.phone     ?? '',
-          email:     data.clients?.email     ?? '',
-        }));
         setState('form');
       });
   }, [token]);
@@ -64,7 +80,6 @@ export default function ContractFormPage() {
     if (!eventId) return;
     setSaving(true);
 
-    // Update client data
     if (clientId) {
       await (supabase.from as any)('clients').update({
         name:     form.name     || undefined,
@@ -77,12 +92,11 @@ export default function ContractFormPage() {
       }).eq('id', clientId);
     }
 
-    // Update event witness data + mark submitted
     await (supabase.from as any)('events').update({
-      witness_name:             form.witness_name  || null,
-      witness_cpf:              form.witness_cpf   || null,
-      witness_email:            form.witness_email || null,
-      contract_form_submitted:  true,
+      witness_name:            form.witness_name  || null,
+      witness_cpf:             form.witness_cpf   || null,
+      witness_email:           form.witness_email || null,
+      contract_form_submitted: true,
     }).eq('id', eventId);
 
     setSaving(false);
@@ -101,6 +115,7 @@ export default function ContractFormPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">
+          <CompanyHeader company={company} />
           <p className="text-gray-500 font-medium">Link inválido ou expirado.</p>
           <p className="text-sm text-gray-400 mt-1">Entre em contato com o buffet.</p>
         </div>
@@ -112,6 +127,7 @@ export default function ContractFormPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">
+          <CompanyHeader company={company} />
           <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-1">Dados já enviados</h2>
           <p className="text-sm text-gray-500">Este formulário já foi preenchido. Obrigado!</p>
@@ -124,11 +140,11 @@ export default function ContractFormPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 max-w-md w-full text-center">
+          <CompanyHeader company={company} />
           <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center mx-auto mb-5">
             <CheckCircle2 className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Dados para elaboração de contrato</h2>
-          <p className="text-gray-500 text-sm">Informações salvas com sucesso.</p>
+          <p className="text-gray-500 text-sm mt-2">Informações salvas com sucesso.</p>
         </div>
       </div>
     );
@@ -137,14 +153,7 @@ export default function ContractFormPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-lg mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-xl">R</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">Rondello Buffet</h1>
-          <p className="text-gray-500 text-sm mt-1">Dados para elaboração de contrato</p>
-        </div>
+        <CompanyHeader company={company} />
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-5">
 
