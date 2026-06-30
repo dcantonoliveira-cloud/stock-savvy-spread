@@ -24,7 +24,8 @@ interface EventData {
   ceremony_time: string | null; duration_hours: number | null; location_text: string | null;
   guest_count: number | null; price_per_person: number | null; total_value: number | null;
   product_name: string | null; pricing_mode: string | null; contract_value: number | null;
-  witness_name: string | null; witness_cpf: string | null;
+  witness_name: string | null; witness_cpf: string | null; witness_email: string | null;
+  witness_2_name: string | null; witness_2_email: string | null;
   clients: { name: string | null; cpf: string | null; rg: string | null; address: string | null; email: string | null } | null;
 }
 interface ZapSigner { token: string; name: string; email: string; status: string; sign_url: string }
@@ -188,6 +189,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [annexModels, setAnnexModels]         = useState<AnnexModel[]>([]);
   const [witness1Name, setWitness1Name]       = useState('');
   const [witness1Cpf, setWitness1Cpf]         = useState('');
+  const [witness1Email, setWitness1Email]     = useState('');
+  const [signerName, setSignerName]           = useState('');
+  const [signerEmail, setSignerEmail]         = useState('');
   const [files, setFiles]                     = useState<EventFile[]>([]);
   const [uploading, setUploading]             = useState(false);
   const [generatingPdf, setGeneratingPdf]     = useState(false);
@@ -197,7 +201,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   // ZapSign
   const [zapToken, setZapToken]               = useState<string | null>(null);
   const [zapData, setZapData]                 = useState<ZapData | null>(null);
-  const [zapSigners, setZapSigners]           = useState<{ name: string; email: string }[]>([]);
+  const [zapSigners, setZapSigners]           = useState<{ name: string; email: string; role?: string }[]>([]);
   const [showZapForm, setShowZapForm]         = useState(false);
   const [sendingZap, setSendingZap]           = useState(false);
   const [refreshingZap, setRefreshingZap]     = useState(false);
@@ -212,7 +216,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
           .eq('event_id', eventId),
         supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text,zapsign_data').eq('id', eventId).single(),
-        supabase.from('companies').select('witness_1_name,witness_1_cpf,logo_base64,name').limit(1).single(),
+        supabase.from('companies').select('witness_1_name,witness_1_cpf,witness_1_email,signer_name,signer_email,logo_base64,name').limit(1).single(),
         supabase.from('annex_models' as any).select('id,name,content').order('name'),
         supabase.from('event_files' as any).select('id,name,url,created_at').eq('event_id', eventId).order('created_at'),
         supabase.from('company_integrations' as any).select('api_key').eq('provider','zapsign').maybeSingle(),
@@ -234,6 +238,8 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       if (compData) {
         const c = compData as any;
         setWitness1Name(c.witness_1_name ?? ''); setWitness1Cpf(c.witness_1_cpf ?? '');
+        setWitness1Email(c.witness_1_email ?? '');
+        setSignerName(c.signer_name ?? ''); setSignerEmail(c.signer_email ?? '');
         if (c.logo_base64) setCompanyLogo(c.logo_base64);
         if (c.name) setCompanyName(c.name);
       }
@@ -255,10 +261,22 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   // Pre-populate ZapSign signers when form opens
   useEffect(() => {
     if (!showZapForm) return;
-    const signers: { name: string; email: string }[] = [];
-    if (event.clients?.name)  signers.push({ name: event.clients.name,  email: event.clients.email ?? '' });
-    if (witness1Name)          signers.push({ name: witness1Name,         email: '' });
-    if (event.witness_name)   signers.push({ name: event.witness_name,   email: '' });
+    const signers: { name: string; email: string; role?: string }[] = [];
+    // 1. Contratante (cliente)
+    if (event.clients?.name)
+      signers.push({ name: event.clients.name, email: event.clients.email ?? '', role: 'Contratante' });
+    // 2. Assinante da empresa — de Configurações → Empresa
+    if (signerName)
+      signers.push({ name: signerName, email: signerEmail, role: 'Assinante da empresa' });
+    // 3. Testemunha da empresa — de Configurações → Empresa
+    if (witness1Name)
+      signers.push({ name: witness1Name, email: witness1Email, role: 'Testemunha da empresa' });
+    // 4. Testemunha 1 do evento (dados do cliente)
+    if (event.witness_name)
+      signers.push({ name: event.witness_name, email: event.witness_email ?? '', role: 'Testemunha 1' });
+    // 5. Testemunha 2 do evento (dados do cliente)
+    if (event.witness_2_name)
+      signers.push({ name: event.witness_2_name, email: event.witness_2_email ?? '', role: 'Testemunha 2' });
     setZapSigners(signers.length > 0 ? signers : [{ name: '', email: '' }]);
   }, [showZapForm]);
 
@@ -526,6 +544,10 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                 </div>
                 {zapSigners.map((s,i)=>(
                   <div key={i} className="flex gap-2 items-end">
+                    <div className="w-36 shrink-0">
+                      <label className={labelCls}>Papel</label>
+                      <input className={inputCls} value={s.role ?? ''} onChange={e=>setZapSigners(prev=>prev.map((x,j)=>j===i?{...x,role:e.target.value}:x))} placeholder="Ex: Contratante" />
+                    </div>
                     <div className="flex-1">
                       <label className={labelCls}>Nome</label>
                       <input className={inputCls} value={s.name} onChange={e=>setZapSigners(prev=>prev.map((x,j)=>j===i?{...x,name:e.target.value}:x))} placeholder="Nome completo" />
@@ -534,11 +556,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                       <label className={labelCls}>E-mail</label>
                       <input className={inputCls} type="email" value={s.email} onChange={e=>setZapSigners(prev=>prev.map((x,j)=>j===i?{...x,email:e.target.value}:x))} placeholder="email@exemplo.com" />
                     </div>
-                    {zapSigners.length > 1 && (
-                      <button onClick={()=>setZapSigners(prev=>prev.filter((_,j)=>j!==i))} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button onClick={()=>setZapSigners(prev=>prev.filter((_,j)=>j!==i))} className="p-2 text-muted-foreground hover:text-destructive transition-colors mb-0.5">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 ))}
                 <div className="flex items-center justify-between pt-1">
@@ -572,11 +592,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                 <div className="space-y-2">
                   {zapData.signers.map(s=>(
                     <div key={s.token} className="flex items-center justify-between py-2 px-3 bg-white border border-border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{s.name}</p>
-                          <p className="text-[11px] text-muted-foreground">{s.email}</p>
-                        </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{s.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{s.email}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <SignerStatusBadge status={s.status} />
