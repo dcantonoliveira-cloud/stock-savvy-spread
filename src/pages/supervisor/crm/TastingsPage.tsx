@@ -60,7 +60,8 @@ const fmtDate = (d: string | null) => {
 const fmtMoney = (v: number) =>
   v === 0 ? null : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-const STATUS_OPTIONS = ALL_STATUS_KEYS.map(k => ({
+const TASTING_STATUS_KEYS = ['lead', 'negotiating', 'confirmed', 'cancelled', 'lost'] as const;
+const STATUS_OPTIONS = TASTING_STATUS_KEYS.map(k => ({
   value: k,
   label: EVENT_STATUS[k].label,
   color: EVENT_STATUS[k].cls,
