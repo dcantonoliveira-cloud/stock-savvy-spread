@@ -216,11 +216,14 @@ export default function FluxoCaixaPage() {
         ) : (
           <div className="divide-y divide-border/50">
             {entries.map(e => (
-              <div key={e.id} className={`px-5 py-3 grid grid-cols-[100px_1fr_160px_120px_36px_36px] gap-3 items-center hover:bg-slate-50 transition-colors group ${e._source === 'event_payment' ? 'bg-emerald-50/30' : ''} ${e.reconciled ? 'opacity-60' : ''}`}>
+              <div key={e.id} className={`px-5 py-3 grid grid-cols-[100px_1fr_160px_120px_36px_36px] gap-3 items-center hover:bg-slate-50 transition-colors group ${e._source === 'event_payment' ? 'bg-emerald-50/30' : ''}`}>
                 <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(e.date)}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className={`text-sm font-medium truncate ${e.reconciled ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{e.description}</p>
+                    <span className={`text-[10px] font-bold shrink-0 ${e.amount >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {e.amount >= 0 ? 'ENTRADA' : 'SAÍDA'}
+                    </span>
+                    <p className="text-sm font-medium truncate text-foreground">{e.description}</p>
                     {e._source === 'event_payment' && (
                       <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">evento</span>
                     )}
@@ -255,11 +258,11 @@ export default function FluxoCaixaPage() {
                 <span className={`text-sm font-semibold tabular-nums text-right ${e.amount >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                   {e.amount >= 0 ? '+' : ''}{fmtBRL(e.amount)}
                 </span>
-                {/* Check conferido */}
+                {/* Conferido */}
                 <button
                   onClick={() => toggleReconciled(e)}
-                  title={e.reconciled ? 'Marcar como não conferido' : 'Marcar como conferido'}
-                  className={`p-1.5 rounded-lg transition-all ${e.reconciled ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground'}`}
+                  title={e.reconciled ? 'Conferido — clique para desmarcar' : 'Marcar como conferido'}
+                  className={`p-1.5 rounded-lg transition-all ${e.reconciled ? 'text-emerald-500' : 'opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-emerald-500'}`}
                 >
                   <Check className="w-3.5 h-3.5" />
                 </button>

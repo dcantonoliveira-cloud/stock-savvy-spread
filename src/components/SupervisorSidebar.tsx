@@ -33,9 +33,6 @@ const navStructure: NavGroup[] = [
     { path: '/financeiro/fluxo',            label: 'Fluxo de Caixa',   icon: ArrowRightLeft },
     { path: '/financeiro/contas-receber',   label: 'Contas a Receber', icon: ArrowDownCircle },
     { path: '/financeiro/contas-pagar',     label: 'Contas a Pagar',   icon: ArrowUpCircle },
-    { path: '/financeiro/transferencias',   label: 'Transferências',   icon: ArrowRightLeft },
-    { path: '/financeiro/extrato',          label: 'Extrato Bancário', icon: ScrollText },
-    { path: '/financeiro/conciliacao',      label: 'Conciliação',      icon: ClipboardCheck },
     { path: '/financeiro/cartoes',          label: 'Cartões',          icon: Tag },
     { path: '/financeiro/dre',             label: 'DRE',              icon: FileText },
     { path: '/financeiro/relatorios',       label: 'Relatórios',       icon: BookMarked },
@@ -174,7 +171,10 @@ export default function SupervisorSidebar() {
                        style={{ borderColor: 'hsl(220 35% 20%)' }}>
                     {item.items.map(sub => {
                       const SubIcon = sub.icon;
-                      const active = pathname === sub.path || pathname.startsWith(sub.path + '/');
+                      const active = pathname === sub.path || (
+                        pathname.startsWith(sub.path + '/') &&
+                        !item.items.some(sib => sib.path !== sub.path && (pathname === sib.path || pathname.startsWith(sib.path + '/')))
+                      );
                       return (
                         <Link key={sub.path} to={sub.path}
                           className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${active ? 'nav-item-active' : 'hover:bg-white/5'}`}
