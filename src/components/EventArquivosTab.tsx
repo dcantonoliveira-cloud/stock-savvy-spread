@@ -181,6 +181,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [contractText, setContractText]       = useState('');
   const [contractGenerated, setContractGenerated] = useState(false);
   const [contractOpen, setContractOpen]       = useState(true);
+  const [editorOpen, setEditorOpen]           = useState(true);
   const [signedUrl, setSignedUrl]             = useState('');
   const [annex1, setAnnex1]                   = useState('');
   const [annex2, setAnnex2]                   = useState('');
@@ -619,9 +620,18 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
 
             {contractGenerated && contractText ? (
               <>
-                <RichTextEditor content={contractText}
-                  onChange={html=>{setContractText(html);autoSave('contract_text',html);}}
-                  placeholder="" />
+                <button onClick={()=>setEditorOpen(o=>!o)}
+                  className="flex items-center gap-2 w-full text-left group mb-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
+                    {editorOpen ? 'Ocultar texto do contrato' : 'Mostrar texto do contrato'}
+                  </span>
+                  {editorOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/40" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />}
+                </button>
+                {editorOpen && (
+                  <RichTextEditor content={contractText}
+                    onChange={html=>{setContractText(html);autoSave('contract_text',html);}}
+                    placeholder="" />
+                )}
                 <div className="mt-5 pt-4 border-t border-border">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Anexos contratuais</span>
