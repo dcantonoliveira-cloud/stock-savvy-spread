@@ -80,6 +80,8 @@ interface EventDetail {
   pricing_mode: string | null;
   contract_value: number | null;
   date_reserved: boolean | null;
+  contract_form_token: string | null;
+  contract_form_submitted: boolean | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -284,6 +286,19 @@ export default function EventDetailPage() {
     toast.success('Salvo com sucesso');
     setTimeout(() => setSaveStatus('idle'), 2000);
   }, []);
+
+  const copyContractLink = async () => {
+    if (!id) return;
+    let token = event?.contract_form_token;
+    if (!token) {
+      token = crypto.randomUUID();
+      await (supabase.from as any)('events').update({ contract_form_token: token }).eq('id', id);
+      setEvent(prev => prev ? { ...prev, contract_form_token: token! } : prev);
+    }
+    const link = `${window.location.origin}/contrato-cliente/${token}`;
+    await navigator.clipboard.writeText(link);
+    toast.success('Link copiado! Cole no WhatsApp para o cliente preencher.');
+  };
 
   const toggleDateReserved = async () => {
     if (!id || !event) return;
@@ -496,9 +511,13 @@ export default function EventDetailPage() {
               </button>
             )}
 
-            {/* Dados do contrato / downloads — pipeline e fechados */}
-            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFichaTecnica}>
-              <FileText className="w-3 h-3" />Dados do contrato
+            {/* Dados do contrato — copia link para cliente preencher */}
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={copyContractLink}>
+              <FileText className="w-3 h-3" />
+              Dados do contrato
+              {event.contract_form_submitted && (
+                <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Já preenchido pelo cliente" />
+              )}
             </Button>
             {isClosed && (
               <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>

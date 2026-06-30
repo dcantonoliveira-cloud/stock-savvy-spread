@@ -84,6 +84,7 @@ const EmployeeMateriaisPage   = lazy(() => import("./pages/employee/EmployeeMate
 const PublicInventoryPage    = lazy(() => import("./pages/public/PublicInventoryPage"));
 const MenuSelectionPage      = lazy(() => import("./pages/public/MenuSelectionPage"));
 const ClientRegisterPage     = lazy(() => import("./pages/public/ClientRegisterPage"));
+const ContractFormPage       = lazy(() => import("./pages/public/ContractFormPage"));
 
 // ─── Client portal (lazy) ───
 const ClientPortalLayout     = lazy(() => import("./pages/portal/ClientPortalLayout"));
@@ -129,9 +130,12 @@ function AppRoutes() {
   }
 
   if (!user) {
-    // Rota pública de cadastro de cliente — acessível sem login
+    // Rotas públicas — acessíveis sem login
     if (window.location.pathname.startsWith('/portal/cadastro')) {
       return <Suspense fallback={<PageLoader />}><ClientRegisterPage /></Suspense>;
+    }
+    if (window.location.pathname.startsWith('/contrato-cliente/')) {
+      return <Suspense fallback={<PageLoader />}><ContractFormPage /></Suspense>;
     }
     return <LoginPage />;
   }
@@ -258,6 +262,9 @@ const App = () => (
           } />
           <Route path="/menu/:eventId" element={
             <Suspense fallback={<PageLoader />}><MenuSelectionPage /></Suspense>
+          } />
+          <Route path="/contrato-cliente/:token" element={
+            <Suspense fallback={<PageLoader />}><ContractFormPage /></Suspense>
           } />
           <Route path="/*" element={
             <AuthProvider>
