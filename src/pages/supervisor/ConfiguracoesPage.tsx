@@ -43,7 +43,7 @@ interface Integration {
   enabled: boolean;
 }
 
-type Tab = 'perfil' | 'empresa' | 'conectores' | 'cadastros';
+type Tab = 'perfil' | 'empresa' | 'conectores';
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const inputCls = 'w-full h-10 px-3 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors';
@@ -89,9 +89,9 @@ function ZapiLogo() {
 function ZapSignLogo() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#00C566' }}>
-        <svg viewBox="0 0 20 20" className="w-5 h-5" fill="none">
-          <path d="M5 15l4.5-10H12l-3 6h4.5L9 15H5z" fill="white" />
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden" style={{ background: '#00C566' }}>
+        <svg viewBox="0 0 32 32" className="w-6 h-6" fill="none">
+          <path d="M8 24l7-8H9l8-12h8l-7 8h6L8 24z" fill="white" />
         </svg>
       </div>
       <div>
@@ -658,7 +658,6 @@ export default function ConfiguracoesPage() {
     { key: 'perfil',     label: 'Meu Perfil',  icon: <User className="w-4 h-4" /> },
     { key: 'empresa',    label: 'Empresa',      icon: <Building2 className="w-4 h-4" /> },
     { key: 'conectores', label: 'Conectores',   icon: <Plug className="w-4 h-4" /> },
-    { key: 'cadastros',  label: 'Cadastros',    icon: <MessageCircle className="w-4 h-4" /> },
   ];
 
   return (
@@ -880,14 +879,6 @@ export default function ConfiguracoesPage() {
           </>
         )}
 
-        {tab === 'cadastros' && (
-          <>
-            <WhatsAppTemplatesCard
-              savedJson={integrations.find(i => i.provider === 'whatsapp_messages')?.api_key ?? null}
-              onSave={async (json) => { await saveIntegration('whatsapp_messages', json, true); invalidateTemplateCache(); }}
-            />
-          </>
-        )}
 
       </div>
     </div>

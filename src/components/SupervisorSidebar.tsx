@@ -66,14 +66,14 @@ const navStructure: NavGroup[] = [
   ]},
 
   { label: 'Cadastros', icon: LibraryBig, items: [
+    { path: '/cadastros/assessores', label: 'Assessores', icon: UserCheck },
+    { path: '/cadastros/checklists', label: 'Checklists', icon: ListChecks },
+    { path: '/cadastros/contratos', label: 'Contratos', icon: ScrollText },
+    { path: '/cadastros/decoradores', label: 'Decoradores', icon: Palette },
+    { path: '/cadastros/mensagens', label: 'Mensagens WhatsApp', icon: MessageCircle },
     { path: '/cadastros/produtos', label: 'Produtos', icon: ChefHat },
     { path: '/cadastros/saloes', label: 'Salões & Locais', icon: MapPin },
     { path: '/cadastros/tipos-festa', label: 'Tipos de Festa', icon: Sparkles },
-    { path: '/cadastros/assessores', label: 'Assessores', icon: UserCheck },
-    { path: '/cadastros/decoradores', label: 'Decoradores', icon: Palette },
-    { path: '/cadastros/contratos', label: 'Contratos', icon: ScrollText },
-    { path: '/cadastros/checklists', label: 'Checklists', icon: ListChecks },
-    { path: '/cadastros/mensagens', label: 'Mensagens WhatsApp', icon: MessageCircle },
   ]},
 
   { label: 'Administração', icon: Users, items: [
