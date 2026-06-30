@@ -24,7 +24,7 @@ export const TEMPLATE_LABELS: Record<MessageTemplateKey, string> = {
 export const TEMPLATE_VARS: Record<MessageTemplateKey, string[]> = {
   payment: ['{{clientName}}', '{{value}}', '{{eventName}}'],
   file:    ['{{clientName}}', '{{eventName}}', '{{fileName}}'],
-  tasting: ['{{clientName}}', '{{date}}'],
+  tasting: ['{{clientName}}', '{{date}}', '{{address}}'],
   review:  ['{{clientName}}', '{{eventName}}'],
 };
 

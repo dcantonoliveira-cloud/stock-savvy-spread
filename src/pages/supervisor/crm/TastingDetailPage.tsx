@@ -480,14 +480,17 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
     });
     toast.success(`${ev.event_name} alocado`);
 
-    // Busca telefone do cliente para popup de WhatsApp
-    const { data: evData } = await supabase
-      .from('events').select('clients(name, phone)').eq('id', ev.id).single();
+    // Busca telefone do cliente e endereço da empresa para popup de WhatsApp
+    const [{ data: evData }, { data: companyData }] = await Promise.all([
+      supabase.from('events').select('clients(name, phone)').eq('id', ev.id).single(),
+      supabase.from('companies' as any).select('endereco').single(),
+    ]);
     const client = (evData as any)?.clients;
     if (client?.phone) {
       const [y, m, d] = sessionDate.split('-');
       const dateFmt = `${d}/${m}/${y}`;
-      buildMessage('tasting', { clientName: client.name ?? '', date: dateFmt })
+      const address = (companyData as any)?.endereco ?? '';
+      buildMessage('tasting', { clientName: client.name ?? '', date: dateFmt, address })
         .then(text => setWaTrigger({ phone: client.phone, clientName: client.name ?? 'Cliente', message: text }));
     } else {
       onAdded();
