@@ -357,7 +357,6 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     if (validSigners.length === 0) { toast.error('Adicione ao menos um signatário com nome e email'); return; }
 
     setSendingZap(true);
-    toast.info(`Token (primeiros 20 chars): ${zapToken?.slice(0, 20)}…`);
     try {
       const base64 = await contractPDFBase64(contractText, event.event_name ?? 'Contrato', companyLogo, companyName, [annex1, annex2].filter(Boolean));
       const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
