@@ -262,9 +262,13 @@ export default function FluxoCaixaPage() {
                 <button
                   onClick={() => toggleReconciled(e)}
                   title={e.reconciled ? 'Conferido — clique para desmarcar' : 'Marcar como conferido'}
-                  className={`p-1.5 rounded-lg transition-all ${e.reconciled ? 'text-emerald-500' : 'opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-emerald-500'}`}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    e.reconciled
+                      ? 'bg-emerald-100 text-emerald-600 ring-1 ring-emerald-300'
+                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground/30 hover:bg-emerald-50 hover:text-emerald-600'
+                  }`}
                 >
-                  <Check className="w-3.5 h-3.5" />
+                  <Check className="w-4 h-4" strokeWidth={e.reconciled ? 2.5 : 2} />
                 </button>
                 {!e._readonly ? (
                   <button onClick={() => deleteEntry(e.id)}

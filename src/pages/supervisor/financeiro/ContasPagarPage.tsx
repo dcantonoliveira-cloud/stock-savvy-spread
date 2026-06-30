@@ -9,6 +9,8 @@ type Bill = {
   description: string;
   supplier: string | null;
   category: string;
+  expense_type: string | null;
+  cost_center: string | null;
   amount: number;
   due_date: string;
   paid_date: string | null;
@@ -17,6 +19,14 @@ type Bill = {
   recurrence: string | null;
   notes: string | null;
 };
+
+const EXPENSE_TYPES = [
+  { value: 'fixa',        label: 'Despesa Fixa' },
+  { value: 'variavel',    label: 'Despesa Variável' },
+  { value: 'investimento',label: 'Investimento' },
+  { value: 'pessoal',     label: 'Pessoal' },
+  { value: 'producao',    label: 'Custo de Produção' },
+];
 
 const CATEGORIES = [
   { value: 'pessoal',      label: 'Pessoal' },
@@ -304,6 +314,8 @@ type BillRow = {
   desc: string;
   supplier: string;
   category: string;
+  expenseType: string;
+  costCenter: string;
   amount: string;
   dueDate: string;
   recurring: boolean;
@@ -312,7 +324,7 @@ type BillRow = {
 
 const newRow = (): BillRow => ({
   id: crypto.randomUUID(),
-  desc: '', supplier: '', category: 'outros', amount: '',
+  desc: '', supplier: '', category: 'outros', expenseType: 'variavel', costCenter: '', amount: '',
   dueDate: new Date().toISOString().slice(0, 10),
   recurring: false, recurrence: 'monthly',
 });
@@ -349,12 +361,13 @@ function NewBillModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
 
     setSaving(true);
     const payload = valid.map(r => {
-      // Resolve categoria: pode ser label ou value
       const catMatch = CATEGORIES.find(c => c.label === r.category || c.value === r.category);
       return {
         description: r.desc.trim(),
         supplier: r.supplier.trim() || null,
         category: catMatch ? catMatch.value : r.category.toLowerCase().replace(/\s+/g, '_'),
+        expense_type: r.expenseType,
+        cost_center: r.costCenter.trim() || null,
         amount: parseFloat(r.amount.replace(',', '.')),
         due_date: r.dueDate,
         recurring: r.recurring,
@@ -390,8 +403,8 @@ function NewBillModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
         </div>
 
         {/* Column headers */}
-        <div className="px-5 py-2 bg-muted/30 border-b border-border grid grid-cols-[1fr_140px_130px_100px_110px_36px] gap-2 shrink-0">
-          {['Descrição *','Fornecedor','Categoria','Valor *','Vencimento *',''].map((h, i) => (
+        <div className="px-5 py-2 bg-muted/30 border-b border-border grid grid-cols-[1fr_130px_120px_120px_100px_100px_110px_36px] gap-2 shrink-0">
+          {['Descrição *','Fornecedor','Categoria','Tipo','Centro de custo','Valor *','Vencimento *',''].map((h, i) => (
             <span key={i} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
           ))}
         </div>
@@ -401,7 +414,7 @@ function NewBillModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
           {rows.map((row, idx) => {
             const hasError = row.desc.trim() && (!row.amount || parseFloat(row.amount.replace(',', '.')) <= 0);
             return (
-              <div key={row.id} className={`px-5 py-2.5 grid grid-cols-[1fr_140px_130px_100px_110px_36px] gap-2 items-center ${hasError ? 'bg-red-50/30' : ''}`}>
+              <div key={row.id} className={`px-5 py-2.5 grid grid-cols-[1fr_130px_120px_120px_100px_100px_110px_36px] gap-2 items-center ${hasError ? 'bg-red-50/30' : ''}`}>
                 {/* Descrição */}
                 <input
                   className="h-9 w-full px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -441,6 +454,22 @@ function NewBillModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
                   placeholder="Categoria"
                   allowCreate
                   createLabel="Criar"
+                />
+
+                {/* Tipo de despesa */}
+                <select
+                  value={row.expenseType}
+                  onChange={e => updateRow(row.id, { expenseType: e.target.value })}
+                  className="h-9 w-full px-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white">
+                  {EXPENSE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+
+                {/* Centro de custo */}
+                <input
+                  className="h-9 w-full px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  value={row.costCenter}
+                  onChange={e => updateRow(row.id, { costCenter: e.target.value })}
+                  placeholder="Ex: Salão"
                 />
 
                 {/* Valor */}
