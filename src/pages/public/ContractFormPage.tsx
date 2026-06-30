@@ -219,7 +219,12 @@ export default function ContractFormPage() {
               </div>
               <div>
                 <label className={labelCls}>Como nos conheceu?</label>
-                <input className={inputCls} value={form.source} onChange={set('source')} placeholder="Instagram, indicação, Google..." />
+                <select className={inputCls} value={form.source} onChange={e => setForm(prev => ({ ...prev, source: e.target.value }))}>
+                  <option value="">Selecione...</option>
+                  {['Google','Indicação de amigos','Indicação de assessor','Indicação de salão','Instagram','Influencer','Já fui em uma festa','Outros','Portais de casamentos','Site'].map(o => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
