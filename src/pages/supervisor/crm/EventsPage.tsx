@@ -86,9 +86,11 @@ export default function EventsPage() {
   const location = useLocation();
 
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [searchResults, setSearchResults] = useState<EventRow[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [locationMap, setLocationMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState<number | null>(today.getMonth());
@@ -129,6 +131,32 @@ export default function EventsPage() {
     setClients((data as Client[]) ?? []);
   };
 
+  // Busca global quando há termo de pesquisa (sem filtro de ano)
+  useEffect(() => {
+    if (!search.trim() || search.trim().length < 2) { setSearchResults([]); return; }
+    const timer = setTimeout(async () => {
+      setSearchLoading(true);
+      const q = search.trim();
+      const { data } = await supabase
+        .from('events')
+        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
+        .or(`event_name.ilike.%${q}%,location_text.ilike.%${q}%`)
+        .not('event_name', 'is', null)
+        .order('event_date', { ascending: false })
+        .limit(100);
+      // Filtra também por nome do cliente (join não suporta ilike direto)
+      const all = (data as EventRow[]) ?? [];
+      const withClient = all.filter(e =>
+        (e.event_name ?? '').toLowerCase().includes(q.toLowerCase()) ||
+        (e.clients?.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
+        (e.location_text ?? '').toLowerCase().includes(q.toLowerCase())
+      );
+      setSearchResults(withClient);
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // Carrega locais uma vez + eventos do ano inicial
   useEffect(() => {
     Promise.all([
@@ -153,23 +181,19 @@ export default function EventsPage() {
     return s;
   }, [events, year]);
 
-  const filtered = useMemo(() => events.filter(e => {
-    if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
-    // Quando há busca ativa, ignora filtro de mês/ano
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        (e.event_name ?? '').toLowerCase().includes(q) ||
-        (e.clients?.name ?? '').toLowerCase().includes(q) ||
-        (e.location_text ?? '').toLowerCase().includes(q)
-      );
-    }
-    if (!e.event_date) return false;
-    const d = new Date(e.event_date + 'T12:00:00');
-    if (d.getFullYear() !== year) return false;
-    if (month !== null && d.getMonth() !== month) return false;
-    return true;
-  }), [events, year, month, search, statusFilter]);
+  const filtered = useMemo(() => {
+    // Busca ativa: usa resultados vindos direto do banco (todos os anos)
+    const pool = search.trim().length >= 2 ? searchResults : events;
+    return pool.filter(e => {
+      if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
+      if (search.trim().length >= 2) return true; // já filtrado pelo banco/searchResults
+      if (!e.event_date) return false;
+      const d = new Date(e.event_date + 'T12:00:00');
+      if (d.getFullYear() !== year) return false;
+      if (month !== null && d.getMonth() !== month) return false;
+      return true;
+    });
+  }, [events, searchResults, year, month, search, statusFilter]);
 
   const confirmedFiltered = filtered.filter(e => e.status === 'confirmed');
   const statsValue = confirmedFiltered.reduce((s,e) => s + (e.total_value ?? 0), 0);
@@ -662,7 +686,7 @@ export default function EventsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading || searchLoading ? (
                 Array.from({length:8}).map((_,i) => (
                   <tr key={i} className="border-b border-border/50">
                     {[
@@ -678,7 +702,11 @@ export default function EventsPage() {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={10} className="py-20 text-center">
                   <CalendarX className="w-8 h-8 mx-auto mb-2 text-muted-foreground/20" />
-                  <p className="text-sm text-muted-foreground">Nenhum evento neste período</p>
+                  <p className="text-sm text-muted-foreground">
+                    {search.trim().length >= 2
+                      ? `Nenhum evento encontrado para "${search}"`
+                      : 'Nenhum evento neste período'}
+                  </p>
                 </td></tr>
               ) : filtered.map(ev => {
                 const past = !!ev.event_date && ev.event_date < todayStr;
