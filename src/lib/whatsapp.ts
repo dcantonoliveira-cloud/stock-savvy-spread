@@ -94,7 +94,9 @@ export async function sendWhatsApp(phone: string, message: string): Promise<{ ok
     );
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      return { ok: false, error: (body as any)?.message ?? `HTTP ${res.status}` };
+      const detail = (body as any)?.message ?? (body as any)?.error ?? (body as any)?.reason ?? JSON.stringify(body);
+      console.error('[Z-API] erro', res.status, body);
+      return { ok: false, error: `HTTP ${res.status}: ${detail}` };
     }
     return { ok: true };
   } catch (e: any) {
