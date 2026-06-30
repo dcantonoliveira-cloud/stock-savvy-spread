@@ -81,8 +81,16 @@ const EmployeeEventsPage      = lazy(() => import("./pages/employee/EmployeeEven
 const EmployeeMateriaisPage   = lazy(() => import("./pages/employee/EmployeeMateriaisPage"));
 
 // ─── Public pages (lazy) ───
-const PublicInventoryPage = lazy(() => import("./pages/public/PublicInventoryPage"));
-const MenuSelectionPage   = lazy(() => import("./pages/public/MenuSelectionPage"));
+const PublicInventoryPage    = lazy(() => import("./pages/public/PublicInventoryPage"));
+const MenuSelectionPage      = lazy(() => import("./pages/public/MenuSelectionPage"));
+const ClientRegisterPage     = lazy(() => import("./pages/public/ClientRegisterPage"));
+
+// ─── Client portal (lazy) ───
+const ClientPortalLayout     = lazy(() => import("./pages/portal/ClientPortalLayout"));
+const PortalEventoPage       = lazy(() => import("./pages/portal/PortalEventoPage"));
+const PortalFinanceiroPage   = lazy(() => import("./pages/portal/PortalFinanceiroPage"));
+const PortalContratoPage     = lazy(() => import("./pages/portal/PortalContratoPage"));
+const PortalArquivosPage     = lazy(() => import("./pages/portal/PortalArquivosPage"));
 
 const queryClient = new QueryClient();
 
@@ -120,8 +128,30 @@ function AppRoutes() {
     );
   }
 
-  if (!user) return <LoginPage />;
+  if (!user) {
+    // Rota pública de cadastro de cliente — acessível sem login
+    if (window.location.pathname.startsWith('/portal/cadastro')) {
+      return <Suspense fallback={<PageLoader />}><ClientRegisterPage /></Suspense>;
+    }
+    return <LoginPage />;
+  }
   if (!role) return <NoRolePage />;
+
+  if (role === 'client') {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/portal" element={<ClientPortalLayout />}>
+            <Route index element={<PortalEventoPage />} />
+            <Route path="financeiro" element={<PortalFinanceiroPage />} />
+            <Route path="contrato"   element={<PortalContratoPage />} />
+            <Route path="arquivos"   element={<PortalArquivosPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/portal" replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
 
   if (role === 'supervisor') {
     if (isMobile) {

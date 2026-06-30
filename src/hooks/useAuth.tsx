@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable';
 import type { User } from '@supabase/supabase-js';
 
-type Role = 'supervisor' | 'employee' | null;
+type Role = 'supervisor' | 'employee' | 'client' | null;
 
 interface Permissions {
   can_entry: boolean;
@@ -33,15 +33,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
-    const [rolesRes, permRes, profileRes] = await Promise.all([
+    const [rolesRes, permRes, profileRes, clientRes] = await Promise.all([
       supabase.from('user_roles').select('role').eq('user_id', userId),
       supabase.from('employee_permissions').select('can_entry, can_output, access_stock, access_materials').eq('user_id', userId).maybeSingle(),
       supabase.from('profiles').select('display_name, email').eq('user_id', userId).maybeSingle(),
+      (supabase.from as any)('client_portal_access').select('id').eq('user_id', userId).maybeSingle(),
     ]);
 
     if (rolesRes.data && rolesRes.data.length > 0) {
       const roles = rolesRes.data.map(r => r.role);
       setRole(roles.includes('supervisor') ? 'supervisor' : 'employee');
+    } else if (clientRes.data) {
+      setRole('client');
     } else {
       setRole(null);
     }

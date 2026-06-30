@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Clock, Copy, Send, XCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Clock, Copy, Send, XCircle, Trash2, RefreshCw, UserPlus, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
-import { buildMessage } from '@/lib/whatsapp';
+import { buildMessage, sendWhatsApp, openWhatsAppLink } from '@/lib/whatsapp';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -16,6 +16,9 @@ interface PortalAccess {
   whatsapp: string | null;
   first_accessed_at: string | null;
   last_accessed_at: string | null;
+  invite_token: string | null;
+  invite_sent_at: string | null;
+  user_id: string | null;
 }
 
 interface HistoryEntry {
@@ -117,6 +120,37 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
     if (portal?.access_code) { navigator.clipboard.writeText(portal.access_code); toast.success('Código copiado!'); }
   };
 
+  const sendInvite = async () => {
+    const p = await ensurePortal();
+    if (!p) return;
+    const phone = p.whatsapp ?? clientWhatsapp;
+    if (!phone) { toast.error('Preencha o WhatsApp do cliente antes de enviar o convite'); return; }
+
+    // Gera token único
+    const token = crypto.randomUUID().replace(/-/g, '');
+    await (supabase as any).from('client_portal_access')
+      .update({ invite_token: token, invite_sent_at: new Date().toISOString() })
+      .eq('id', p.id);
+    setPortal(prev => prev ? { ...prev, invite_token: token, invite_sent_at: new Date().toISOString() } : prev);
+
+    const link = `${window.location.origin}/portal/cadastro?token=${token}`;
+    const msg  = `Olá! 🎉\n\nSeu portal do cliente está pronto.\nAcesse o link abaixo para criar sua conta e acompanhar tudo sobre o seu evento:\n\n${link}\n\n— Rondello Buffet`;
+
+    const { ok, error } = await sendWhatsApp(phone, msg);
+    if (ok) { toast.success('Convite enviado por WhatsApp!'); }
+    else {
+      // fallback: abre wa.me
+      openWhatsAppLink(phone, msg);
+    }
+  };
+
+  const copyInviteLink = () => {
+    if (!portal?.invite_token) return;
+    const link = `${window.location.origin}/portal/cadastro?token=${portal.invite_token}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Link copiado!');
+  };
+
   if (loading) return <div className="h-10 animate-pulse bg-muted/30 rounded-xl" />;
 
   return (
@@ -163,36 +197,46 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
             placeholder="(11) 9 0000-0000"
           />
         </div>
-        <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70 mb-1.5">Código de acesso</label>
-          <div className="flex gap-1.5">
-            <div className="flex-1 h-9 px-3 flex items-center text-sm font-mono bg-muted/30 border border-border rounded-lg text-muted-foreground select-all">
-              {portal?.access_code ?? '—'}
-            </div>
-            <button onClick={copyCode} title="Copiar" className="h-9 w-9 flex items-center justify-center border border-border rounded-lg hover:bg-muted transition-colors">
-              <Copy className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-            <button onClick={regenCode} title="Regenerar código" className="h-9 w-9 flex items-center justify-center border border-border rounded-lg hover:bg-muted transition-colors">
-              <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
-            </button>
-          </div>
-        </div>
       </div>
 
-      {portal?.first_accessed_at || portal?.last_accessed_at ? (
-        <div className="flex gap-6 text-[12px] text-muted-foreground border-t border-border pt-3 mt-2">
-          {portal.first_accessed_at && (
-            <span>Primeiro acesso em <strong className="text-foreground">{fmtDT(portal.first_accessed_at)}</strong></span>
-          )}
-          {portal.last_accessed_at && (
-            <span>Último acesso em <strong className="text-foreground">{fmtDT(portal.last_accessed_at)}</strong></span>
-          )}
-        </div>
-      ) : (
-        <p className="text-[12px] text-muted-foreground border-t border-border pt-3 mt-2">
-          {portal?.enabled ? 'Aguardando primeiro acesso do cliente.' : 'Ative o portal para liberar o acesso.'}
-        </p>
-      )}
+      {/* Convite / status de acesso */}
+      <div className="border-t border-border pt-4 mt-2">
+        {portal?.user_id ? (
+          // Cliente já tem conta
+          <div className="flex items-center gap-2 text-sm text-emerald-700">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span>Cliente cadastrado no portal.</span>
+            {portal.last_accessed_at && (
+              <span className="text-muted-foreground text-xs ml-1">Último acesso: {fmtDT(portal.last_accessed_at)}</span>
+            )}
+          </div>
+        ) : portal?.invite_token ? (
+          // Convite enviado, aguardando cadastro
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-amber-700">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <span>Convite enviado{portal.invite_sent_at ? ` em ${fmtDT(portal.invite_sent_at)}` : ''}. Aguardando cadastro do cliente.</span>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={copyInviteLink}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
+                <Copy className="w-3.5 h-3.5" /> Copiar link
+              </button>
+              <button onClick={sendInvite}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
+                <RefreshCw className="w-3.5 h-3.5" /> Reenviar
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Sem convite
+          <button onClick={sendInvite}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+            <UserPlus className="w-4 h-4" />
+            Enviar convite de acesso ao cliente
+          </button>
+        )}
+      </div>
     </div>
   );
 }
