@@ -181,7 +181,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [contractText, setContractText]       = useState('');
   const [contractGenerated, setContractGenerated] = useState(false);
   const [contractOpen, setContractOpen]       = useState(true);
-  const [editorOpen, setEditorOpen]           = useState(true);
+  const [editorOpen, setEditorOpen]           = useState(false);
   const [signedUrl, setSignedUrl]             = useState('');
   const [annex1, setAnnex1]                   = useState('');
   const [annex2, setAnnex2]                   = useState('');
@@ -396,9 +396,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     }
   };
 
-  const refreshZapStatus = async () => {
+  const fetchZapStatus = async (silent = false) => {
     if (!zapToken || !zapData) return;
-    setRefreshingZap(true);
+    if (!silent) setRefreshingZap(true);
     try {
       const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
       const res = await fetch(`${proxyBase}?path=/api/v1/docs/${zapData.doc_token}/`, {
@@ -418,13 +418,21 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       };
       setZapData(updated);
       await supabase.from('events').update({ zapsign_data: updated as any }).eq('id', eventId);
-      toast.success('Status atualizado');
+      if (!silent) toast.success('Status atualizado');
     } catch {
-      toast.error('Erro ao atualizar status');
+      if (!silent) toast.error('Erro ao atualizar status');
     } finally {
-      setRefreshingZap(false);
+      if (!silent) setRefreshingZap(false);
     }
   };
+  const refreshZapStatus = () => fetchZapStatus(false);
+
+  // Auto-refresh signature status every 30s while there are pending signers
+  useEffect(() => {
+    if (!zapData || zapData.signers.every(s => s.status === 'signed')) return;
+    const interval = setInterval(() => fetchZapStatus(true), 30000);
+    return () => clearInterval(interval);
+  }, [zapData?.doc_token, zapData?.signers.map(s=>s.status).join(',')]);
 
   const copySignerLink = (signer: ZapSigner) => {
     const firstName = signer.name.split(' ')[0];
