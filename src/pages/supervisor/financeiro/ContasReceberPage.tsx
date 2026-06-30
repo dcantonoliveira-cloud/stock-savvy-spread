@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { ExternalLink, TrendingUp, Clock, CheckCircle2, AlertTriangle, Search } from 'lucide-react';
+import { ExternalLink, TrendingUp, Clock, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
-type Bill = {
+// Para cada evento: total_value - soma dos pagamentos confirmados = saldo devedor
+type EventBalance = {
   id: string;
-  event_id: string;
   event_name: string;
   client_name: string | null;
   event_date: string | null;
-  payment_date: string | null;
-  value: number;
-  payment_type: string | null;
-  is_confirmed: boolean;
-  notes: string | null;
+  total_value: number;
+  paid: number;
+  outstanding: number; // total_value - paid
+  status: string | null;
 };
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -22,92 +21,115 @@ const fmtDate = (d: string) => {
   const [y, m, day] = d.split('-');
   return `${day}/${m}/${y}`;
 };
-const today = new Date().toISOString().slice(0, 10);
-
-const PAYMENT_TYPE_LABEL: Record<string, string> = {
-  entrada: 'Entrada',
-  parcela: 'Parcela',
-  saldo_final: 'Saldo Final',
-  reembolso: 'Reembolso',
-  outros: 'Outros',
+const fmtMonth = (d: string) => {
+  const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const [y, m] = d.split('-');
+  return `${MONTHS[parseInt(m) - 1]} ${y}`;
 };
+const today = new Date().toISOString().slice(0, 10);
 
 export default function ContasReceberPage() {
   const navigate = useNavigate();
-  const [bills, setBills] = useState<Bill[]>([]);
+  const [events, setEvents]   = useState<EventBalance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'aberto' | 'recebido' | 'vencido'>('aberto');
-  const [search, setSearch] = useState('');
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [tab, setTab]         = useState<'aberto' | 'vencido'>('aberto');
+  const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Busca eventos ativos com valor definido
+    const { data: eventsData } = await supabase
+      .from('events')
+      .select('id, event_name, event_date, total_value, status, clients(name)')
+      .in('status', ['confirmed', 'negotiating', 'completed'])
+      .not('total_value', 'is', null)
+      .gt('total_value', 0)
+      .order('event_date', { ascending: true });
+
+    if (!eventsData || eventsData.length === 0) { setLoading(false); return; }
+
+    // Busca todos os pagamentos confirmados desses eventos
+    const eventIds = (eventsData as any[]).map((e: any) => e.id);
+    const { data: paymentsData } = await supabase
       .from('event_payments' as any)
-      .select('id, event_id, payment_date, value, payment_type, is_confirmed, notes, events(event_name, event_date, clients(name))')
-      .order('payment_date', { ascending: true });
-    if (error) { toast.error('Erro ao carregar'); setLoading(false); return; }
-    const mapped: Bill[] = ((data ?? []) as any[]).map(p => ({
-      id: p.id,
-      event_id: p.event_id,
-      event_name: (p.events as any)?.event_name ?? '—',
-      client_name: (p.events as any)?.clients?.name ?? null,
-      event_date: (p.events as any)?.event_date ?? null,
-      payment_date: p.payment_date,
-      value: p.value,
-      payment_type: p.payment_type,
-      is_confirmed: p.is_confirmed,
-      notes: p.notes,
-    }));
-    setBills(mapped);
+      .select('event_id, value')
+      .in('event_id', eventIds)
+      .eq('is_confirmed', true);
+
+    // Agrupa pagamentos por evento
+    const paidByEvent: Record<string, number> = {};
+    ((paymentsData ?? []) as any[]).forEach((p: any) => {
+      paidByEvent[p.event_id] = (paidByEvent[p.event_id] ?? 0) + p.value;
+    });
+
+    const balances: EventBalance[] = ((eventsData as any[]))
+      .map((e: any) => {
+        const paid = paidByEvent[e.id] ?? 0;
+        const outstanding = Math.max(0, (e.total_value ?? 0) - paid);
+        return {
+          id: e.id,
+          event_name: e.event_name ?? '—',
+          client_name: (e.clients as any)?.name ?? null,
+          event_date: e.event_date,
+          total_value: e.total_value ?? 0,
+          paid,
+          outstanding,
+          status: e.status,
+        };
+      })
+      .filter(e => e.outstanding > 0); // só quem ainda deve algo
+
+    setEvents(balances);
+
+    // Abre o mês atual por padrão
+    const currentPrefix = today.slice(0, 7);
+    setOpenMonths(new Set([currentPrefix]));
+
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const confirm = async (id: string) => {
-    setConfirming(id);
-    const { error } = await supabase
-      .from('event_payments' as any)
-      .update({ is_confirmed: true })
-      .eq('id', id);
-    if (error) { toast.error('Erro ao confirmar'); setConfirming(null); return; }
-    setBills(prev => prev.map(b => b.id === id ? { ...b, is_confirmed: true } : b));
-    toast.success('Pagamento confirmado');
-    setConfirming(null);
-  };
+  const isPastEvent = (e: EventBalance) =>
+    e.event_date !== null && e.event_date < today;
 
-  const isOverdue = (b: Bill) => !b.is_confirmed && b.payment_date && b.payment_date < today;
+  // Aba "Em aberto" = evento ainda não aconteceu (ou não tem data)
+  // Aba "Vencidos" = evento já passou mas ainda tem saldo
+  const filtered = events.filter(e =>
+    tab === 'vencido' ? isPastEvent(e) : !isPastEvent(e)
+  );
 
-  const filtered = bills
-    .filter(b => {
-      if (tab === 'recebido') return b.is_confirmed;
-      if (tab === 'vencido') return isOverdue(b);
-      return !b.is_confirmed && !isOverdue(b);
-    })
-    .filter(b =>
-      !search ||
-      b.event_name.toLowerCase().includes(search.toLowerCase()) ||
-      (b.client_name ?? '').toLowerCase().includes(search.toLowerCase())
-    );
+  // Agrupa por mês do evento
+  const byMonth: Record<string, EventBalance[]> = {};
+  filtered.forEach(e => {
+    const key = e.event_date ? e.event_date.slice(0, 7) : 'sem-data';
+    (byMonth[key] ??= []).push(e);
+  });
+  const monthKeys = Object.keys(byMonth).sort();
 
-  const totalAberto = bills.filter(b => !b.is_confirmed && !isOverdue(b)).reduce((s, b) => s + b.value, 0);
-  const totalRecebido = bills.filter(b => b.is_confirmed).reduce((s, b) => s + b.value, 0);
-  const totalVencido = bills.filter(b => isOverdue(b)).reduce((s, b) => s + b.value, 0);
+  const toggleMonth = (k: string) =>
+    setOpenMonths(prev => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+
+  const totalAberto  = events.filter(e => !isPastEvent(e)).reduce((s, e) => s + e.outstanding, 0);
+  const totalVencido = events.filter(e => isPastEvent(e)).reduce((s, e) => s + e.outstanding, 0);
+  const totalRecebido = events.reduce((s, e) => s + e.paid, 0);
 
   const TAB = [
-    { key: 'aberto',    label: 'Em aberto',  count: bills.filter(b => !b.is_confirmed && !isOverdue(b)).length },
-    { key: 'vencido',   label: 'Vencidas',   count: bills.filter(b => isOverdue(b)).length },
-    { key: 'recebido',  label: 'Recebidas',  count: bills.filter(b => b.is_confirmed).length },
+    { key: 'aberto',  label: 'Em aberto',  count: events.filter(e => !isPastEvent(e)).length },
+    { key: 'vencido', label: 'Vencidos',   count: events.filter(e => isPastEvent(e)).length },
   ] as const;
 
   return (
     <div className="space-y-6">
 
-      {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-foreground">Contas a Receber</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Parcelas e saldos dos eventos</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Saldo devedor por evento</p>
       </div>
 
       {/* KPIs */}
@@ -118,122 +140,121 @@ export default function ContasReceberPage() {
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">A receber</p>
           </div>
           <p className="text-2xl font-bold tabular-nums text-amber-600">{fmtBRL(totalAberto)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{bills.filter(b => !b.is_confirmed && !isOverdue(b)).length} parcelas</p>
+          <p className="text-xs text-muted-foreground mt-1">{events.filter(e => !isPastEvent(e)).length} eventos com saldo</p>
         </div>
         <div className="bg-white px-6 py-5">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-red-500" />
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Vencidas</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Vencidos</p>
           </div>
           <p className="text-2xl font-bold tabular-nums text-red-500">{fmtBRL(totalVencido)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{bills.filter(b => isOverdue(b)).length} parcelas</p>
+          <p className="text-xs text-muted-foreground mt-1">{events.filter(e => isPastEvent(e)).length} eventos passados com saldo</p>
         </div>
         <div className="bg-white px-6 py-5">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="w-4 h-4 text-emerald-600" />
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Recebido</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Já recebido</p>
           </div>
           <p className="text-2xl font-bold tabular-nums text-emerald-600">{fmtBRL(totalRecebido)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{bills.filter(b => b.is_confirmed).length} parcelas</p>
+          <p className="text-xs text-muted-foreground mt-1">De {events.length} eventos com saldo aberto</p>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-border rounded-2xl overflow-hidden">
+      {/* Tabs */}
+      <div className="flex gap-1">
+        {TAB.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === t.key ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted bg-white border border-border'}`}>
+            {t.label}
+            {t.count > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${tab === t.key ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground'}`}>{t.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
 
-        {/* Tabs + search */}
-        <div className="px-5 py-3 border-b border-border flex items-center justify-between gap-4">
-          <div className="flex gap-1">
-            {TAB.map(t => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === t.key ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}>
-                {t.label}
-                {t.count > 0 && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${tab === t.key ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground'}`}>
-                    {t.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50" />
-            <input
-              type="text" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar evento ou cliente..."
-              className="pl-8 pr-3 h-8 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 w-56"
-            />
-          </div>
+      {/* Table by month */}
+      {loading ? (
+        <div className="bg-white border border-border rounded-2xl py-16 text-center text-sm text-muted-foreground">Carregando...</div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white border border-border rounded-2xl py-16 text-center text-sm text-muted-foreground">
+          {tab === 'aberto' ? 'Nenhum evento com saldo em aberto.' : 'Nenhum evento vencido com saldo.'}
         </div>
+      ) : (
+        <div className="space-y-3">
+          {monthKeys.map(key => {
+            const monthEvents = byMonth[key];
+            const monthTotal = monthEvents.reduce((s, e) => s + e.outstanding, 0);
+            const isOpen = openMonths.has(key);
 
-        {/* Header row */}
-        <div className="px-5 py-3 bg-muted/30 border-b border-border grid grid-cols-[120px_1fr_140px_100px_130px_100px] gap-3">
-          {['Vencimento','Evento / Cliente','Tipo','Valor','',''].map((h, i) => (
-            <span key={i} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 ${i >= 3 ? 'text-right' : ''}`}>{h}</span>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">Carregando...</div>
-        ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">Nenhum registro.</div>
-        ) : (
-          <div className="divide-y divide-border/50">
-            {filtered.map(b => {
-              const overdue = isOverdue(b);
-              return (
-                <div key={b.id} className={`px-5 py-3 grid grid-cols-[120px_1fr_140px_100px_130px_100px] gap-3 items-center hover:bg-slate-50 transition-colors group ${overdue ? 'bg-red-50/30' : ''}`}>
-
-                  {/* Data */}
-                  <div>
-                    <span className={`text-sm tabular-nums font-medium ${overdue ? 'text-red-600' : 'text-muted-foreground'}`}>
-                      {b.payment_date ? fmtDate(b.payment_date) : '—'}
+            return (
+              <div key={key} className="bg-white border border-border rounded-2xl overflow-hidden">
+                {/* Month header */}
+                <button
+                  onClick={() => toggleMonth(key)}
+                  className="w-full px-5 py-3 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    {isOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                    <span className="text-sm font-semibold text-foreground">
+                      {key === 'sem-data' ? 'Sem data' : fmtMonth(key + '-01')}
                     </span>
-                    {overdue && <p className="text-[10px] text-red-500 font-semibold">Vencida</p>}
+                    <span className="text-xs text-muted-foreground">{monthEvents.length} evento{monthEvents.length !== 1 ? 's' : ''}</span>
                   </div>
+                  <span className="text-sm font-bold tabular-nums text-amber-600">{fmtBRL(monthTotal)}</span>
+                </button>
 
-                  {/* Evento */}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{b.event_name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {b.client_name && <span className="text-xs text-muted-foreground truncate">{b.client_name}</span>}
-                      <button onClick={() => navigate(`/events/${b.event_id}`)}
-                        className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-xs text-primary hover:underline transition-opacity">
-                        <ExternalLink className="w-3 h-3" />ver
-                      </button>
+                {isOpen && (
+                  <>
+                    {/* Header row */}
+                    <div className="px-5 py-2 bg-muted/20 border-t border-border grid grid-cols-[110px_1fr_110px_110px_110px] gap-3">
+                      {['Data do evento','Evento / Cliente','Valor total','Pago','Saldo'].map((h, i) => (
+                        <span key={i} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 ${i >= 2 ? 'text-right' : ''}`}>{h}</span>
+                      ))}
                     </div>
-                  </div>
 
-                  {/* Tipo */}
-                  <span className="text-xs text-muted-foreground">{PAYMENT_TYPE_LABEL[b.payment_type ?? ''] ?? b.payment_type ?? '—'}</span>
+                    <div className="divide-y divide-border/50">
+                      {monthEvents.map(e => {
+                        const pct = e.total_value > 0 ? Math.round((e.paid / e.total_value) * 100) : 0;
+                        return (
+                          <div key={e.id} className="px-5 py-3 grid grid-cols-[110px_1fr_110px_110px_110px] gap-3 items-center hover:bg-slate-50 transition-colors group">
+                            <span className="text-sm tabular-nums text-muted-foreground">
+                              {e.event_date ? fmtDate(e.event_date) : '—'}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{e.event_name}</p>
+                              {e.client_name && <p className="text-xs text-muted-foreground truncate">{e.client_name}</p>}
+                              {/* Barra de progresso */}
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <div className="h-1 flex-1 bg-muted rounded-full overflow-hidden max-w-[100px]">
+                                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">{pct}% pago</span>
+                                <button onClick={() => navigate(`/events/${e.id}`)}
+                                  className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 text-[10px] text-primary hover:underline transition-opacity">
+                                  <ExternalLink className="w-3 h-3" />ver
+                                </button>
+                              </div>
+                            </div>
+                            <span className="text-sm tabular-nums text-right text-muted-foreground">{fmtBRL(e.total_value)}</span>
+                            <span className="text-sm tabular-nums text-right text-emerald-600">+{fmtBRL(e.paid)}</span>
+                            <span className="text-sm font-bold tabular-nums text-right text-amber-600">{fmtBRL(e.outstanding)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                  {/* Valor */}
-                  <span className="text-sm font-semibold tabular-nums text-right text-emerald-600">+{fmtBRL(b.value)}</span>
-
-                  {/* Status / ação */}
-                  <div className="text-right">
-                    {b.is_confirmed ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
-                        <CheckCircle2 className="w-3 h-3" />Recebido
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => confirm(b.id)}
-                        disabled={confirming === b.id}
-                        className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-primary/30 text-primary hover:bg-primary hover:text-white transition-colors disabled:opacity-50">
-                        {confirming === b.id ? 'Confirmando…' : 'Confirmar recebimento'}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Notas */}
-                  <span className="text-xs text-muted-foreground truncate text-right">{b.notes ?? ''}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                    {/* Month subtotal */}
+                    <div className="px-5 py-2.5 border-t border-border bg-muted/10 flex justify-end gap-6">
+                      <span className="text-xs text-muted-foreground font-semibold">Total do mês</span>
+                      <span className="text-sm font-bold tabular-nums text-amber-600">{fmtBRL(monthTotal)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

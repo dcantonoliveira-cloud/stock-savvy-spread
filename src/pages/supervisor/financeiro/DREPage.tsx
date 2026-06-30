@@ -17,6 +17,8 @@ export default function DREPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [viewMode, setViewMode] = useState<'annual' | 'monthly'>('annual');
   const [month, setMonth] = useState(now.getMonth());
+  // caixa = receita quando o pagamento entra; competencia = receita pelo mês do evento
+  const [basis, setBasis] = useState<'caixa' | 'competencia'>('caixa');
   const [data, setData] = useState<MonthData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,36 +28,61 @@ export default function DREPage() {
       const first = `${year}-01-01`;
       const last = `${year}-12-31`;
 
-      const [{ data: payments }, { data: cashEntries }] = await Promise.all([
-        supabase.from('event_payments' as any)
-          .select('payment_date, value')
-          .gte('payment_date', first).lte('payment_date', last)
-          .eq('is_confirmed', true),
-        supabase.from('cash_flow_entries' as any)
-          .select('date, amount, category')
-          .gte('date', first).lte('date', last),
-      ]);
+      if (basis === 'caixa') {
+        const [{ data: payments }, { data: cashEntries }] = await Promise.all([
+          supabase.from('event_payments' as any)
+            .select('payment_date, value')
+            .gte('payment_date', first).lte('payment_date', last)
+            .eq('is_confirmed', true),
+          supabase.from('cash_flow_entries' as any)
+            .select('date, amount, category')
+            .gte('date', first).lte('date', last),
+        ]);
 
-      const monthsData: MonthData[] = MONTHS.map((label, m) => {
-        const prefix = `${year}-${String(m + 1).padStart(2, '0')}`;
-        const receita = ((payments ?? []) as any[])
-          .filter(p => p.payment_date?.startsWith(prefix))
-          .reduce((s: number, p: any) => s + p.value, 0);
-        const posEntries = ((cashEntries ?? []) as any[])
-          .filter(e => e.date?.startsWith(prefix) && e.amount > 0)
-          .reduce((s: number, e: any) => s + e.amount, 0);
-        const despesa = Math.abs(((cashEntries ?? []) as any[])
-          .filter(e => e.date?.startsWith(prefix) && e.amount < 0)
-          .reduce((s: number, e: any) => s + e.amount, 0));
-        const totalReceita = receita + posEntries;
-        return { label, year, month: m, receita: totalReceita, custo: 0, despesa, lucro: totalReceita - despesa };
-      });
+        const monthsData: MonthData[] = MONTHS.map((label, m) => {
+          const prefix = `${year}-${String(m + 1).padStart(2, '0')}`;
+          const receita = ((payments ?? []) as any[])
+            .filter(p => p.payment_date?.startsWith(prefix))
+            .reduce((s: number, p: any) => s + p.value, 0);
+          const posEntries = ((cashEntries ?? []) as any[])
+            .filter(e => e.date?.startsWith(prefix) && e.amount > 0)
+            .reduce((s: number, e: any) => s + e.amount, 0);
+          const despesa = Math.abs(((cashEntries ?? []) as any[])
+            .filter(e => e.date?.startsWith(prefix) && e.amount < 0)
+            .reduce((s: number, e: any) => s + e.amount, 0));
+          const totalReceita = receita + posEntries;
+          return { label, year, month: m, receita: totalReceita, custo: 0, despesa, lucro: totalReceita - despesa };
+        });
+        setData(monthsData);
+      } else {
+        // Competência: valor total do evento no mês da festa
+        const [{ data: events }, { data: cashEntries }] = await Promise.all([
+          supabase.from('events')
+            .select('event_date, total_value')
+            .gte('event_date', first).lte('event_date', last)
+            .in('status', ['confirmed', 'completed']),
+          supabase.from('cash_flow_entries' as any)
+            .select('date, amount, category')
+            .gte('date', first).lte('date', last),
+        ]);
 
-      setData(monthsData);
+        const monthsData: MonthData[] = MONTHS.map((label, m) => {
+          const prefix = `${year}-${String(m + 1).padStart(2, '0')}`;
+          const receita = ((events ?? []) as any[])
+            .filter(e => e.event_date?.startsWith(prefix))
+            .reduce((s: number, e: any) => s + (e.total_value ?? 0), 0);
+          const despesa = Math.abs(((cashEntries ?? []) as any[])
+            .filter(e => e.date?.startsWith(prefix) && e.amount < 0)
+            .reduce((s: number, e: any) => s + e.amount, 0));
+          return { label, year, month: m, receita, custo: 0, despesa, lucro: receita - despesa };
+        });
+        setData(monthsData);
+      }
+
       setLoading(false);
     };
     load();
-  }, [year]);
+  }, [year, basis]);
 
   const totals = data.reduce((acc, d) => ({
     receita: acc.receita + d.receita,
@@ -68,7 +95,7 @@ export default function DREPage() {
 
   const DRE_ROWS = (d: { receita: number; despesa: number; lucro: number }) => [
     { label: 'RECEITA BRUTA', value: d.receita, bold: true, color: 'text-emerald-600', indent: 0 },
-    { label: 'Receita de eventos (recebido)', value: d.receita, bold: false, color: 'text-foreground', indent: 1 },
+    { label: basis === 'caixa' ? 'Receita de eventos (recebido)' : 'Valor total dos eventos do mês', value: d.receita, bold: false, color: 'text-foreground', indent: 1 },
     { label: '(-) DESPESAS OPERACIONAIS', value: -d.despesa, bold: true, color: 'text-red-500', indent: 0 },
     { label: 'Despesas diversas', value: -d.despesa, bold: false, color: 'text-foreground', indent: 1 },
     { label: 'RESULTADO OPERACIONAL', value: d.lucro, bold: true, color: d.lucro >= 0 ? 'text-foreground' : 'text-red-500', indent: 0, separator: true },
@@ -85,6 +112,18 @@ export default function DREPage() {
           <p className="text-sm text-muted-foreground mt-0.5">Resultado financeiro do exercício</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Base de cálculo */}
+          <div className="flex gap-1 bg-muted p-1 rounded-xl" title="Caixa: receita quando o pagamento entra. Competência: receita no mês da festa.">
+            <button onClick={() => setBasis('caixa')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${basis === 'caixa' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+              Caixa
+            </button>
+            <button onClick={() => setBasis('competencia')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${basis === 'competencia' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+              Competência
+            </button>
+          </div>
+
           <div className="flex gap-1 bg-muted p-1 rounded-xl">
             <button onClick={() => setViewMode('annual')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${viewMode === 'annual' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground'}`}>
