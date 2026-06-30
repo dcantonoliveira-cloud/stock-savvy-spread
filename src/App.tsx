@@ -59,6 +59,14 @@ const TastingDetailPage        = lazy(() => import("./pages/supervisor/crm/Tasti
 const CalendarPage             = lazy(() => import("./pages/supervisor/crm/CalendarPage"));
 const FinanceiroPage           = lazy(() => import("./pages/supervisor/FinanceiroPage"));
 const FluxoCaixaPage           = lazy(() => import("./pages/supervisor/FluxoCaixaPage"));
+const ContasReceberPage        = lazy(() => import("./pages/supervisor/financeiro/ContasReceberPage"));
+const ContasPagarPage          = lazy(() => import("./pages/supervisor/financeiro/ContasPagarPage"));
+const TransferenciasFinPage    = lazy(() => import("./pages/supervisor/financeiro/TransferenciasPage"));
+const ExtratoBancarioPage      = lazy(() => import("./pages/supervisor/financeiro/ExtratoBancarioPage"));
+const ConciliacaoPage          = lazy(() => import("./pages/supervisor/financeiro/ConciliacaoPage"));
+const CartoesPage              = lazy(() => import("./pages/supervisor/financeiro/CartoesPage"));
+const DREPage                  = lazy(() => import("./pages/supervisor/financeiro/DREPage"));
+const RelatoriosFinPage        = lazy(() => import("./pages/supervisor/financeiro/RelatoriosPage"));
 const MateriaisInventarioPage  = lazy(() => import("./pages/supervisor/materiais/MateriaisInventarioPage"));
 const MateriaisCategoriasPage  = lazy(() => import("./pages/supervisor/materiais/MateriaisCategoriasPage"));
 const EmprestimosPage          = lazy(() => import("./pages/supervisor/materiais/EmprestimosPage"));
@@ -145,6 +153,14 @@ function AppRoutes() {
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/financeiro" element={<FinanceiroPage />} />
             <Route path="/financeiro/fluxo" element={<FluxoCaixaPage />} />
+            <Route path="/financeiro/contas-receber" element={<ContasReceberPage />} />
+            <Route path="/financeiro/contas-pagar" element={<ContasPagarPage />} />
+            <Route path="/financeiro/transferencias" element={<TransferenciasFinPage />} />
+            <Route path="/financeiro/extrato" element={<ExtratoBancarioPage />} />
+            <Route path="/financeiro/conciliacao" element={<ConciliacaoPage />} />
+            <Route path="/financeiro/cartoes" element={<CartoesPage />} />
+            <Route path="/financeiro/dre" element={<DREPage />} />
+            <Route path="/financeiro/relatorios" element={<RelatoriosFinPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/categories/:name" element={<CategoryDetailPage />} />
             <Route path="/tags" element={<TagsPage />} />

@@ -29,8 +29,16 @@ const navStructure: NavGroup[] = [
   ]},
 
   { label: 'Financeiro', icon: DollarSign, items: [
-    { path: '/financeiro', label: 'Visão Geral', icon: TrendingUp },
-    { path: '/financeiro/fluxo', label: 'Fluxo de Caixa', icon: DollarSign },
+    { path: '/financeiro',                  label: 'Visão Geral',      icon: TrendingUp },
+    { path: '/financeiro/fluxo',            label: 'Fluxo de Caixa',   icon: ArrowRightLeft },
+    { path: '/financeiro/contas-receber',   label: 'Contas a Receber', icon: ArrowDownCircle },
+    { path: '/financeiro/contas-pagar',     label: 'Contas a Pagar',   icon: ArrowUpCircle },
+    { path: '/financeiro/transferencias',   label: 'Transferências',   icon: ArrowRightLeft },
+    { path: '/financeiro/extrato',          label: 'Extrato Bancário', icon: ScrollText },
+    { path: '/financeiro/conciliacao',      label: 'Conciliação',      icon: ClipboardCheck },
+    { path: '/financeiro/cartoes',          label: 'Cartões',          icon: Tag },
+    { path: '/financeiro/dre',             label: 'DRE',              icon: FileText },
+    { path: '/financeiro/relatorios',       label: 'Relatórios',       icon: BookMarked },
   ]},
 
   { label: 'Operações', icon: UtensilsCrossed, items: [
