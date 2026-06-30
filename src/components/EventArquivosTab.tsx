@@ -370,7 +370,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         body: JSON.stringify({
           name: `Contrato - ${event.event_name ?? 'Evento'}`,
           base64_pdf: base64,
-          sandbox: false,
+          sandbox: true,
           signers: validSigners.map(s => ({ name: s.name, email: s.email, send_automatic_email: true })),
         }),
       });
