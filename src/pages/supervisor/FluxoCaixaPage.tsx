@@ -16,6 +16,8 @@ type Entry = {
   event_id: string | null;
   events?: { event_name: string } | null;
   created_at: string;
+  _source?: 'cash_flow' | 'event_payment';
+  _readonly?: boolean;
 };
 
 type EventOption = { id: string; event_name: string; total_value: number | null };
@@ -25,6 +27,10 @@ const CATEGORY_LABEL: Record<string, string> = {
   event_payment: 'Pagamento de evento',
   manual: 'Lançamento manual',
   expense: 'Despesa',
+  entrada: 'Entrada',
+  parcela: 'Parcela',
+  reembolso: 'Reembolso',
+  outros: 'Outros',
 };
 
 function fmtBRL(v: number) {
@@ -49,13 +55,42 @@ export default function FluxoCaixaPage() {
     setLoading(true);
     const first = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const last  = new Date(year, month + 1, 0).toISOString().slice(0, 10);
-    const { data } = await supabase
-      .from('cash_flow_entries' as any)
-      .select('*, events(event_name)')
-      .gte('date', first)
-      .lte('date', last)
-      .order('date', { ascending: false });
-    setEntries((data ?? []) as Entry[]);
+
+    const [cashRes, paymentsRes] = await Promise.all([
+      supabase
+        .from('cash_flow_entries' as any)
+        .select('*, events(event_name)')
+        .gte('date', first)
+        .lte('date', last)
+        .order('date', { ascending: false }),
+      supabase
+        .from('event_payments' as any)
+        .select('id, event_id, payment_date, value, payment_type, is_confirmed, events(event_name)')
+        .gte('payment_date', first)
+        .lte('payment_date', last)
+        .eq('is_confirmed', true)
+        .order('payment_date', { ascending: false }),
+    ]);
+
+    const cashEntries: Entry[] = ((cashRes.data ?? []) as any[]).map(e => ({ ...e, _source: 'cash_flow' }));
+
+    const paymentEntries: Entry[] = ((paymentsRes.data ?? []) as any[]).map(p => ({
+      id: `ep_${p.id}`,
+      date: p.payment_date,
+      description: `Pagamento — ${(p.events as any)?.event_name ?? 'Evento'}`,
+      amount: p.value,
+      category: p.payment_type ?? 'event_payment',
+      event_id: p.event_id,
+      events: p.events as any,
+      created_at: p.payment_date,
+      _source: 'event_payment',
+      _readonly: true,
+    }));
+
+    const all = [...cashEntries, ...paymentEntries].sort(
+      (a, b) => b.date.localeCompare(a.date)
+    );
+    setEntries(all);
     setLoading(false);
   };
 
@@ -82,6 +117,8 @@ export default function FluxoCaixaPage() {
     setEntries(prev => prev.filter(e => e.id !== id));
     toast.success('Lançamento removido');
   };
+
+  const eventPaymentsCount = entries.filter(e => e._source === 'event_payment').length;
 
   return (
     <div className="space-y-6">
@@ -142,10 +179,17 @@ export default function FluxoCaixaPage() {
 
       {/* Entries table */}
       <div className="bg-white border border-border rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-border bg-muted/30 grid grid-cols-[100px_1fr_160px_120px_80px_36px] gap-3">
-          {['Data','Descrição','Categoria','Valor','',''].map((h, i) => (
-            <span key={i} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 ${i >= 3 ? 'text-right' : ''}`}>{h}</span>
-          ))}
+        <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="grid grid-cols-[100px_1fr_160px_120px_80px_36px] gap-3 flex-1">
+            {['Data','Descrição','Categoria','Valor','',''].map((h, i) => (
+              <span key={i} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 ${i >= 3 ? 'text-right' : ''}`}>{h}</span>
+            ))}
+          </div>
+          {eventPaymentsCount > 0 && (
+            <span className="ml-3 shrink-0 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 font-medium">
+              {eventPaymentsCount} pagamento{eventPaymentsCount > 1 ? 's' : ''} de evento
+            </span>
+          )}
         </div>
 
         {loading ? (
@@ -158,15 +202,27 @@ export default function FluxoCaixaPage() {
         ) : (
           <div className="divide-y divide-border/50">
             {entries.map(e => (
-              <div key={e.id} className="px-5 py-3 grid grid-cols-[100px_1fr_160px_120px_80px_36px] gap-3 items-center hover:bg-slate-50 transition-colors group">
+              <div key={e.id} className={`px-5 py-3 grid grid-cols-[100px_1fr_160px_120px_80px_36px] gap-3 items-center hover:bg-slate-50 transition-colors group ${e._source === 'event_payment' ? 'bg-emerald-50/30' : ''}`}>
                 <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(e.date)}</span>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{e.description}</p>
-                  {e.events?.event_name && (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">{e.description}</p>
+                    {e._source === 'event_payment' && (
+                      <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">evento</span>
+                    )}
+                  </div>
+                  {e.events?.event_name && e._source !== 'event_payment' && (
                     <button onClick={() => navigate(`/events/${e.event_id}`)}
                       className="text-xs text-primary hover:underline flex items-center gap-1 mt-0.5">
                       <ExternalLink className="w-3 h-3" />
                       {e.events.event_name}
+                    </button>
+                  )}
+                  {e._source === 'event_payment' && e.event_id && (
+                    <button onClick={() => navigate(`/events/${e.event_id}`)}
+                      className="text-xs text-primary hover:underline flex items-center gap-1 mt-0.5">
+                      <ExternalLink className="w-3 h-3" />
+                      Ver evento
                     </button>
                   )}
                 </div>
@@ -175,10 +231,12 @@ export default function FluxoCaixaPage() {
                   {e.amount >= 0 ? '+' : ''}{fmtBRL(e.amount)}
                 </span>
                 <span />
-                <button onClick={() => deleteEntry(e.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-all">
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                {!e._readonly ? (
+                  <button onClick={() => deleteEntry(e.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-all">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                ) : <span />}
               </div>
             ))}
           </div>

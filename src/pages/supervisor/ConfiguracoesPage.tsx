@@ -63,6 +63,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+// ─── Zapi Logo ────────────────────────────────────────────────────────────────
+function ZapiLogo() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#25D366' }}>
+        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="white">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.138.564 4.14 1.547 5.872L0 24l6.302-1.53A11.934 11.934 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.938 0-3.752-.517-5.31-1.42l-.379-.225-3.742.908.95-3.627-.247-.393A9.957 9.957 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+        </svg>
+      </div>
+      <div>
+        <p className="text-sm font-bold text-foreground leading-none">Z-API</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">WhatsApp Business API</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── ZapSign Logo ─────────────────────────────────────────────────────────────
 function ZapSignLogo() {
   return (
@@ -76,6 +94,117 @@ function ZapSignLogo() {
         <p className="text-sm font-bold text-foreground leading-none">ZapSign</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">zapsign.com.br</p>
       </div>
+    </div>
+  );
+}
+
+// ─── Zapi Connector Card ──────────────────────────────────────────────────────
+function ZapiConnectorCard({ integration, onSave }: {
+  integration: Integration | null;
+  onSave: (key: string, enabled: boolean) => Promise<void>;
+}) {
+  const parsed = (() => {
+    try { return integration?.api_key ? JSON.parse(integration.api_key) : {}; } catch { return {}; }
+  })();
+  const [instanceId, setInstanceId] = useState<string>(parsed.instance_id ?? '');
+  const [token,      setToken]      = useState<string>(parsed.token ?? '');
+  const [enabled,    setEnabled]    = useState(integration?.enabled ?? false);
+  const [showToken,  setShowToken]  = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [editing,    setEditing]    = useState(!integration?.api_key);
+
+  const isConfigured = !!integration?.api_key;
+
+  const handleSave = async () => {
+    if (!instanceId.trim() || !token.trim()) { toast.error('Preencha Instance ID e Token'); return; }
+    setSaving(true);
+    await onSave(JSON.stringify({ instance_id: instanceId.trim(), token: token.trim() }), enabled);
+    setSaving(false);
+    setEditing(false);
+  };
+
+  const handleRemove = async () => {
+    setSaving(true);
+    await onSave('', false);
+    setSaving(false);
+    setInstanceId(''); setToken(''); setEditing(true); setEnabled(false);
+  };
+
+  return (
+    <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-2">
+          <ZapiLogo />
+          <p className="text-xs text-muted-foreground max-w-sm">
+            Envie mensagens de WhatsApp diretamente do sistema — confirmações, lembretes de evento e contratos.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {isConfigured && (
+            <button
+              onClick={async () => {
+                const next = !enabled; setEnabled(next); setSaving(true);
+                await onSave(integration!.api_key!, next); setSaving(false);
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-muted border border-border'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          )}
+          <span className={`flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full border ${
+            isConfigured ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-muted-foreground bg-muted border-border'
+          }`}>
+            {isConfigured ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+            {isConfigured ? 'Ativo' : 'Inativo'}
+          </span>
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="space-y-3">
+          <Field label="Instance ID">
+            <input type="text" value={instanceId} onChange={e => setInstanceId(e.target.value)}
+              placeholder="Ex: 3EB09A6FA3D8..." className={inputCls} />
+          </Field>
+          <Field label="Token (Client-Token)">
+            <div className="relative">
+              <input type={showToken ? 'text' : 'password'} value={token} onChange={e => setToken(e.target.value)}
+                placeholder="Cole aqui seu token Z-API..." className={`${inputCls} pr-10`} />
+              <button type="button" onClick={() => setShowToken(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">Encontre no painel Z-API → sua instância → Security Token.</p>
+          </Field>
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={saving || !instanceId.trim() || !token.trim()}
+              className="px-4 py-2 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/80 transition-colors disabled:opacity-40">
+              {saving ? 'Salvando…' : 'Salvar'}
+            </button>
+            {isConfigured && (
+              <button onClick={() => setEditing(false)}
+                className="px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">
+                Cancelar
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Instance: <span className="font-mono">{instanceId.slice(0, 8)}…</span></p>
+          <div className="flex gap-2">
+            <button onClick={() => setEditing(true)}
+              className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
+              Editar
+            </button>
+            <button onClick={handleRemove} disabled={saving}
+              className="px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40">
+              Remover
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -569,9 +698,14 @@ export default function ConfiguracoesPage() {
               onSave={(key, enabled) => saveIntegration('zapsign', key, enabled)}
             />
 
+            <ZapiConnectorCard
+              integration={integrations.find(i => i.provider === 'zapi') ?? null}
+              onSave={(key, enabled) => saveIntegration('zapi', key, enabled)}
+            />
+
             <div className="border border-border rounded-2xl p-5 bg-muted/20">
               <p className="text-xs text-muted-foreground">
-                Mais integrações em breve — Autentique, Google Calendar, WhatsApp Business.
+                Mais integrações em breve — Autentique, Google Calendar.
               </p>
             </div>
           </>
