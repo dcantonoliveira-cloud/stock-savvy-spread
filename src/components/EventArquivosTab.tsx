@@ -353,9 +353,10 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     setSendingZap(true);
     try {
       const base64 = await contractPDFBase64(contractText, event.event_name ?? 'Contrato', companyLogo, companyName, [annex1, annex2].filter(Boolean));
-      const res = await fetch('https://api.zapsign.com.br/api/v1/docs/', {
+      const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+      const res = await fetch(`${proxyBase}?path=/api/v1/docs/`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${zapToken}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-zapsign-token': zapToken },
         body: JSON.stringify({
           name: `Contrato - ${event.event_name ?? 'Evento'}`,
           base64_pdf: base64,
@@ -388,8 +389,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     if (!zapToken || !zapData) return;
     setRefreshingZap(true);
     try {
-      const res = await fetch(`https://api.zapsign.com.br/api/v1/docs/${zapData.doc_token}/`, {
-        headers: { 'Authorization': `Bearer ${zapToken}` },
+      const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+      const res = await fetch(`${proxyBase}?path=/api/v1/docs/${zapData.doc_token}/`, {
+        headers: { 'x-zapsign-token': zapToken },
       });
       if (!res.ok) throw new Error('Erro ao buscar status');
       const data = await res.json();
