@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { X, Plus, Trash2, ExternalLink, Search, Loader2, AlertTriangle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import RichTextEditor from '@/components/RichTextEditor';
+import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Session {
@@ -346,6 +347,7 @@ export default function TastingDetailPage() {
       {allocOpen && (
         <AllocModal
           sessionId={session.id}
+          sessionDate={session.scheduled_date}
           existingEventIds={rows.map(r => r.event_id ?? '')}
           maxCouples={maxCouples}
           currentCount={total}
@@ -441,8 +443,9 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
 }
 
 // ── AllocModal ─────────────────────────────────────────────────────────────────
-function AllocModal({ sessionId, existingEventIds, maxCouples, currentCount, onClose, onAdded }: {
+function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, currentCount, onClose, onAdded }: {
   sessionId: string;
+  sessionDate: string;
   existingEventIds: string[];
   maxCouples: number | null;
   currentCount: number;
@@ -453,6 +456,7 @@ function AllocModal({ sessionId, existingEventIds, maxCouples, currentCount, onC
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmEv, setConfirmEv] = useState<any | null>(null);
+  const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
 
   useEffect(() => {
     if (!search.trim()) { setResults([]); return; }
@@ -474,7 +478,22 @@ function AllocModal({ sessionId, existingEventIds, maxCouples, currentCount, onC
       session_id: sessionId, event_id: ev.id, situation_snapshot: snapshot,
     });
     toast.success(`${ev.event_name} alocado`);
-    onAdded();
+
+    // Busca telefone do cliente para popup de WhatsApp
+    const { data: evData } = await supabase
+      .from('events').select('clients(name, phone)').eq('id', ev.id).single();
+    const client = (evData as any)?.clients;
+    if (client?.phone) {
+      const [y, m, d] = sessionDate.split('-');
+      const dateFmt = `${d}/${m}/${y}`;
+      setWaTrigger({
+        phone: client.phone,
+        clientName: client.name ?? 'Cliente',
+        message: `Olá, ${client.name ?? 'tudo bem'}! 🍽️\n\nSua degustação foi agendada para o dia *${dateFmt}*.\n\nAguardamos vocês com muito carinho para essa experiência especial!\n\n— Rondello Buffet`,
+      });
+    } else {
+      onAdded();
+    }
   };
 
   const handleClick = (ev: any) => {
@@ -558,6 +577,13 @@ function AllocModal({ sessionId, existingEventIds, maxCouples, currentCount, onC
             </div>
           </div>
         </div>
+      )}
+
+      {waTrigger && (
+        <WhatsAppConfirmModal
+          trigger={waTrigger}
+          onClose={() => { setWaTrigger(null); onAdded(); }}
+        />
       )}
     </>,
     document.body

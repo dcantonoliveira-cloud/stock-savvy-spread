@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 import {
   FileText, RefreshCw, ExternalLink, Copy, Plus, Trash2,
   Loader2, Download, Upload, File, X, AlertTriangle,
@@ -30,7 +31,7 @@ interface EventData {
   clients: { name: string | null; cpf: string | null; rg: string | null; address: string | null } | null;
 }
 
-interface Props { eventId: string; event: EventData }
+interface Props { eventId: string; event: EventData; clientPhone?: string | null }
 
 // ── tag replacement ────────────────────────────────────────────────────────────
 const MONTHS_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -208,7 +209,7 @@ function SectionDivider({ title }: { title: string }) {
 }
 
 // ── componente ─────────────────────────────────────────────────────────────────
-export default function EventArquivosTab({ eventId, event }: Props) {
+export default function EventArquivosTab({ eventId, event, clientPhone }: Props) {
   const navigate = useNavigate();
   const [tastings, setTastings]           = useState<Tasting[]>([]);
   const [contractTemplate, setContractTemplate] = useState('');
@@ -228,6 +229,7 @@ export default function EventArquivosTab({ eventId, event }: Props) {
   const [companyLogo, setCompanyLogo]     = useState<string | null>(null);
   const [companyName, setCompanyName]     = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
@@ -333,6 +335,15 @@ export default function EventArquivosTab({ eventId, event }: Props) {
     setFiles(prev => [...prev, newFile as EventFile]);
     toast.success('Arquivo enviado');
     setUploading(false);
+
+    if (clientPhone) {
+      const clientName = (event.clients as any)?.name ?? 'Cliente';
+      setWaTrigger({
+        phone: clientPhone,
+        clientName,
+        message: `Olá, ${clientName}! 📎\n\nUm novo arquivo foi adicionado ao seu evento *${event.event_name ?? ''}*:\n\n*${file.name}*\n\nAcesse o portal do cliente para visualizar.\n\n— Rondello Buffet`,
+      });
+    }
   };
 
   const deleteFile = async (id: string) => {
@@ -555,6 +566,10 @@ export default function EventArquivosTab({ eventId, event }: Props) {
           </div>
         )}
       </div>
+
+      {waTrigger && (
+        <WhatsAppConfirmModal trigger={waTrigger} onClose={() => setWaTrigger(null)} />
+      )}
     </div>
   );
 }

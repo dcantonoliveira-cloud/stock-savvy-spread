@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2, Check, X, ChevronDown, ChevronRight, Info, HelpCircle } from 'lucide-react';
+import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 
 // ── SectionHeader ─────────────────────────────────────────────────────────────
 function SectionHeader({ title, tooltip }: { title: string; tooltip: string }) {
@@ -85,16 +86,23 @@ export default function EventFinanceiroTab({
   event,
   onUpdateEvent,
   onTotalsChange,
+  clientPhone,
+  clientName,
+  eventName,
 }: {
   eventId: string;
   event: EventFinanceiro;
   onUpdateEvent: (field: string, value: any) => void;
   onTotalsChange?: (totalValue: number, paidValue: number) => void;
+  clientPhone?: string | null;
+  clientName?: string | null;
+  eventName?: string | null;
 }) {
   const [additionals, setAdditionals] = useState<AdditionalValue[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [showScheduled, setShowScheduled] = useState(false);
+  const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
 
   // New row state
   const [newDesc, setNewDesc] = useState('');
@@ -228,6 +236,16 @@ export default function EventFinanceiroTab({
     if (isScheduled) { setNewSchedDate(''); setNewSchedVal(''); setNewSchedNotes(''); }
     else { setNewPayDate(''); setNewPayVal(''); setNewPayNotes(''); setNewPayType('payment'); }
     syncEventTotals(additionals, next, event);
+
+    // Popup WhatsApp
+    if (clientPhone) {
+      const fmtVal = Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      setWaTrigger({
+        phone: clientPhone,
+        clientName: clientName ?? 'Cliente',
+        message: `Olá, ${clientName ?? 'tudo bem'}! 😊\n\nRegistramos seu pagamento de *${fmtVal}* referente ao evento *${eventName ?? 'seu evento'}*.\n\nQualquer dúvida, estamos à disposição! 🎉\n\n— Rondello Buffet`,
+      });
+    }
   };
 
   const confirmPayment = async (p: Payment) => {
@@ -513,6 +531,10 @@ export default function EventFinanceiroTab({
           </div>
         )}
       </div>
+
+      {waTrigger && (
+        <WhatsAppConfirmModal trigger={waTrigger} onClose={() => setWaTrigger(null)} />
+      )}
     </div>
   );
 }
