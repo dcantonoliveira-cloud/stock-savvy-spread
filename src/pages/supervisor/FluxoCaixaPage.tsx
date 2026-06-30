@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, X, ChevronLeft, ChevronRight, ExternalLink, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { Plus, X, ChevronLeft, ChevronRight, ExternalLink, TrendingUp, TrendingDown, Wallet, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -14,10 +14,12 @@ type Entry = {
   amount: number;
   category: string;
   event_id: string | null;
-  events?: { event_name: string } | null;
+  events?: { event_name: string; event_date?: string | null; location_text?: string | null } | null;
   created_at: string;
+  reconciled?: boolean;
   _source?: 'cash_flow' | 'event_payment';
   _readonly?: boolean;
+  _ep_id?: string; // real event_payments.id for DB updates
 };
 
 type EventOption = { id: string; event_name: string; total_value: number | null };
@@ -65,7 +67,7 @@ export default function FluxoCaixaPage() {
         .order('date', { ascending: false }),
       supabase
         .from('event_payments' as any)
-        .select('id, event_id, payment_date, value, payment_type, is_confirmed, events(event_name)')
+        .select('id, event_id, payment_date, value, payment_type, is_confirmed, reconciled, events(event_name, event_date, location_text)')
         .gte('payment_date', first)
         .lte('payment_date', last)
         .eq('is_confirmed', true)
@@ -83,8 +85,10 @@ export default function FluxoCaixaPage() {
       event_id: p.event_id,
       events: p.events as any,
       created_at: p.payment_date,
+      reconciled: p.reconciled ?? false,
       _source: 'event_payment',
       _readonly: true,
+      _ep_id: p.id,
     }));
 
     const all = [...cashEntries, ...paymentEntries].sort(
@@ -116,6 +120,16 @@ export default function FluxoCaixaPage() {
     await supabase.from('cash_flow_entries' as any).delete().eq('id', id);
     setEntries(prev => prev.filter(e => e.id !== id));
     toast.success('Lançamento removido');
+  };
+
+  const toggleReconciled = async (entry: Entry) => {
+    const newVal = !entry.reconciled;
+    setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, reconciled: newVal } : e));
+    if (entry._source === 'event_payment' && entry._ep_id) {
+      await supabase.from('event_payments' as any).update({ reconciled: newVal }).eq('id', entry._ep_id);
+    } else {
+      await supabase.from('cash_flow_entries' as any).update({ reconciled: newVal }).eq('id', entry.id);
+    }
   };
 
   const eventPaymentsCount = entries.filter(e => e._source === 'event_payment').length;
@@ -180,7 +194,7 @@ export default function FluxoCaixaPage() {
       {/* Entries table */}
       <div className="bg-white border border-border rounded-2xl overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
-          <div className="grid grid-cols-[100px_1fr_160px_120px_80px_36px] gap-3 flex-1">
+          <div className="grid grid-cols-[100px_1fr_160px_120px_36px_36px] gap-3 flex-1">
             {['Data','Descrição','Categoria','Valor','',''].map((h, i) => (
               <span key={i} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 ${i >= 3 ? 'text-right' : ''}`}>{h}</span>
             ))}
@@ -202,35 +216,53 @@ export default function FluxoCaixaPage() {
         ) : (
           <div className="divide-y divide-border/50">
             {entries.map(e => (
-              <div key={e.id} className={`px-5 py-3 grid grid-cols-[100px_1fr_160px_120px_80px_36px] gap-3 items-center hover:bg-slate-50 transition-colors group ${e._source === 'event_payment' ? 'bg-emerald-50/30' : ''}`}>
+              <div key={e.id} className={`px-5 py-3 grid grid-cols-[100px_1fr_160px_120px_36px_36px] gap-3 items-center hover:bg-slate-50 transition-colors group ${e._source === 'event_payment' ? 'bg-emerald-50/30' : ''} ${e.reconciled ? 'opacity-60' : ''}`}>
                 <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(e.date)}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{e.description}</p>
+                    <p className={`text-sm font-medium truncate ${e.reconciled ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{e.description}</p>
                     {e._source === 'event_payment' && (
                       <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">evento</span>
                     )}
                   </div>
-                  {e.events?.event_name && e._source !== 'event_payment' && (
+                  {e._source === 'event_payment' && e.event_id ? (
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      <button onClick={() => navigate(`/events/${e.event_id}`)}
+                        className="text-xs text-primary hover:underline flex items-center gap-1">
+                        <ExternalLink className="w-3 h-3" />
+                        {e.events?.event_name ?? 'Ver evento'}
+                      </button>
+                      {e.events?.event_date && (
+                        <span className="text-xs text-muted-foreground">
+                          {fmtDate(e.events.event_date.slice(0, 10))}
+                        </span>
+                      )}
+                      {e.events?.location_text && (
+                        <span className="text-xs text-muted-foreground truncate max-w-[160px]">
+                          {e.events.location_text}
+                        </span>
+                      )}
+                    </div>
+                  ) : e.events?.event_name ? (
                     <button onClick={() => navigate(`/events/${e.event_id}`)}
                       className="text-xs text-primary hover:underline flex items-center gap-1 mt-0.5">
                       <ExternalLink className="w-3 h-3" />
                       {e.events.event_name}
                     </button>
-                  )}
-                  {e._source === 'event_payment' && e.event_id && (
-                    <button onClick={() => navigate(`/events/${e.event_id}`)}
-                      className="text-xs text-primary hover:underline flex items-center gap-1 mt-0.5">
-                      <ExternalLink className="w-3 h-3" />
-                      Ver evento
-                    </button>
-                  )}
+                  ) : null}
                 </div>
                 <span className="text-xs text-muted-foreground truncate">{CATEGORY_LABEL[e.category] ?? e.category}</span>
                 <span className={`text-sm font-semibold tabular-nums text-right ${e.amount >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                   {e.amount >= 0 ? '+' : ''}{fmtBRL(e.amount)}
                 </span>
-                <span />
+                {/* Check conferido */}
+                <button
+                  onClick={() => toggleReconciled(e)}
+                  title={e.reconciled ? 'Marcar como não conferido' : 'Marcar como conferido'}
+                  className={`p-1.5 rounded-lg transition-all ${e.reconciled ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground'}`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
                 {!e._readonly ? (
                   <button onClick={() => deleteEntry(e.id)}
                     className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-all">

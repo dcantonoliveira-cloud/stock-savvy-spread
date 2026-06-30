@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ChevronLeft, ChevronRight, Users, CalendarCheck,
-  TrendingUp, Clock, ExternalLink, UtensilsCrossed,
+  TrendingUp, Clock, ExternalLink, UtensilsCrossed, Plus, X, CalendarPlus, Mail, MapPin,
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 type TastingRow = {
@@ -25,6 +27,16 @@ type EventRow = {
   location_text: string | null;
   date_reserved: boolean | null;
   clients: { name: string | null } | null;
+};
+
+type AppointmentRow = {
+  id: string;
+  title: string;
+  date: string;
+  time: string | null;
+  location: string | null;
+  notes: string | null;
+  invited_emails: string | null;
 };
 
 // ── Constants ───────────────────────────────────────────────────────────────────
@@ -54,10 +66,13 @@ export default function CalendarPage() {
   const today      = new Date();
   const [year, setYear]         = useState(today.getFullYear());
   const [month, setMonth]       = useState(today.getMonth());
-  const [events,   setEvents]   = useState<EventRow[]>([]);
-  const [tastings, setTastings] = useState<TastingRow[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [events,       setEvents]       = useState<EventRow[]>([]);
+  const [tastings,     setTastings]     = useState<TastingRow[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [selected,     setSelected]     = useState<number | null>(null);
+  const [showApptModal, setShowApptModal] = useState(false);
+  const [apptDate,      setApptDate]     = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
 
   // ── Fetch month ──────────────────────────────────────────────────────────────
@@ -67,7 +82,7 @@ export default function CalendarPage() {
       setSelected(null);
       const first = `${year}-${String(month + 1).padStart(2, '0')}-01`;
       const last  = new Date(year, month + 1, 0).toISOString().slice(0, 10);
-      const [{ data }, { data: tsData }] = await Promise.all([
+      const [{ data }, { data: tsData }, { data: apptData }] = await Promise.all([
         supabase
           .from('events')
           .select('id, event_name, event_date, status, total_value, guest_count, event_type, location_text, date_reserved, clients(name)')
@@ -82,12 +97,19 @@ export default function CalendarPage() {
           .gte('scheduled_date', first)
           .lte('scheduled_date', last)
           .order('scheduled_date'),
+        supabase
+          .from('appointments' as any)
+          .select('id, title, date, time, location, notes, invited_emails')
+          .gte('date', first)
+          .lte('date', last)
+          .order('date'),
       ]);
       const visible = (data ?? []).filter((e: any) =>
         e.status === 'confirmed' || e.status === 'completed' || e.date_reserved === true
       );
       setEvents(visible as EventRow[]);
       setTastings((tsData ?? []) as TastingRow[]);
+      setAppointments((apptData ?? []) as AppointmentRow[]);
       setLoading(false);
     };
     load();
@@ -112,6 +134,12 @@ export default function CalendarPage() {
     return acc;
   }, {});
 
+  const apptsByDay = appointments.reduce<Record<number, AppointmentRow[]>>((acc, a) => {
+    const d = new Date(a.date + 'T12:00:00').getDate();
+    (acc[d] ??= []).push(a);
+    return acc;
+  }, {});
+
   const confirmed = events.filter(e => e.status === 'confirmed' || e.status === 'completed');
   const totalRevenue = confirmed.reduce((s, e) => s + (e.total_value ?? 0), 0);
   const totalGuests  = confirmed.reduce((s, e) => s + (e.guest_count ?? 0), 0);
@@ -122,8 +150,9 @@ export default function CalendarPage() {
   while (cells.length % 7 !== 0) cells.push(null);
 
   const isToday = (d: number) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-  const selectedEvents   = selected ? (byDay[selected]       ?? []) : [];
-  const selectedTastings = selected ? (tastingsByDay[selected] ?? []) : [];
+  const selectedEvents       = selected ? (byDay[selected]       ?? []) : [];
+  const selectedTastings     = selected ? (tastingsByDay[selected] ?? []) : [];
+  const selectedAppointments = selected ? (apptsByDay[selected]   ?? []) : [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -145,6 +174,19 @@ export default function CalendarPage() {
           </div>
           <button onClick={goToday} className="px-3 py-2 text-sm font-medium rounded-xl border border-border bg-white hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
             Hoje
+          </button>
+          <button
+            onClick={() => {
+              const d = selected
+                ? `${year}-${String(month + 1).padStart(2, '0')}-${String(selected).padStart(2, '0')}`
+                : new Date().toISOString().slice(0, 10);
+              setApptDate(d);
+              setShowApptModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <CalendarPlus className="w-4 h-4" />
+            Compromisso
           </button>
         </div>
 
@@ -187,9 +229,10 @@ export default function CalendarPage() {
 
                 const evs  = byDay[day] ?? [];
                 const tsgs = tastingsByDay[day] ?? [];
+                const apts = apptsByDay[day] ?? [];
                 const isTod = isToday(day);
                 const isSel = selected === day;
-                const total = evs.length + tsgs.length;
+                const total = evs.length + tsgs.length + apts.length;
 
                 return (
                   <div
@@ -225,6 +268,13 @@ export default function CalendarPage() {
                           <span className="text-[10px] font-medium truncate leading-tight text-violet-700">
                             Deg. {t.type ?? ''}
                           </span>
+                        </div>
+                      ))}
+                      {/* Appointments */}
+                      {apts.slice(0, Math.max(0, 3 - evs.length - tsgs.length)).map(a => (
+                        <div key={a.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 min-w-0">
+                          <CalendarPlus className="w-2.5 h-2.5 shrink-0 text-blue-500" />
+                          <span className="text-[10px] font-medium truncate leading-tight text-blue-700">{a.title}</span>
                         </div>
                       ))}
                       {total > 3 && (
@@ -274,6 +324,29 @@ export default function CalendarPage() {
                         <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover/card:opacity-100 shrink-0 transition-opacity" />
                       </div>
                     ))}
+                    {selectedAppointments.map(a => (
+                      <div key={a.id} className="px-4 py-3 hover:bg-blue-50/50 transition-colors group/card">
+                        <div className="flex items-start gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                            <CalendarPlus className="w-3.5 h-3.5 text-blue-600" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-foreground leading-tight">{a.title}</p>
+                            {a.time && <p className="text-xs text-muted-foreground mt-0.5">{a.time}</p>}
+                            {a.location && (
+                              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                <MapPin className="w-3 h-3 shrink-0" />{a.location}
+                              </p>
+                            )}
+                            {a.invited_emails && (
+                              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                <Mail className="w-3 h-3 shrink-0" />{a.invited_emails}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </>
                 )}
               </div>
@@ -309,11 +382,26 @@ export default function CalendarPage() {
                 <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-violet-400" />
                 <span className="text-xs text-muted-foreground">Degustação</span>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-blue-400" />
+                <span className="text-xs text-muted-foreground">Compromisso</span>
+              </div>
             </div>
           </div>
 
         </div>
       </div>
+
+      {showApptModal && (
+        <AppointmentModal
+          defaultDate={apptDate}
+          onClose={() => setShowApptModal(false)}
+          onCreated={(a) => {
+            setAppointments(prev => [...prev, a]);
+            setShowApptModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -389,5 +477,108 @@ function EventCard({ ev, showDate, onOpen }: { ev: EventRow; showDate?: boolean;
         <p className="text-xs font-semibold text-foreground mt-2 text-right">{fmtBRL(ev.total_value)}</p>
       )}
     </div>
+  );
+}
+
+// ── AppointmentModal ───────────────────────────────────────────────────────────
+function AppointmentModal({ defaultDate, onClose, onCreated }: {
+  defaultDate: string;
+  onClose: () => void;
+  onCreated: (a: AppointmentRow) => void;
+}) {
+  const [title,   setTitle]   = useState('');
+  const [date,    setDate]    = useState(defaultDate);
+  const [time,    setTime]    = useState('');
+  const [location, setLocation] = useState('');
+  const [notes,   setNotes]   = useState('');
+  const [invited, setInvited] = useState('');
+  const [saving,  setSaving]  = useState(false);
+
+  const save = async () => {
+    if (!title || !date) { toast.error('Título e data são obrigatórios'); return; }
+    setSaving(true);
+    const { data, error } = await supabase
+      .from('appointments' as any)
+      .insert({
+        title,
+        date,
+        time: time || null,
+        location: location || null,
+        notes: notes || null,
+        invited_emails: invited || null,
+      })
+      .select('id, title, date, time, location, notes, invited_emails')
+      .single();
+    if (error) { toast.error('Erro ao salvar'); setSaving(false); return; }
+    toast.success('Compromisso adicionado');
+    onCreated(data as AppointmentRow);
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarPlus className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-foreground">Novo compromisso</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Título *</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="Ex: Reunião com fornecedor"
+              className="w-full h-10 px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Data *</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full h-10 px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Horário</label>
+              <input type="time" value={time} onChange={e => setTime(e.target.value)}
+                className="w-full h-10 px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
+              <MapPin className="inline w-3 h-3 mr-1" />Local
+            </label>
+            <input type="text" value={location} onChange={e => setLocation(e.target.value)}
+              placeholder="Endereço ou link de reunião"
+              className="w-full h-10 px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">
+              <Mail className="inline w-3 h-3 mr-1" />Convidar (e-mails)
+            </label>
+            <input type="text" value={invited} onChange={e => setInvited(e.target.value)}
+              placeholder="email@exemplo.com, outro@email.com"
+              className="w-full h-10 px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Observações</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              placeholder="Detalhes, pauta..."
+              className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
+          </div>
+
+          <button onClick={save} disabled={saving}
+            className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60">
+            {saving ? 'Salvando...' : 'Adicionar compromisso'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
