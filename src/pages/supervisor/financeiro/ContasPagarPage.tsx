@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, X, TrendingDown, Clock, CheckCircle2, AlertTriangle, Search, RefreshCw } from 'lucide-react';
+import { Plus, X, TrendingDown, Clock, CheckCircle2, AlertTriangle, Search, RefreshCw, Trash2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
 
@@ -230,102 +230,266 @@ export default function ContasPagarPage() {
       {showModal && (
         <NewBillModal
           onClose={() => setShowModal(false)}
-          onCreated={b => { setBills(prev => [...prev, b]); setShowModal(false); }}
+          onCreated={newBills => { setBills(prev => [...prev, ...newBills]); setShowModal(false); }}
         />
       )}
     </div>
   );
 }
 
-function NewBillModal({ onClose, onCreated }: { onClose: () => void; onCreated: (b: Bill) => void }) {
-  const [desc,      setDesc]      = useState('');
-  const [supplier,  setSupplier]  = useState('');
-  const [category,  setCategory]  = useState('outros');
-  const [amount,    setAmount]    = useState('');
-  const [dueDate,   setDueDate]   = useState(new Date().toISOString().slice(0, 10));
-  const [recurring, setRecurring] = useState(false);
-  const [recurrence, setRecurrence] = useState('monthly');
-  const [notes,     setNotes]     = useState('');
-  const [saving,    setSaving]    = useState(false);
+// ---------- Combobox genérico ----------
+function Combobox({
+  value, onChange, options, placeholder, allowCreate = false, createLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  allowCreate?: boolean;
+  createLabel?: string;
+}) {
+  const [open, setOpen]       = useState(false);
+  const [query, setQuery]     = useState(value);
+  const ref                   = useRef<HTMLDivElement>(null);
+
+  // sync when parent resets
+  useEffect(() => { setQuery(value); }, [value]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = options.filter(o => o.toLowerCase().includes(query.toLowerCase()));
+  const showCreate = allowCreate && query.trim() && !options.some(o => o.toLowerCase() === query.toLowerCase());
+
+  const select = (v: string) => { onChange(v); setQuery(v); setOpen(false); };
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <input
+          className="w-full h-9 px-3 pr-8 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+          value={query}
+          placeholder={placeholder}
+          onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+        />
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+      </div>
+      {open && (filtered.length > 0 || showCreate) && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-border rounded-xl shadow-lg overflow-hidden max-h-44 overflow-y-auto">
+          {filtered.map(o => (
+            <button key={o} onMouseDown={() => select(o)}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors">
+              {o}
+            </button>
+          ))}
+          {showCreate && (
+            <button onMouseDown={() => select(query.trim())}
+              className="w-full text-left px-3 py-2 text-sm text-primary font-medium hover:bg-primary/5 border-t border-border transition-colors">
+              {createLabel ?? 'Criar'} &ldquo;{query.trim()}&rdquo;
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Modal em lote ----------
+type BillRow = {
+  id: string;
+  desc: string;
+  supplier: string;
+  category: string;
+  amount: string;
+  dueDate: string;
+  recurring: boolean;
+  recurrence: string;
+};
+
+const newRow = (): BillRow => ({
+  id: crypto.randomUUID(),
+  desc: '', supplier: '', category: 'outros', amount: '',
+  dueDate: new Date().toISOString().slice(0, 10),
+  recurring: false, recurrence: 'monthly',
+});
+
+function NewBillModal({ onClose, onCreated }: { onClose: () => void; onCreated: (bills: Bill[]) => void }) {
+  const [rows,           setRows]         = useState<BillRow[]>([newRow()]);
+  const [saving,         setSaving]       = useState(false);
+  const [knownSuppliers, setKnownSuppliers] = useState<string[]>([]);
+  const [customCats,     setCustomCats]   = useState<string[]>([]);
+
+  // Carrega fornecedores já usados
+  useEffect(() => {
+    supabase.from('bills_payable' as any).select('supplier').then(({ data }) => {
+      const names = [...new Set(((data ?? []) as any[]).map((r: any) => r.supplier).filter(Boolean))] as string[];
+      setKnownSuppliers(names);
+    });
+  }, []);
+
+  const allCategories = [
+    ...CATEGORIES.map(c => c.label),
+    ...customCats,
+  ];
+
+  const updateRow = (id: string, patch: Partial<BillRow>) =>
+    setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+
+  const addRow = () => setRows(prev => [...prev, newRow()]);
+
+  const removeRow = (id: string) => setRows(prev => prev.length === 1 ? prev : prev.filter(r => r.id !== id));
 
   const save = async () => {
-    if (!desc || !amount || !dueDate) { toast.error('Preencha os campos obrigatórios'); return; }
-    const num = parseFloat(amount.replace(',', '.'));
-    if (isNaN(num) || num <= 0) { toast.error('Valor inválido'); return; }
+    const valid = rows.filter(r => r.desc.trim() && r.amount && parseFloat(r.amount.replace(',', '.')) > 0 && r.dueDate);
+    if (valid.length === 0) { toast.error('Preencha ao menos uma linha completa'); return; }
+
     setSaving(true);
+    const payload = valid.map(r => {
+      // Resolve categoria: pode ser label ou value
+      const catMatch = CATEGORIES.find(c => c.label === r.category || c.value === r.category);
+      return {
+        description: r.desc.trim(),
+        supplier: r.supplier.trim() || null,
+        category: catMatch ? catMatch.value : r.category.toLowerCase().replace(/\s+/g, '_'),
+        amount: parseFloat(r.amount.replace(',', '.')),
+        due_date: r.dueDate,
+        recurring: r.recurring,
+        recurrence: r.recurring ? r.recurrence : null,
+        notes: null,
+      };
+    });
+
     const { data, error } = await supabase
       .from('bills_payable' as any)
-      .insert({ description: desc, supplier: supplier || null, category, amount: num, due_date: dueDate, recurring, recurrence: recurring ? recurrence : null, notes: notes || null })
-      .select('*').single();
+      .insert(payload)
+      .select('*');
+
     if (error) { toast.error('Erro ao salvar'); setSaving(false); return; }
-    toast.success('Conta adicionada');
-    onCreated(data as Bill);
+    toast.success(`${(data as any[]).length} conta${(data as any[]).length !== 1 ? 's' : ''} adicionada${(data as any[]).length !== 1 ? 's' : ''}`);
+    onCreated(data as Bill[]);
   };
 
-  const inputCls = 'w-full h-10 px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20';
+  const totalValid = rows.filter(r => r.desc.trim() && parseFloat(r.amount.replace(',', '.')) > 0).length;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <h3 className="font-semibold text-foreground">Nova conta a pagar</h3>
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 flex flex-col max-h-[90vh]">
+
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
+          <div>
+            <h3 className="font-semibold text-foreground">Lançamento em lote</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Adicione várias contas de uma vez. Linhas incompletas são ignoradas.</p>
+          </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
         </div>
-        <div className="p-5 space-y-4">
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Descrição *</label>
-            <input className={inputCls} value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ex: Aluguel Junho" />
-          </div>
+        {/* Column headers */}
+        <div className="px-5 py-2 bg-muted/30 border-b border-border grid grid-cols-[1fr_140px_130px_100px_110px_36px] gap-2 shrink-0">
+          {['Descrição *','Fornecedor','Categoria','Valor *','Vencimento *',''].map((h, i) => (
+            <span key={i} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
+          ))}
+        </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Fornecedor</label>
-              <input className={inputCls} value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Nome do fornecedor" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Vencimento *</label>
-              <input type="date" className={inputCls} value={dueDate} onChange={e => setDueDate(e.target.value)} />
-            </div>
-          </div>
+        {/* Rows */}
+        <div className="overflow-y-auto flex-1 divide-y divide-border/50">
+          {rows.map((row, idx) => {
+            const hasError = row.desc.trim() && (!row.amount || parseFloat(row.amount.replace(',', '.')) <= 0);
+            return (
+              <div key={row.id} className={`px-5 py-2.5 grid grid-cols-[1fr_140px_130px_100px_110px_36px] gap-2 items-center ${hasError ? 'bg-red-50/30' : ''}`}>
+                {/* Descrição */}
+                <input
+                  className="h-9 w-full px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  value={row.desc}
+                  onChange={e => updateRow(row.id, { desc: e.target.value })}
+                  placeholder={`Conta ${idx + 1}`}
+                  autoFocus={idx === rows.length - 1 && idx > 0}
+                />
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Categoria</label>
-              <select className={inputCls} value={category} onChange={e => setCategory(e.target.value)}>
-                {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Valor (R$) *</label>
-              <input type="number" className={inputCls} value={amount} onChange={e => setAmount(e.target.value)} min="0" step="0.01" placeholder="0,00" />
-            </div>
-          </div>
+                {/* Fornecedor combobox */}
+                <Combobox
+                  value={row.supplier}
+                  onChange={v => updateRow(row.id, { supplier: v })}
+                  options={knownSuppliers}
+                  placeholder="Fornecedor"
+                  allowCreate
+                  createLabel="Usar"
+                />
 
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={recurring} onChange={e => setRecurring(e.target.checked)} className="w-4 h-4 rounded" />
-              <span className="text-sm text-foreground">Conta recorrente</span>
-            </label>
-            {recurring && (
-              <select className="h-9 px-3 text-sm border border-border rounded-xl focus:outline-none" value={recurrence} onChange={e => setRecurrence(e.target.value)}>
-                <option value="monthly">Mensal</option>
-                <option value="weekly">Semanal</option>
-                <option value="yearly">Anual</option>
-              </select>
-            )}
-          </div>
+                {/* Categoria combobox */}
+                <Combobox
+                  value={(() => {
+                    const cat = CATEGORIES.find(c => c.value === row.category);
+                    return cat ? cat.label : row.category;
+                  })()}
+                  onChange={v => {
+                    const cat = CATEGORIES.find(c => c.label === v);
+                    if (cat) { updateRow(row.id, { category: cat.value }); }
+                    else {
+                      updateRow(row.id, { category: v });
+                      if (!customCats.includes(v) && !CATEGORIES.find(c => c.label === v)) {
+                        setCustomCats(prev => [...new Set([...prev, v])]);
+                      }
+                    }
+                  }}
+                  options={allCategories}
+                  placeholder="Categoria"
+                  allowCreate
+                  createLabel="Criar"
+                />
 
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Observações</label>
-            <textarea className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
+                {/* Valor */}
+                <input
+                  type="number"
+                  className="h-9 w-full px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  value={row.amount}
+                  onChange={e => updateRow(row.id, { amount: e.target.value })}
+                  placeholder="0,00"
+                  min="0"
+                  step="0.01"
+                />
 
-          <button onClick={save} disabled={saving}
-            className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60">
-            {saving ? 'Salvando...' : 'Adicionar conta'}
+                {/* Vencimento */}
+                <input
+                  type="date"
+                  className="h-9 w-full px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  value={row.dueDate}
+                  onChange={e => updateRow(row.id, { dueDate: e.target.value })}
+                />
+
+                {/* Remove */}
+                <button onClick={() => removeRow(row.id)}
+                  className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground/40 hover:text-red-500 transition-colors disabled:opacity-20"
+                  disabled={rows.length === 1}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-border flex items-center justify-between gap-4 shrink-0">
+          <button onClick={addRow}
+            className="flex items-center gap-1.5 text-sm text-primary font-medium hover:underline">
+            <Plus className="w-4 h-4" /> Adicionar linha
           </button>
+          <div className="flex items-center gap-3">
+            {totalValid > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {totalValid} conta{totalValid !== 1 ? 's' : ''} pronta{totalValid !== 1 ? 's' : ''}
+              </span>
+            )}
+            <button onClick={save} disabled={saving || totalValid === 0}
+              className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+              {saving ? 'Salvando...' : `Salvar${totalValid > 1 ? ` ${totalValid} contas` : ' conta'}`}
+            </button>
+          </div>
         </div>
       </div>
     </div>,
