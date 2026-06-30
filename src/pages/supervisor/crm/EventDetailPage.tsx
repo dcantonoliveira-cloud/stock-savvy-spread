@@ -511,6 +511,12 @@ export default function EventDetailPage() {
               </button>
             )}
 
+            {/* Ficha Técnica — imprimir */}
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFichaTecnica}>
+              <FileText className="w-3 h-3" />
+              Ficha Técnica
+            </Button>
+
             {/* Dados do contrato — copia link para cliente preencher */}
             <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={copyContractLink}>
               <FileText className="w-3 h-3" />
