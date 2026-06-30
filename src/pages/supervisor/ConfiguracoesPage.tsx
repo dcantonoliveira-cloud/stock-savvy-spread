@@ -219,6 +219,83 @@ function ZapiConnectorCard({ integration, onSave }: {
   );
 }
 
+// ─── ZapSign Connector Card ───────────────────────────────────────────────────
+function ZapSignConnectorCard({ integration, onSave }: {
+  integration: Integration | null;
+  onSave: (key: string, enabled: boolean) => Promise<void>;
+}) {
+  const parsed = (() => { try { return integration?.api_key ? JSON.parse(integration.api_key) : {}; } catch { return {}; } })();
+  const [token,   setToken]   = useState<string>(parsed.token ?? '');
+  const [enabled, setEnabled] = useState(integration?.enabled ?? false);
+  const [showTok, setShowTok] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const [editing, setEditing] = useState(!integration?.api_key);
+
+  const isConfigured = !!integration?.api_key;
+
+  const handleSave = async () => {
+    if (!token.trim()) { toast.error('Preencha o Token de acesso'); return; }
+    setSaving(true);
+    await onSave(JSON.stringify({ token: token.trim() }), enabled);
+    setSaving(false);
+    setEditing(false);
+  };
+  const handleRemove = async () => {
+    setSaving(true);
+    await onSave('', false);
+    setSaving(false);
+    setToken('');
+    setEditing(true);
+    setEnabled(false);
+  };
+
+  return (
+    <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-2">
+          <ZapSignLogo />
+          <p className="text-xs text-muted-foreground max-w-sm">Assinatura eletrônica com validade jurídica. Envie contratos para assinatura diretamente da ficha do evento, sem sair do sistema.</p>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer shrink-0">
+          <div onClick={() => setEnabled(e => !e)} className={`w-9 h-5 rounded-full transition-colors ${enabled ? 'bg-primary' : 'bg-muted'} relative`}>
+            <div className={`w-3.5 h-3.5 rounded-full bg-white shadow absolute top-0.75 transition-transform ${enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} style={{top:'3px'}} />
+          </div>
+        </label>
+      </div>
+      {editing ? (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground/70 mb-1.5">Token de acesso</label>
+            <div className="relative">
+              <input type={showTok ? 'text' : 'password'} value={token} onChange={e => setToken(e.target.value)}
+                placeholder="e8a5e7d4-435b-497e-..."
+                className="w-full h-9 px-3 pr-10 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors font-mono" />
+              <button type="button" onClick={() => setShowTok(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                {showTok ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">ZapSign → Configurações → Integrações → API ZapSign → Token de acesso.</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            {isConfigured && <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">Cancelar</button>}
+            <button onClick={handleSave} disabled={saving} className="px-4 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60">
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Token: <span className="font-mono">{token.slice(0, 8)}…</span></p>
+          <div className="flex gap-2">
+            <button onClick={() => setEditing(true)} className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">Editar</button>
+            <button onClick={handleRemove} disabled={saving} className="px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40">Remover</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Connector Card ───────────────────────────────────────────────────────────
 function ConnectorCard({ provider, description, logo, integration, onSave }: {
   provider: string;
@@ -785,10 +862,7 @@ export default function ConfiguracoesPage() {
               Conecte serviços externos ao sistema. Cada empresa configura sua própria chave — seus dados nunca são compartilhados.
             </p>
 
-            <ConnectorCard
-              provider="zapsign"
-              description="Assinatura eletrônica com validade jurídica. Envie contratos para assinatura diretamente da ficha do evento, sem sair do sistema."
-              logo={<ZapSignLogo />}
+            <ZapSignConnectorCard
               integration={integrations.find(i => i.provider === 'zapsign') ?? null}
               onSave={(key, enabled) => saveIntegration('zapsign', key, enabled)}
             />
