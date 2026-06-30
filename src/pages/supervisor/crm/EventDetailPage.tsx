@@ -453,13 +453,15 @@ export default function EventDetailPage() {
             {/* Reservar data — só pipeline */}
             {isPipeline && (
               <button onClick={toggleDateReserved}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
                   event.date_reserved
-                    ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200'
+                    ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
                     : 'bg-white text-muted-foreground border-border hover:bg-muted'
                 }`}>
                 <CalendarDays className="w-3.5 h-3.5" />
-                {event.date_reserved ? 'Reservado' : 'Reservar data'}
+                {event.date_reserved
+                  ? <><span className="group-hover:hidden">Reservado</span><span className="hidden group-hover:inline">Cancelar reserva</span></>
+                  : 'Reservar data'}
               </button>
             )}
 
