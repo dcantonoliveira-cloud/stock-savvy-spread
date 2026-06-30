@@ -356,7 +356,11 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
       const res = await fetch(`${proxyBase}?path=/api/v1/docs/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-zapsign-token': zapToken },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-zapsign-token': zapToken,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
         body: JSON.stringify({
           name: `Contrato - ${event.event_name ?? 'Evento'}`,
           base64_pdf: base64,
@@ -392,7 +396,10 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     try {
       const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
       const res = await fetch(`${proxyBase}?path=/api/v1/docs/${zapData.doc_token}/`, {
-        headers: { 'x-zapsign-token': zapToken },
+        headers: {
+          'x-zapsign-token': zapToken,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
       });
       if (!res.ok) throw new Error('Erro ao buscar status');
       const data = await res.json();
