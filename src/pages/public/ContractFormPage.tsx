@@ -16,6 +16,7 @@ interface FormData {
   witness_name: string;
   witness_cpf: string;
   witness_email: string;
+  source: string;
 }
 
 const inputCls =
@@ -47,7 +48,7 @@ const maskRg = (v: string) => {
 
 const BLANK: FormData = {
   name: '', cpf: '', rg: '', address: '', zip_code: '',
-  phone: '', email: '', witness_name: '', witness_cpf: '', witness_email: '',
+  phone: '', email: '', witness_name: '', witness_cpf: '', witness_email: '', source: '',
 };
 
 function CompanyHeader({ company }: { company: Company | null }) {
@@ -113,6 +114,7 @@ export default function ContractFormPage() {
         zip_code: form.zip_code || undefined,
         phone:    form.phone    || undefined,
         email:    form.email    || undefined,
+        source:   form.source   || undefined,
       }).eq('id', clientId);
     }
 
@@ -214,6 +216,10 @@ export default function ContractFormPage() {
               <div>
                 <label className={labelCls}>Email</label>
                 <input className={inputCls} type="email" value={form.email} onChange={set('email')} placeholder="email@exemplo.com" />
+              </div>
+              <div>
+                <label className={labelCls}>Como nos conheceu?</label>
+                <input className={inputCls} value={form.source} onChange={set('source')} placeholder="Instagram, indicação, Google..." />
               </div>
             </div>
           </div>
