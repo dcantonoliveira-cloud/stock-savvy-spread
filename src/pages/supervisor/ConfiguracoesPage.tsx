@@ -490,7 +490,7 @@ export default function ConfiguracoesPage() {
   ];
 
   return (
-    <div className="flex gap-6 items-start max-w-4xl">
+    <div className="flex gap-6 items-start">
 
       {/* Sidebar */}
       <div className="w-48 shrink-0 bg-white border border-border rounded-2xl p-2 sticky top-0">
