@@ -245,7 +245,13 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         if (c.name) setCompanyName(c.name);
       }
       if (zapCfg) {
-        try { const cfg = JSON.parse((zapCfg as any).api_key ?? '{}'); setZapToken(cfg.token ?? null); } catch {}
+        try {
+          const raw = (zapCfg as any).api_key ?? '';
+          let tok: string | null = null;
+          try { tok = JSON.parse(raw)?.token ?? null; } catch { tok = null; }
+          if (!tok) tok = raw || null; // fallback: raw string
+          setZapToken(tok);
+        } catch {}
       }
       const { data: tplData } = await supabase.from('contract_templates' as any).select('content').eq('is_default', true).limit(1).single();
       if (tplData) setContractTemplate((tplData as any).content ?? '');
@@ -351,6 +357,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     if (validSigners.length === 0) { toast.error('Adicione ao menos um signatário com nome e email'); return; }
 
     setSendingZap(true);
+    toast.info(`Token (primeiros 20 chars): ${zapToken?.slice(0, 20)}…`);
     try {
       const base64 = await contractPDFBase64(contractText, event.event_name ?? 'Contrato', companyLogo, companyName, [annex1, annex2].filter(Boolean));
       const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
