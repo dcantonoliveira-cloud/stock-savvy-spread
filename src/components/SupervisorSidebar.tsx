@@ -7,7 +7,7 @@ import {
   ArrowRightLeft, ChevronDown, Truck, ShoppingCart, Warehouse, ClipboardList,
   AlertTriangle, BookMarked, Tag, UserRound, CalendarDays, Coffee, Bell,
   TrendingUp, DollarSign, Calendar, LibraryBig, MapPin, Sparkles, UserCheck,
-  Palette, ScrollText, ChefHat, ListChecks, Settings,
+  Palette, ScrollText, ChefHat, ListChecks, Settings, MessageCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -73,6 +73,7 @@ const navStructure: NavGroup[] = [
     { path: '/cadastros/decoradores', label: 'Decoradores', icon: Palette },
     { path: '/cadastros/contratos', label: 'Contratos', icon: ScrollText },
     { path: '/cadastros/checklists', label: 'Checklists', icon: ListChecks },
+    { path: '/cadastros/mensagens', label: 'Mensagens WhatsApp', icon: MessageCircle },
   ]},
 
   { label: 'Administração', icon: Users, items: [
