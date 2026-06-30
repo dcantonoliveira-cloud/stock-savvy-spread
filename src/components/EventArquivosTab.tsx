@@ -256,7 +256,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   useEffect(() => {
     if (!showZapForm) return;
     const signers: { name: string; email: string }[] = [];
-    if (event.clients?.name) signers.push({ name: event.clients.name, email: event.clients.email ?? '' });
+    if (event.clients?.name)  signers.push({ name: event.clients.name,  email: event.clients.email ?? '' });
+    if (witness1Name)          signers.push({ name: witness1Name,         email: '' });
+    if (event.witness_name)   signers.push({ name: event.witness_name,   email: '' });
     setZapSigners(signers.length > 0 ? signers : [{ name: '', email: '' }]);
   }, [showZapForm]);
 
