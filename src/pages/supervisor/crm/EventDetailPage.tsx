@@ -553,7 +553,7 @@ export default function EventDetailPage() {
           const isClosed = ['confirmed', 'completed'].includes(event.status);
           const tabs = isClosed ? TABS_ALL : TABS_ALL.filter(t => !TABS_CLOSED_ONLY.includes(t));
           return (
-        <div className="px-8 flex gap-0 -mb-px">
+        <div className="px-8 flex gap-0 -mb-px overflow-x-auto scrollbar-none">
           {tabs.map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
