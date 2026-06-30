@@ -17,11 +17,7 @@ type EventRow = {
 };
 type TastingRow = { id: string; scheduled_date: string; type: string | null };
 
-const STATUS_LABEL: Record<string, string> = {
-  lead: 'Lead', negotiating: 'Negociando',
-  tasting_scheduled: 'Deg. agendada', confirmed: 'Confirmado',
-  completed: 'Realizado', cancelled: 'Cancelado',
-};
+import { STATUS_LABELS as STATUS_LABEL } from '@/lib/eventStatus';
 const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const MONTHS_LONG  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const WEEK_DAYS    = ['D','S','T','Q','Q','S','S'];

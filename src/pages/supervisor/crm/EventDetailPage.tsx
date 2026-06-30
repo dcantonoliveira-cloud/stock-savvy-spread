@@ -83,20 +83,8 @@ interface EventDetail {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const STATUS_LABELS: Record<string, string> = {
-  lead: '1° Contato', negotiating: 'Negociando', tasting_scheduled: 'Degustação',
-  confirmed: 'Confirmado', completed: 'Concluído', cancelled: 'Cancelado',
-  lost: 'Não fechado',
-};
-const STATUS_CLASSES: Record<string, string> = {
-  lead: 'bg-slate-100 text-slate-600 border-slate-200',
-  negotiating: 'bg-amber-50 text-amber-700 border-amber-200',
-  tasting_scheduled: 'bg-purple-50 text-purple-700 border-purple-200',
-  confirmed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  completed: 'bg-blue-50 text-blue-700 border-blue-200',
-  cancelled: 'bg-red-50 text-red-700 border-red-200',
-  lost: 'bg-zinc-100 text-zinc-500 border-zinc-200',
-};
+import { STATUS_LABELS, STATUS_CLS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
+const STATUS_CLASSES: Record<string, string> = Object.fromEntries(ALL_STATUS_KEYS.map(k => [k, STATUS_CLS(k)]));
 const TABS_ALL = ['Ficha Técnica','Dados do Cliente','Cardápio','Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'];
 const TABS_CLOSED_ONLY = ['Cardápio','Checklist','Cronograma','Financeiro','Equipe'];
 const EVENT_TYPES = ['Casamento','Coorporativo','Formatura','Debutante','Confraternização','Outro'];
@@ -155,12 +143,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-const ALL_STATUS_OPTIONS: { key: string; label: string; cls: string }[] = [
-  { key: 'lead',        label: '1° Contato', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
-  { key: 'negotiating', label: 'Negociando', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { key: 'confirmed',   label: 'Confirmado', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { key: 'cancelled',   label: 'Não fechado', cls: 'bg-rose-50 text-rose-500 border-rose-200' },
-];
+import { EVENT_STATUS } from '@/lib/eventStatus';
+const ALL_STATUS_OPTIONS = ALL_STATUS_KEYS.map(k => ({ key: k, label: EVENT_STATUS[k].label, cls: EVENT_STATUS[k].cls }));
 
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
   const [open, setOpen] = useState(false);

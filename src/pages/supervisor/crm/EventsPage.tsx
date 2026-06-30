@@ -41,15 +41,8 @@ type Client = { id: string; name: string; phone: string | null; email: string | 
 // ── Constants ──────────────────────────────────────────────────────
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-const STATUS_LABELS: Record<string,string> = {
-  lead: '1º Contato', negotiating: 'Negociando', confirmed: 'Confirmado', cancelled: 'Cancelado',
-};
-const STATUS_CLASSES: Record<string,string> = {
-  lead: 'bg-blue-100 text-blue-700',
-  negotiating: 'bg-amber-100 text-amber-700',
-  confirmed: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-red-100 text-red-700',
-};
+import { STATUS_LABELS, STATUS_CLS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
+const STATUS_CLASSES: Record<string,string> = Object.fromEntries(ALL_STATUS_KEYS.map(k => [k, STATUS_CLS(k)]));
 const EVENT_TYPES = ['Casamento','Formatura','Aniversário','Corporativo','Debutante','Batizado','Confraternização','Outro'];
 const EMPTY_FORM = {
   client_id: '', event_name: '', event_type: 'Casamento', status: 'lead',
