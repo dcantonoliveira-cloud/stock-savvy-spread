@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Clock, Copy, Send, XCircle, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
+import { buildMessage } from '@/lib/whatsapp';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -226,20 +228,22 @@ function ConfirmModal({ title, description, confirmLabel, confirmCls, onConfirm,
 
 // ── Ações perigosas ───────────────────────────────────────────────────────────
 
-function ActionsSection({ eventId, onCancel, onDelete }: {
+function ActionsSection({ eventId, clientWhatsapp, clientName, eventName, onCancel, onDelete }: {
   eventId: string;
+  clientWhatsapp?: string | null;
+  clientName?: string | null;
+  eventName?: string | null;
   onCancel: () => void;
   onDelete: () => void;
 }) {
-  const [sendingReview, setSendingReview] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [waTrigger, setWaTrigger]             = useState<WhatsAppTrigger | null>(null);
 
-  const sendReviewMessage = async () => {
-    setSendingReview(true);
-    await new Promise(r => setTimeout(r, 800));
-    toast.success('Mensagem de avaliação enviada!');
-    setSendingReview(false);
+  const openReviewModal = async () => {
+    if (!clientWhatsapp) { toast.error('Cliente sem telefone cadastrado'); return; }
+    const text = await buildMessage('review', { clientName: clientName ?? '', eventName: eventName ?? '' });
+    setWaTrigger({ phone: clientWhatsapp, clientName: clientName ?? 'Cliente', message: text });
   };
 
   return (
@@ -272,13 +276,19 @@ function ActionsSection({ eventId, onCancel, onDelete }: {
           <h3 className="font-semibold text-foreground text-[14px]">Mensagem para avaliar-nos</h3>
           <p className="text-sm text-muted-foreground mt-0.5">
             Envie uma mensagem ao casal solicitando avaliação após o evento.
+            {!clientWhatsapp && <span className="text-amber-600 ml-1">— cliente sem telefone cadastrado.</span>}
           </p>
         </div>
-        <Button onClick={sendReviewMessage} disabled={sendingReview} className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white">
+        <Button onClick={openReviewModal} disabled={!clientWhatsapp}
+          className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40">
           <Send className="w-3.5 h-3.5 mr-1.5" />
-          Enviar
+          Enviar via WhatsApp
         </Button>
       </div>
+
+      {waTrigger && (
+        <WhatsAppConfirmModal trigger={waTrigger} onClose={() => setWaTrigger(null)} />
+      )}
 
       {/* Cancelar */}
       <div className="bg-white border border-border rounded-2xl p-5 flex items-center justify-between gap-4">
@@ -405,17 +415,26 @@ interface EventOutrosTabProps {
   eventId: string;
   clientEmail?: string | null;
   clientWhatsapp?: string | null;
+  clientName?: string | null;
+  eventName?: string | null;
   onCancelEvent: () => void;
   onDeleteEvent: () => void;
 }
 
 export default function EventOutrosTab({
-  eventId, clientEmail, clientWhatsapp, onCancelEvent, onDeleteEvent
+  eventId, clientEmail, clientWhatsapp, clientName, eventName, onCancelEvent, onDeleteEvent
 }: EventOutrosTabProps) {
   return (
     <div className="space-y-4">
       <PortalSection eventId={eventId} clientEmail={clientEmail} clientWhatsapp={clientWhatsapp} />
-      <ActionsSection eventId={eventId} onCancel={onCancelEvent} onDelete={onDeleteEvent} />
+      <ActionsSection
+        eventId={eventId}
+        clientWhatsapp={clientWhatsapp}
+        clientName={clientName}
+        eventName={eventName}
+        onCancel={onCancelEvent}
+        onDelete={onDeleteEvent}
+      />
       <HistorySection eventId={eventId} />
     </div>
   );

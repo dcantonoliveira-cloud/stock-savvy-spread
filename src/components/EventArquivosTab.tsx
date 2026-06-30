@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
+import { buildMessage } from '@/lib/whatsapp';
 import {
   FileText, RefreshCw, ExternalLink, Copy, Plus, Trash2,
   Loader2, Download, Upload, File, X, AlertTriangle,
@@ -338,11 +339,8 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
 
     if (clientPhone) {
       const clientName = (event.clients as any)?.name ?? 'Cliente';
-      setWaTrigger({
-        phone: clientPhone,
-        clientName,
-        message: `Olá, ${clientName}! 📎\n\nUm novo arquivo foi adicionado ao seu evento *${event.event_name ?? ''}*:\n\n*${file.name}*\n\nAcesse o portal do cliente para visualizar.\n\n— Rondello Buffet`,
-      });
+      buildMessage('file', { clientName, eventName: event.event_name ?? '', fileName: file.name })
+        .then(text => setWaTrigger({ phone: clientPhone, clientName, message: text }));
     }
   };
 

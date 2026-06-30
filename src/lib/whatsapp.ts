@@ -2,8 +2,69 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type ZapiConfig = { instance_id: string; token: string };
 
+export type MessageTemplateKey = 'payment' | 'file' | 'tasting' | 'review';
+
+export type MessageTemplates = Record<MessageTemplateKey, string>;
+
+// Defaults — substituídos pelos templates salvos em Configurações
+export const DEFAULT_TEMPLATES: MessageTemplates = {
+  payment: `Olá, {{clientName}}! 😊\n\nRegistramos seu pagamento de *{{value}}* referente ao evento *{{eventName}}*.\n\nQualquer dúvida, estamos à disposição! 🎉\n\n— Rondello Buffet`,
+  file:    `Olá, {{clientName}}! 📎\n\nUm novo arquivo foi adicionado ao seu evento *{{eventName}}*:\n\n*{{fileName}}*\n\nAcesse o portal do cliente para visualizar.\n\n— Rondello Buffet`,
+  tasting: `Olá, {{clientName}}! 🍽️\n\nSua degustação foi agendada para o dia *{{date}}*.\n\nAguardamos vocês com muito carinho para essa experiência especial!\n\n— Rondello Buffet`,
+  review:  `Olá, {{clientName}}! ⭐\n\nFoi uma honra realizar o *{{eventName}}*!\n\nGostaríamos muito de saber sua opinião sobre nossos serviços. Sua avaliação é muito importante para nós!\n\nObrigado pela confiança!\n— Rondello Buffet`,
+};
+
+export const TEMPLATE_LABELS: Record<MessageTemplateKey, string> = {
+  payment: 'Pagamento adicionado',
+  file:    'Arquivo incluído',
+  tasting: 'Degustação agendada',
+  review:  'Pedido de avaliação',
+};
+
+export const TEMPLATE_VARS: Record<MessageTemplateKey, string[]> = {
+  payment: ['{{clientName}}', '{{value}}', '{{eventName}}'],
+  file:    ['{{clientName}}', '{{eventName}}', '{{fileName}}'],
+  tasting: ['{{clientName}}', '{{date}}'],
+  review:  ['{{clientName}}', '{{eventName}}'],
+};
+
+// Busca templates salvos no banco (provider = 'whatsapp_messages')
+let _cachedTemplates: MessageTemplates | null = null;
+
+export async function getMessageTemplates(): Promise<MessageTemplates> {
+  if (_cachedTemplates) return _cachedTemplates;
+  const { data } = await (supabase.from as any)('company_integrations')
+    .select('api_key')
+    .eq('provider', 'whatsapp_messages')
+    .single();
+  if (data?.api_key) {
+    try {
+      _cachedTemplates = { ...DEFAULT_TEMPLATES, ...JSON.parse(data.api_key) };
+      return _cachedTemplates!;
+    } catch { /* fallthrough */ }
+  }
+  return DEFAULT_TEMPLATES;
+}
+
+export function invalidateTemplateCache() {
+  _cachedTemplates = null;
+}
+
+// Constrói a mensagem final com variáveis substituídas
+export async function buildMessage(
+  key: MessageTemplateKey,
+  vars: Partial<Record<string, string>>
+): Promise<string> {
+  const templates = await getMessageTemplates();
+  let text = templates[key];
+  Object.entries(vars).forEach(([k, v]) => {
+    text = text.replaceAll(`{{${k}}}`, v ?? '');
+  });
+  return text;
+}
+
 export async function getZapiConfig(): Promise<ZapiConfig | null> {
-  const { data } = await (supabase.from as any)('integrations')
+  const { data } = await (supabase.from as any)('company_integrations')
     .select('api_key, enabled')
     .eq('provider', 'zapi')
     .single();
