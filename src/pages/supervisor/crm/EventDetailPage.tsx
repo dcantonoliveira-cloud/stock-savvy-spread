@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, ChevronDown } from 'lucide-react';
+import { Download, X, Loader2, FileText, AlignLeft, BookOpen, Search, Trash2, Clock, Users, MapPin, CalendarDays, Check, ChevronDown, MessageCircle, UtensilsCrossed } from 'lucide-react';
+import { openWhatsAppLink } from '@/lib/whatsapp';
 import { Button } from '@/components/ui/button';
 import RichTextEditor from '@/components/RichTextEditor';
 import LinkedField from '@/components/LinkedField';
@@ -206,6 +207,7 @@ export default function EventDetailPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [tab, setTab] = useState('Ficha Técnica');
   const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
+  const [allocTastingOpen, setAllocTastingOpen] = useState(false);
   const [form, setForm] = useState<Partial<EventDetail>>({});
   const [clientForm, setClientForm] = useState<Record<string, string>>({});
   const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -445,67 +447,64 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <StatusDropdown status={event.status} onChange={changeStatus} />
 
-            {/* Reservar data — só para orçamentos em pipeline */}
+            {/* Reservar data — só pipeline */}
             {isPipeline && (
-              <button
-                onClick={toggleDateReserved}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border uppercase tracking-wide transition-colors ${
+              <button onClick={toggleDateReserved}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
                   event.date_reserved
                     ? 'bg-violet-100 text-violet-700 border-violet-300 hover:bg-violet-200'
-                    : 'bg-muted text-muted-foreground border-border hover:bg-accent'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${event.date_reserved ? 'bg-violet-500' : 'bg-muted-foreground/40'}`} />
+                    : 'bg-white text-muted-foreground border-border hover:bg-muted'
+                }`}>
+                <CalendarDays className="w-3.5 h-3.5" />
                 {event.date_reserved ? 'Reservado' : 'Reservar data'}
               </button>
             )}
 
-            {/* Tag de pagamento — só eventos fechados */}
+            {/* Tag de pagamento — só fechados */}
             {isClosed && (() => {
               const total = event.total_value ?? 0;
               const paid = event.paid_value ?? 0;
               const pct = total > 0 ? Math.min(Math.round((paid / total) * 100), 100) : 0;
               if (event.is_paid_in_full || pct >= 100)
-                return (
-                  <span className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
-                    <Check className="w-3 h-3" />QUITADO
-                  </span>
-                );
+                return <span className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-200"><Check className="w-3 h-3" />QUITADO</span>;
               if (pct > 0)
-                return (
-                  <span className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
-                    {pct}% pago
-                    <span className="w-10 h-1.5 bg-amber-100 rounded-full overflow-hidden inline-block">
-                      <span className="h-full bg-amber-500 rounded-full block" style={{ width: `${pct}%` }} />
-                    </span>
-                  </span>
-                );
-              return (
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-red-50 text-red-600 border-red-200">
-                  Não quitado
-                </span>
-              );
+                return <span className="flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-xl border bg-amber-50 text-amber-700 border-amber-200">{pct}% pago</span>;
+              return <span className="text-[11px] font-bold px-2.5 py-1.5 rounded-xl border bg-red-50 text-red-600 border-red-200">Não quitado</span>;
             })()}
 
-            {saveStatus === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" />}
-            {contractShort && isClosed && (
-              <span className="hidden md:block text-xs text-muted-foreground">Fechado em {contractShort}</span>
+            {/* Chamar no WhatsApp — sempre visível se tiver telefone */}
+            {event.clients?.phone && (
+              <button
+                onClick={() => openWhatsAppLink(event.clients!.phone!, `Olá, ${event.clients!.name ?? ''}!`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border bg-white border-border text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors">
+                <MessageCircle className="w-3.5 h-3.5" />
+                WhatsApp
+              </button>
             )}
 
-            {/* Botões de ação — só eventos fechados */}
-            {isClosed && (
-              <>
-                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFichaTecnica}>
-                  <Download className="w-3 h-3" />Ficha técnica
-                </Button>
-                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
-                  <Download className="w-3 h-3" />Fechamento
-                </Button>
-              </>
+            {/* Alocar a uma degustação — só pipeline */}
+            {isPipeline && (
+              <button onClick={() => setAllocTastingOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+                <UtensilsCrossed className="w-3.5 h-3.5" />
+                Alocar degustação
+              </button>
             )}
+
+            {/* Dados do contrato / downloads — pipeline e fechados */}
+            <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFichaTecnica}>
+              <FileText className="w-3 h-3" />Dados do contrato
+            </Button>
+            {isClosed && (
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs hidden md:flex" onClick={handleFechamento}>
+                <Download className="w-3 h-3" />Fechamento
+              </Button>
+            )}
+
+            {saveStatus === 'saving' && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" />}
 
             <button onClick={() => navigate(backPath)}
               className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
@@ -959,7 +958,113 @@ function EventHistorySection({ eventId }: { eventId: string }) {
       {waTrigger && (
         <WhatsAppConfirmModal trigger={waTrigger} onClose={() => setWaTrigger(null)} />
       )}
+
+      {allocTastingOpen && event && (
+        <AllocTastingModal
+          eventId={event.id}
+          eventName={event.event_name ?? ''}
+          onClose={() => setAllocTastingOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Modal: Alocar a uma degustação ────────────────────────────────────────────
+type TastingSession = { id: string; scheduled_date: string | null; max_couples: number | null; current_count: number };
+
+function AllocTastingModal({ eventId, eventName, onClose }: { eventId: string; eventName: string; onClose: () => void }) {
+  const [sessions, setSessions] = useState<TastingSession[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState<string | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    (async () => {
+      const { data: sessData } = await (supabase.from as any)('tasting_sessions')
+        .select('id, scheduled_date, max_couples')
+        .gte('scheduled_date', today)
+        .order('scheduled_date');
+
+      if (!sessData) { setLoading(false); return; }
+
+      // Conta casais em cada sessão
+      const counts = await Promise.all(sessData.map(async (s: any) => {
+        const { count } = await (supabase.from as any)('tasting_session_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('session_id', s.id);
+        return { ...s, current_count: count ?? 0 };
+      }));
+
+      setSessions(counts);
+      setLoading(false);
+    })();
+  }, []);
+
+  const alloc = async (session: TastingSession) => {
+    setSaving(session.id);
+    const { error } = await (supabase.from as any)('tasting_session_events')
+      .insert({ session_id: session.id, event_id: eventId, situation_snapshot: 'new' });
+    if (error) { toast.error('Erro ao alocar'); setSaving(null); return; }
+    toast.success('Evento alocado na degustação!');
+    onClose();
+  };
+
+  const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div>
+            <h3 className="font-semibold text-foreground">Alocar a uma degustação</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{eventName}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-4 max-h-80 overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : sessions.length === 0 ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              Nenhuma degustação agendada para os próximos dias.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sessions.map(s => {
+                const full = s.max_couples !== null && s.current_count >= s.max_couples;
+                return (
+                  <button key={s.id} onClick={() => !full && alloc(s)} disabled={full || saving === s.id}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors text-left ${
+                      full ? 'opacity-40 cursor-not-allowed border-border bg-muted/30'
+                           : 'border-border hover:border-violet-300 hover:bg-violet-50'
+                    }`}>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground capitalize">
+                        {s.scheduled_date ? fmtDate(s.scheduled_date) : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {s.current_count}{s.max_couples ? `/${s.max_couples}` : ''} casais
+                        {full && ' — lotado'}
+                      </p>
+                    </div>
+                    {saving === s.id
+                      ? <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
+                      : !full && <UtensilsCrossed className="w-4 h-4 text-violet-400" />
+                    }
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
