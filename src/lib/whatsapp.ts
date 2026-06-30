@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type ZapiConfig = { instance_id: string; token: string };
+export type ZapiConfig = { instance_id: string; token: string; client_token?: string };
 
 export type MessageTemplateKey = 'payment' | 'file' | 'tasting' | 'review';
 
@@ -88,7 +88,10 @@ export async function sendWhatsApp(phone: string, message: string): Promise<{ ok
       `https://api.z-api.io/instances/${config.instance_id}/token/${config.token}/send-text`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(config.client_token ? { 'Client-Token': config.client_token } : {}),
+        },
         body: JSON.stringify({ phone: formatted, message }),
       }
     );

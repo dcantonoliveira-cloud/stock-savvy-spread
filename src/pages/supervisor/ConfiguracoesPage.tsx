@@ -43,7 +43,7 @@ interface Integration {
   enabled: boolean;
 }
 
-type Tab = 'perfil' | 'empresa' | 'conectores';
+type Tab = 'perfil' | 'empresa' | 'conectores' | 'cadastros';
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const inputCls = 'w-full h-10 px-3 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors';
@@ -110,19 +110,20 @@ function ZapiConnectorCard({ integration, onSave }: {
   const parsed = (() => {
     try { return integration?.api_key ? JSON.parse(integration.api_key) : {}; } catch { return {}; }
   })();
-  const [instanceId, setInstanceId] = useState<string>(parsed.instance_id ?? '');
-  const [token,      setToken]      = useState<string>(parsed.token ?? '');
-  const [enabled,    setEnabled]    = useState(integration?.enabled ?? false);
-  const [showToken,  setShowToken]  = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [editing,    setEditing]    = useState(!integration?.api_key);
+  const [instanceId,   setInstanceId]   = useState<string>(parsed.instance_id ?? '');
+  const [token,        setToken]        = useState<string>(parsed.token ?? '');
+  const [clientToken,  setClientToken]  = useState<string>(parsed.client_token ?? '');
+  const [enabled,      setEnabled]      = useState(integration?.enabled ?? false);
+  const [showToken,    setShowToken]    = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [editing,      setEditing]      = useState(!integration?.api_key);
 
   const isConfigured = !!integration?.api_key;
 
   const handleSave = async () => {
     if (!instanceId.trim() || !token.trim()) { toast.error('Preencha Instance ID e Token'); return; }
     setSaving(true);
-    await onSave(JSON.stringify({ instance_id: instanceId.trim(), token: token.trim() }), enabled);
+    await onSave(JSON.stringify({ instance_id: instanceId.trim(), token: token.trim(), client_token: clientToken.trim() || undefined }), enabled);
     setSaving(false);
     setEditing(false);
   };
@@ -131,7 +132,7 @@ function ZapiConnectorCard({ integration, onSave }: {
     setSaving(true);
     await onSave('', false);
     setSaving(false);
-    setInstanceId(''); setToken(''); setEditing(true); setEnabled(false);
+    setInstanceId(''); setToken(''); setClientToken(''); setEditing(true); setEnabled(false);
   };
 
   return (
@@ -170,16 +171,21 @@ function ZapiConnectorCard({ integration, onSave }: {
             <input type="text" value={instanceId} onChange={e => setInstanceId(e.target.value)}
               placeholder="Ex: 3EB09A6FA3D8..." className={inputCls} />
           </Field>
-          <Field label="Token (Client-Token)">
+          <Field label="Token da instância (Security Token)">
             <div className="relative">
               <input type={showToken ? 'text' : 'password'} value={token} onChange={e => setToken(e.target.value)}
-                placeholder="Cole aqui seu token Z-API..." className={`${inputCls} pr-10`} />
+                placeholder="Cole aqui o Security Token da instância…" className={`${inputCls} pr-10`} />
               <button type="button" onClick={() => setShowToken(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1.5">Encontre no painel Z-API → sua instância → Security Token.</p>
+            <p className="text-xs text-muted-foreground mt-1.5">Painel Z-API → sua instância → Security Token.</p>
+          </Field>
+          <Field label="Client-Token (conta Z-API)">
+            <input type="password" value={clientToken} onChange={e => setClientToken(e.target.value)}
+              placeholder="Cole aqui o Client-Token da sua conta…" className={inputCls} />
+            <p className="text-xs text-muted-foreground mt-1.5">Painel Z-API → sua conta → Client-Token (canto superior direito).</p>
           </Field>
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={saving || !instanceId.trim() || !token.trim()}
@@ -575,6 +581,7 @@ export default function ConfiguracoesPage() {
     { key: 'perfil',     label: 'Meu Perfil',  icon: <User className="w-4 h-4" /> },
     { key: 'empresa',    label: 'Empresa',      icon: <Building2 className="w-4 h-4" /> },
     { key: 'conectores', label: 'Conectores',   icon: <Plug className="w-4 h-4" /> },
+    { key: 'cadastros',  label: 'Cadastros',    icon: <MessageCircle className="w-4 h-4" /> },
   ];
 
   return (
@@ -791,16 +798,20 @@ export default function ConfiguracoesPage() {
               onSave={(key, enabled) => saveIntegration('zapi', key, enabled)}
             />
 
-            <WhatsAppTemplatesCard
-              savedJson={integrations.find(i => i.provider === 'whatsapp_messages')?.api_key ?? null}
-              onSave={async (json) => { await saveIntegration('whatsapp_messages', json, true); invalidateTemplateCache(); }}
-            />
-
             <div className="border border-border rounded-2xl p-5 bg-muted/20">
               <p className="text-xs text-muted-foreground">
                 Mais integrações em breve — Autentique, Google Calendar.
               </p>
             </div>
+          </>
+        )}
+
+        {tab === 'cadastros' && (
+          <>
+            <WhatsAppTemplatesCard
+              savedJson={integrations.find(i => i.provider === 'whatsapp_messages')?.api_key ?? null}
+              onSave={async (json) => { await saveIntegration('whatsapp_messages', json, true); invalidateTemplateCache(); }}
+            />
           </>
         )}
 
