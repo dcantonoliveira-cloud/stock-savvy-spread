@@ -153,23 +153,32 @@ export default function SupervisorSidebar() {
                   style={{ opacity: 0.5, transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }} />
               </button>
 
-              {isOpen && (
-                <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2"
-                     style={{ borderColor: 'hsl(220 35% 20%)' }}>
-                  {item.items.map(sub => {
-                    const SubIcon = sub.icon;
-                    const active = pathname === sub.path || pathname.startsWith(sub.path + '/');
-                    return (
-                      <Link key={sub.path} to={sub.path}
-                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${active ? 'nav-item-active' : 'hover:bg-white/5'}`}
-                        style={{ color: active ? undefined : 'hsl(220 15% 52%)' }}>
-                        <SubIcon className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{sub.label}</span>
-                      </Link>
-                    );
-                  })}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateRows: isOpen ? '1fr' : '0fr',
+                  transition: 'grid-template-rows 220ms cubic-bezier(0.4,0,0.2,1)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ overflow: 'hidden' }}>
+                  <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2"
+                       style={{ borderColor: 'hsl(220 35% 20%)' }}>
+                    {item.items.map(sub => {
+                      const SubIcon = sub.icon;
+                      const active = pathname === sub.path || pathname.startsWith(sub.path + '/');
+                      return (
+                        <Link key={sub.path} to={sub.path}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${active ? 'nav-item-active' : 'hover:bg-white/5'}`}
+                          style={{ color: active ? undefined : 'hsl(220 15% 52%)' }}>
+                          <SubIcon className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{sub.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
