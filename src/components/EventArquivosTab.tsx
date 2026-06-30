@@ -486,12 +486,19 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                   title="Baixar PDF">
                   {generatingPdf?<Loader2 className="w-4 h-4 animate-spin"/>:<FileText className="w-4 h-4"/>}
                 </button>
-                {zapToken && (
-                  <button onClick={()=>setShowZapForm(o=>!o)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide border border-primary/30 text-primary bg-primary/5 rounded-lg hover:bg-primary/10 transition-colors">
-                    <Send className="w-3 h-3" />Enviar para assinaturas
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    if (!zapToken) { toast.error('Configure o ZapSign em Configurações → Conectores para usar esta função'); return; }
+                    setShowZapForm(o => !o);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide rounded-lg transition-colors ${
+                    zapToken
+                      ? 'border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10'
+                      : 'border border-border text-muted-foreground/50 bg-muted/30 cursor-not-allowed'
+                  }`}
+                  title={zapToken ? 'Enviar para assinatura eletrônica via ZapSign' : 'Configure o ZapSign em Configurações → Conectores'}>
+                  <Send className="w-3 h-3" />Enviar para assinaturas
+                </button>
               </>
             )}
             <button onClick={generateContract}
