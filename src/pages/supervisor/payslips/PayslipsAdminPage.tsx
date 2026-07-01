@@ -4,11 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
-  Upload, FileText, CheckCircle2, Clock, Eye, Download,
-  Plus, Loader2, X, ArrowLeft,
+  Upload, FileText, Eye, Download,
+  Plus, Loader2, X, ArrowLeft, Search,
 } from 'lucide-react';
 import { sha256Hex } from '@/lib/payslipPdf';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const MONTHS = [
@@ -42,6 +42,8 @@ export default function PayslipsAdminPage() {
   const [uploading, setUploading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterSearch, setFilterSearch] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
   const [form, setForm] = useState({
     employee_id: employeeFilter ?? '',
     month: new Date().getMonth(),
@@ -246,16 +248,28 @@ export default function PayslipsAdminPage() {
     if (url) window.open(url, '_blank');
   };
 
-  const filteredEmployee = employeeFilter
+  const base = employeeFilter
     ? payslips.filter(p => p.employee_id === employeeFilter)
     : payslips;
-  const filtered = filterStatus === 'all'
-    ? filteredEmployee
-    : filteredEmployee.filter(p => p.status === filterStatus);
 
-  const source = employeeFilter ? filteredEmployee : payslips;
-  const counts = { all: source.length, draft: 0, published: 0, signed: 0 };
-  source.forEach(p => { if (p.status in counts) counts[p.status as keyof typeof counts]++; });
+  const filtered = base.filter(p => {
+    if (filterStatus !== 'all' && p.status !== filterStatus) return false;
+    if (filterMonth && !p.reference_month.startsWith(filterMonth)) return false;
+    if (filterSearch) {
+      const q = filterSearch.toLowerCase();
+      const name = p.profiles?.display_name?.toLowerCase() ?? '';
+      const email = p.profiles?.email?.toLowerCase() ?? '';
+      if (!name.includes(q) && !email.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const counts = { all: base.length, draft: 0, published: 0, signed: 0 };
+  base.forEach(p => { if (p.status in counts) counts[p.status as keyof typeof counts]++; });
+
+  // Unique months for filter dropdown
+  const uniqueMonths = [...new Set(payslips.map(p => p.reference_month.slice(0, 7)))]
+    .sort((a, b) => b.localeCompare(a));
 
   const focusedEmployee = employeeFilter
     ? employees.find(e => e.id === employeeFilter)
@@ -325,13 +339,41 @@ export default function PayslipsAdminPage() {
         ))}
       </div>
 
+      {/* Search + month filter */}
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+          <input
+            type="text"
+            placeholder="Buscar por funcionário..."
+            value={filterSearch}
+            onChange={e => setFilterSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border border-border rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+        <select
+          value={filterMonth}
+          onChange={e => setFilterMonth(e.target.value)}
+          className="border border-border rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[180px]">
+          <option value="">Todas as competências</option>
+          {uniqueMonths.map(m => {
+            const [y, mo] = m.split('-');
+            return (
+              <option key={m} value={m}>
+                {MONTHS[parseInt(mo) - 1]}/{y}
+              </option>
+            );
+          })}
+        </select>
+      </div>
+
       {/* Table */}
       <div className="bg-white border border-border rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
               <th className="text-left px-5 py-3">Funcionário</th>
-              <th className="text-left px-4 py-3">Holerite</th>
+              <th className="text-left px-4 py-3">Competência</th>
               <th className="text-left px-4 py-3">Status</th>
               <th className="text-left px-4 py-3">Data assinatura</th>
               <th className="text-right px-5 py-3">Ações</th>
@@ -364,7 +406,12 @@ export default function PayslipsAdminPage() {
                     <p className="font-medium text-foreground">{(p as any).profiles?.display_name ?? '—'}</p>
                     <p className="text-xs text-muted-foreground">{(p as any).profiles?.email}</p>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{p.title}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {(() => {
+                      const [y, mo] = p.reference_month.split('-');
+                      return `${MONTHS[parseInt(mo) - 1]}/${y}`;
+                    })()}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${status.cls}`}>
                       {status.label}
