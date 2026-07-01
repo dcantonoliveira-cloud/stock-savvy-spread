@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
   Upload, FileText, CheckCircle2, Clock, Eye, Download,
-  Plus, Users, ChevronDown, Loader2, X, AlertCircle,
+  Plus, Loader2, X, ArrowLeft,
 } from 'lucide-react';
 import { sha256Hex } from '@/lib/payslipPdf';
 import { format } from 'date-fns';
@@ -31,6 +32,10 @@ const STATUS_MAP = {
 
 export default function PayslipsAdminPage() {
   const { profile } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const employeeFilter = searchParams.get('employee');
+
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +43,7 @@ export default function PayslipsAdminPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [form, setForm] = useState({
-    employee_id: '',
+    employee_id: employeeFilter ?? '',
     month: new Date().getMonth(),
     year: new Date().getFullYear(),
     file: null as File | null,
@@ -195,17 +200,44 @@ export default function PayslipsAdminPage() {
     if (url) window.open(url, '_blank');
   };
 
-  const filtered = filterStatus === 'all' ? payslips : payslips.filter(p => p.status === filterStatus);
-  const counts = { all: payslips.length, draft: 0, published: 0, signed: 0 };
-  payslips.forEach(p => { if (p.status in counts) counts[p.status as keyof typeof counts]++; });
+  const filteredEmployee = employeeFilter
+    ? payslips.filter(p => p.employee_id === employeeFilter)
+    : payslips;
+  const filtered = filterStatus === 'all'
+    ? filteredEmployee
+    : filteredEmployee.filter(p => p.status === filterStatus);
+
+  const source = employeeFilter ? filteredEmployee : payslips;
+  const counts = { all: source.length, draft: 0, published: 0, signed: 0 };
+  source.forEach(p => { if (p.status in counts) counts[p.status as keyof typeof counts]++; });
+
+  const focusedEmployee = employeeFilter
+    ? employees.find(e => e.id === employeeFilter)
+    : null;
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
+      {/* Breadcrumb when filtering by employee */}
+      {employeeFilter && (
+        <button
+          onClick={() => navigate('/users')}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          Funcionários
+        </button>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Holerites</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Gerencie e publique holerites para os funcionários</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {focusedEmployee ? `Holerites — ${focusedEmployee.display_name}` : 'Holerites'}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {focusedEmployee
+              ? focusedEmployee.email
+              : 'Gerencie e publique holerites para os funcionários'}
+          </p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
