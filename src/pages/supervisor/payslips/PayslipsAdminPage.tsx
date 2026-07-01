@@ -50,22 +50,23 @@ export default function PayslipsAdminPage() {
   });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { loadEmployees(); load(); }, []);
+
+  const loadEmployees = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('user_id, display_name, email')
+      .order('display_name');
+    setEmployees((data ?? []).map((p: any) => ({ id: p.user_id, display_name: p.display_name, email: p.email })));
+  };
 
   const load = async () => {
     setLoading(true);
-    const [psRes, empRes] = await Promise.all([
-      supabase
-        .from('payslips' as any)
-        .select('id, title, status, reference_month, employee_id, published_at, created_at, profiles(display_name, email), electronic_signatures(id, signed_at_utc, signature_hash)')
-        .order('reference_month', { ascending: false }),
-      supabase
-        .from('profiles')
-        .select('user_id, display_name, email')
-        .order('display_name'),
-    ]);
-    setPayslips((psRes.data ?? []) as unknown as Payslip[]);
-    setEmployees((empRes.data ?? []).map((p: any) => ({ id: p.user_id, display_name: p.display_name, email: p.email })));
+    const { data } = await supabase
+      .from('payslips' as any)
+      .select('id, title, status, reference_month, employee_id, published_at, created_at, profiles(display_name, email), electronic_signatures(id, signed_at_utc, signature_hash)')
+      .order('reference_month', { ascending: false });
+    setPayslips((data ?? []) as unknown as Payslip[]);
     setLoading(false);
   };
 
