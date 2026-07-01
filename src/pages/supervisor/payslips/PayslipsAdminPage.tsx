@@ -50,7 +50,7 @@ export default function PayslipsAdminPage() {
   });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { if (profile?.company_id) load(); }, [profile?.company_id]);
+  useEffect(() => { load(); }, []);
 
   const load = async () => {
     setLoading(true);
