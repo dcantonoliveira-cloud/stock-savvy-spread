@@ -166,6 +166,27 @@ export default function PayslipsAdminPage() {
       setModalOpen(false);
       setForm({ employee_id: '', month: new Date().getMonth(), year: new Date().getFullYear(), file: null });
       load();
+
+      // Enviar notificações (email + whatsapp) em background
+      const session = (await supabase.auth.getSession()).data.session;
+      const signUrl = `${window.location.origin}/meus-holerites/${payslipId}`;
+      supabase.functions.invoke('send-payslip-notification', {
+        body: {
+          payslip_id: payslipId,
+          employee_id: form.employee_id,
+          payslip_title: title,
+          sign_url: signUrl,
+          channels: ['email', 'whatsapp'],
+        },
+      }).then(({ data: notifData, error: notifErr }) => {
+        if (notifErr) return;
+        const r = notifData?.results ?? {};
+        if (r.email?.ok)      toast.success('E-mail enviado ao funcionário');
+        if (r.email?.error)   toast.error(`E-mail: ${r.email.error}`);
+        if (r.whatsapp?.ok)   toast.success('WhatsApp enviado ao funcionário');
+        if (r.whatsapp?.error && r.whatsapp.error !== 'Z-API não configurado')
+          toast.error(`WhatsApp: ${r.whatsapp.error}`);
+      });
     } catch (e: any) {
       toast.error(e.message ?? 'Erro ao publicar holerite');
     } finally {
