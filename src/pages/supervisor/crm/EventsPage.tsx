@@ -131,22 +131,37 @@ export default function EventsPage() {
     if (!search.trim() || search.trim().length < 2) { setSearchResults([]); return; }
     const timer = setTimeout(async () => {
       setSearchLoading(true);
-      const q = search.trim();
+      const q = search.trim().toLowerCase();
+      const words = q.split(/\s+/).filter(Boolean);
+
       const { data } = await supabase
         .from('events')
         .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
-        .or(`event_name.ilike.%${q}%,location_text.ilike.%${q}%`)
         .not('event_name', 'is', null)
         .order('event_date', { ascending: false })
-        .limit(100);
-      // Filtra também por nome do cliente (join não suporta ilike direto)
+        .limit(300);
+
       const all = (data as EventRow[]) ?? [];
-      const withClient = all.filter(e =>
-        (e.event_name ?? '').toLowerCase().includes(q.toLowerCase()) ||
-        (e.clients?.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
-        (e.location_text ?? '').toLowerCase().includes(q.toLowerCase())
-      );
-      setSearchResults(withClient);
+
+      // Score de similaridade: exact match > starts with > contains word > contains any char
+      const score = (e: EventRow) => {
+        const name     = (e.event_name ?? '').toLowerCase();
+        const location = (e.location_text ?? '').toLowerCase();
+        const client   = (e.clients?.name ?? '').toLowerCase();
+        const haystack = [name, location, client];
+
+        if (haystack.some(h => h === q)) return 100;
+        if (haystack.some(h => h.startsWith(q))) return 80;
+        if (haystack.some(h => h.includes(q))) return 60;
+        const matchedWords = words.filter(w => haystack.some(h => h.includes(w)));
+        if (matchedWords.length === words.length) return 40;
+        if (matchedWords.length > 0) return 20 + matchedWords.length;
+        return 0;
+      };
+
+      const scored = all.map(e => ({ e, s: score(e) })).filter(x => x.s > 0);
+      scored.sort((a, b) => b.s - a.s);
+      setSearchResults(scored.map(x => x.e));
       setSearchLoading(false);
     }, 300);
     return () => clearTimeout(timer);

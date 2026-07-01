@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, Search, Loader2, UserX } from 'lucide-react';
 
-type EventRow = { id: string; status: string; event_date: string | null; total_value: number | null };
+type EventRow = { id: string; status: string; event_date: string | null; total_value: number | null; event_name: string | null; event_type: string | null };
 
 type Client = {
   id: string;
@@ -52,7 +52,7 @@ export default function ClientsPage() {
       setLoading(true);
       const { data } = await supabase
         .from('clients')
-        .select('id, name, phone, email, address, notes, created_at, events(id, status, event_date, total_value)')
+        .select('id, name, phone, email, address, notes, created_at, events(id, status, event_date, total_value, event_name, event_type)')
         .order('name');
       setClients((data as Client[]) ?? []);
       setLoading(false);
@@ -114,13 +114,13 @@ export default function ClientsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-xs bg-muted/30">
-              <th className="text-left px-5 py-3 font-semibold text-muted-foreground">CLIENTE</th>
-              <th className="text-left px-4 py-3 font-semibold text-muted-foreground hidden md:table-cell">TELEFONE</th>
-              <th className="text-left px-4 py-3 font-semibold text-muted-foreground hidden lg:table-cell">E-MAIL</th>
-              <th className="text-left px-4 py-3 font-semibold text-muted-foreground hidden xl:table-cell">ENDEREÇO</th>
-              <th className="text-center px-4 py-3 font-semibold text-muted-foreground">EVENTOS</th>
-              <th className="text-left px-4 py-3 font-semibold text-muted-foreground">STATUS</th>
-              <th className="text-right px-5 py-3 font-semibold text-muted-foreground hidden sm:table-cell">CADASTRO</th>
+              <th className="text-left px-5 py-2.5 font-semibold text-muted-foreground">CLIENTE</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground hidden md:table-cell">TELEFONE</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground hidden lg:table-cell">E-MAIL</th>
+              <th className="text-center px-4 py-2.5 font-semibold text-muted-foreground">EVENTOS</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground hidden md:table-cell">ÚLTIMO EVENTO</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground hidden lg:table-cell">TIPO</th>
+              <th className="text-right px-5 py-2.5 font-semibold text-muted-foreground hidden sm:table-cell">DATA DO EVENTO</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -149,24 +149,16 @@ export default function ClientsPage() {
                   className="hover:bg-primary/5 transition-colors cursor-pointer"
                   onClick={() => console.log('client', client.id)}
                 >
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        {getInitials(client.name)}
-                      </div>
-                      <span className="font-semibold text-foreground truncate max-w-[180px]">{client.name}</span>
-                    </div>
+                  <td className="px-5 py-2.5">
+                    <span className="font-semibold text-foreground truncate max-w-[200px] block">{client.name}</span>
                   </td>
-                  <td className="px-4 py-3.5 text-muted-foreground hidden md:table-cell">
+                  <td className="px-4 py-2.5 text-muted-foreground text-sm hidden md:table-cell">
                     {client.phone ?? <span className="opacity-30">—</span>}
                   </td>
-                  <td className="px-4 py-3.5 text-muted-foreground hidden lg:table-cell">
+                  <td className="px-4 py-2.5 text-muted-foreground text-sm hidden lg:table-cell">
                     <span className="truncate max-w-[180px] block">{client.email ?? <span className="opacity-30">—</span>}</span>
                   </td>
-                  <td className="px-4 py-3.5 text-muted-foreground hidden xl:table-cell">
-                    <span className="truncate max-w-[180px] block">{client.address ?? <span className="opacity-30">—</span>}</span>
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
+                  <td className="px-4 py-2.5 text-center">
                     {client.events.length > 0 ? (
                       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold">
                         {client.events.length}
@@ -175,17 +167,14 @@ export default function ClientsPage() {
                       <span className="text-muted-foreground/40 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3.5">
-                    {latest ? (
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_CLASSES[latest.status] ?? 'bg-muted text-muted-foreground'}`}>
-                        {STATUS_LABELS[latest.status] ?? latest.status}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/40 text-xs">—</span>
-                    )}
+                  <td className="px-4 py-2.5 text-sm text-muted-foreground hidden md:table-cell truncate max-w-[180px]">
+                    {latest?.event_name ?? <span className="opacity-30">—</span>}
                   </td>
-                  <td className="px-5 py-3.5 text-right text-muted-foreground text-xs hidden sm:table-cell">
-                    {fmtDate(client.created_at)}
+                  <td className="px-4 py-2.5 text-sm text-muted-foreground hidden lg:table-cell">
+                    {latest?.event_type ?? <span className="opacity-30">—</span>}
+                  </td>
+                  <td className="px-5 py-2.5 text-right text-muted-foreground text-sm hidden sm:table-cell">
+                    {latest?.event_date ? fmtDate(latest.event_date) : <span className="opacity-30">—</span>}
                   </td>
                 </tr>
               );
