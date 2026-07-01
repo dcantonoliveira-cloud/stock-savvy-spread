@@ -50,7 +50,7 @@ export default function PayslipsAdminPage() {
   });
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (profile?.company_id) load(); }, [profile?.company_id]);
 
   const load = async () => {
     setLoading(true);
@@ -62,7 +62,7 @@ export default function PayslipsAdminPage() {
       supabase
         .from('profiles')
         .select('user_id, display_name, email')
-        .eq('company_id', profile?.company_id ?? ''),
+        .eq('company_id', profile!.company_id),
     ]);
     setPayslips((psRes.data ?? []) as unknown as Payslip[]);
     setEmployees((empRes.data ?? []).map((p: any) => ({ id: p.user_id, display_name: p.display_name, email: p.email })));
