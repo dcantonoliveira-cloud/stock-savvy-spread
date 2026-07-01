@@ -133,14 +133,14 @@ export default function PayslipSignPage() {
 
       const signedPdfBytes = await generateSignedPdf(pdfBytes, tempAuditData);
 
-      // 5. Upload signed PDF (temp path; will be confirmed after we get signature_id)
-      const tempPath = `${payslip.company_id}/${payslip.id}/signed_temp_${Date.now()}.pdf`;
+      // 5. Upload signed PDF com nome baseado em timestamp (sem depender do signature_id)
+      const signedPath = `${payslip.company_id}/${payslip.id}/signed_${user.id}_${Date.now()}.pdf`;
       const { error: upErr } = await supabase.storage
         .from('payslips')
-        .upload(tempPath, signedPdfBytes, { contentType: 'application/pdf' });
+        .upload(signedPath, signedPdfBytes, { contentType: 'application/pdf' });
       if (upErr) throw upErr;
 
-      // 6. Call edge function to record signature
+      // 6. Call edge function — passa o path definitivo já no insert
       const session = (await supabase.auth.getSession()).data.session;
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payslip-sign`,
@@ -157,7 +157,7 @@ export default function PayslipSignPage() {
             document_hash: computedHash,
             sig_method: method,
             sig_data: sigData,
-            signed_pdf_path: tempPath,
+            signed_pdf_path: signedPath,
             timezone: tz,
             signed_at_local: signedAtLocal,
           }),
@@ -166,28 +166,17 @@ export default function PayslipSignPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        // Cleanup temp upload
-        await supabase.storage.from('payslips').remove([tempPath]);
+        await supabase.storage.from('payslips').remove([signedPath]);
         throw new Error(err.error ?? 'Erro ao registrar assinatura');
       }
 
       const result = await res.json();
 
-      // 7. Rename to final path with real signature_id
-      const finalPath = `${payslip.company_id}/${payslip.id}/signed_${result.signature_id}.pdf`;
-      await supabase.storage.from('payslips').move(tempPath, finalPath);
-
-      // 8. Update signed_pdf_path on signature record
-      await supabase
-        .from('electronic_signatures' as any)
-        .update({ signed_pdf_path: finalPath })
-        .eq('id', result.signature_id);
-
       setSignature({
         id: result.signature_id,
         signed_at_utc: result.signed_at,
         signature_hash: result.signature_hash,
-        signed_pdf_path: finalPath,
+        signed_pdf_path: signedPath,
       });
       setPayslip(p => p ? { ...p, status: 'signed' } : p);
       toast.success('Holerite assinado com sucesso!');
