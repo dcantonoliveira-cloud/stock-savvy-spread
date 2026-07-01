@@ -80,6 +80,15 @@ export default function PayslipsAdminPage() {
       const title = `Holerite ${monthLabel}`;
       const emp = employees.find(e => e.id === form.employee_id);
 
+      // Fetch company_id from current user's profile
+      const { data: myProfile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+        .single();
+      const companyId = (myProfile as any)?.company_id;
+      if (!companyId) throw new Error('Empresa não encontrada no perfil do usuário');
+
       // Compute SHA-256
       const fileBytes = await form.file.arrayBuffer();
       const hash = await sha256Hex(fileBytes);
@@ -111,7 +120,7 @@ export default function PayslipsAdminPage() {
         const { data: ps, error } = await supabase
           .from('payslips' as any)
           .insert({
-            company_id: profile?.company_id,
+            company_id: companyId,
             employee_id: form.employee_id,
             reference_month: refMonth,
             title,
@@ -127,7 +136,7 @@ export default function PayslipsAdminPage() {
       }
 
       // Upload PDF to Storage
-      const path = `${profile?.company_id}/${payslipId}/v${version}.pdf`;
+      const path = `${companyId}/${payslipId}/v${version}.pdf`;
       const { error: storageErr } = await supabase.storage
         .from('payslips')
         .upload(path, form.file, { contentType: 'application/pdf', upsert: true });
@@ -156,7 +165,7 @@ export default function PayslipsAdminPage() {
       // Audit log
       await supabase.from('payslip_audit_logs' as any).insert({
         payslip_id: payslipId,
-        company_id: profile?.company_id,
+        company_id: companyId,
         user_id: (await supabase.auth.getUser()).data.user?.id,
         action: version === 1 ? 'payslip_created' : 'new_version_created',
         details: { version, hash, employee: emp?.display_name },
