@@ -5,8 +5,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
   Upload, FileText, Eye, Download,
-  Plus, Loader2, X, ArrowLeft, Search,
+  Plus, Loader2, X, ArrowLeft, Search, Layers,
 } from 'lucide-react';
+import BulkPayslipUpload from '@/components/payslips/BulkPayslipUpload';
 import { sha256Hex } from '@/lib/payslipPdf';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -43,6 +44,7 @@ export default function PayslipsAdminPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterSearch, setFilterSearch] = useState('');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [filterMonth, setFilterMonth] = useState('');
   const [form, setForm] = useState({
     employee_id: employeeFilter ?? '',
@@ -299,12 +301,20 @@ export default function PayslipsAdminPage() {
               : 'Gerencie e publique holerites para os funcionários'}
           </p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors">
-          <Plus className="w-4 h-4" />
-          Publicar holerite
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="flex items-center gap-2 border border-border text-muted-foreground px-4 py-2 rounded-xl text-sm font-medium hover:bg-muted transition-colors">
+            <Layers className="w-4 h-4" />
+            Upload em lote
+          </button>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors">
+            <Plus className="w-4 h-4" />
+            Publicar holerite
+          </button>
+        </div>
       </div>
 
       {/* KPI strip */}
@@ -442,6 +452,14 @@ export default function PayslipsAdminPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Bulk upload */}
+      {bulkOpen && (
+        <BulkPayslipUpload
+          onClose={() => setBulkOpen(false)}
+          onDone={() => load()}
+        />
+      )}
 
       {/* Upload modal */}
       {modalOpen && (
