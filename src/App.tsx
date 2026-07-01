@@ -13,6 +13,7 @@ import EmployeeLayout from "./components/EmployeeLayout";
 
 // ─── Auth (sempre necessários na primeira tela) ───
 import LoginPage from "./pages/auth/LoginPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import NoRolePage from "./pages/auth/NoRolePage";
 
 // ─── Supervisor pages (lazy) ───
@@ -141,6 +142,10 @@ function AppRoutes() {
     }
     if (window.location.pathname.startsWith('/contrato-cliente/')) {
       return <Suspense fallback={<PageLoader />}><ContractFormPage /></Suspense>;
+    }
+    // Link de recovery do Supabase chega com #type=recovery no hash
+    if (window.location.hash.includes('type=recovery')) {
+      return <ResetPasswordPage />;
     }
     return <LoginPage />;
   }
