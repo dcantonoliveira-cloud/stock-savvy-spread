@@ -38,6 +38,28 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
+function InputField({
+  label, field, type = 'text', value, onChange,
+}: {
+  label: string;
+  field: string;
+  type?: string;
+  value: string;
+  onChange: (field: string, val: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1 block">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(field, e.target.value)}
+        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+      />
+    </div>
+  );
+}
+
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -99,8 +121,8 @@ export default function EmployeeDetailPage() {
     setSaving(false);
   };
 
-  const f = (field: keyof Profile) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const handleField = (field: string, val: string) =>
+    setForm(prev => ({ ...prev, [field]: val }));
 
   const getSignedUrl = async (path: string) => {
     const { data } = await supabase.storage.from('payslips').createSignedUrl(path, 60);
@@ -138,20 +160,8 @@ export default function EmployeeDetailPage() {
   const pending = payslips.filter(p => p.status === 'published').length;
   const signed  = payslips.filter(p => p.status === 'signed').length;
 
-  const InputField = ({ label, field, type = 'text' }: { label: string; field: keyof Profile; type?: string }) => (
-    <div>
-      <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1 block">{label}</label>
-      <input
-        type={type}
-        value={(form[field] as string) ?? ''}
-        onChange={f(field)}
-        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
-      />
-    </div>
-  );
-
   return (
-    <div className="max-w-4xl mx-auto space-y-5 pb-10">
+    <div className="p-6 space-y-5">
       {/* Back */}
       <button onClick={() => navigate('/users')}
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -237,10 +247,10 @@ export default function EmployeeDetailPage() {
             </p>
             {editing ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <InputField label="Nome completo" field="display_name" />
-                <InputField label="Telefone" field="phone" />
-                <InputField label="CPF" field="cpf" />
-                <InputField label="Data de nascimento" field="birth_date" type="date" />
+                <InputField label="Nome completo" field="display_name" value={form.display_name ?? ''} onChange={handleField} />
+                <InputField label="Telefone" field="phone" value={form.phone ?? ''} onChange={handleField} />
+                <InputField label="CPF" field="cpf" value={form.cpf ?? ''} onChange={handleField} />
+                <InputField label="Data de nascimento" field="birth_date" type="date" value={form.birth_date ?? ''} onChange={handleField} />
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -264,11 +274,11 @@ export default function EmployeeDetailPage() {
             {editing ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <InputField label="Endereço" field="address" />
+                  <InputField label="Endereço" field="address" value={form.address ?? ''} onChange={handleField} />
                 </div>
-                <InputField label="Cidade" field="city" />
-                <InputField label="Estado" field="state" />
-                <InputField label="CEP" field="zip_code" />
+                <InputField label="Cidade" field="city" value={form.city ?? ''} onChange={handleField} />
+                <InputField label="Estado" field="state" value={form.state ?? ''} onChange={handleField} />
+                <InputField label="CEP" field="zip_code" value={form.zip_code ?? ''} onChange={handleField} />
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -289,9 +299,9 @@ export default function EmployeeDetailPage() {
             </p>
             {editing ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <InputField label="Cargo" field="position" />
-                <InputField label="Departamento" field="department" />
-                <InputField label="Data de contratação" field="hire_date" type="date" />
+                <InputField label="Cargo" field="position" value={form.position ?? ''} onChange={handleField} />
+                <InputField label="Departamento" field="department" value={form.department ?? ''} onChange={handleField} />
+                <InputField label="Data de contratação" field="hire_date" type="date" value={form.hire_date ?? ''} onChange={handleField} />
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
