@@ -121,7 +121,7 @@ export async function generateSignedPdf(originalBytes: ArrayBuffer, audit: Audit
   // Declaration
   y -= 8;
   page.drawRectangle({ x: 40, y: y - 28, width: width - 80, height: 36, color: lightBg });
-  page.drawText('✓  Declaro que visualizei e recebi este holerite.', {
+  page.drawText('[OK]  Declaro que visualizei e recebi este holerite.', {
     x: 48, y: y - 14, size: 9, font: helveticaBold, color: dark,
   });
   y -= 40;
