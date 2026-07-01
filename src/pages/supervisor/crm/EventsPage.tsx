@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import {
   Search, Plus, ChevronLeft, ChevronRight,
@@ -43,7 +44,7 @@ const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 
 import { STATUS_LABELS, STATUS_CLS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
 const STATUS_CLASSES: Record<string,string> = Object.fromEntries(ALL_STATUS_KEYS.map(k => [k, STATUS_CLS(k)]));
-const EVENT_TYPES = ['Casamento','Formatura','Aniversário','Corporativo','Debutante','Batizado','Confraternização','Outro'];
+const EVENT_TYPES = ['Aniversário','Batizado','Casamento','Confraternização','Corporativo','Debutante','Formatura','Outro'];
 const EMPTY_FORM = {
   client_id: '', event_name: '', event_type: 'Casamento', status: 'lead',
   event_date: '', location_text: '',
@@ -92,6 +93,7 @@ export default function EventsPage() {
 
   // Sheets
   const [newOpen, setNewOpen] = useState(() => !!(location.state as any)?.openNew);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailEvent, setDetailEvent] = useState<EventRow | null>(null);
   const [editMode, setEditMode] = useState(false);
 
@@ -281,7 +283,9 @@ export default function EventsPage() {
       children_50_pct: String(event.children_50_pct ?? '0'),
       non_paying_guests: String(event.non_paying_guests ?? '0'),
       price_per_person: String(event.price_per_person ?? ''),
+      contract_value: String(event.contract_value ?? ''),
       total_value: String(event.total_value ?? ''),
+      pricing_mode: event.pricing_mode ?? 'per_person',
       contract_signed: event.contract_signed ?? false,
       contract_signed_date: event.contract_signed_date ?? '',
       is_paid_in_full: event.is_paid_in_full ?? false,
@@ -290,9 +294,9 @@ export default function EventsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Excluir este evento?')) return;
     await supabase.from('events').delete().eq('id', id);
     setDetailEvent(null);
+    setDeleteId(null);
     toast.success('Evento excluído');
     loadEvents(year);
   };
@@ -834,7 +838,7 @@ export default function EventsPage() {
                     <button onClick={() => openEdit(detailEvent)} className="p-1.5 rounded-lg hover:bg-white/40 transition-colors" title="Editar">
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDelete(detailEvent.id)} className="p-1.5 rounded-lg hover:bg-red-100 hover:text-red-600 transition-colors" title="Excluir">
+                    <button onClick={() => setDeleteId(detailEvent.id)} className="p-1.5 rounded-lg hover:bg-red-100 hover:text-red-600 transition-colors" title="Excluir">
                       <Trash2 className="w-4 h-4" />
                     </button>
                     <button onClick={() => setDetailEvent(null)} className="p-1.5 rounded-lg hover:bg-white/40 transition-colors">
@@ -941,6 +945,21 @@ export default function EventsPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={!!deleteId} onOpenChange={o => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir evento?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. O evento e todos os dados vinculados serão removidos permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

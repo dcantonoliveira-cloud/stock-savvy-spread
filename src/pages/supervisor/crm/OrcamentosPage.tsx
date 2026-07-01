@@ -56,7 +56,7 @@ export default function OrcamentosPage() {
     const { data, error } = await supabase
       .from('events')
       .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, clients(name)')
-      .in('status', [...PIPELINE_STATUSES, 'cancelled'])
+      .in('status', [...PIPELINE_STATUSES, 'cancelled', 'lost'])
       .not('event_name', 'is', null)
       .neq('event_name', '')
       .not('event_date', 'is', null)
@@ -207,7 +207,7 @@ export default function OrcamentosPage() {
         </div>
 
         <button
-          onClick={() => navigate('/events', { state: { openNew: true } })}
+          onClick={() => navigate('/events', { state: { openNew: true, backTo: '/orcamentos' } })}
           className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -356,7 +356,8 @@ function Count({ n }: { n: number }) {
 
 const ALL_STATUS_OPTIONS = [
   ...PIPELINE_STATUSES.map(s => ({ key: s, ...STATUS_CONFIG[s] })),
-  { key: 'cancelled', label: 'Não fechado', bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200' },
+  { key: 'cancelled', label: 'Não fechou', bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200' },
+  { key: 'lost', label: 'Cancelado', bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200' },
 ];
 
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {

@@ -198,6 +198,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [generatingPdf, setGeneratingPdf]     = useState(false);
   const [companyLogo, setCompanyLogo]         = useState<string | null>(null);
   const [companyName, setCompanyName]         = useState<string>('');
+  const [companyId, setCompanyId]             = useState<string | null>(null);
   const [waTrigger, setWaTrigger]             = useState<WhatsAppTrigger | null>(null);
   // ZapSign
   const [zapToken, setZapToken]               = useState<string | null>(null);
@@ -217,7 +218,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
           .eq('event_id', eventId),
         supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text,zapsign_data').eq('id', eventId).single(),
-        supabase.from('companies').select('witness_1_name,witness_1_cpf,witness_1_email,signer_name,signer_email,logo_base64,name').limit(1).single(),
+        supabase.from('companies').select('id,witness_1_name,witness_1_cpf,witness_1_email,signer_name,signer_email,logo_base64,name').limit(1).single(),
         supabase.from('annex_models' as any).select('id,name,content').order('name'),
         supabase.from('event_files' as any).select('id,name,url,created_at').eq('event_id', eventId).order('created_at'),
         supabase.from('company_integrations' as any).select('api_key').eq('provider','zapsign').maybeSingle(),
@@ -243,6 +244,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         setSignerName(c.signer_name ?? ''); setSignerEmail(c.signer_email ?? '');
         if (c.logo_base64) setCompanyLogo(c.logo_base64);
         if (c.name) setCompanyName(c.name);
+        if (c.id) setCompanyId(c.id);
       }
       if (zapCfg) {
         try {
@@ -342,9 +344,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const saveAnnexAsModel = async (content: string) => {
     const name = window.prompt('Nome para salvar como modelo de anexo:');
     if (!name?.trim()) return;
-    const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
+    if (!companyId) { toast.error('Empresa não encontrada'); return; }
     const { data, error } = await supabase.from('annex_models' as any)
-      .insert({ name: name.trim(), company_id: COMPANY_ID, content }).select('id,name,content').single();
+      .insert({ name: name.trim(), company_id: companyId, content }).select('id,name,content').single();
     if (error) { toast.error('Erro ao salvar modelo'); return; }
     setAnnexModels(prev => [...prev, data as AnnexModel]);
     toast.success(`Modelo "${name.trim()}" salvo`);
@@ -370,7 +372,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         body: JSON.stringify({
           name: `Contrato - ${event.event_name ?? 'Evento'}`,
           base64_pdf: base64,
-          sandbox: true,
+          sandbox: false,
           signers: validSigners.map(s => ({ name: s.name, email: s.email, send_automatic_email: true })),
         }),
       });

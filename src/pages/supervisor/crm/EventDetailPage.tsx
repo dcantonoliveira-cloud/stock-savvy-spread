@@ -70,7 +70,8 @@ interface EventDetail {
   witness_name: string | null;
   witness_cpf: string | null;
   witness_email: string | null;
-  total_value: number | null;
+  witness_2_name: string | null;
+  witness_2_email: string | null;
   paid_value: number | null;
   menu_text: string | null;
   menu_mode: string | null;
@@ -90,7 +91,7 @@ import { STATUS_LABELS, STATUS_CLS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
 const STATUS_CLASSES: Record<string, string> = Object.fromEntries(ALL_STATUS_KEYS.map(k => [k, STATUS_CLS(k)]));
 const TABS_ALL = ['Ficha Técnica','Dados do Cliente','Cardápio','Checklist','Cronograma','Financeiro','Arquivos','Equipe','Outros'];
 const TABS_CLOSED_ONLY = ['Cardápio','Checklist','Cronograma','Financeiro','Equipe'];
-const EVENT_TYPES = ['Casamento','Coorporativo','Formatura','Debutante','Confraternização','Outro'];
+const EVENT_TYPES = ['Aniversário','Batizado','Casamento','Confraternização','Corporativo','Debutante','Formatura','Outro'];
 
 function fmtDate(d: string | null) {
   if (!d) return '—';
@@ -275,6 +276,8 @@ export default function EventDetailPage() {
       witness_name: data.witness_name ?? null,
       witness_cpf: data.witness_cpf ?? null,
       witness_email: data.witness_email ?? null,
+      witness_2_name: data.witness_2_name ?? null,
+      witness_2_email: data.witness_2_email ?? null,
       menu_text: data.menu_text ?? null,
       menu_mode: data.menu_mode ?? 'text',
       schedule_text: data.schedule_text ?? null,
@@ -895,9 +898,9 @@ export default function EventDetailPage() {
               contract_value: form.contract_value ?? null,
               witness_name: form.witness_name ?? null,
               witness_cpf: form.witness_cpf ?? null,
-              witness_email: (form as any).witness_email ?? null,
-              witness_2_name: (form as any).witness_2_name ?? null,
-              witness_2_email: (form as any).witness_2_email ?? null,
+              witness_email: form.witness_email ?? null,
+              witness_2_name: form.witness_2_name ?? null,
+              witness_2_email: form.witness_2_email ?? null,
               clients: event.clients ? {
                 name: event.clients.name ?? null,
                 cpf: event.clients.cpf ?? null,
