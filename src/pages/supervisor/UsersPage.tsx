@@ -226,7 +226,9 @@ export default function UsersPage() {
             ) : filtered.map(emp => {
               const roleInfo = ROLE_MAP[emp.role] ?? ROLE_MAP['sem acesso'];
               return (
-                <tr key={emp.user_id} className="hover:bg-primary/5 transition-colors">
+                <tr key={emp.user_id}
+                  className="hover:bg-primary/5 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/users/${emp.user_id}`)}>
                   <td className="px-5 py-3">
                     <p className="font-semibold text-foreground">{emp.display_name}</p>
                   </td>
@@ -257,7 +259,7 @@ export default function UsersPage() {
                       </button>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="px-5 py-3 text-right" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => navigate(`/holerites?employee=${emp.user_id}`)}
