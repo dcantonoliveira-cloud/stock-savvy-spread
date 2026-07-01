@@ -80,6 +80,9 @@ const EmployeeDashboard       = lazy(() => import("./pages/employee/EmployeeDash
 const EmployeeInventoryPage   = lazy(() => import("./pages/employee/EmployeeInventoryPage"));
 const EmployeeEventsPage      = lazy(() => import("./pages/employee/EmployeeEventsPage"));
 const EmployeeMateriaisPage   = lazy(() => import("./pages/employee/EmployeeMateriaisPage"));
+const MyPayslipsPage          = lazy(() => import("./pages/employee/MyPayslipsPage"));
+const PayslipSignPage         = lazy(() => import("./pages/employee/PayslipSignPage"));
+const PayslipsAdminPage       = lazy(() => import("./pages/supervisor/payslips/PayslipsAdminPage"));
 
 // ─── Public pages (lazy) ───
 const PublicInventoryPage    = lazy(() => import("./pages/public/PublicInventoryPage"));
@@ -221,6 +224,7 @@ function AppRoutes() {
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/analysis" element={<AIAnalysisPage />} />
             <Route path="/estatisticas" element={<EstatisticasPage />} />
+            <Route path="/holerites" element={<PayslipsAdminPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/fornecedores" element={<FornecedoresPage />} />
             <Route path="/fornecedores/:supplierName" element={<FornecedorDetailPage />} />
@@ -245,6 +249,8 @@ function AppRoutes() {
           <Route path="/inventario" element={permissions.access_stock ? <EmployeeInventoryPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/eventos" element={permissions.access_stock ? <EmployeeEventsPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/materiais" element={permissions.access_materials ? <EmployeeMateriaisPage /> : <Navigate to="/" replace />} />
+          <Route path="/meus-holerites" element={<MyPayslipsPage />} />
+          <Route path="/meus-holerites/:id" element={<PayslipSignPage />} />
           <Route path="*" element={<Navigate to={permissions.access_stock ? "/" : "/materiais"} replace />} />
         </Routes>
       </Suspense>
