@@ -199,18 +199,34 @@ export default function PayslipSignPage() {
   };
 
   const downloadSigned = async () => {
-    if (!signature?.signed_pdf_path) return;
-    const { data } = await supabase.storage
+    // Fallback: se não tiver PDF assinado, baixa o original
+    const path = signature?.signed_pdf_path ?? version?.storage_path;
+    if (!path) { toast.error('PDF não disponível'); return; }
+
+    const { data, error } = await supabase.storage
       .from('payslips')
-      .createSignedUrl(signature.signed_pdf_path, 60);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+      .createSignedUrl(path, 300);
+
+    if (error || !data?.signedUrl) {
+      toast.error('Erro ao gerar link de download');
+      return;
+    }
+
+    // Cria link <a> para forçar download sem depender de popup
+    const a = document.createElement('a');
+    a.href = data.signedUrl;
+    a.download = `${payslip?.title ?? 'holerite'}.pdf`;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 
     await supabase.from('payslip_audit_logs' as any).insert({
       payslip_id: payslip?.id,
       company_id: payslip?.company_id,
       user_id: user?.id,
       action: 'payslip_downloaded',
-      details: { signed_pdf: signature.signed_pdf_path },
+      details: { path },
     });
   };
 
