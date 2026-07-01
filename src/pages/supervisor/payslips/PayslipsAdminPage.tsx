@@ -62,11 +62,26 @@ export default function PayslipsAdminPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('payslips' as any)
-      .select('id, title, status, reference_month, employee_id, published_at, created_at, profiles(display_name, email), electronic_signatures(id, signed_at_utc, signature_hash)')
+      .select('id, title, status, reference_month, employee_id, published_at, created_at, electronic_signatures(id, signed_at_utc, signature_hash)')
       .order('reference_month', { ascending: false });
-    setPayslips((data ?? []) as unknown as Payslip[]);
+    if (error) { console.error('[holerites] load error:', error); }
+
+    const rows = (data ?? []) as any[];
+
+    // Fetch employee profiles separately (payslips.employee_id → profiles.user_id, no direct FK)
+    if (rows.length > 0) {
+      const empIds = [...new Set(rows.map((r: any) => r.employee_id))];
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('user_id, display_name, email')
+        .in('user_id', empIds);
+      const profMap = Object.fromEntries((profs ?? []).map((p: any) => [p.user_id, p]));
+      rows.forEach((r: any) => { r.profiles = profMap[r.employee_id] ?? null; });
+    }
+
+    setPayslips(rows as unknown as Payslip[]);
     setLoading(false);
   };
 
@@ -247,7 +262,7 @@ export default function PayslipsAdminPage() {
     : null;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-6 space-y-6">
       {/* Breadcrumb when filtering by employee */}
       {employeeFilter && (
         <button
