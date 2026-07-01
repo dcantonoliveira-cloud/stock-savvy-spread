@@ -1,8 +1,8 @@
-import { ReactNode, useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { ReactNode, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SupervisorSidebar from './SupervisorSidebar';
 import { supabase } from '@/integrations/supabase/client';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, Receipt, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const PAGE_TITLES: Record<string, string> = {
@@ -46,8 +46,21 @@ const PAGE_TITLES: Record<string, string> = {
 
 export default function SupervisorLayout({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
-  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const { profile, signOut } = useAuth();
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const pageTitle = Object.entries(PAGE_TITLES)
     .sort((a, b) => b[0].length - a[0].length)
@@ -104,14 +117,42 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
               )}
             </Link>
 
-            <div className="flex items-center gap-2 pl-2 border-l border-border ml-1">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
-                   style={{ background: 'hsl(220 70% 30% / 0.12)', color: 'hsl(220 70% 35%)' }}>
-                {profile?.display_name?.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() || '?'}
-              </div>
-              <span className="hidden md:block text-[13px] font-medium text-foreground">
-                {profile?.display_name?.split(' ')[0]}
-              </span>
+            <div className="relative pl-2 border-l border-border ml-1" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen(v => !v)}
+                className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-accent transition-colors">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
+                     style={{ background: 'hsl(220 70% 30% / 0.12)', color: 'hsl(220 70% 35%)' }}>
+                  {profile?.display_name?.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() || '?'}
+                </div>
+                <span className="hidden md:block text-[13px] font-medium text-foreground">
+                  {profile?.display_name?.split(' ')[0]}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-border rounded-xl shadow-lg py-1 z-50">
+                  <div className="px-3 py-2 border-b border-border mb-1">
+                    <p className="text-xs font-medium text-foreground truncate">{profile?.display_name}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{profile?.email}</p>
+                  </div>
+                  <button
+                    onClick={() => { setMenuOpen(false); navigate('/meus-holerites'); }}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">
+                    <Receipt className="w-4 h-4 text-muted-foreground" />
+                    Meus Holerites
+                  </button>
+                  <div className="border-t border-border mt-1 pt-1">
+                    <button
+                      onClick={() => { setMenuOpen(false); signOut(); }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-destructive hover:bg-red-50 transition-colors">
+                      <LogOut className="w-4 h-4" />
+                      Sair
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
