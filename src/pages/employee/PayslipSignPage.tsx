@@ -100,48 +100,21 @@ export default function PayslipSignPage() {
         throw new Error('Integridade do documento comprometida — hash não corresponde');
       }
 
-      // 3. Build audit data (partial — signature_id and hash will come from edge function)
+      // 3. Collect metadata
       const signedAt = new Date();
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const signedAtLocal = format(signedAt, "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR });
 
-      // 4. Generate signed PDF client-side
       const { data: companyData } = await supabase
         .from('companies')
         .select('name')
         .eq('id', payslip.company_id)
         .single();
 
-      const tempAuditData: AuditData = {
-        signature_id: '(pendente)',
-        signature_hash: '(pendente)',
-        document_hash: computedHash,
-        employee_name: profile?.display_name ?? user.email ?? '',
-        company_name: (companyData as any)?.name ?? 'Empresa',
-        payslip_title: payslip.title,
-        signed_at_utc: signedAt.toISOString(),
-        signed_at_local: signedAtLocal,
-        timezone: tz,
-        ip_address: '(registrado pelo servidor)',
-        browser: getBrowser(),
-        os: getOS(),
-        device_type: /Mobile/.test(navigator.userAgent) ? 'mobile' : 'desktop',
-        document_version: version.version_number,
-        sig_method: method,
-        sig_data: sigData,
-      };
-
-      const signedPdfBytes = await generateSignedPdf(pdfBytes, tempAuditData);
-
-      // 5. Upload signed PDF com nome baseado em timestamp (sem depender do signature_id)
-      const signedPath = `${payslip.company_id}/${payslip.id}/signed_${user.id}_${Date.now()}.pdf`;
-      const { error: upErr } = await supabase.storage
-        .from('payslips')
-        .upload(signedPath, signedPdfBytes, { contentType: 'application/pdf' });
-      if (upErr) throw upErr;
-
-      // 6. Call edge function — passa o path definitivo já no insert
+      // 4. Call edge function first to get real signature_id and hash
       const session = (await supabase.auth.getSession()).data.session;
+      const signedPath = `${payslip.company_id}/${payslip.id}/signed_${user.id}_${Date.now()}.pdf`;
+
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payslip-sign`,
         {
@@ -166,11 +139,37 @@ export default function PayslipSignPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        await supabase.storage.from('payslips').remove([signedPath]);
         throw new Error(err.error ?? 'Erro ao registrar assinatura');
       }
 
       const result = await res.json();
+
+      // 5. Generate signed PDF with real signature_id and hash
+      const auditData: AuditData = {
+        signature_id: result.signature_id,
+        signature_hash: result.signature_hash,
+        document_hash: computedHash,
+        employee_name: profile?.display_name ?? user.email ?? '',
+        company_name: (companyData as any)?.name ?? 'Empresa',
+        payslip_title: payslip.title,
+        signed_at_utc: result.signed_at,
+        signed_at_local: signedAtLocal,
+        timezone: tz,
+        ip_address: '(registrado pelo servidor)',
+        browser: getBrowser(),
+        os: getOS(),
+        device_type: /Mobile/.test(navigator.userAgent) ? 'mobile' : 'desktop',
+        document_version: version.version_number,
+        sig_method: method,
+        sig_data: sigData,
+      };
+
+      const signedPdfBytes = await generateSignedPdf(pdfBytes, auditData);
+
+      // 6. Upload PDF with real data
+      await supabase.storage
+        .from('payslips')
+        .upload(signedPath, signedPdfBytes, { contentType: 'application/pdf', upsert: true });
 
       setSignature({
         id: result.signature_id,
