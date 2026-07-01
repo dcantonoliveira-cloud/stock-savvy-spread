@@ -16,6 +16,8 @@ interface FormData {
   witness_name: string;
   witness_cpf: string;
   witness_email: string;
+  witness_2_name: string;
+  witness_2_email: string;
   source: string;
 }
 
@@ -48,7 +50,8 @@ const maskRg = (v: string) => {
 
 const BLANK: FormData = {
   name: '', cpf: '', rg: '', address: '', zip_code: '',
-  phone: '', email: '', witness_name: '', witness_cpf: '', witness_email: '', source: '',
+  phone: '', email: '', witness_name: '', witness_cpf: '', witness_email: '',
+  witness_2_name: '', witness_2_email: '', source: '',
 };
 
 function CompanyHeader({ company }: { company: Company | null }) {
@@ -119,9 +122,11 @@ export default function ContractFormPage() {
     }
 
     await (supabase.from as any)('events').update({
-      witness_name:            form.witness_name  || null,
-      witness_cpf:             form.witness_cpf   || null,
-      witness_email:           form.witness_email || null,
+      witness_name:            form.witness_name    || null,
+      witness_cpf:             form.witness_cpf     || null,
+      witness_email:           form.witness_email   || null,
+      witness_2_name:          form.witness_2_name  || null,
+      witness_2_email:         form.witness_2_email || null,
       contract_form_submitted: true,
     }).eq('id', eventId);
 
@@ -229,9 +234,9 @@ export default function ContractFormPage() {
             </div>
           </div>
 
-          {/* Testemunha */}
+          {/* Testemunha 1 */}
           <div className="pt-2 border-t border-gray-100">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 mt-4">Testemunha</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 mt-4">Testemunha 1</p>
             <div className="space-y-4">
               <div>
                 <label className={labelCls}>Nome completo</label>
@@ -246,6 +251,21 @@ export default function ContractFormPage() {
                   <label className={labelCls}>Email</label>
                   <input className={inputCls} type="email" value={form.witness_email} onChange={set('witness_email')} placeholder="email@exemplo.com" />
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Testemunha 2 */}
+          <div className="pt-2 border-t border-gray-100">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 mt-4">Testemunha 2</p>
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Nome completo</label>
+                <input className={inputCls} value={form.witness_2_name} onChange={set('witness_2_name')} placeholder="Nome da testemunha" />
+              </div>
+              <div>
+                <label className={labelCls}>Email</label>
+                <input className={inputCls} type="email" value={form.witness_2_email} onChange={set('witness_2_email')} placeholder="email@exemplo.com" />
               </div>
             </div>
           </div>
