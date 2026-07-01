@@ -28,6 +28,8 @@ const navStructure: NavGroup[] = [
     { path: '/tastings', label: 'Degustações', icon: Coffee },
   ]},
 
+  { path: '/estatisticas', label: 'Estatísticas', icon: BarChart3 },
+
   { label: 'Financeiro', icon: DollarSign, items: [
     { path: '/financeiro',                  label: 'Visão Geral',      icon: TrendingUp },
     { path: '/financeiro/fluxo',            label: 'Fluxo de Caixa',   icon: ArrowRightLeft },
@@ -79,7 +81,6 @@ const navStructure: NavGroup[] = [
   { label: 'Administração', icon: Users, items: [
     { path: '/users', label: 'Funcionários', icon: Users },
     { path: '/holerites', label: 'Holerites', icon: FileText },
-    { path: '/estatisticas', label: 'Estatísticas', icon: BarChart3 },
     { path: '/analysis', label: 'Análise IA', icon: Brain },
     { path: '/notifications', label: 'Notificações', icon: Bell },
     { path: '/configuracoes', label: 'Configurações', icon: Settings },
