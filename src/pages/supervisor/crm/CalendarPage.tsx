@@ -372,14 +372,12 @@ export default function CalendarPage() {
           <div className="bg-white border border-border rounded-2xl p-4">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">Legenda</p>
             <div className="space-y-2">
-              {Object.entries(STATUS).map(([k, v]) => (
-                <div key={k} className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-sm shrink-0 ${v.bar}`} />
-                  <span className="text-xs text-muted-foreground">{v.label}</span>
-                </div>
-              ))}
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-violet-400" />
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-emerald-500" />
+                <span className="text-xs text-muted-foreground">Reservado</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-purple-400" />
                 <span className="text-xs text-muted-foreground">Degustação</span>
               </div>
               <div className="flex items-center gap-2">
