@@ -12,6 +12,15 @@ const MONTHS = [
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
 
+const TIPOS = [
+  { value: 'pagamento',   label: 'Pagamento' },
+  { value: 'adiantamento', label: 'Adiantamento' },
+  { value: 'ferias',      label: 'Férias' },
+  { value: '13o',         label: '13º Salário' },
+  { value: 'rescisao',    label: 'Rescisão' },
+  { value: 'outros',      label: 'Outros' },
+];
+
 interface Employee { id: string; display_name: string; email: string }
 interface EmployeeFile { employee: Employee; file: File | null }
 type JobStatus = 'pending' | 'uploading' | 'done' | 'error';
@@ -26,6 +35,7 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
   const [search, setSearch] = useState('');
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
+  const [tipo, setTipo] = useState('pagamento');
   const [files, setFiles] = useState<Record<string, File>>({});
   const [jobs, setJobs] = useState<Job[]>([]);
   const [running, setRunning] = useState(false);
@@ -88,7 +98,8 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
 
     const refMonth = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const monthLabel = `${MONTHS[month]}/${year}`;
-    const title = `Holerite ${monthLabel}`;
+    const tipoLabel = TIPOS.find(t => t.value === tipo)?.label ?? 'Holerite';
+    const title = `${tipoLabel} ${monthLabel}`;
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData.user?.id;
 
@@ -180,7 +191,7 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
           <div>
             <h2 className="font-semibold text-foreground">Upload em lote</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {MONTHS[month]}/{year} — Passo {step} de 3
+              {TIPOS.find(t => t.value === tipo)?.label} · {MONTHS[month]}/{year} — Passo {step} de 3
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
@@ -228,6 +239,26 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
                   <input type="number" value={year} onChange={e => setYear(Number(e.target.value))}
                     min={2020} max={2099}
                     className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                </div>
+              </div>
+
+              {/* Tipo */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Tipo</label>
+                <div className="flex flex-wrap gap-2">
+                  {TIPOS.map(t => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setTipo(t.value)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                        tipo === t.value
+                          ? 'bg-primary text-white border-primary'
+                          : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                      }`}>
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
