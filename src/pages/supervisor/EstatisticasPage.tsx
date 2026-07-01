@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, TrendingUp, Users, BarChart3, DollarSign } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { ChevronLeft, ChevronRight, TrendingUp, Users, BarChart3, DollarSign, Lock } from 'lucide-react';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -51,13 +52,31 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
+const BI_URL = 'https://thriving-mandazi-69c510.netlify.app';
+const RONDELLO_DOMAIN = 'rondellobuffet.com.br';
+
 export default function EstatisticasPage() {
+  const { user } = useAuth();
   const [year, setYear] = useState(new Date().getFullYear());
   const [tab, setTab] = useState<'originais' | 'bi'>('originais');
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tastings, setTastings] = useState<any[]>([]);
   const [tastingRange, setTastingRange] = useState<'3m' | '1a' | 'all'>('1a');
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [iframeHeight, setIframeHeight] = useState(1000);
+
+  const isRondello = user?.email?.endsWith(`@${RONDELLO_DOMAIN}`) ?? false;
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'resize' && typeof event.data.height === 'number') {
+        setIframeHeight(event.data.height);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
 
   // ── Load data ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -414,14 +433,28 @@ export default function EstatisticasPage() {
         </div>
       )}
 
-      {!loading && tab === 'bi' && (
-        <div className="bg-white border border-border rounded-2xl p-16 flex flex-col items-center gap-3 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center text-2xl">📊</div>
-          <p className="font-semibold">Dashboard BI</p>
-          <p className="text-sm text-muted-foreground max-w-xs">
-            Em desenvolvimento. Esta aba terá análises avançadas com cruzamento de dados e KPIs estratégicos.
-          </p>
-        </div>
+      {tab === 'bi' && (
+        isRondello ? (
+          <div className="bg-white border border-border rounded-2xl overflow-hidden">
+            <iframe
+              ref={iframeRef}
+              src={BI_URL}
+              style={{ width: '100%', height: iframeHeight, border: 'none', display: 'block' }}
+              title="Dashboard BI"
+              allow="fullscreen"
+            />
+          </div>
+        ) : (
+          <div className="bg-white border border-border rounded-2xl p-16 flex flex-col items-center gap-3 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
+              <Lock className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <p className="font-semibold text-foreground">Acesso restrito</p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Este painel está disponível apenas para colaboradores do Rondello Buffet.
+            </p>
+          </div>
+        )
       )}
 
     </div>
