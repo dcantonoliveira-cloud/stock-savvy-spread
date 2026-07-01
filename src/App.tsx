@@ -28,6 +28,7 @@ const UsersPage                = lazy(() => import("./pages/supervisor/UsersPage
 const NotificationsPage        = lazy(() => import("./pages/supervisor/NotificationsPage"));
 const AIAnalysisPage           = lazy(() => import("./pages/supervisor/AIAnalysisPage"));
 const EstatisticasPage         = lazy(() => import("./pages/supervisor/EstatisticasPage"));
+const EmployeeDetailPage       = lazy(() => import("./pages/supervisor/EmployeeDetailPage"));
 const CategoriesPage           = lazy(() => import("./pages/supervisor/CategoriesPage"));
 const TagsPage                 = lazy(() => import("./pages/supervisor/TagsPage"));
 const CategoryDetailPage       = lazy(() => import("./pages/supervisor/CategoryDetailPage"));
@@ -225,6 +226,7 @@ function AppRoutes() {
             <Route path="/analysis" element={<AIAnalysisPage />} />
             <Route path="/estatisticas" element={<EstatisticasPage />} />
             <Route path="/holerites" element={<PayslipsAdminPage />} />
+            <Route path="/users/:id" element={<EmployeeDetailPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/fornecedores" element={<FornecedoresPage />} />
             <Route path="/fornecedores/:supplierName" element={<FornecedorDetailPage />} />
