@@ -153,24 +153,30 @@ export default function TastingsPage() {
     setSegundaLoading(true);
     const today = new Date().toISOString().split('T')[0];
 
+    // Conta quantas degustações cada evento teve
     const { data: tse } = await supabase
       .from('tasting_session_events' as any)
       .select('event_id');
 
-    const eventIds = [...new Set((tse ?? []).map((r: any) => r.event_id).filter(Boolean))];
-    if (eventIds.length === 0) { setSegundaRows([]); setSegundaLoading(false); return; }
+    const tastingCount: Record<string, number> = {};
+    (tse ?? []).forEach((r: any) => {
+      if (r.event_id) tastingCount[r.event_id] = (tastingCount[r.event_id] ?? 0) + 1;
+    });
 
+    // Busca eventos confirmados com data futura
     const { data: evts, error } = await supabase
       .from('events')
       .select('id, event_name, event_date, status, location_text, clients(name)')
-      .in('id', eventIds)
-      .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
+      .eq('status', 'confirmed')
       .gte('event_date', today)
       .order('event_date', { ascending: true });
 
     if (error) console.error('[segunda]', error);
 
-    setSegundaRows((evts ?? []).map((e: any) => ({
+    // Filtra eventos com menos de 2 degustações
+    const filtered = (evts ?? []).filter((e: any) => (tastingCount[e.id] ?? 0) < 2);
+
+    setSegundaRows(filtered.map((e: any) => ({
       event_id:      e.id,
       event_name:    e.event_name,
       event_date:    e.event_date,
@@ -327,13 +333,15 @@ export default function TastingsPage() {
           onNavigate={id => navigate(`/events/${id}`)}
           onStatusChange={(id, status) => {
             const OPEN = ['lead', 'negotiating'];
-            if (!OPEN.includes(status)) {
-              setAbertoRows(prev => prev.filter(r => r.event_id !== id));
-            } else {
-              setAbertoRows(prev => prev.map(r => r.event_id === id ? { ...r, status } : r));
-            }
             supabase.from('events').update({ status }).eq('id', id).then(({ error }) => {
-              if (error) toast.error('Erro ao atualizar status');
+              if (error) { toast.error('Erro ao atualizar status'); return; }
+              if (status === 'confirmed') {
+                navigate(`/events/${id}`);
+              } else if (!OPEN.includes(status)) {
+                setAbertoRows(prev => prev.filter(r => r.event_id !== id));
+              } else {
+                setAbertoRows(prev => prev.map(r => r.event_id === id ? { ...r, status } : r));
+              }
             });
           }}
           onNoteChange={(id, note) => {
@@ -375,14 +383,20 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 // ─── Status badge com dropdown ────────────────────────────────────────────────
 function StatusBadge({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
-  const [pos,  setPos]  = useState({ top: 0, left: 0 });
+  const [pos,  setPos]  = useState({ top: 0, left: 0, openUp: false });
   const ref = useRef<HTMLButtonElement>(null);
   const s = getStatus(value);
+  const DROP_H = STATUS_OPTIONS.length * 36 + 8;
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     const r = ref.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 4, left: r.left });
+    if (!r) return;
+    const openUp = r.bottom + 4 + DROP_H > window.innerHeight;
+    setPos(openUp
+      ? { top: r.top - DROP_H - 4, left: r.left, openUp: true }
+      : { top: r.bottom + 4, left: r.left, openUp: false }
+    );
     setOpen(o => !o);
   };
 
@@ -497,10 +511,10 @@ function ListaAbertoTab({ rows, loading, onNavigate, onStatusChange, onNoteChang
 // ─── Urgency helpers ──────────────────────────────────────────────────────────
 function urgency(eventDate: string) {
   const days = Math.ceil((new Date(eventDate).getTime() - Date.now()) / 86_400_000);
-  if (days > 90) return null;
-  if (days > 60) return { label: 'Baixa', days, color: 'text-emerald-700 bg-emerald-50 border-emerald-200', Icon: CheckCircle2 };
-  if (days > 30) return { label: 'Média', days, color: 'text-amber-700 bg-amber-50 border-amber-200',   Icon: AlertCircle   };
-  return           { label: 'Alta',  days, color: 'text-red-700 bg-red-50 border-red-200',         Icon: AlertTriangle };
+  if (days > 90) return { label: `+90 dias`, days, color: 'text-slate-500 bg-slate-50 border-slate-200', Icon: CheckCircle2 };
+  if (days > 60) return { label: 'Baixa',    days, color: 'text-emerald-700 bg-emerald-50 border-emerald-200', Icon: CheckCircle2 };
+  if (days > 30) return { label: 'Média',    days, color: 'text-amber-700 bg-amber-50 border-amber-200',   Icon: AlertCircle   };
+  return           { label: 'Alta',    days, color: 'text-red-700 bg-red-50 border-red-200',         Icon: AlertTriangle };
 }
 
 // ─── 2ª Degustação tab ────────────────────────────────────────────────────────
@@ -514,7 +528,7 @@ function SegundaTab({ rows, loading, onNavigate }: {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Eventos que já participaram de uma degustação mas ainda estão com orçamento em aberto. Agende a segunda degustação para aumentar as chances de conversão.
+        Eventos confirmados com menos de 2 degustações realizadas. Urgência baseada no prazo até a data do evento.
       </p>
       {rows.length === 0 ? (
         <div className="bg-white border border-border rounded-2xl py-16 text-center text-muted-foreground text-sm">

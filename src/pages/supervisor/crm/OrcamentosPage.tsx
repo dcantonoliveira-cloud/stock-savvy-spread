@@ -59,7 +59,6 @@ export default function OrcamentosPage() {
       .in('status', [...PIPELINE_STATUSES, 'cancelled', 'lost'])
       .not('event_name', 'is', null)
       .neq('event_name', '')
-      .not('event_date', 'is', null)
       .order('created_at', { ascending: false });
     if (error) console.error('[OrcamentosPage]', error);
     const sorted = (data ?? []).sort((a: any, b: any) => {
