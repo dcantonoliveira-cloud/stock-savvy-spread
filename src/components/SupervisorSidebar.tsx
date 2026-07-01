@@ -7,7 +7,7 @@ import {
   ArrowRightLeft, ChevronDown, Truck, ShoppingCart, Warehouse, ClipboardList,
   AlertTriangle, BookMarked, Tag, UserRound, CalendarDays, Coffee, Bell,
   TrendingUp, DollarSign, Calendar, LibraryBig, MapPin, Sparkles, UserCheck,
-  Palette, ScrollText, ChefHat, ListChecks, Settings, MessageCircle, BarChart3, FileText,
+  Palette, ScrollText, ChefHat, ListChecks, Settings, MessageCircle, BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
