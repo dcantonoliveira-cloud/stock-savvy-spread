@@ -62,7 +62,7 @@ export default function PayslipsAdminPage() {
       supabase
         .from('profiles')
         .select('user_id, display_name, email')
-        .eq('company_id', profile!.company_id),
+        .order('display_name'),
     ]);
     setPayslips((psRes.data ?? []) as unknown as Payslip[]);
     setEmployees((empRes.data ?? []).map((p: any) => ({ id: p.user_id, display_name: p.display_name, email: p.email })));
