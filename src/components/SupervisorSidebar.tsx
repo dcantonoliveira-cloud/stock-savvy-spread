@@ -7,7 +7,7 @@ import {
   ArrowRightLeft, ChevronDown, Truck, ShoppingCart, Warehouse, ClipboardList,
   AlertTriangle, BookMarked, Tag, UserRound, CalendarDays, Coffee, Bell,
   TrendingUp, DollarSign, Calendar, LibraryBig, MapPin, Sparkles, UserCheck,
-  Palette, ScrollText, ChefHat, ListChecks, Settings, MessageCircle, BarChart3, Receipt,
+  Palette, ScrollText, ChefHat, ListChecks, Settings, MessageCircle, BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -81,7 +81,6 @@ const navStructure: NavGroup[] = [
   { label: 'Administração', icon: Users, items: [
     { path: '/users', label: 'Funcionários', icon: Users },
     { path: '/holerites', label: 'Holerites', icon: FileText },
-    { path: '/meus-holerites', label: 'Meus Holerites', icon: Receipt },
     { path: '/analysis', label: 'Análise IA', icon: Brain },
     { path: '/notifications', label: 'Notificações', icon: Bell },
     { path: '/configuracoes', label: 'Configurações', icon: Settings },
