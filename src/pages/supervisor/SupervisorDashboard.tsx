@@ -199,10 +199,6 @@ export default function SupervisorDashboard() {
             {greeting()}, Douglas
           </h1>
         </div>
-        <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground bg-muted/60 border border-border px-3 py-1.5 rounded-xl">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Sistema ativo
-        </div>
       </div>
 
       {/* ── KPI cards ── */}
