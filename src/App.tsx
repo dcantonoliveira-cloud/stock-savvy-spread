@@ -231,6 +231,8 @@ function AppRoutes() {
             <Route path="/analysis" element={<AIAnalysisPage />} />
             <Route path="/estatisticas" element={<EstatisticasPage />} />
             <Route path="/holerites" element={<PayslipsAdminPage />} />
+            <Route path="/meus-holerites" element={<MyPayslipsPage />} />
+            <Route path="/meus-holerites/:id" element={<PayslipSignPage />} />
             <Route path="/users/:id" element={<EmployeeDetailPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/fornecedores" element={<FornecedoresPage />} />
