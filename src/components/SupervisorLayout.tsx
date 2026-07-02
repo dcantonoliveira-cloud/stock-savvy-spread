@@ -46,11 +46,12 @@ const PAGE_TITLES: Record<string, string> = {
 
 export default function SupervisorLayout({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0);
+  const [pendingPayslips, setPendingPayslips] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, user } = useAuth();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -61,6 +62,19 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      const { count } = await supabase
+        .from('payslips' as any)
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', user.id)
+        .eq('status', 'published');
+      setPendingPayslips(count ?? 0);
+    };
+    load();
+  }, [user]);
 
   const pageTitle = Object.entries(PAGE_TITLES)
     .sort((a, b) => b[0].length - a[0].length)
@@ -121,9 +135,16 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
               <button
                 onClick={() => setMenuOpen(v => !v)}
                 className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-accent transition-colors">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
-                     style={{ background: 'hsl(220 70% 30% / 0.12)', color: 'hsl(220 70% 35%)' }}>
-                  {profile?.display_name?.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() || '?'}
+                <div className="relative">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
+                       style={{ background: 'hsl(220 70% 30% / 0.12)', color: 'hsl(220 70% 35%)' }}>
+                    {profile?.display_name?.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() || '?'}
+                  </div>
+                  {pendingPayslips > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white">
+                      {pendingPayslips > 9 ? '9+' : pendingPayslips}
+                    </span>
+                  )}
                 </div>
                 <span className="hidden md:block text-[13px] font-medium text-foreground">
                   {profile?.display_name?.split(' ')[0]}

@@ -1,14 +1,69 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, User, Mail, Phone, MapPin, Briefcase, Calendar,
-  FileText, CheckCircle2, Clock, Edit2, Save, X, Loader2,
-  Eye, Download, Plus, Shield,
+  ArrowLeft, User, Mail, MapPin, Briefcase,
+  FileText, Edit2, Save, X, Loader2,
+  Eye, Download, Plus, ShieldCheck,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+interface EmpPermissions {
+  can_entry: boolean; can_output: boolean;
+  access_stock: boolean; access_materials: boolean;
+  access_comercial: boolean; access_financeiro: boolean;
+  access_estoque: boolean; access_cadastros: boolean;
+  access_estatisticas: boolean; access_administracao: boolean;
+  is_admin: boolean;
+}
+
+const DEFAULT_PERMS: EmpPermissions = {
+  can_entry: true, can_output: true,
+  access_stock: false, access_materials: false,
+  access_comercial: false, access_financeiro: false,
+  access_estoque: false, access_cadastros: false,
+  access_estatisticas: false, access_administracao: false,
+  is_admin: false,
+};
+
+const PERM_GROUPS = [
+  {
+    label: 'Comercial', key: 'access_comercial' as keyof EmpPermissions,
+    desc: 'Eventos, orçamentos, clientes, degustações e calendário',
+  },
+  {
+    label: 'Financeiro', key: 'access_financeiro' as keyof EmpPermissions,
+    desc: 'Fluxo de caixa, contas, DRE e relatórios financeiros',
+  },
+  {
+    label: 'Estoque & Operações', key: 'access_estoque' as keyof EmpPermissions,
+    desc: 'Entradas, saídas, fichas técnicas, inventário e compras',
+  },
+  {
+    label: 'Materiais', key: 'access_materials' as keyof EmpPermissions,
+    desc: 'Inventário de materiais, empréstimos e perdas',
+  },
+  {
+    label: 'Cadastros', key: 'access_cadastros' as keyof EmpPermissions,
+    desc: 'Produtos, salões, assessores, contratos e tipos de evento',
+  },
+  {
+    label: 'Estatísticas', key: 'access_estatisticas' as keyof EmpPermissions,
+    desc: 'Relatórios de desempenho e Dashboard BI',
+  },
+  {
+    label: 'Administração', key: 'access_administracao' as keyof EmpPermissions,
+    desc: 'Funcionários, holerites, análise IA e configurações',
+  },
+  {
+    label: 'Administrador do sistema', key: 'is_admin' as keyof EmpPermissions,
+    desc: 'Pode gerenciar permissões de outros usuários',
+    danger: true,
+  },
+];
 
 interface Profile {
   user_id: string; display_name: string; email: string;
@@ -63,21 +118,24 @@ function InputField({
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { permissions: myPerms } = useAuth();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<string>('');
   const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [empPerms, setEmpPerms] = useState<EmpPermissions>(DEFAULT_PERMS);
+  const [savingPerms, setSavingPerms] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<'info' | 'holerites'>('info');
+  const [tab, setTab] = useState<'info' | 'holerites' | 'permissoes'>('info');
   const [form, setForm] = useState<Partial<Profile>>({});
 
   useEffect(() => { if (id) load(); }, [id]);
 
   const load = async () => {
     setLoading(true);
-    const [profRes, roleRes, psRes] = await Promise.all([
+    const [profRes, roleRes, psRes, permRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('user_id', id!).single(),
       supabase.from('user_roles').select('role').eq('user_id', id!).maybeSingle(),
       supabase
@@ -85,6 +143,7 @@ export default function EmployeeDetailPage() {
         .select('id, title, status, reference_month, published_at, electronic_signatures(id, signed_at_utc, signed_pdf_path)')
         .eq('employee_id', id!)
         .order('reference_month', { ascending: false }),
+      supabase.from('employee_permissions').select('*').eq('user_id', id!).maybeSingle(),
     ]);
 
     if (!profRes.data) { toast.error('Funcionário não encontrado'); navigate('/users'); return; }
@@ -93,7 +152,33 @@ export default function EmployeeDetailPage() {
     setForm(p);
     setRole((roleRes.data as any)?.role ?? 'sem acesso');
     setPayslips((psRes.data ?? []) as unknown as Payslip[]);
+    if (permRes.data) {
+      const d = permRes.data as any;
+      setEmpPerms({
+        can_entry: d.can_entry ?? true,
+        can_output: d.can_output ?? true,
+        access_stock: d.access_stock ?? false,
+        access_materials: d.access_materials ?? false,
+        access_comercial: d.access_comercial ?? false,
+        access_financeiro: d.access_financeiro ?? false,
+        access_estoque: d.access_estoque ?? false,
+        access_cadastros: d.access_cadastros ?? false,
+        access_estatisticas: d.access_estatisticas ?? false,
+        access_administracao: d.access_administracao ?? false,
+        is_admin: d.is_admin ?? false,
+      });
+    }
     setLoading(false);
+  };
+
+  const handleSavePerms = async () => {
+    setSavingPerms(true);
+    const { error } = await supabase
+      .from('employee_permissions')
+      .upsert({ user_id: id!, ...empPerms }, { onConflict: 'user_id' });
+    if (error) toast.error('Erro ao salvar permissões');
+    else toast.success('Permissões salvas');
+    setSavingPerms(false);
   };
 
   const handleSave = async () => {
@@ -235,6 +320,15 @@ export default function EmployeeDetailPage() {
             <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pending}</span>
           )}
         </button>
+        {myPerms.is_admin && (
+          <button onClick={() => setTab('permissoes')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'permissoes' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}>
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Permissões
+          </button>
+        )}
       </div>
 
       {/* ── Tab: Dados cadastrais ── */}
@@ -416,6 +510,42 @@ export default function EmployeeDetailPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab: Permissões ── */}
+      {tab === 'permissoes' && myPerms.is_admin && (
+        <div className="space-y-4">
+          <div className="bg-white border border-border rounded-2xl divide-y divide-border/60">
+            {PERM_GROUPS.map(g => (
+              <div key={g.key} className="flex items-center justify-between px-5 py-4">
+                <div className="flex-1 min-w-0 pr-4">
+                  <p className={`text-sm font-medium ${g.danger ? 'text-amber-700' : 'text-foreground'}`}>{g.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{g.desc}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEmpPerms(prev => ({ ...prev, [g.key]: !prev[g.key] }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+                    empPerms[g.key] ? (g.danger ? 'bg-amber-500' : 'bg-primary') : 'bg-muted-foreground/30'
+                  }`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    empPerms[g.key] ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={handleSavePerms}
+              disabled={savingPerms}
+              className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+              {savingPerms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Salvar permissões
+            </button>
           </div>
         </div>
       )}

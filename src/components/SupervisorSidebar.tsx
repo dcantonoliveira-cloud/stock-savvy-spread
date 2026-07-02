@@ -12,93 +12,100 @@ import {
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import logoRondello from '@/assets/logo-rondello.png';
+import type { Permissions } from '@/hooks/useAuth';
 
 type NavItem = { path: string; label: string; icon: any };
-type NavGroup = { label: string; icon: any; items: NavItem[] } | NavItem;
+type NavGroup = { label: string; icon: any; items: NavItem[]; permKey?: keyof Permissions } | (NavItem & { permKey?: keyof Permissions });
 
 const navStructure: NavGroup[] = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
 
-  { path: '/calendar', label: 'Calendário', icon: Calendar },
+  { path: '/calendar', label: 'Calendário', icon: Calendar, permKey: 'access_comercial' },
 
-  { label: 'Comercial', icon: UserRound, items: [
+  { label: 'Comercial', icon: UserRound, permKey: 'access_comercial', items: [
     { path: '/orcamentos', label: 'Orçamentos', icon: FileText },
     { path: '/events', label: 'Eventos', icon: CalendarDays },
     { path: '/clients', label: 'Clientes', icon: UserRound },
     { path: '/tastings', label: 'Degustações', icon: Coffee },
   ]},
 
-  { path: '/estatisticas', label: 'Estatísticas', icon: BarChart3 },
+  { path: '/estatisticas', label: 'Estatísticas', icon: BarChart3, permKey: 'access_estatisticas' },
 
-  { label: 'Financeiro', icon: DollarSign, items: [
-    { path: '/financeiro',                  label: 'Visão Geral',      icon: TrendingUp },
-    { path: '/financeiro/fluxo',            label: 'Fluxo de Caixa',   icon: ArrowRightLeft },
-    { path: '/financeiro/contas-receber',   label: 'Contas a Receber', icon: ArrowDownCircle },
-    { path: '/financeiro/contas-pagar',     label: 'Contas a Pagar',   icon: ArrowUpCircle },
-    { path: '/financeiro/cartoes',          label: 'Cartões',          icon: Tag },
-    { path: '/financeiro/dre',             label: 'DRE',              icon: FileText },
-    { path: '/financeiro/relatorios',       label: 'Relatórios',       icon: BookMarked },
+  { label: 'Financeiro', icon: DollarSign, permKey: 'access_financeiro', items: [
+    { path: '/financeiro',                label: 'Visão Geral',      icon: TrendingUp },
+    { path: '/financeiro/fluxo',          label: 'Fluxo de Caixa',   icon: ArrowRightLeft },
+    { path: '/financeiro/contas-receber', label: 'Contas a Receber', icon: ArrowDownCircle },
+    { path: '/financeiro/contas-pagar',   label: 'Contas a Pagar',   icon: ArrowUpCircle },
+    { path: '/financeiro/cartoes',        label: 'Cartões',          icon: Tag },
+    { path: '/financeiro/dre',            label: 'DRE',              icon: FileText },
+    { path: '/financeiro/relatorios',     label: 'Relatórios',       icon: BookMarked },
   ]},
 
-  { label: 'Operações', icon: UtensilsCrossed, items: [
-    { path: '/event-menus', label: 'Cardápios', icon: UtensilsCrossed },
-    { path: '/sheets', label: 'Fichas Técnicas', icon: FileText },
-    { path: '/shopping-lists', label: 'Compras', icon: ShoppingCart },
+  { label: 'Operações', icon: UtensilsCrossed, permKey: 'access_estoque', items: [
+    { path: '/event-menus',    label: 'Cardápios',       icon: UtensilsCrossed },
+    { path: '/sheets',         label: 'Fichas Técnicas', icon: FileText },
+    { path: '/shopping-lists', label: 'Compras',         icon: ShoppingCart },
   ]},
 
-  { label: 'Estoque', icon: Package, items: [
-    { path: '/items', label: 'Estoque Geral', icon: Package },
-    { path: '/inventory', label: 'Inventários', icon: ClipboardCheck },
-    { path: '/entries', label: 'Entradas', icon: ArrowUpCircle },
-    { path: '/outputs', label: 'Saídas', icon: ArrowDownCircle },
-    { path: '/batch-movement', label: 'Em Lote', icon: ArrowRightLeft },
-    { path: '/transfers', label: 'Transferências', icon: ArrowRightLeft },
-    { path: '/fornecedores', label: 'Fornecedores', icon: Truck },
-    { path: '/categories', label: 'Insumos', icon: FolderOpen },
-    { path: '/tags', label: 'Tags', icon: Tag },
-    { path: '/kitchens', label: 'Centros de Custo', icon: Building2 },
+  { label: 'Estoque', icon: Package, permKey: 'access_estoque', items: [
+    { path: '/items',          label: 'Estoque Geral',    icon: Package },
+    { path: '/inventory',      label: 'Inventários',      icon: ClipboardCheck },
+    { path: '/entries',        label: 'Entradas',         icon: ArrowUpCircle },
+    { path: '/outputs',        label: 'Saídas',           icon: ArrowDownCircle },
+    { path: '/batch-movement', label: 'Em Lote',          icon: ArrowRightLeft },
+    { path: '/transfers',      label: 'Transferências',   icon: ArrowRightLeft },
+    { path: '/fornecedores',   label: 'Fornecedores',     icon: Truck },
+    { path: '/categories',     label: 'Insumos',          icon: FolderOpen },
+    { path: '/tags',           label: 'Tags',             icon: Tag },
+    { path: '/kitchens',       label: 'Centros de Custo', icon: Building2 },
   ]},
 
-  { label: 'Materiais', icon: Warehouse, items: [
-    { path: '/materiais', label: 'Inventário', icon: Package },
-    { path: '/materiais/emprestimos', label: 'Por Evento', icon: ClipboardList },
-    { path: '/materiais/lista-base', label: 'Lista Base', icon: BookMarked },
-    { path: '/materiais/perdas', label: 'Perdas & Avarias', icon: AlertTriangle },
-    { path: '/materiais/categorias', label: 'Categorias', icon: FolderOpen },
+  { label: 'Materiais', icon: Warehouse, permKey: 'access_materiais', items: [
+    { path: '/materiais',                 label: 'Inventário',      icon: Package },
+    { path: '/materiais/emprestimos',     label: 'Por Evento',      icon: ClipboardList },
+    { path: '/materiais/lista-base',      label: 'Lista Base',      icon: BookMarked },
+    { path: '/materiais/perdas',          label: 'Perdas & Avarias',icon: AlertTriangle },
+    { path: '/materiais/categorias',      label: 'Categorias',      icon: FolderOpen },
   ]},
 
-  { label: 'Cadastros', icon: LibraryBig, items: [
-    { path: '/cadastros/assessores', label: 'Assessores', icon: UserCheck },
-    { path: '/cadastros/checklists', label: 'Checklists', icon: ListChecks },
-    { path: '/cadastros/contratos', label: 'Contratos', icon: ScrollText },
-    { path: '/cadastros/decoradores', label: 'Decoradores', icon: Palette },
-    { path: '/cadastros/mensagens', label: 'Mensagens WhatsApp', icon: MessageCircle },
-    { path: '/cadastros/produtos', label: 'Produtos', icon: ChefHat },
-    { path: '/cadastros/saloes', label: 'Salões & Locais', icon: MapPin },
-    { path: '/cadastros/tipos-festa', label: 'Tipos de Festa', icon: Sparkles },
+  { label: 'Cadastros', icon: LibraryBig, permKey: 'access_cadastros', items: [
+    { path: '/cadastros/assessores',  label: 'Assessores',         icon: UserCheck },
+    { path: '/cadastros/checklists',  label: 'Checklists',         icon: ListChecks },
+    { path: '/cadastros/contratos',   label: 'Contratos',          icon: ScrollText },
+    { path: '/cadastros/decoradores', label: 'Decoradores',        icon: Palette },
+    { path: '/cadastros/mensagens',   label: 'Mensagens WhatsApp', icon: MessageCircle },
+    { path: '/cadastros/produtos',    label: 'Produtos',           icon: ChefHat },
+    { path: '/cadastros/saloes',      label: 'Salões & Locais',    icon: MapPin },
+    { path: '/cadastros/tipos-festa', label: 'Tipos de Festa',     icon: Sparkles },
   ]},
 
-  { label: 'Administração', icon: Users, items: [
-    { path: '/users', label: 'Funcionários', icon: Users },
-    { path: '/holerites', label: 'Holerites', icon: FileText },
-    { path: '/analysis', label: 'Análise IA', icon: Brain },
-    { path: '/notifications', label: 'Notificações', icon: Bell },
-    { path: '/configuracoes', label: 'Configurações', icon: Settings },
+  { label: 'Administração', icon: Users, permKey: 'access_administracao', items: [
+    { path: '/users',          label: 'Funcionários', icon: Users },
+    { path: '/holerites',      label: 'Holerites',    icon: FileText },
+    { path: '/analysis',       label: 'Análise IA',   icon: Brain },
+    { path: '/notifications',  label: 'Notificações', icon: Bell },
+    { path: '/configuracoes',  label: 'Configurações',icon: Settings },
   ]},
 ];
 
-function isGroup(item: NavGroup): item is { label: string; icon: any; items: NavItem[] } {
+function isGroup(item: NavGroup): item is { label: string; icon: any; items: NavItem[]; permKey?: keyof Permissions } {
   return 'items' in item;
 }
 
 export default function SupervisorSidebar() {
   const { pathname } = useLocation();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, permissions } = useAuth();
   const onlineUsers = useOnlineUsers();
+
+  const visible = navStructure.filter(item => {
+    const key = (item as any).permKey as keyof Permissions | undefined;
+    if (!key) return true; // Dashboard always visible
+    return permissions[key] === true;
+  });
 
   const getDefaultOpen = () => {
     const open = new Set<string>();
-    navStructure.forEach(item => {
+    visible.forEach(item => {
       if (isGroup(item) && item.items.some(i => pathname === i.path || pathname.startsWith(i.path + '/')))
         open.add(item.label);
     });
@@ -133,16 +140,16 @@ export default function SupervisorSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-0.5">
-        {navStructure.map((item) => {
+        {visible.map((item) => {
           if (!isGroup(item)) {
-            const active = pathname === item.path;
+            const active = pathname === (item as any).path;
             const Icon = item.icon;
             return (
-              <Link key={item.path} to={item.path}
+              <Link key={(item as any).path} to={(item as any).path}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] font-medium transition-colors ${active ? 'nav-item-active' : 'hover:bg-white/5'}`}
                 style={{ color: active ? undefined : 'hsl(220 20% 62%)' }}>
                 <Icon className="w-4 h-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{(item as any).label}</span>
               </Link>
             );
           }
@@ -162,17 +169,9 @@ export default function SupervisorSidebar() {
                   style={{ opacity: 0.5, transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }} />
               </button>
 
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateRows: isOpen ? '1fr' : '0fr',
-                  transition: 'grid-template-rows 220ms cubic-bezier(0.4,0,0.2,1)',
-                  overflow: 'hidden',
-                }}
-              >
+              <div style={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 220ms cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
                 <div style={{ overflow: 'hidden' }}>
-                  <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2"
-                       style={{ borderColor: 'hsl(220 35% 20%)' }}>
+                  <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2" style={{ borderColor: 'hsl(220 35% 20%)' }}>
                     {item.items.map(sub => {
                       const SubIcon = sub.icon;
                       const active = pathname === sub.path || (

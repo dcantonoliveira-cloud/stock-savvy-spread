@@ -5,12 +5,51 @@ import type { User } from '@supabase/supabase-js';
 
 type Role = 'supervisor' | 'employee' | 'client' | null;
 
-interface Permissions {
+export interface Permissions {
+  // legacy employee flags
   can_entry: boolean;
   can_output: boolean;
+  // modules
   access_stock: boolean;
   access_materials: boolean;
+  access_comercial: boolean;
+  access_financeiro: boolean;
+  access_estoque: boolean;
+  access_cadastros: boolean;
+  access_estatisticas: boolean;
+  access_administracao: boolean;
+  // admin flag — can manage other users' permissions
+  is_admin: boolean;
 }
+
+// Supervisors with no permissions row get full access
+const SUPERVISOR_DEFAULTS: Permissions = {
+  can_entry: true,
+  can_output: true,
+  access_stock: true,
+  access_materials: true,
+  access_comercial: true,
+  access_financeiro: true,
+  access_estoque: true,
+  access_cadastros: true,
+  access_estatisticas: true,
+  access_administracao: true,
+  is_admin: true,
+};
+
+const EMPLOYEE_DEFAULTS: Permissions = {
+  can_entry: true,
+  can_output: true,
+  access_stock: true,
+  access_materials: false,
+  access_comercial: false,
+  access_financeiro: false,
+  access_estoque: false,
+  access_cadastros: false,
+  access_estatisticas: false,
+  access_administracao: false,
+  is_admin: false,
+};
 
 interface AuthContextType {
   user: User | null;
@@ -28,39 +67,48 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role>(null);
-  const [permissions, setPermissions] = useState<Permissions>({ can_entry: true, can_output: true, access_stock: true, access_materials: false });
+  const [permissions, setPermissions] = useState<Permissions>(EMPLOYEE_DEFAULTS);
   const [profile, setProfile] = useState<{ display_name: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
     const [rolesRes, permRes, profileRes, clientRes] = await Promise.all([
       supabase.from('user_roles').select('role').eq('user_id', userId),
-      supabase.from('employee_permissions').select('can_entry, can_output, access_stock, access_materials').eq('user_id', userId).maybeSingle(),
+      supabase.from('employee_permissions').select('*').eq('user_id', userId).maybeSingle(),
       supabase.from('profiles').select('display_name, email').eq('user_id', userId).maybeSingle(),
       (supabase.from as any)('client_portal_access').select('id').eq('user_id', userId).maybeSingle(),
     ]);
 
+    let resolvedRole: Role = null;
     if (rolesRes.data && rolesRes.data.length > 0) {
       const roles = rolesRes.data.map(r => r.role);
-      setRole(roles.includes('supervisor') ? 'supervisor' : 'employee');
+      resolvedRole = roles.includes('supervisor') ? 'supervisor' : 'employee';
     } else if (clientRes.data) {
-      setRole('client');
-    } else {
-      setRole(null);
+      resolvedRole = 'client';
     }
+    setRole(resolvedRole);
 
-    if (permRes.data) {
+    const p = permRes.data as any;
+    if (p) {
       setPermissions({
-        can_entry: permRes.data.can_entry,
-        can_output: permRes.data.can_output,
-        access_stock: (permRes.data as any).access_stock ?? true,
-        access_materials: (permRes.data as any).access_materials ?? false,
+        can_entry:             p.can_entry          ?? true,
+        can_output:            p.can_output         ?? true,
+        access_stock:          p.access_stock       ?? true,
+        access_materials:      p.access_materials   ?? false,
+        access_comercial:      p.access_comercial   ?? (resolvedRole === 'supervisor'),
+        access_financeiro:     p.access_financeiro  ?? false,
+        access_estoque:        p.access_estoque     ?? false,
+        access_cadastros:      p.access_cadastros   ?? false,
+        access_estatisticas:   p.access_estatisticas ?? false,
+        access_administracao:  p.access_administracao ?? false,
+        is_admin:              p.is_admin           ?? false,
       });
+    } else {
+      // No row → full access for supervisors, defaults for employees
+      setPermissions(resolvedRole === 'supervisor' ? SUPERVISOR_DEFAULTS : EMPLOYEE_DEFAULTS);
     }
 
-    if (profileRes.data) {
-      setProfile(profileRes.data);
-    }
+    if (profileRes.data) setProfile(profileRes.data);
   };
 
   useEffect(() => {
