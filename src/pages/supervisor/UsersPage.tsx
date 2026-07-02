@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import {
   Plus, Search, Loader2, Shield, User, UserX,
-  ArrowUpCircle, Trash2, FileText, ChevronRight, Settings2,
+  ArrowUpCircle, Trash2, FileText, ChevronRight, Settings2, Crown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,6 +19,7 @@ type Employee = {
   can_output: boolean;
   access_stock: boolean;
   access_materials: boolean;
+  is_admin: boolean;
   payslips_total: number;
   payslips_pending: number;
 };
@@ -46,7 +47,7 @@ export default function UsersPage() {
     const [profRes, rolesRes, permsRes, psRes] = await Promise.all([
       supabase.from('profiles').select('user_id, display_name, email'),
       supabase.from('user_roles').select('user_id, role'),
-      supabase.from('employee_permissions').select('user_id, can_entry, can_output, access_stock, access_materials'),
+      supabase.from('employee_permissions').select('user_id, can_entry, can_output, access_stock, access_materials, is_admin'),
       supabase.from('payslips' as any).select('employee_id, status'),
     ]);
 
@@ -68,6 +69,7 @@ export default function UsersPage() {
         can_output:       perm?.can_output       ?? true,
         access_stock:     (perm as any)?.access_stock     ?? true,
         access_materials: (perm as any)?.access_materials ?? false,
+        is_admin:         (perm as any)?.is_admin         ?? false,
         payslips_total:   myPs.length,
         payslips_pending: myPs.filter(ps => ps.status === 'published').length,
       };
@@ -234,9 +236,17 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{emp.email}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${roleInfo.cls}`}>
-                      {roleInfo.label}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${roleInfo.cls}`}>
+                        {roleInfo.label}
+                      </span>
+                      {emp.is_admin && (
+                        <span title="Administrador do sistema" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          <Crown className="w-3 h-3" />
+                          ADM
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-center hidden sm:table-cell">
                     {emp.payslips_total > 0 ? (
