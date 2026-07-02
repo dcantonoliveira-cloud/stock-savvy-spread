@@ -759,7 +759,7 @@ export default function EventsPage() {
                       <span className="text-xs text-muted-foreground">{ev.event_type || '—'}</span>
                     </td>
                     {/* PREÇO/PAX */}
-                    <td className={`px-3 py-2 text-right font-medium text-foreground whitespace-nowrap text-xs ${finBlur} transition-all`}>
+                    <td className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap text-xs">
                       {fmtBRL(ev.price_per_person)}
                     </td>
                     {/* CONVIDADOS */}
