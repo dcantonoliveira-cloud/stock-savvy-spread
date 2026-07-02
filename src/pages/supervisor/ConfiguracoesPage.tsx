@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import {
   Upload, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle,
   User, Building2, Plug, Camera, Lock, MessageCircle, Save, ChevronDown, ChevronUp,
-  HardDrive, RefreshCw, FolderOpen, CalendarClock, Mail,
+  HardDrive, RefreshCw, CalendarClock, Mail,
 } from 'lucide-react';
 import {
   DEFAULT_TEMPLATES, TEMPLATE_LABELS, TEMPLATE_VARS,
@@ -543,12 +543,15 @@ function WhatsAppTemplatesCard({ savedJson, onSave }: {
   );
 }
 
-// ─── Backup automático (Google Drive) ─────────────────────────────────────────
+// ─── Backup automático (Google Drive · OAuth) ─────────────────────────────────
 interface BackupCfg {
-  folder_id: string;
   frequency: 'weekly' | 'monthly';
   day: number;
   notify_email: string;
+  refresh_token?: string | null;
+  connected_email?: string | null;
+  oauth_state?: string | null;
+  folder_id?: string | null;
   last_run_at?: string | null;
   last_status?: 'success' | 'partial' | 'error' | null;
   last_summary?: string | null;
@@ -556,7 +559,11 @@ interface BackupCfg {
 }
 
 const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-const DEFAULT_BACKUP: BackupCfg = { folder_id: '', frequency: 'weekly', day: 1, notify_email: '', last_status: null };
+const DEFAULT_BACKUP: BackupCfg = { frequency: 'weekly', day: 1, notify_email: '', last_status: null };
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const OAUTH_REDIRECT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-oauth-callback`;
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email openid';
 
 function DriveBackupCard({ integration, onSave }: {
   integration: Integration | null;
@@ -572,36 +579,76 @@ function DriveBackupCard({ integration, onSave }: {
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
 
+  const connected = !!cfg.refresh_token;
   const upd = (patch: Partial<BackupCfg>) => setCfg(prev => ({ ...prev, ...patch }));
 
+  // Toast de retorno do fluxo OAuth (?drive=connected|error)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const drive = params.get('drive');
+    if (drive === 'connected') toast.success('Google Drive conectado!');
+    else if (drive === 'error') toast.error('Não foi possível conectar o Google Drive');
+    if (drive) {
+      params.delete('drive');
+      const clean = window.location.pathname + (params.toString() ? `?${params}` : '');
+      window.history.replaceState({}, '', clean);
+    }
+  }, []);
+
+  const buildStore = (patch: Partial<BackupCfg> = {}): BackupCfg => ({
+    frequency: cfg.frequency,
+    day: Number(cfg.day),
+    notify_email: cfg.notify_email.trim(),
+    refresh_token: cfg.refresh_token ?? null,
+    connected_email: cfg.connected_email ?? null,
+    oauth_state: cfg.oauth_state ?? null,
+    folder_id: cfg.folder_id ?? null,
+    last_run_at: cfg.last_run_at ?? null,
+    last_status: cfg.last_status ?? null,
+    last_summary: cfg.last_summary ?? null,
+    last_error: cfg.last_error ?? null,
+    ...patch,
+  });
+
   const persist = async (nextEnabled = enabled) => {
-    if (!cfg.folder_id.trim()) { toast.error('Informe o ID da pasta do Drive'); return false; }
     setSaving(true);
-    // Preserva campos de status ao salvar
-    const toStore: BackupCfg = {
-      folder_id: cfg.folder_id.trim(),
-      frequency: cfg.frequency,
-      day: Number(cfg.day),
-      notify_email: cfg.notify_email.trim(),
-      last_run_at: cfg.last_run_at ?? null,
-      last_status: cfg.last_status ?? null,
-      last_summary: cfg.last_summary ?? null,
-      last_error: cfg.last_error ?? null,
-    };
-    await onSave(JSON.stringify(toStore), nextEnabled);
+    await onSave(JSON.stringify(buildStore()), nextEnabled);
     setSaving(false);
     return true;
   };
 
+  const connectDrive = async () => {
+    if (!GOOGLE_CLIENT_ID) { toast.error('VITE_GOOGLE_CLIENT_ID não configurado'); return; }
+    const state = crypto.randomUUID();
+    // Salva o nonce (state) e a config atual antes de redirecionar
+    await onSave(JSON.stringify(buildStore({ oauth_state: state })), enabled);
+    const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: OAUTH_REDIRECT,
+      response_type: 'code',
+      scope: DRIVE_SCOPE,
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    }).toString();
+    window.location.href = url;
+  };
+
+  const disconnectDrive = async () => {
+    upd({ refresh_token: null, connected_email: null });
+    setEnabled(false);
+    await onSave(JSON.stringify(buildStore({ refresh_token: null, connected_email: null })), false);
+    toast.success('Google Drive desconectado');
+  };
+
   const runNow = async () => {
-    const saved = await persist();
-    if (!saved) return;
+    await persist();
     setRunning(true);
     try {
       const { data, error } = await (supabase.functions as any).invoke('backup-databases', { body: { force: true } });
       if (error) throw error;
       if (data?.ok) toast.success(`Backup concluído · ${data.totalRows?.toLocaleString('pt-BR') ?? 0} registros`);
-      else if (data?.skipped) toast.info('Backup desativado ou sem configuração');
+      else if (data?.skipped) toast.info(`Backup não rodou: ${data.reason ?? 'sem configuração'}`);
       else throw new Error(data?.error || 'Falha no backup');
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao rodar backup');
@@ -635,31 +682,51 @@ function DriveBackupCard({ integration, onSave }: {
             </div>
           </div>
           <p className="text-xs text-muted-foreground max-w-md">
-            Envia eventos, financeiro, cadastros, estoque, materiais e fichas técnicas para uma pasta do seu Drive, no dia escolhido, e avisa por e-mail.
+            Envia eventos, financeiro, cadastros, estoque, materiais e fichas técnicas para o seu Google Drive, no dia escolhido, e avisa por e-mail.
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {statusBadge()}
-          <button
-            onClick={async () => { const next = !enabled; setEnabled(next); await persist(next); }}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-muted border border-border'}`}>
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
+          {connected && (
+            <button
+              onClick={async () => { const next = !enabled; setEnabled(next); await persist(next); }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-muted border border-border'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 pt-1">
-        <div className="col-span-2">
-          <label className={labelCls}><FolderOpen className="w-3 h-3 inline mr-1 -mt-0.5" />ID da pasta do Google Drive</label>
-          <input className={inputCls} value={cfg.folder_id} onChange={e => upd({ folder_id: e.target.value })}
-            placeholder="Ex: 1A2b3C4d5E6f7G8h9I0j..." />
-          <p className="text-[11px] text-muted-foreground mt-1">Abra a pasta no Drive e copie o trecho final da URL (depois de <code className="bg-muted px-1 rounded">/folders/</code>). Compartilhe a pasta com o e-mail da conta de serviço.</p>
+      {/* Conexão com o Drive */}
+      {!connected ? (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-dashed border-border bg-muted/20">
+          <p className="text-xs text-muted-foreground">Conecte sua conta do Google para o sistema enviar os backups automaticamente.</p>
+          <button onClick={connectDrive}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm shrink-0">
+            <svg viewBox="0 0 48 48" className="w-4 h-4"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
+            Conectar Google Drive
+          </button>
         </div>
+      ) : (
+        <div className="flex items-center justify-between gap-4 p-3 rounded-xl border border-emerald-200 bg-emerald-50">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <p className="text-xs text-emerald-800 truncate">
+              Conectado{cfg.connected_email ? ` como ${cfg.connected_email}` : ''}
+            </p>
+          </div>
+          <button onClick={disconnectDrive} className="text-xs text-emerald-700 hover:text-red-600 transition-colors shrink-0">
+            Desconectar
+          </button>
+        </div>
+      )}
 
+      {/* Configuração (só faz sentido depois de conectar) */}
+      <div className={`grid grid-cols-2 gap-4 pt-1 ${!connected ? 'opacity-40 pointer-events-none' : ''}`}>
         <div>
           <label className={labelCls}><CalendarClock className="w-3 h-3 inline mr-1 -mt-0.5" />Frequência</label>
           <select className={inputCls} value={cfg.frequency}
-            onChange={e => upd({ frequency: e.target.value as 'weekly' | 'monthly', day: e.target.value === 'weekly' ? 1 : 1 })}>
+            onChange={e => upd({ frequency: e.target.value as 'weekly' | 'monthly', day: 1 })}>
             <option value="weekly">Semanal</option>
             <option value="monthly">Mensal</option>
           </select>
@@ -693,17 +760,19 @@ function DriveBackupCard({ integration, onSave }: {
         </p>
       )}
 
-      <div className="flex items-center gap-2 pt-1">
-        <button onClick={() => persist().then(ok => ok && toast.success('Configuração salva'))} disabled={saving}
-          className="px-4 py-2 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/80 transition-colors disabled:opacity-40">
-          {saving ? 'Salvando…' : 'Salvar configuração'}
-        </button>
-        <button onClick={runNow} disabled={running || saving}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40">
-          <RefreshCw className={`w-3.5 h-3.5 ${running ? 'animate-spin' : ''}`} />
-          {running ? 'Fazendo backup…' : 'Fazer backup agora'}
-        </button>
-      </div>
+      {connected && (
+        <div className="flex items-center gap-2 pt-1">
+          <button onClick={() => persist().then(ok => ok && toast.success('Configuração salva'))} disabled={saving}
+            className="px-4 py-2 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/80 transition-colors disabled:opacity-40">
+            {saving ? 'Salvando…' : 'Salvar configuração'}
+          </button>
+          <button onClick={runNow} disabled={running || saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40">
+            <RefreshCw className={`w-3.5 h-3.5 ${running ? 'animate-spin' : ''}`} />
+            {running ? 'Fazendo backup…' : 'Fazer backup agora'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

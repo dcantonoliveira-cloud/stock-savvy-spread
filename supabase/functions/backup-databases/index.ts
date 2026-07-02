@@ -1,17 +1,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  backup-databases
-//  Exporta as tabelas principais em CSV, envia para uma pasta do Google Drive
-//  (via Conta de Serviço), mantém apenas o backup mais recente e avisa por e-mail.
+//  Exporta as tabelas principais em CSV, envia para o Google Drive da empresa
+//  (via OAuth — a empresa conecta com 1 clique), mantém só o backup mais recente
+//  e avisa por e-mail.
 //
 //  Disparo:
 //   • Automático — via pg_cron (roda todo dia; a função decide se hoje "bate" com
 //     a frequência/dia configurados). Chamado com o SERVICE_ROLE_KEY no Authorization.
-//   • Manual     — botão "Fazer backup agora" na tela de Conectores (JWT de admin),
-//     enviando { force: true } no corpo.
+//   • Manual     — botão "Fazer backup agora" (JWT de admin), com { force: true }.
 //
-//  Segredos necessários (Supabase → Project Settings → Edge Functions → Secrets):
-//   • GDRIVE_SERVICE_ACCOUNT  → JSON completo da conta de serviço do Google
-//   • RESEND_API_KEY          → chave do Resend (já usada em send-payslip-notification)
+//  Segredos (Supabase → Edge Functions → Secrets):
+//   • GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET  → credenciais OAuth (1x pro sistema)
+//   • RESEND_API_KEY                                       → envio de e-mail
 //   • SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY (padrão)
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -38,28 +38,19 @@ const TABLE_GROUPS: Record<string, string[]> = {
     'contract_templates', 'annex_models',
     'checklist_templates', 'checklist_template_items',
   ],
-  estoque: [
-    'stock_items', 'stock_item_locations',
-  ],
-  materiais: [
-    'material_categories', 'material_items', 'material_base_list',
-  ],
-  fichas_tecnicas: [
-    'technical_sheets', 'technical_sheet_items', 'sheet_categories',
-  ],
+  estoque: ['stock_items', 'stock_item_locations'],
+  materiais: ['material_categories', 'material_items', 'material_base_list'],
+  fichas_tecnicas: ['technical_sheets', 'technical_sheet_items', 'sheet_categories'],
 }
 const ALL_TABLES = Object.values(TABLE_GROUPS).flat()
 
-interface ServiceAccount {
-  client_email: string
-  private_key: string
-}
-
 interface BackupConfig {
-  folder_id: string
   frequency: 'weekly' | 'monthly'
-  day: number            // weekly: 0-6 (dom-sáb) · monthly: 1-28
+  day: number
   notify_email: string | null
+  refresh_token?: string | null
+  connected_email?: string | null
+  folder_id?: string | null       // pasta raiz de backup criada pelo app (cacheada)
 }
 
 Deno.serve(async (req) => {
@@ -79,7 +70,6 @@ Deno.serve(async (req) => {
   try { body = await req.json() } catch { /* corpo vazio (cron) */ }
 
   if (!isCron) {
-    // Chamada manual → precisa ser admin
     const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
     })
@@ -103,13 +93,12 @@ Deno.serve(async (req) => {
   try { config = JSON.parse(integ.api_key) } catch {
     return json({ error: 'Configuração de backup inválida' }, 400)
   }
-  if (!config.folder_id) return json({ error: 'Pasta do Drive não configurada' }, 400)
+  if (!config.refresh_token) return json({ skipped: true, reason: 'Google Drive não conectado' })
 
   // ── Decide se roda hoje (quando disparado pelo cron) ──────────────────────
   const force = body.force === true
   if (!force) {
-    // Usa horário de Brasília (UTC-3) para bater com o dia configurado
-    const nowBR = new Date(Date.now() - 3 * 3600 * 1000)
+    const nowBR = new Date(Date.now() - 3 * 3600 * 1000)  // horário de Brasília
     const matches = config.frequency === 'weekly'
       ? nowBR.getUTCDay() === Number(config.day)
       : nowBR.getUTCDate() === Number(config.day)
@@ -118,23 +107,22 @@ Deno.serve(async (req) => {
 
   const startedAt = new Date().toISOString()
   try {
-    // ── Autentica no Google Drive ──────────────────────────────────────────
-    const saRaw = Deno.env.get('GDRIVE_SERVICE_ACCOUNT')
-    if (!saRaw) throw new Error('GDRIVE_SERVICE_ACCOUNT não configurado')
-    const sa: ServiceAccount = JSON.parse(saRaw)
-    const accessToken = await getGoogleAccessToken(sa)
+    // ── Renova access token via OAuth ──────────────────────────────────────
+    const accessToken = await getAccessToken(config.refresh_token)
 
-    // ── Cria a subpasta datada do backup ───────────────────────────────────
-    const stamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', 'h')
-    const backupFolderId = await createFolder(accessToken, `backup_${stamp}`, config.folder_id)
+    // ── Garante a pasta raiz de backup no Drive da empresa ─────────────────
+    const rootFolder = await ensureRootFolder(accessToken, config.folder_id ?? null)
+
+    // ── Subpasta datada deste backup ───────────────────────────────────────
+    const stamp = new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 16).replace('T', '_').replace(':', 'h')
+    const backupFolderId = await createFolder(accessToken, `backup_${stamp}`, rootFolder)
 
     // ── Exporta cada tabela em CSV e envia ─────────────────────────────────
     const report: { table: string; rows: number; ok: boolean; error?: string }[] = []
     for (const table of ALL_TABLES) {
       try {
         const rows = await fetchAll(supabase, table)
-        const csv = toCSV(rows)
-        await uploadCsv(accessToken, `${table}.csv`, csv, backupFolderId)
+        await uploadCsv(accessToken, `${table}.csv`, toCSV(rows), backupFolderId)
         report.push({ table, rows: rows.length, ok: true })
       } catch (e) {
         report.push({ table, rows: 0, ok: false, error: String((e as Error).message) })
@@ -142,23 +130,20 @@ Deno.serve(async (req) => {
     }
 
     // ── Remove backups antigos (mantém só o atual) ─────────────────────────
-    const deleted = await cleanOldBackups(accessToken, config.folder_id, backupFolderId)
+    const deleted = await cleanOldBackups(accessToken, rootFolder, backupFolderId)
 
     const okCount = report.filter(r => r.ok).length
     const totalRows = report.reduce((s, r) => s + r.rows, 0)
     const finishedAt = new Date().toISOString()
 
-    // ── E-mail de aviso ────────────────────────────────────────────────────
     if (config.notify_email) {
-      await sendEmail(config.notify_email, {
-        okCount, total: ALL_TABLES.length, totalRows, deleted, report, stamp,
-      })
+      await sendEmail(config.notify_email, { okCount, total: ALL_TABLES.length, totalRows, deleted, report, stamp }).catch(() => {})
     }
 
-    // ── Registra status ────────────────────────────────────────────────────
     await supabase.from('company_integrations').update({
       api_key: JSON.stringify({
         ...config,
+        folder_id: rootFolder,
         last_run_at: finishedAt,
         last_status: okCount === ALL_TABLES.length ? 'success' : 'partial',
         last_summary: `${okCount}/${ALL_TABLES.length} tabelas · ${totalRows} registros`,
@@ -179,7 +164,24 @@ Deno.serve(async (req) => {
   }
 })
 
-// ─── Supabase: busca paginada (contorna o limite de 1000 linhas) ─────────────
+// ─── OAuth: access token a partir do refresh token ───────────────────────────
+async function getAccessToken(refreshToken: string): Promise<string> {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')!,
+      client_secret: Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')!,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  })
+  const data = await res.json()
+  if (!data.access_token) throw new Error(`Falha ao renovar token Google (reconecte o Drive): ${JSON.stringify(data)}`)
+  return data.access_token as string
+}
+
+// ─── Supabase: busca paginada (contorna limite de 1000 linhas) ───────────────
 async function fetchAll(supabase: ReturnType<typeof createClient>, table: string) {
   const PAGE = 1000
   let from = 0
@@ -209,41 +211,20 @@ function toCSV(rows: Record<string, unknown>[]): string {
   return '﻿' + head + '\n' + lines.join('\n')  // BOM p/ acentos no Excel
 }
 
-// ─── Google: access token via JWT da conta de serviço ────────────────────────
-async function getGoogleAccessToken(sa: ServiceAccount): Promise<string> {
-  const now = Math.floor(Date.now() / 1000)
-  const header = { alg: 'RS256', typ: 'JWT' }
-  const claim = {
-    iss: sa.client_email,
-    scope: 'https://www.googleapis.com/auth/drive',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now,
-  }
-  const unsigned = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(claim))}`
-  const key = await importPrivateKey(sa.private_key)
-  const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned))
-  const jwt = `${unsigned}.${b64urlBytes(new Uint8Array(sigBuf))}`
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
-  })
-  const data = await res.json()
-  if (!data.access_token) throw new Error(`Falha na autenticação Google: ${JSON.stringify(data)}`)
-  return data.access_token as string
-}
-
-async function importPrivateKey(pem: string): Promise<CryptoKey> {
-  const b64 = pem.replace('-----BEGIN PRIVATE KEY-----', '')
-                 .replace('-----END PRIVATE KEY-----', '')
-                 .replace(/\s/g, '')
-  const der = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
-  return crypto.subtle.importKey('pkcs8', der.buffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign'])
-}
-
 // ─── Google Drive: pastas, upload e limpeza ──────────────────────────────────
+async function ensureRootFolder(token: string, cachedId: string | null): Promise<string> {
+  if (cachedId) {
+    const check = await fetch(`https://www.googleapis.com/drive/v3/files/${cachedId}?fields=id,trashed`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+    if (check.ok) {
+      const d = await check.json()
+      if (!d.trashed) return cachedId
+    }
+  }
+  return await createFolder(token, 'Backups - Stock Savvy', 'root')
+}
+
 async function createFolder(token: string, name: string, parentId: string): Promise<string> {
   const res = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
     method: 'POST',
@@ -344,19 +325,9 @@ async function sendEmailError(to: string, error: string) {
     body: JSON.stringify({
       from: 'Rondello Buffet <noreply@rondellobuffet.com.br>',
       to, subject: '❌ Falha no backup automático',
-      html: `<div style="font-family:sans-serif;padding:24px;"><h2 style="color:#dc2626;">Falha no backup</h2><p>O backup automático não foi concluído.</p><pre style="background:#f8fafc;padding:12px;border-radius:8px;color:#334155;">${error}</pre></div>`,
+      html: `<div style="font-family:sans-serif;padding:24px;"><h2 style="color:#dc2626;">Falha no backup</h2><p>O backup automático não foi concluído.</p><pre style="background:#f8fafc;padding:12px;border-radius:8px;color:#334155;white-space:pre-wrap;">${error}</pre></div>`,
     }),
   })
-}
-
-// ─── Helpers base64url ───────────────────────────────────────────────────────
-function b64url(str: string): string {
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-function b64urlBytes(bytes: Uint8Array): string {
-  let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 function json(data: unknown, status = 200) {
