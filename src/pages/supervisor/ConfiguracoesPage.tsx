@@ -543,8 +543,9 @@ function WhatsAppTemplatesCard({ savedJson, onSave }: {
   );
 }
 
-// ─── Backup automático (Google Drive · OAuth) ─────────────────────────────────
+// ─── Backup automático (E-mail com ZIP · ou Google Drive OAuth) ───────────────
 interface BackupCfg {
+  delivery: 'email' | 'drive';
   frequency: 'weekly' | 'monthly';
   day: number;
   notify_email: string;
@@ -559,7 +560,7 @@ interface BackupCfg {
 }
 
 const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-const DEFAULT_BACKUP: BackupCfg = { frequency: 'weekly', day: 1, notify_email: '', last_status: null };
+const DEFAULT_BACKUP: BackupCfg = { delivery: 'email', frequency: 'weekly', day: 1, notify_email: '', last_status: null };
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const OAUTH_REDIRECT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-oauth-callback`;
@@ -580,6 +581,7 @@ function DriveBackupCard({ integration, onSave }: {
   const [running, setRunning] = useState(false);
 
   const connected = !!cfg.refresh_token;
+  const isEmailMode = cfg.delivery === 'email';
   const upd = (patch: Partial<BackupCfg>) => setCfg(prev => ({ ...prev, ...patch }));
 
   // Toast de retorno do fluxo OAuth (?drive=connected|error)
@@ -596,6 +598,7 @@ function DriveBackupCard({ integration, onSave }: {
   }, []);
 
   const buildStore = (patch: Partial<BackupCfg> = {}): BackupCfg => ({
+    delivery: cfg.delivery,
     frequency: cfg.frequency,
     day: Number(cfg.day),
     notify_email: cfg.notify_email.trim(),
@@ -680,17 +683,17 @@ function DriveBackupCard({ integration, onSave }: {
               <HardDrive className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-sm font-bold text-foreground leading-none">Backup automático · Google Drive</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Exporta as tabelas em CSV e mantém só o backup mais recente</p>
+              <p className="text-sm font-bold text-foreground leading-none">Backup automático</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Exporta suas tabelas em CSV, no dia escolhido</p>
             </div>
           </div>
           <p className="text-xs text-muted-foreground max-w-md">
-            Envia eventos, financeiro, cadastros, estoque, materiais e fichas técnicas para o seu Google Drive, no dia escolhido, e avisa por e-mail.
+            Envia eventos, financeiro, cadastros, estoque, materiais e fichas técnicas — sempre isolados só à sua empresa.
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {statusBadge()}
-          {connected && (
+          {(isEmailMode || connected) && (
             <button
               onClick={async () => { const next = !enabled; setEnabled(next); await persist(next); }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-muted border border-border'}`}>
@@ -700,8 +703,27 @@ function DriveBackupCard({ integration, onSave }: {
         </div>
       </div>
 
-      {/* Conexão com o Drive */}
-      {!connected ? (
+      {/* Modo de entrega */}
+      <div className="flex items-center bg-muted rounded-xl p-1 gap-1 w-fit">
+        <button type="button" onClick={() => upd({ delivery: 'email' })}
+          className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            isEmailMode ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+          }`}>
+          E-mail (recomendado)
+        </button>
+        <button type="button" onClick={() => upd({ delivery: 'drive' })}
+          className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            !isEmailMode ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+          }`}>
+          Google Drive
+        </button>
+      </div>
+
+      {isEmailMode ? (
+        <p className="text-xs text-muted-foreground -mt-2">
+          Um arquivo .zip com os CSVs de cada tabela é enviado por e-mail — sem conexão externa nenhuma.
+        </p>
+      ) : !connected ? (
         <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-dashed border-border bg-muted/20">
           <p className="text-xs text-muted-foreground">Conecte sua conta do Google para o sistema enviar os backups automaticamente.</p>
           <button onClick={connectDrive}
@@ -724,8 +746,8 @@ function DriveBackupCard({ integration, onSave }: {
         </div>
       )}
 
-      {/* Configuração (só faz sentido depois de conectar) */}
-      <div className={`grid grid-cols-2 gap-4 pt-1 ${!connected ? 'opacity-40 pointer-events-none' : ''}`}>
+      {/* Configuração (email: sempre liberado · drive: só depois de conectar) */}
+      <div className={`grid grid-cols-2 gap-4 pt-1 ${!isEmailMode && !connected ? 'opacity-40 pointer-events-none' : ''}`}>
         <div>
           <label className={labelCls}><CalendarClock className="w-3 h-3 inline mr-1 -mt-0.5" />Frequência</label>
           <select className={inputCls} value={cfg.frequency}
@@ -749,7 +771,7 @@ function DriveBackupCard({ integration, onSave }: {
         </div>
 
         <div className="col-span-2">
-          <label className={labelCls}><Mail className="w-3 h-3 inline mr-1 -mt-0.5" />E-mail para aviso</label>
+          <label className={labelCls}><Mail className="w-3 h-3 inline mr-1 -mt-0.5" />{isEmailMode ? 'E-mail de destino' : 'E-mail para aviso'}</label>
           <input className={inputCls} type="email" value={cfg.notify_email} onChange={e => upd({ notify_email: e.target.value })}
             placeholder="douglas@rondellobuffet.com.br" />
         </div>
@@ -763,7 +785,7 @@ function DriveBackupCard({ integration, onSave }: {
         </p>
       )}
 
-      {connected && (
+      {(isEmailMode || connected) && (
         <div className="flex items-center gap-2 pt-1">
           <button onClick={() => persist().then(ok => ok && toast.success('Configuração salva'))} disabled={saving}
             className="px-4 py-2 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/80 transition-colors disabled:opacity-40">
