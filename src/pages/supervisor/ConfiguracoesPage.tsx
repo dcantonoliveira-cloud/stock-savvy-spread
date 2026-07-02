@@ -647,7 +647,10 @@ function DriveBackupCard({ integration, onSave }: {
     try {
       const { data, error } = await (supabase.functions as any).invoke('backup-databases', { body: { force: true } });
       if (error) throw error;
-      if (data?.ok) toast.success(`Backup concluído · ${data.totalRows?.toLocaleString('pt-BR') ?? 0} registros`);
+      if (data?.ok) {
+        toast.success(`Backup concluído · ${data.totalRows?.toLocaleString('pt-BR') ?? 0} registros`);
+        if (data.emailError) toast.warning(data.emailError);
+      }
       else if (data?.skipped) toast.info(`Backup não rodou: ${data.reason ?? 'sem configuração'}`);
       else throw new Error(data?.error || 'Falha no backup');
     } catch (e: any) {

@@ -136,8 +136,14 @@ Deno.serve(async (req) => {
     const totalRows = report.reduce((s, r) => s + r.rows, 0)
     const finishedAt = new Date().toISOString()
 
+    let emailError: string | null = null
     if (config.notify_email) {
-      await sendEmail(config.notify_email, { okCount, total: ALL_TABLES.length, totalRows, deleted, report, stamp }).catch(() => {})
+      try {
+        await sendEmail(config.notify_email, { okCount, total: ALL_TABLES.length, totalRows, deleted, report, stamp })
+      } catch (e) {
+        emailError = `E-mail não enviado: ${String((e as Error).message)}`
+        console.error(emailError)
+      }
     }
 
     await supabase.from('company_integrations').update({
@@ -145,14 +151,14 @@ Deno.serve(async (req) => {
         ...config,
         folder_id: rootFolder,
         last_run_at: finishedAt,
-        last_status: okCount === ALL_TABLES.length ? 'success' : 'partial',
+        last_status: okCount === ALL_TABLES.length ? (emailError ? 'partial' : 'success') : 'partial',
         last_summary: `${okCount}/${ALL_TABLES.length} tabelas · ${totalRows} registros`,
-        last_error: null,
+        last_error: emailError,
       }),
       updated_at: finishedAt,
     }).eq('id', integ.id)
 
-    return json({ ok: true, started_at: startedAt, finished_at: finishedAt, okCount, totalRows, report })
+    return json({ ok: true, started_at: startedAt, finished_at: finishedAt, okCount, totalRows, report, emailError })
   } catch (e) {
     const msg = String((e as Error).message)
     await supabase.from('company_integrations').update({
@@ -274,7 +280,7 @@ async function sendEmail(to: string, s: {
   report: { table: string; rows: number; ok: boolean; error?: string }[]; stamp: string
 }) {
   const key = Deno.env.get('RESEND_API_KEY')
-  if (!key) return
+  if (!key) throw new Error('RESEND_API_KEY não configurada')
   const failed = s.report.filter(r => !r.ok)
   const rowsHtml = s.report.map(r =>
     `<tr><td style="padding:4px 12px;border-bottom:1px solid #f1f5f9;">${r.table}</td>
@@ -306,7 +312,7 @@ async function sendEmail(to: string, s: {
         <p style="margin:0;color:#94a3b8;font-size:11px;">Somente o backup mais recente é mantido no Drive. © Rondello Buffet</p>
       </div>
     </div></body></html>`
-  await fetch('https://api.resend.com/emails', {
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -314,6 +320,10 @@ async function sendEmail(to: string, s: {
       to, subject: `💾 Backup ${failed.length ? 'parcial' : 'concluído'} — ${s.totalRows.toLocaleString('pt-BR')} registros`, html,
     }),
   })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Resend HTTP ${res.status}: ${body}`)
+  }
 }
 
 async function sendEmailError(to: string, error: string) {
