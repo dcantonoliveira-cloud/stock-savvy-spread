@@ -175,10 +175,20 @@ export default function EmployeeDetailPage() {
   const handleChangeRole = async (newRole: 'supervisor' | 'employee') => {
     if (newRole === role) return;
     setSavingRole(true);
-    const { error } = await supabase
+    // Delete existing role(s) then insert the new one
+    const { error: delErr } = await supabase
       .from('user_roles')
-      .upsert({ user_id: id!, role: newRole }, { onConflict: 'user_id' });
-    if (error) {
+      .delete()
+      .eq('user_id', id!);
+    if (delErr) {
+      toast.error('Erro ao alterar tipo de acesso');
+      setSavingRole(false);
+      return;
+    }
+    const { error: insErr } = await supabase
+      .from('user_roles')
+      .insert({ user_id: id!, role: newRole });
+    if (insErr) {
       toast.error('Erro ao alterar tipo de acesso');
     } else {
       setRole(newRole);
