@@ -257,7 +257,17 @@ async function fetchScoped(
   }
   const ids = parentIdCache[child.parent]
   if (ids.length === 0) return []
-  return fetchAll(supabase, table, { inColumn: child.fk, inValues: ids })
+
+  // Envia o filtro .in() em lotes — muitos IDs de uma vez estouram o limite
+  // de tamanho da URL da requisição (912 UUIDs ≈ 33 mil caracteres).
+  const CHUNK = 150
+  const all: Record<string, unknown>[] = []
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK)
+    const rows = await fetchAll(supabase, table, { inColumn: child.fk, inValues: slice })
+    all.push(...rows)
+  }
+  return all
 }
 
 // ─── Supabase: busca paginada (contorna limite de 1000 linhas) ───────────────
