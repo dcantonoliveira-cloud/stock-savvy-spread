@@ -45,7 +45,7 @@ const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
 const WEEKDAYS_SHORT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
 const STATUS: Record<string, { label: string; bar: string; dot: string; bg: string; text: string; badge: string }> = {
-  lead:              { label: '1° Contato',  bar: 'bg-sky-400',     dot: 'bg-sky-400',     bg: 'bg-sky-50',     text: 'text-sky-700',    badge: 'border-sky-200 bg-sky-50 text-sky-700' },
+  lead:              { label: '1° Contato',  bar: 'bg-amber-400',   dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700',  badge: 'border-amber-200 bg-amber-50 text-amber-700' },
   negotiating:       { label: 'Negociando',  bar: 'bg-amber-400',   dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700',  badge: 'border-amber-200 bg-amber-50 text-amber-700' },
   tasting_scheduled: { label: 'Degustação',  bar: 'bg-purple-400',  dot: 'bg-purple-400',  bg: 'bg-purple-50',  text: 'text-purple-700', badge: 'border-purple-200 bg-purple-50 text-purple-700' },
   confirmed:         { label: 'Confirmado',  bar: 'bg-emerald-500', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700',badge: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
@@ -374,7 +374,11 @@ export default function CalendarPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-emerald-500" />
-                <span className="text-xs text-muted-foreground">Reservado</span>
+                <span className="text-xs text-muted-foreground">Confirmado</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-amber-400" />
+                <span className="text-xs text-muted-foreground">Reservado (1° contato / negociando)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-purple-400" />
