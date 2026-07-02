@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 
 // ─── Layouts (carregam cedo, são pequenos) ───
 import SupervisorLayout from "./components/SupervisorLayout";
+import SupervisorRouteGuard from "./components/SupervisorRouteGuard";
 import EmployeeLayout from "./components/EmployeeLayout";
 
 // ─── Auth (sempre necessários na primeira tela) ───
@@ -179,6 +180,7 @@ function AppRoutes() {
     return (
       <SupervisorLayout>
         <Suspense fallback={<PageLoader />}>
+          <SupervisorRouteGuard>
           <Routes>
             <Route path="/" element={<SupervisorDashboard />} />
             <Route path="/clients" element={<ClientsPage />} />
@@ -247,6 +249,7 @@ function AppRoutes() {
             <Route path="/invoices" element={<Navigate to="/entries" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </SupervisorRouteGuard>
         </Suspense>
       </SupervisorLayout>
     );
