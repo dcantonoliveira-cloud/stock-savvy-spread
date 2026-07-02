@@ -165,7 +165,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
                     Meus Holerites
                   </button>
                   <button
-                    onClick={() => { setMenuOpen(false); navigate('/configuracoes?tab=perfil'); }}
+                    onClick={() => { setMenuOpen(false); navigate('/meu-perfil'); }}
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">
                     <Settings className="w-4 h-4 text-muted-foreground" />
                     Meu Perfil

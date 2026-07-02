@@ -44,7 +44,7 @@ interface Integration {
   enabled: boolean;
 }
 
-type Tab = 'perfil' | 'empresa' | 'conectores';
+type Tab = 'empresa' | 'conectores';
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const inputCls = 'w-full h-10 px-3 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors';
@@ -546,7 +546,7 @@ function WhatsAppTemplatesCard({ savedJson, onSave }: {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ConfiguracoesPage() {
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) ?? 'empresa');
+  const [tab, setTab] = useState<Tab>('empresa');
   const [company,         setCompany]       = useState<Company | null>(null);
   const [profile,         setProfile]       = useState<Profile | null>(null);
   const [integrations,    setIntegrations]  = useState<Integration[]>([]);
@@ -657,9 +657,8 @@ export default function ConfiguracoesPage() {
   );
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: 'perfil',     label: 'Meu Perfil',  icon: <User className="w-4 h-4" /> },
-    { key: 'empresa',    label: 'Empresa',      icon: <Building2 className="w-4 h-4" /> },
-    { key: 'conectores', label: 'Conectores',   icon: <Plug className="w-4 h-4" /> },
+    { key: 'empresa',    label: 'Empresa',    icon: <Building2 className="w-4 h-4" /> },
+    { key: 'conectores', label: 'Conectores', icon: <Plug className="w-4 h-4" /> },
   ];
 
   return (
@@ -682,65 +681,6 @@ export default function ConfiguracoesPage() {
 
       {/* Content */}
       <div className="flex-1 min-w-0 space-y-4">
-
-        {/* ── Perfil ────────────────────────────────────────────────── */}
-        {tab === 'perfil' && (
-          <>
-            <div className="bg-white border border-border rounded-2xl p-6 space-y-6">
-              <Section title="Foto & identidade" />
-              <AvatarBlock
-                profile={profile}
-                onUpload={handleAvatarUpload}
-                onRemove={handleAvatarRemove}
-                uploading={avatarUploading}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Field label="Nome de exibição">
-                    <input className={inputCls} value={profile.display_name}
-                      onChange={e => saveProfile('display_name', e.target.value)} />
-                  </Field>
-                </div>
-                <div className="col-span-2">
-                  <Field label="E-mail">
-                    <input className={`${inputCls} opacity-50 cursor-not-allowed`} value={profile.email} readOnly />
-                  </Field>
-                </div>
-                <div className="col-span-2">
-                  <Field label="Telefone / WhatsApp">
-                    <input className={inputCls} value={profile.phone ?? ''}
-                      onChange={e => saveProfile('phone', e.target.value)}
-                      placeholder="(15) 99999-0000" />
-                  </Field>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
-              <Section title="Segurança" />
-              <Field label="Nova senha">
-                <div className="relative">
-                  <input
-                    type={showPwd ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
-                    className={`${inputCls} pr-10`}
-                  />
-                  <button type="button" onClick={() => setShowPwd(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </Field>
-              <button onClick={handlePasswordChange} disabled={pwdSaving || !newPassword}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/80 transition-colors disabled:opacity-40">
-                <Lock className="w-3.5 h-3.5" />
-                {pwdSaving ? 'Salvando…' : 'Alterar senha'}
-              </button>
-            </div>
-          </>
-        )}
 
         {/* ── Empresa ───────────────────────────────────────────────── */}
         {tab === 'empresa' && (
