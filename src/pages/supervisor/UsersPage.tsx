@@ -141,6 +141,7 @@ export default function UsersPage() {
   };
 
   const filtered = employees.filter(e => {
+    if (e.role === 'sem acesso') return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return e.display_name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q);
