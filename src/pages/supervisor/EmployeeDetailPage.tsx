@@ -125,6 +125,7 @@ export default function EmployeeDetailPage() {
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [empPerms, setEmpPerms] = useState<EmpPermissions>(DEFAULT_PERMS);
   const [savingPerms, setSavingPerms] = useState(false);
+  const [savingRole, setSavingRole] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -169,6 +170,21 @@ export default function EmployeeDetailPage() {
       });
     }
     setLoading(false);
+  };
+
+  const handleChangeRole = async (newRole: 'supervisor' | 'employee') => {
+    if (newRole === role) return;
+    setSavingRole(true);
+    const { error } = await supabase
+      .from('user_roles')
+      .upsert({ user_id: id!, role: newRole }, { onConflict: 'user_id' });
+    if (error) {
+      toast.error('Erro ao alterar tipo de acesso');
+    } else {
+      setRole(newRole);
+      toast.success(`Acesso alterado para ${newRole === 'supervisor' ? 'Supervisor' : 'Funcionário'}`);
+    }
+    setSavingRole(false);
   };
 
   const handleSavePerms = async () => {
@@ -517,6 +533,39 @@ export default function EmployeeDetailPage() {
       {/* ── Tab: Permissões ── */}
       {tab === 'permissoes' && myPerms.is_admin && (
         <div className="space-y-4">
+
+          {/* Tipo de acesso */}
+          <div className="bg-white border border-border rounded-2xl p-5">
+            <p className="text-sm font-semibold text-foreground mb-1">Tipo de acesso</p>
+            <p className="text-xs text-muted-foreground mb-4">
+              <strong>Funcionário</strong> acessa somente Estoque e Materiais (tela simplificada).&ensp;
+              <strong>Supervisor</strong> acessa o painel completo com menu lateral.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleChangeRole('employee')}
+                disabled={savingRole}
+                className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                  role === 'employee'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'border-border text-muted-foreground hover:bg-muted/40'
+                }`}>
+                Funcionário
+              </button>
+              <button
+                onClick={() => handleChangeRole('supervisor')}
+                disabled={savingRole}
+                className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                  role === 'supervisor'
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-border text-muted-foreground hover:bg-muted/40'
+                }`}>
+                Supervisor
+              </button>
+            </div>
+            {savingRole && <p className="text-xs text-muted-foreground mt-2 text-center">Salvando...</p>}
+          </div>
+
           <div className="bg-white border border-border rounded-2xl divide-y divide-border/60">
             {PERM_GROUPS.map(g => (
               <div key={g.key} className="flex items-center justify-between px-5 py-4">
