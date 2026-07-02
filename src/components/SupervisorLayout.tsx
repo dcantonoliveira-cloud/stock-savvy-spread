@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SupervisorSidebar from './SupervisorSidebar';
 import { supabase } from '@/integrations/supabase/client';
-import { Bell, Search, Receipt, LogOut, ChevronDown } from 'lucide-react';
+import { Bell, Search, Receipt, LogOut, ChevronDown, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const PAGE_TITLES: Record<string, string> = {
@@ -51,7 +51,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
   const menuRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { profile, signOut, user } = useAuth();
+  const { profile, signOut, user, permissions } = useAuth();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -164,6 +164,14 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
                     <Receipt className="w-4 h-4 text-muted-foreground" />
                     Meus Holerites
                   </button>
+                  {permissions.is_admin && (
+                    <button
+                      onClick={() => { setMenuOpen(false); navigate('/configuracoes'); }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors">
+                      <Settings className="w-4 h-4 text-muted-foreground" />
+                      Configurações
+                    </button>
+                  )}
                   <div className="border-t border-border mt-1 pt-1">
                     <button
                       onClick={() => { setMenuOpen(false); signOut(); }}
