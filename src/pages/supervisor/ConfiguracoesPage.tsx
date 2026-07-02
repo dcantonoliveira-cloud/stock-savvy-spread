@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Upload, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle,
   User, Building2, Plug, Camera, Lock, MessageCircle, Save, ChevronDown, ChevronUp,
+  HardDrive, RefreshCw, FolderOpen, CalendarClock, Mail,
 } from 'lucide-react';
 import {
   DEFAULT_TEMPLATES, TEMPLATE_LABELS, TEMPLATE_VARS,
@@ -543,9 +543,173 @@ function WhatsAppTemplatesCard({ savedJson, onSave }: {
   );
 }
 
+// ─── Backup automático (Google Drive) ─────────────────────────────────────────
+interface BackupCfg {
+  folder_id: string;
+  frequency: 'weekly' | 'monthly';
+  day: number;
+  notify_email: string;
+  last_run_at?: string | null;
+  last_status?: 'success' | 'partial' | 'error' | null;
+  last_summary?: string | null;
+  last_error?: string | null;
+}
+
+const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+const DEFAULT_BACKUP: BackupCfg = { folder_id: '', frequency: 'weekly', day: 1, notify_email: '', last_status: null };
+
+function DriveBackupCard({ integration, onSave }: {
+  integration: Integration | null;
+  onSave: (key: string, enabled: boolean) => Promise<void>;
+}) {
+  const parsed: BackupCfg = (() => {
+    try { return integration?.api_key ? { ...DEFAULT_BACKUP, ...JSON.parse(integration.api_key) } : DEFAULT_BACKUP; }
+    catch { return DEFAULT_BACKUP; }
+  })();
+
+  const [cfg, setCfg] = useState<BackupCfg>(parsed);
+  const [enabled, setEnabled] = useState(integration?.enabled ?? false);
+  const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState(false);
+
+  const upd = (patch: Partial<BackupCfg>) => setCfg(prev => ({ ...prev, ...patch }));
+
+  const persist = async (nextEnabled = enabled) => {
+    if (!cfg.folder_id.trim()) { toast.error('Informe o ID da pasta do Drive'); return false; }
+    setSaving(true);
+    // Preserva campos de status ao salvar
+    const toStore: BackupCfg = {
+      folder_id: cfg.folder_id.trim(),
+      frequency: cfg.frequency,
+      day: Number(cfg.day),
+      notify_email: cfg.notify_email.trim(),
+      last_run_at: cfg.last_run_at ?? null,
+      last_status: cfg.last_status ?? null,
+      last_summary: cfg.last_summary ?? null,
+      last_error: cfg.last_error ?? null,
+    };
+    await onSave(JSON.stringify(toStore), nextEnabled);
+    setSaving(false);
+    return true;
+  };
+
+  const runNow = async () => {
+    const saved = await persist();
+    if (!saved) return;
+    setRunning(true);
+    try {
+      const { data, error } = await (supabase.functions as any).invoke('backup-databases', { body: { force: true } });
+      if (error) throw error;
+      if (data?.ok) toast.success(`Backup concluído · ${data.totalRows?.toLocaleString('pt-BR') ?? 0} registros`);
+      else if (data?.skipped) toast.info('Backup desativado ou sem configuração');
+      else throw new Error(data?.error || 'Falha no backup');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao rodar backup');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const statusBadge = () => {
+    const st = cfg.last_status;
+    if (!st) return null;
+    const map = {
+      success: { cls: 'text-emerald-700 bg-emerald-50 border-emerald-200', label: 'Último: sucesso' },
+      partial: { cls: 'text-amber-700 bg-amber-50 border-amber-200', label: 'Último: parcial' },
+      error:   { cls: 'text-red-600 bg-red-50 border-red-200', label: 'Último: erro' },
+    }[st];
+    return <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${map.cls}`}>{map.label}</span>;
+  };
+
+  return (
+    <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#1a73e8' }}>
+              <HardDrive className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground leading-none">Backup automático · Google Drive</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Exporta as tabelas em CSV e mantém só o backup mais recente</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground max-w-md">
+            Envia eventos, financeiro, cadastros, estoque, materiais e fichas técnicas para uma pasta do seu Drive, no dia escolhido, e avisa por e-mail.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {statusBadge()}
+          <button
+            onClick={async () => { const next = !enabled; setEnabled(next); await persist(next); }}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${enabled ? 'bg-emerald-500' : 'bg-muted border border-border'}`}>
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 pt-1">
+        <div className="col-span-2">
+          <label className={labelCls}><FolderOpen className="w-3 h-3 inline mr-1 -mt-0.5" />ID da pasta do Google Drive</label>
+          <input className={inputCls} value={cfg.folder_id} onChange={e => upd({ folder_id: e.target.value })}
+            placeholder="Ex: 1A2b3C4d5E6f7G8h9I0j..." />
+          <p className="text-[11px] text-muted-foreground mt-1">Abra a pasta no Drive e copie o trecho final da URL (depois de <code className="bg-muted px-1 rounded">/folders/</code>). Compartilhe a pasta com o e-mail da conta de serviço.</p>
+        </div>
+
+        <div>
+          <label className={labelCls}><CalendarClock className="w-3 h-3 inline mr-1 -mt-0.5" />Frequência</label>
+          <select className={inputCls} value={cfg.frequency}
+            onChange={e => upd({ frequency: e.target.value as 'weekly' | 'monthly', day: e.target.value === 'weekly' ? 1 : 1 })}>
+            <option value="weekly">Semanal</option>
+            <option value="monthly">Mensal</option>
+          </select>
+        </div>
+
+        <div>
+          <label className={labelCls}>{cfg.frequency === 'weekly' ? 'Dia da semana' : 'Dia do mês'}</label>
+          {cfg.frequency === 'weekly' ? (
+            <select className={inputCls} value={cfg.day} onChange={e => upd({ day: Number(e.target.value) })}>
+              {WEEKDAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+            </select>
+          ) : (
+            <select className={inputCls} value={cfg.day} onChange={e => upd({ day: Number(e.target.value) })}>
+              {Array.from({ length: 28 }, (_, i) => i + 1).map(d => <option key={d} value={d}>Dia {d}</option>)}
+            </select>
+          )}
+        </div>
+
+        <div className="col-span-2">
+          <label className={labelCls}><Mail className="w-3 h-3 inline mr-1 -mt-0.5" />E-mail para aviso</label>
+          <input className={inputCls} type="email" value={cfg.notify_email} onChange={e => upd({ notify_email: e.target.value })}
+            placeholder="douglas@rondellobuffet.com.br" />
+        </div>
+      </div>
+
+      {cfg.last_run_at && (
+        <p className="text-[11px] text-muted-foreground">
+          Último backup: {new Date(cfg.last_run_at).toLocaleString('pt-BR')}
+          {cfg.last_summary ? ` · ${cfg.last_summary}` : ''}
+          {cfg.last_status === 'error' && cfg.last_error ? ` · ${cfg.last_error}` : ''}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <button onClick={() => persist().then(ok => ok && toast.success('Configuração salva'))} disabled={saving}
+          className="px-4 py-2 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/80 transition-colors disabled:opacity-40">
+          {saving ? 'Salvando…' : 'Salvar configuração'}
+        </button>
+        <button onClick={runNow} disabled={running || saving}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40">
+          <RefreshCw className={`w-3.5 h-3.5 ${running ? 'animate-spin' : ''}`} />
+          {running ? 'Fazendo backup…' : 'Fazer backup agora'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ConfiguracoesPage() {
-  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>('empresa');
   const [company,         setCompany]       = useState<Company | null>(null);
   const [profile,         setProfile]       = useState<Profile | null>(null);
@@ -832,6 +996,11 @@ export default function ConfiguracoesPage() {
             <ZapiConnectorCard
               integration={integrations.find(i => i.provider === 'zapi') ?? null}
               onSave={(key, enabled) => saveIntegration('zapi', key, enabled)}
+            />
+
+            <DriveBackupCard
+              integration={integrations.find(i => i.provider === 'drive_backup') ?? null}
+              onSave={(key, enabled) => saveIntegration('drive_backup', key, enabled)}
             />
 
             <div className="border border-border rounded-2xl p-5 bg-muted/20">
