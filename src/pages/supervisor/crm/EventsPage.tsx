@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -75,6 +76,8 @@ const calcTotal = (guests: string, children: string, nonPaying: string, price: s
 
 // ══════════════════════════════════════════════════════════════════
 export default function EventsPage() {
+  const { permissions } = useAuth();
+  const finBlur = !permissions.access_financeiro ? 'blur-sm select-none pointer-events-none' : '';
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
   const location = useLocation();
@@ -657,12 +660,12 @@ export default function EventsPage() {
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-muted-foreground">Por convidado</span>
-                <span className="text-sm font-bold text-primary">{fmtBRL(avgPerGuest)}</span>
+                <span className={`text-sm font-bold text-primary ${finBlur} transition-all`}>{fmtBRL(avgPerGuest)}</span>
               </div>
               <div className="h-px bg-border/60" />
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-muted-foreground">Por evento</span>
-                <span className="text-sm font-bold text-primary">{fmtBRL(avgPerEvent)}</span>
+                <span className={`text-sm font-bold text-primary ${finBlur} transition-all`}>{fmtBRL(avgPerEvent)}</span>
               </div>
             </div>
           </div>
@@ -670,13 +673,13 @@ export default function EventsPage() {
           {/* Valor confirmado */}
           <div className="bg-white rounded-2xl border border-border px-5 py-4 flex flex-col gap-1">
             <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/60">Confirmado</p>
-            <p className="text-lg font-bold text-primary leading-none">{fmtBRL(statsValue)}</p>
+            <p className={`text-lg font-bold text-primary leading-none ${finBlur} transition-all`}>{fmtBRL(statsValue)}</p>
           </div>
 
           {/* A receber */}
           <div className="bg-white rounded-2xl border border-border px-5 py-4 flex flex-col gap-1">
             <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/60">A receber</p>
-            <p className="text-lg font-bold text-amber-600 leading-none">{fmtBRL(statsReceivable)}</p>
+            <p className={`text-lg font-bold text-amber-600 leading-none ${finBlur} transition-all`}>{fmtBRL(statsReceivable)}</p>
           </div>
         </div>
 
@@ -756,7 +759,7 @@ export default function EventsPage() {
                       <span className="text-xs text-muted-foreground">{ev.event_type || '—'}</span>
                     </td>
                     {/* PREÇO/PAX */}
-                    <td className="px-3 py-2 text-right font-medium text-foreground whitespace-nowrap text-xs">
+                    <td className={`px-3 py-2 text-right font-medium text-foreground whitespace-nowrap text-xs ${finBlur} transition-all`}>
                       {fmtBRL(ev.price_per_person)}
                     </td>
                     {/* CONVIDADOS */}
@@ -910,8 +913,12 @@ export default function EventsPage() {
                       ? `${detailEvent.guest_count} pax${(detailEvent.children_50_pct||0) > 0 ? ` · ${detailEvent.children_50_pct} cri 50%` : ''}${(detailEvent.non_paying_guests||0) > 0 ? ` · ${detailEvent.non_paying_guests} cortesia` : ''}`
                       : '—'
                   } />
-                  <InfoCard icon={DollarSign} label="Preço/pessoa" value={fmtBRL(detailEvent.price_per_person)} />
-                  <InfoCard icon={DollarSign} label="Valor Total" value={fmtBRL(detailEvent.total_value)} accent />
+                  <div className={finBlur}>
+                    <InfoCard icon={DollarSign} label="Preço/pessoa" value={fmtBRL(detailEvent.price_per_person)} />
+                  </div>
+                  <div className={finBlur}>
+                    <InfoCard icon={DollarSign} label="Valor Total" value={fmtBRL(detailEvent.total_value)} accent />
+                  </div>
                 </div>
 
                 {/* Contrato & Pagamento */}
