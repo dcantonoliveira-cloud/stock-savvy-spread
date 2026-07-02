@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -544,7 +545,8 @@ function WhatsAppTemplatesCard({ savedJson, onSave }: {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ConfiguracoesPage() {
-  const [tab,             setTab]           = useState<Tab>('perfil');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) ?? 'empresa');
   const [company,         setCompany]       = useState<Company | null>(null);
   const [profile,         setProfile]       = useState<Profile | null>(null);
   const [integrations,    setIntegrations]  = useState<Integration[]>([]);

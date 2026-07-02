@@ -84,6 +84,7 @@ const navStructure: NavGroup[] = [
     { path: '/holerites',      label: 'Holerites',    icon: FileText },
     { path: '/analysis',       label: 'Análise IA',   icon: Brain },
     { path: '/notifications',  label: 'Notificações', icon: Bell },
+    { path: '/configuracoes',  label: 'Configurações', icon: Settings },
   ]},
 ];
 
