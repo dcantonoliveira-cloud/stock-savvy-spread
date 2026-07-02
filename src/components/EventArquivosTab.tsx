@@ -315,9 +315,20 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     else { setAnnex2(html); autoSave('annex_2_text', html); }
   };
 
+  const ALLOWED_EXT = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv'];
+  const MAX_SIZE_MB = 15;
+
   const handleFileUpload = async (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!ALLOWED_EXT.includes(ext)) {
+      toast.error(`Tipo de arquivo não permitido (.${ext}). Use PDF, imagem ou documento.`);
+      return;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      toast.error(`Arquivo muito grande (máx. ${MAX_SIZE_MB}MB).`);
+      return;
+    }
     setUploading(true);
-    const ext = file.name.split('.').pop();
     const path = `event-docs/${eventId}/${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from('event-files').upload(path, file, { upsert: true });
     if (upErr) { toast.error('Erro no upload'); setUploading(false); return; }

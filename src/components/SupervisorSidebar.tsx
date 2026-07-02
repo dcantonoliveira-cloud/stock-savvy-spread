@@ -60,7 +60,7 @@ const navStructure: NavGroup[] = [
     { path: '/kitchens',       label: 'Centros de Custo', icon: Building2 },
   ]},
 
-  { label: 'Materiais', icon: Warehouse, permKey: 'access_materiais', items: [
+  { label: 'Materiais', icon: Warehouse, permKey: 'access_materials', items: [
     { path: '/materiais',                 label: 'Inventário',      icon: Package },
     { path: '/materiais/emprestimos',     label: 'Por Evento',      icon: ClipboardList },
     { path: '/materiais/lista-base',      label: 'Lista Base',      icon: BookMarked },

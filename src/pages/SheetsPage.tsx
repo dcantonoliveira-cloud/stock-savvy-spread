@@ -150,7 +150,13 @@ export default function SupervisorSheetsPage() {
     resetForm(); setDialogOpen(false); load();
   };
 
-  const handleDelete = async (id: string) => { await supabase.from('technical_sheets').delete().eq('id', id); toast.success('Ficha removida!'); load(); };
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Excluir esta ficha técnica? Esta ação não pode ser desfeita.')) return;
+    const { error } = await supabase.from('technical_sheets').delete().eq('id', id);
+    if (error) { toast.error('Erro ao remover ficha'); return; }
+    toast.success('Ficha removida!');
+    load();
+  };
   const getSheetTotalCost = (sheet: Sheet) => sheet.items.reduce((sum, i) => sum + (i.quantity * i.unit_cost), 0);
   const filteredSheets = sheets.filter(s => { const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()); const matchCat = filterCategory === 'all' || s.category === filterCategory; return matchSearch && matchCat; });
   const handleQuickItemCreated = (newItem: StockItem) => setStockItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));

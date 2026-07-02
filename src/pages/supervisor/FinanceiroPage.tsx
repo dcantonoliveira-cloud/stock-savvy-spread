@@ -44,19 +44,22 @@ export default function FinanceiroPage() {
     const load = async () => {
       setLoading(true);
       const now = new Date();
-      const first = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const mm = (m: number) => String(m + 1).padStart(2, '0');
+      const currentPrefix = `${now.getFullYear()}-${mm(now.getMonth())}`;
+      const sixStartDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      const sixStart = `${sixStartDate.getFullYear()}-${mm(sixStartDate.getMonth())}-01`;
       const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
       const next30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30).toISOString().slice(0, 10);
 
       const [
-        { data: payments },
-        { data: cashEntries },
+        { data: payments6 },
+        { data: cash6 },
         { data: accs },
         { data: epFuture },
         { data: bills },
       ] = await Promise.all([
-        supabase.from('event_payments' as any).select('payment_date, value').gte('payment_date', first).lte('payment_date', last).eq('is_confirmed', true),
-        supabase.from('cash_flow_entries' as any).select('date, amount, category').gte('date', first).lte('date', last),
+        supabase.from('event_payments' as any).select('payment_date, value').gte('payment_date', sixStart).lte('payment_date', last).eq('is_confirmed', true),
+        supabase.from('cash_flow_entries' as any).select('date, amount, category').gte('date', sixStart).lte('date', last),
         supabase.from('bank_accounts' as any).select('id, name, bank_name, balance, color').eq('active', true).order('name'),
         supabase.from('event_payments' as any)
           .select('id, event_id, payment_date, value, events(event_name, clients(name))')
@@ -66,30 +69,43 @@ export default function FinanceiroPage() {
           .neq('status', 'paid').lte('due_date', next30).order('due_date'),
       ]);
 
-      // KPIs
-      const receitaMes = ((payments ?? []) as any[]).reduce((s: number, p: any) => s + p.value, 0)
-        + ((cashEntries ?? []) as any[]).filter((e: any) => e.amount > 0).reduce((s: number, e: any) => s + e.amount, 0);
-      const despesaMes = Math.abs(((cashEntries ?? []) as any[]).filter((e: any) => e.amount < 0).reduce((s: number, e: any) => s + e.amount, 0));
+      const pays = (payments6 ?? []) as any[];
+      const cash = (cash6 ?? []) as any[];
+
+      // KPIs — só o mês atual (filtrado do range de 6 meses)
+      const curPays = pays.filter((p: any) => (p.payment_date ?? '').slice(0, 7) === currentPrefix);
+      const curCash = cash.filter((e: any) => (e.date ?? '').slice(0, 7) === currentPrefix);
+      const receitaMes = curPays.reduce((s: number, p: any) => s + p.value, 0)
+        + curCash.filter((e: any) => e.amount > 0).reduce((s: number, e: any) => s + e.amount, 0);
+      const despesaMes = Math.abs(curCash.filter((e: any) => e.amount < 0).reduce((s: number, e: any) => s + e.amount, 0));
       setReceita(receitaMes);
       setDespesa(despesaMes);
       setSaldoContas(((accs ?? []) as any[]).reduce((s: number, a: any) => s + a.balance, 0));
       setTotalAReceber(((epFuture ?? []) as any[]).reduce((s: number, p: any) => s + p.value, 0));
       setTotalAPagar(((bills ?? []) as any[]).reduce((s: number, b: any) => s + b.amount, 0));
 
-      // Last 6 months chart
+      // Gráfico dos últimos 6 meses — agrega receitas/despesas por mês
       const chart = Array.from({ length: 6 }, (_, i) => {
         const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-        const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        return { label: MONTHS[d.getMonth()], receita: 0, despesa: 0, prefix };
+        return { label: MONTHS[d.getMonth()], receita: 0, despesa: 0, prefix: `${d.getFullYear()}-${mm(d.getMonth())}` };
       });
-      // We only loaded current month, so chart shows only current month data
-      chart[5].receita = receitaMes;
-      chart[5].despesa = despesaMes;
+      const idxByPrefix: Record<string, number> = {};
+      chart.forEach((c, i) => { idxByPrefix[c.prefix] = i; });
+      pays.forEach((p: any) => {
+        const i = idxByPrefix[(p.payment_date ?? '').slice(0, 7)];
+        if (i != null) chart[i].receita += p.value;
+      });
+      cash.forEach((e: any) => {
+        const i = idxByPrefix[(e.date ?? '').slice(0, 7)];
+        if (i == null) return;
+        if (e.amount > 0) chart[i].receita += e.amount;
+        else chart[i].despesa += Math.abs(e.amount);
+      });
       setChartData(chart.map(({ prefix, ...rest }) => rest));
 
-      // Category breakdown
+      // Despesas por categoria — mês atual
       const catMap: Record<string, number> = {};
-      ((cashEntries ?? []) as any[]).filter((e: any) => e.amount < 0).forEach((e: any) => {
+      curCash.filter((e: any) => e.amount < 0).forEach((e: any) => {
         const cat = e.category ?? 'outros';
         catMap[cat] = (catMap[cat] ?? 0) + Math.abs(e.amount);
       });

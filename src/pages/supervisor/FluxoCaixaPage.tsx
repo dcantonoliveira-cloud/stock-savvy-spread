@@ -117,7 +117,9 @@ export default function FluxoCaixaPage() {
   const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1); };
 
   const deleteEntry = async (id: string) => {
-    await supabase.from('cash_flow_entries' as any).delete().eq('id', id);
+    if (!window.confirm('Excluir este lançamento? Esta ação não pode ser desfeita.')) return;
+    const { error } = await supabase.from('cash_flow_entries' as any).delete().eq('id', id);
+    if (error) { toast.error('Erro ao remover lançamento'); return; }
     setEntries(prev => prev.filter(e => e.id !== id));
     toast.success('Lançamento removido');
   };

@@ -328,12 +328,10 @@ export default function EventMenusPage() {
   const extractDishes = async (base64: string, mediaType: string) => {
     setExtracting(true); setExtractedDishes([]); startTimer();
     try {
-      const response = await fetch('https://vfrtvnzptaazhzfirflm.supabase.co/functions/v1/extract-menu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmcnR2bnpwdGFhemh6ZmlyZmxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0Mjg2MjksImV4cCI6MjA4OTAwNDYyOX0.6yyDclMjzfkSUK2c_zUEjtAkhOUWrEotwRbGcQo6tb0` },
-        body: JSON.stringify({ base64, mediaType }),
+      const { data, error: invokeError } = await supabase.functions.invoke('extract-menu', {
+        body: { base64, mediaType },
       });
-      const data = await response.json();
+      if (invokeError) throw invokeError;
       if (data.error) {
         if (data.error === 'parse_failed') {
           console.error('Claude raw response that failed to parse:', data.raw);

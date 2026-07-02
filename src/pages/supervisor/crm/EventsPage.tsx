@@ -320,7 +320,10 @@ export default function EventsPage() {
   };
 
   // ── Form panel (shared for new + edit) ───────────────────────────
-  const FormPanel = () => (
+  // Chamado como função ({renderFormPanel()}) — NÃO como <FormPanel /> — para não
+  // criar um novo componente a cada render (o que remontaria os inputs e faria
+  // o campo perder o foco a cada tecla digitada).
+  const renderFormPanel = () => (
     <div className="flex flex-col gap-5 pb-6">
 
       {/* Cliente */}
@@ -837,7 +840,7 @@ export default function EventsPage() {
           <SheetHeader className="mb-6">
             <SheetTitle className="text-lg font-bold text-foreground">Novo Evento</SheetTitle>
           </SheetHeader>
-          <FormPanel />
+          {renderFormPanel()}
         </SheetContent>
       </Sheet>
 
@@ -961,7 +964,7 @@ export default function EventsPage() {
                 </button>
               </div>
               <div className="px-6">
-                <FormPanel />
+                {renderFormPanel()}
               </div>
             </>
           )}

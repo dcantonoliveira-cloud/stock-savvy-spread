@@ -13,6 +13,9 @@ const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julh
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtNum = (v: number) => v.toLocaleString('pt-BR');
 
+// Mês (0-11) a partir de uma data 'YYYY-MM-DD...' sem sofrer com timezone
+const monthOf = (d: string) => Number(d.slice(5, 7)) - 1;
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface EventRow {
   id: string;
@@ -105,7 +108,7 @@ export default function EstatisticasPage() {
   // Eventos por mês
   const byMonth = useMemo(() => MONTHS.map((m, i) => ({
     name: m,
-    value: completed.filter(e => e.event_date && new Date(e.event_date).getMonth() === i).length,
+    value: completed.filter(e => e.event_date && monthOf(e.event_date) === i).length,
   })), [completed]);
 
   // Tipos de evento %
@@ -127,7 +130,7 @@ export default function EstatisticasPage() {
 
   // Tabela mensal
   const monthlyTable = useMemo(() => MONTHS.map((_, i) => {
-    const mo = events.filter(e => e.event_date && new Date(e.event_date).getMonth() === i);
+    const mo = events.filter(e => e.event_date && monthOf(e.event_date) === i);
     const fechados = mo.filter(e => e.contract_signed || ['confirmed','completed'].includes(e.status));
     const rev = fechados.reduce((s, e) => s + (e.total_value ?? 0), 0);
     return {
@@ -144,8 +147,7 @@ export default function EstatisticasPage() {
     tastings.forEach((t: any) => {
       const d = (t.tasting_sessions as any)?.scheduled_date;
       if (d && d.startsWith(`${year}`)) {
-        const m = new Date(d).getMonth();
-        counts[m]++;
+        counts[monthOf(d)]++;
       }
     });
     return counts;
