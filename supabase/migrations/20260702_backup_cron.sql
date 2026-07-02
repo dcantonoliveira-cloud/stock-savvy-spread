@@ -24,7 +24,7 @@ select cron.schedule(
   '0 3 * * *',
   $$
   select net.http_post(
-    url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/backup-databases',
+    url     := 'https://vfrtvnzptaazhzfirflm.supabase.co/functions/v1/backup-databases',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
       'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
