@@ -5,9 +5,10 @@
 --  e ela mesma decide se hoje bate com a frequência/dia configurados na tela de
 --  Conectores. Assim, mudar a frequência na interface NÃO exige mexer no cron.
 --
---  Antes de rodar, substitua:
---    <PROJECT_REF>        → ref do projeto (ex: abcdefghijklmno) — veja na URL do Supabase
---    <SERVICE_ROLE_KEY>   → a Service Role Key (Project Settings → API)
+--  Já preenchido: URL do projeto (vfrtvnzptaazhzfirflm).
+--  Antes de rodar, substitua SERVICE_ROLE_KEY_AQUI (linha ~30) pela Service Role
+--  Key real (Project Settings → API → service_role). NÃO deixe '<' ou '>' ao
+--  redor do valor — são só marcadores deste comentário, não fazem parte da chave.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Extensões necessárias
@@ -27,7 +28,7 @@ select cron.schedule(
     url     := 'https://vfrtvnzptaazhzfirflm.supabase.co/functions/v1/backup-databases',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
-      'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+      'Authorization', 'Bearer SERVICE_ROLE_KEY_AQUI'
     ),
     body    := '{}'::jsonb
   );
