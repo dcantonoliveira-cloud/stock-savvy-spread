@@ -58,6 +58,50 @@ const CHILD_TABLES: Record<string, { parent: string; fk: string }> = {
   material_base_list:       { parent: 'material_items', fk: 'material_item_id' },
 }
 
+// Colunas de referência (IDs) que ganham uma coluna extra com o nome legível ao
+// lado, para não precisar abrir outra planilha pra saber quem é quem. Se a
+// coluna de exibição não existir na tabela-alvo, a busca falha silenciosamente
+// e o backup segue normal (só aquela referência específica fica sem nome).
+const LOOKUPS: Record<string, { fk: string; refTable: string; refColumn: string; newCol: string }[]> = {
+  events: [
+    { fk: 'client_id',    refTable: 'clients',         refColumn: 'name', newCol: 'cliente_nome' },
+    { fk: 'decorator_id', refTable: 'suppliers',       refColumn: 'name', newCol: 'decorador_nome' },
+    { fk: 'organizer_id', refTable: 'suppliers',       refColumn: 'name', newCol: 'assessor_nome' },
+    { fk: 'product_id',   refTable: 'event_products',  refColumn: 'name', newCol: 'produto_nome' },
+  ],
+  event_payments:           [{ fk: 'event_id', refTable: 'events', refColumn: 'event_name', newCol: 'event_nome' }],
+  event_additional_values:  [{ fk: 'event_id', refTable: 'events', refColumn: 'event_name', newCol: 'event_nome' }],
+  cash_flow_entries:        [{ fk: 'event_id', refTable: 'events', refColumn: 'event_name', newCol: 'event_nome' }],
+  event_field_values: [
+    { fk: 'event_id', refTable: 'events', refColumn: 'event_name', newCol: 'event_nome' },
+    { fk: 'field_id', refTable: 'event_field_definitions', refColumn: 'name', newCol: 'campo_nome' },
+  ],
+  event_menu_dishes: [
+    { fk: 'menu_id',  refTable: 'event_menus',     refColumn: 'name', newCol: 'cardapio_nome' },
+    { fk: 'sheet_id', refTable: 'technical_sheets', refColumn: 'name', newCol: 'prato_nome' },
+  ],
+  event_menu_dish_items: [{ fk: 'item_id', refTable: 'stock_items', refColumn: 'name', newCol: 'item_nome' }],
+  technical_sheet_items: [
+    { fk: 'item_id',  refTable: 'stock_items',      refColumn: 'name', newCol: 'item_nome' },
+    { fk: 'sheet_id', refTable: 'technical_sheets', refColumn: 'name', newCol: 'ficha_nome' },
+    { fk: 'tag_id',   refTable: 'tags',             refColumn: 'name', newCol: 'tag_nome' },
+  ],
+  stock_items:           [{ fk: 'subcategory_id', refTable: 'subcategories',   refColumn: 'name', newCol: 'subcategoria_nome' }],
+  subcategories:         [{ fk: 'category_id',    refTable: 'categories',      refColumn: 'name', newCol: 'categoria_nome' }],
+  stock_item_locations: [
+    { fk: 'item_id',    refTable: 'stock_items', refColumn: 'name', newCol: 'item_nome' },
+    { fk: 'kitchen_id', refTable: 'kitchens',    refColumn: 'name', newCol: 'cozinha_nome' },
+  ],
+  material_base_list:       [{ fk: 'material_item_id', refTable: 'material_items',      refColumn: 'name', newCol: 'item_nome' }],
+  checklist_template_items: [{ fk: 'template_id',      refTable: 'checklist_templates', refColumn: 'name', newCol: 'template_nome' }],
+  credit_card_expenses:     [{ fk: 'credit_card_id',   refTable: 'credit_cards',        refColumn: 'name', newCol: 'cartao_nome' }],
+  bills_payable:            [{ fk: 'bank_account_id',  refTable: 'bank_accounts',       refColumn: 'name', newCol: 'conta_nome' }],
+  bank_transfers: [
+    { fk: 'from_account_id', refTable: 'bank_accounts', refColumn: 'name', newCol: 'conta_origem_nome' },
+    { fk: 'to_account_id',   refTable: 'bank_accounts', refColumn: 'name', newCol: 'conta_destino_nome' },
+  ],
+}
+
 interface BackupConfig {
   delivery: 'drive' | 'email'
   frequency: 'weekly' | 'monthly'
@@ -173,12 +217,14 @@ async function runBackupForCompany(
   try {
     // ── Exporta cada tabela em CSV, já filtrada pela empresa ─────────────────
     const parentIdCache: Record<string, string[]> = {}
+    const lookupCache: Record<string, Record<string, string>> = {}
     const csvFiles: { name: string; content: string }[] = []
     const report: { table: string; rows: number; ok: boolean; error?: string }[] = []
 
     for (const table of ALL_TABLES) {
       try {
         const rows = await fetchScoped(supabase, table, integ.company_id, parentIdCache)
+        await enrichRows(supabase, table, rows, lookupCache)
         csvFiles.push({ name: `${table}.csv`, content: toCSV(rows) })
         report.push({ table, rows: rows.length, ok: true })
       } catch (e) {
@@ -268,6 +314,47 @@ async function fetchScoped(
     all.push(...rows)
   }
   return all
+}
+
+// ─── Adiciona colunas com o nome legível ao lado de cada ID referenciado ──────
+// (ex: client_id vira também cliente_nome). Falhas são ignoradas silenciosamente
+// por mapeamento — se a coluna de exibição não existir, só aquela referência
+// fica sem nome; o resto do backup não é afetado.
+async function enrichRows(
+  supabase: SupaClient, table: string, rows: Record<string, unknown>[],
+  lookupCache: Record<string, Record<string, string>>,
+) {
+  const mappings = LOOKUPS[table]
+  if (!mappings || rows.length === 0) return
+
+  for (const m of mappings) {
+    const cacheKey = `${m.refTable}:${m.refColumn}`
+    if (!lookupCache[cacheKey]) lookupCache[cacheKey] = {}
+    const cache = lookupCache[cacheKey]
+
+    const idsNeeded = Array.from(new Set(
+      rows.map(r => r[m.fk] as string | null).filter((v): v is string => !!v && !(v in cache))
+    ))
+
+    if (idsNeeded.length > 0) {
+      try {
+        const CHUNK = 150
+        for (let i = 0; i < idsNeeded.length; i += CHUNK) {
+          const slice = idsNeeded.slice(i, i + CHUNK)
+          const { data, error } = await supabase.from(m.refTable).select(`id, ${m.refColumn}`).in('id', slice)
+          if (error) throw error
+          for (const row of (data ?? []) as any[]) cache[row.id] = row[m.refColumn]
+        }
+      } catch {
+        continue // mapeamento indisponível para essa referência — segue sem quebrar
+      }
+    }
+
+    for (const row of rows) {
+      const fkVal = row[m.fk] as string | null
+      row[m.newCol] = fkVal ? (cache[fkVal] ?? null) : null
+    }
+  }
 }
 
 // ─── Supabase: busca paginada (contorna limite de 1000 linhas) ───────────────
