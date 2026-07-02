@@ -112,11 +112,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let currentUserId: string | null = null;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        currentUserId = session.user.id;
         setUser(session.user);
         setTimeout(() => fetchUserData(session.user.id), 0);
       } else {
+        currentUserId = null;
         setUser(null);
         setRole(null);
         setProfile(null);
@@ -126,13 +130,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        currentUserId = session.user.id;
         setUser(session.user);
         fetchUserData(session.user.id);
       }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Atualiza permissões em tempo real quando o admin salvar mudanças
+    const permChannel = supabase
+      .channel('permissions-watch')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'employee_permissions',
+      }, (payload: any) => {
+        const changedUserId = payload.new?.user_id ?? payload.old?.user_id;
+        if (currentUserId && changedUserId === currentUserId) {
+          fetchUserData(currentUserId);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(permChannel);
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
