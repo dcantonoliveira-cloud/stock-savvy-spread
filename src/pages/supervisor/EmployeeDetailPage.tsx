@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, Mail, MapPin, Briefcase,
   FileText, Edit2, Save, X, Loader2,
-  Eye, Download, Plus, ShieldCheck,
+  Eye, Download, Plus, ShieldCheck, Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -126,6 +126,8 @@ export default function EmployeeDetailPage() {
   const [empPerms, setEmpPerms] = useState<EmpPermissions>(DEFAULT_PERMS);
   const [savingPerms, setSavingPerms] = useState(false);
   const [savingRole, setSavingRole] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -170,6 +172,22 @@ export default function EmployeeDetailPage() {
       });
     }
     setLoading(false);
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    // Remove permissões e role antes de deletar o usuário via admin API
+    await supabase.from('employee_permissions').delete().eq('user_id', id!);
+    await supabase.from('user_roles').delete().eq('user_id', id!);
+    const { error } = await (supabase.functions as any).invoke('delete-user', { body: { user_id: id } });
+    if (error) {
+      // Fallback: se não tiver edge function, só remove os dados locais
+      toast.success('Dados do funcionário removidos. Conta de auth requer remoção manual no Supabase.');
+    } else {
+      toast.success('Funcionário excluído com sucesso');
+    }
+    setDeleting(false);
+    navigate('/users');
   };
 
   const handleChangeRole = async (newRole: 'supervisor' | 'employee') => {
@@ -305,6 +323,13 @@ export default function EmployeeDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {myPerms.is_admin && !editing && (
+            <button onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-2 px-3 py-2 border border-red-200 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" />
+              Excluir
+            </button>
+          )}
           {!editing ? (
             <button onClick={() => setEditing(true)}
               className="flex items-center gap-2 px-3 py-2 border border-border rounded-xl text-sm text-muted-foreground hover:bg-muted transition-colors">
@@ -536,6 +561,37 @@ export default function EmployeeDetailPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmação de exclusão */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl mx-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Excluir funcionário</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-5">
+              Tem certeza que deseja excluir <strong>{profile.display_name}</strong>? Todas as permissões e dados vinculados serão removidos.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDelete(false)} disabled={deleting}
+                className="flex-1 px-4 py-2 border border-border rounded-xl text-sm text-muted-foreground hover:bg-muted transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Excluir
+              </button>
+            </div>
           </div>
         </div>
       )}
