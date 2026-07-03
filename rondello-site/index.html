@@ -443,7 +443,6 @@
 <!-- Google Places API (nova versão 2025) -->
 <script>
 (function(){
-  var MAPS_KEY = 'AIzaSyBcnc3Pqk7xHw1i-KhATVD8xn-K5TRlHhc';
   var PLACE_ID = 'ChIJP5r7TQBgz5QRfINNxWhBAoc';
 
   window._grInit = async function(){
@@ -544,7 +543,7 @@
   };
 
   var s = document.createElement('script');
-  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + MAPS_KEY +
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=' + window._gmk +
           '&loading=async&callback=_grInit&language=pt-BR';
   s.async = true; s.defer = true;
   document.head.appendChild(s);

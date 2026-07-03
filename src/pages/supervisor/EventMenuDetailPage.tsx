@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import DOMPurify from 'dompurify';
 import html2canvas from 'html2canvas';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -1240,7 +1241,7 @@ export default function EventMenuDetailPage() {
 
     const container = document.createElement('div');
     container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;padding:24px;font-family:Arial,sans-serif;width:640px;color:#111;';
-    container.innerHTML = `
+    container.innerHTML = DOMPurify.sanitize(`
       <div style="margin-bottom:16px;border-bottom:2px solid #e5dcc8;padding-bottom:12px;">
         <div style="font-size:20px;font-weight:bold;color:#111;">${supplierName}</div>
       </div>
@@ -1275,7 +1276,7 @@ export default function EventMenuDetailPage() {
         </tfoot>
       </table>
       <div style="margin-top:10px;font-size:10px;color:#bbb;text-align:right;">Gerado em ${now}</div>
-    `;
+    `, { FORCE_BODY: true });
 
     document.body.appendChild(container);
 

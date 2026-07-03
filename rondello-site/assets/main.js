@@ -1,6 +1,7 @@
 /* ============================================================
    RONDELLO BUFFET — Interações
    ============================================================ */
+window._gmk = 'AIzaSyBcnc3Pqk7xHw1i-KhATVD8xn-K5TRlHhc';
 (function(){
   'use strict';
 
