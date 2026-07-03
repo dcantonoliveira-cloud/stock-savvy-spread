@@ -372,7 +372,7 @@ async function syncTastings(eventIdMap) {
   console.log(`  Bubble: ${raw.length} sessões`);
 
   if (DRY) {
-    let totalEventos = 0, totalConfirmados = 0, totalSemMatch = 0;
+    let totalEventos = 0, totalConfirmados = 0, totalSemMatch = 0, semNome = 0;
     for (const s of raw) {
       const evs = Array.isArray(s.eventos) ? s.eventos : [];
       const conf = new Set(Array.isArray(s.eventosConfirmados) ? s.eventosConfirmados : []);
@@ -381,19 +381,13 @@ async function syncTastings(eventIdMap) {
       totalSemMatch += evs.filter(id => !eventIdMap[id]).length;
     }
     const totalNovos = totalEventos - totalConfirmados;
-    console.log(`  [DRY-RUN] Vai RECRIAR todas as ${raw.length} sessões`);
+    console.log(`  [DRY-RUN] Vai UPSERT ${raw.length} sessões por bubble_id`);
     console.log(`  Total vínculos: ${totalEventos} (${totalConfirmados} confirmados + ${totalNovos} novos/leads)`);
     console.log(`  IDs sem match no Supabase: ${totalSemMatch}`);
-    console.log('  ⚠  Degustações serão DELETADAS e recriadas do zero');
     const s = raw[0];
-    if (s) console.log('  Amostra:', JSON.stringify({ date: s.data, tipo: s.TipoDeg, eventos: s.eventos?.length ?? 0, leads: s.leads?.length ?? 0 }, null, 2));
+    if (s) console.log('  Amostra:', JSON.stringify({ bubble_id: s._id, date: s.data, tipo: s.TipoDeg, eventos: s.eventos?.length ?? 0 }, null, 2));
     return;
   }
-
-  // Deleta existentes
-  console.log('  Deletando sessões existentes...');
-  await supabase.from('tasting_session_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  await supabase.from('tasting_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
   const TIPO_MAP = {
     '1684957812120x867236156745106200': 'Jantar',
@@ -408,23 +402,26 @@ async function syncTastings(eventIdMap) {
 
     const tipo = str(s.TipoDeg) ?? TIPO_MAP[s.tipo_degust] ?? null;
 
+    // UPSERT por bubble_id — seguro para rodar múltiplas vezes
     const { data: sess, error: sErr } = await supabase
       .from('tasting_sessions')
-      .insert({
+      .upsert({
+        bubble_id:      s._id,
         scheduled_date: date,
         type:           tipo,
         max_couples:    num(s['Limite de casais']) ?? 4,
         menu_text:      str(s['Cardápio']),
         notes:          str(s['Observações']),
         created_at:     isoTs(s['Created Date']) ?? new Date().toISOString(),
-      })
+      }, { onConflict: 'bubble_id' })
       .select('id').single();
 
     if (sErr) { errors.push(`sessão ${date}: ${sErr.message}`); continue; }
     sessOk++;
 
-    // `eventos` = TODOS os eventos da sessão (leads + confirmados)
-    // `eventosConfirmados` = subconjunto já fechado/confirmado
+    // Apaga vínculos antigos desta sessão e recria (evita duplicatas de eventos)
+    await supabase.from('tasting_session_events').delete().eq('session_id', sess.id);
+
     const confirmadosSet = new Set(Array.isArray(s.eventosConfirmados) ? s.eventosConfirmados : []);
 
     for (const bubbleId of (Array.isArray(s.eventos) ? s.eventos : [])) {
