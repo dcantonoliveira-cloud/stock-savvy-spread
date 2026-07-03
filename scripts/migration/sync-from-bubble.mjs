@@ -322,7 +322,7 @@ async function syncPayments(eventIdMap) {
       value:        num(p.Valor) ?? 0,
       payment_date: dateOnly(p.data),
       is_confirmed: bool(p.conferido),
-      payment_type: 'outros',
+      payment_type: bool(p.deg) ? 'tasting' : 'outros',
     }, { onConflict: 'bubble_id', ignoreDuplicates: false });
 
     if (error) { console.error(`  ✗ pagamento ${p._id}:`, error.message); errors++; }

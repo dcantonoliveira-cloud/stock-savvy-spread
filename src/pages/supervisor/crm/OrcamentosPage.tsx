@@ -56,7 +56,7 @@ export default function OrcamentosPage() {
     const { data, error } = await supabase
       .from('events')
       .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, clients(name)')
-      .in('status', [...PIPELINE_STATUSES, 'cancelled', 'lost'])
+      .in('status', [...PIPELINE_STATUSES, 'cancelled'])
       .not('event_name', 'is', null)
       .neq('event_name', '')
       .order('created_at', { ascending: false });
