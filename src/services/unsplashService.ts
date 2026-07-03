@@ -1,4 +1,4 @@
-const UNSPLASH_ACCESS_KEY = 'qEiGWxUlJ2Snayis0Pz1NnCI9HiQoYOCNN7mu7XBiHo';
+const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY ?? '';
 const UNSPLASH_API = 'https://api.unsplash.com';
 
 const imageCache: Record<string, string> = {};
