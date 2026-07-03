@@ -153,13 +153,17 @@ async function syncClients() {
   for (const c of existing ?? []) if (c.bubble_id) existMap[c.bubble_id] = c.id;
   console.log(`  Supabase: ${Object.keys(existMap).length} com bubble_id`);
 
+  // Mapa bubble_client_id → nome (para fallback em eventos sem NomeDoEvento)
+  const nameMap = {};
+  for (const c of raw) if (c._id && c.NomeDoCliente) nameMap[c._id] = str(c.NomeDoCliente);
+
   if (DRY) {
     const novos = raw.filter(c => !existMap[c._id]).length;
     const atualizar = raw.filter(c => existMap[c._id]).length;
     console.log(`  [DRY-RUN] ${novos} novos para inserir, ${atualizar} para atualizar`);
     const sample = raw.find(c => !existMap[c._id]) || raw[0];
     if (sample) console.log('  Amostra:', JSON.stringify({ bubble_id: sample._id, name: sample.NomeDoCliente, phone: sample.Telefone }, null, 2));
-    return existMap;
+    return { idMap: existMap, nameMap };
   }
 
   let inserted = 0, updated = 0, errors = 0;
@@ -194,11 +198,11 @@ async function syncClients() {
   }
 
   console.log(`  ✅ ${inserted} inseridos | ${updated} atualizados | ${errors} erros`);
-  return idMap;
+  return { idMap, nameMap };
 }
 
 // ─── 2. EVENTOS ────────────────────────────────────────────────────────────────
-async function syncEvents(clientIdMap) {
+async function syncEvents(clientIdMap, clientNameMap) {
   console.log('\n━━━ 2/5  EVENTOS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   const raw = await fetchAll('eventos');
@@ -250,11 +254,13 @@ async function syncEvents(clientIdMap) {
     const clientId = clientIdMap[ev.Cliente] ?? null;
     const contractDate = dateOnly(ev.dataQueFechouContrato);
 
-    const bubbleName = str(ev.NomeDoEvento);
+    const bubbleName = str(ev.NomeDoEvento)
+      ?? str(ev['Nome do Evento'])
+      ?? str(ev.nomeDoEvento)
+      ?? (ev.Cliente ? (clientNameMap[ev.Cliente] ?? null) : null);
 
-    if (DEBUG && bubbleName === null) {
-      // Mostra todos os campos do registro para identificar o campo correto
-      console.log(`\n  [DEBUG] Evento sem nome (_id: ${ev._id}):`);
+    if (DEBUG && !str(ev.NomeDoEvento)) {
+      console.log(`\n  [DEBUG] Evento sem NomeDoEvento (_id: ${ev._id}), usando: "${bubbleName ?? 'null'}":`);
       for (const [k, v] of Object.entries(ev)) {
         if (v !== null && v !== undefined && v !== '') console.log(`    ${k}: ${JSON.stringify(v)}`);
       }
@@ -262,7 +268,7 @@ async function syncEvents(clientIdMap) {
 
     const record = {
       client_id:              clientId,
-      // só atualiza event_name se Bubble tiver um valor; preserva o nome existente no Supabase
+      // só atualiza event_name se tiver um valor (de qualquer fonte)
       ...(bubbleName !== null ? { event_name: bubbleName } : {}),
       event_type:             str(ev.Tipo_Do_Evento),
       status:                 mapStatus(ev.status),
@@ -472,8 +478,8 @@ async function main() {
   }
 
   try {
-    const clientIdMap = await syncClients();
-    const eventIdMap  = await syncEvents(clientIdMap);
+    const { idMap: clientIdMap, nameMap: clientNameMap } = await syncClients();
+    const eventIdMap  = await syncEvents(clientIdMap, clientNameMap);
     await syncPayments(eventIdMap);
     await syncAdditionals(eventIdMap);
     await syncTastings(eventIdMap);
