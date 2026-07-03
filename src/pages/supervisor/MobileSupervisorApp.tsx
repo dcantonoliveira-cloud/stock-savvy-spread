@@ -338,10 +338,10 @@ function EventsScreen({ events, loading }: { events: Event[]; loading: boolean }
 
         {/* Month pills */}
         {months.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+          <div className="flex flex-wrap gap-2">
             {months.map(m => (
               <button key={m} onClick={() => setMonth(m)}
-                className={`flex-shrink-0 flex flex-col items-center px-4 py-2 rounded-2xl border text-sm font-bold transition-all ${month === m ? 'text-white border-transparent' : 'bg-white border-border text-muted-foreground'}`}
+                className={`flex flex-col items-center px-4 py-2 rounded-2xl border text-sm font-bold transition-all ${month === m ? 'text-white border-transparent' : 'bg-white border-border text-muted-foreground'}`}
                 style={month === m ? { background: 'hsl(222 35% 18%)' } : {}}>
                 <span className="text-[10px] uppercase tracking-wide">{MONTH_SHORT[Number(m) - 1]}</span>
                 <span className="text-lg leading-tight">{monthCounts[m]}</span>
@@ -457,10 +457,10 @@ function QuotesScreen({ events, loading }: { events: Event[]; loading: boolean }
         </div>
 
         {/* Filter pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+        <div className="flex flex-wrap gap-2">
           {QUOTE_FILTERS.filter(f => f.key === 'all' || counts[f.key]).map(f => (
             <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-semibold border transition-all ${filter === f.key ? 'text-white border-transparent' : 'bg-white border-border text-muted-foreground'}`}
+              className={`px-4 py-2 rounded-2xl text-sm font-semibold border transition-all ${filter === f.key ? 'text-white border-transparent' : 'bg-white border-border text-muted-foreground'}`}
               style={filter === f.key ? { background: 'hsl(222 35% 18%)' } : {}}>
               {f.label}{f.key !== 'all' && counts[f.key] ? ` ${counts[f.key]}` : ''}
             </button>
