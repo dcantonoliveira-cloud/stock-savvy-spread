@@ -389,7 +389,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
     <tr className={`hover:bg-slate-50 transition-colors ${isLast ? '' : 'border-b border-border/50'}`}>
       <Td>
         <div className="flex items-center gap-1.5">
-          <span className="font-medium text-foreground">{ev?.event_name ?? (ev as any)?.clients?.name ?? '—'}</span>
+          <span className="font-medium text-foreground">{ev?.event_name ?? '—'}</span>
           <button onClick={onNavigate} className="text-muted-foreground/40 hover:text-primary transition-colors shrink-0">
             <ExternalLink className="w-3 h-3" />
           </button>
