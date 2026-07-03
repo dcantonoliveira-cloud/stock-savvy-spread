@@ -166,7 +166,7 @@ async function syncClients() {
 
   for (const c of raw) {
     const record = {
-      name:      str(c.NomeDoCliente),
+      name:      str(c.NomeDoCliente) ?? '(sem nome)',
       phone:     str(c.Telefone),
       email:     str(c.email),
       cpf:       str(c.CPF),
@@ -301,49 +301,33 @@ async function syncPayments(eventIdMap) {
   const raw = await fetchAll('Pagamentos');
   console.log(`  Bubble: ${raw.length} pagamentos`);
 
-  const { data: existing } = await supabase.from('event_payments').select('bubble_id').not('bubble_id', 'is', null);
-  const existingIds = new Set((existing ?? []).map(p => p.bubble_id));
-  console.log(`  Supabase: ${existingIds.size} já migrados`);
-
-  const novos = raw.filter(p => !existingIds.has(p._id));
-  console.log(`  Novos para inserir: ${novos.length}`);
-
   if (DRY) {
-    console.log('  [DRY-RUN] Nenhuma alteração em pagamentos existentes (seguro)');
-    if (novos.length) {
-      const s = novos[0];
-      console.log('  Amostra pagamento novo:', JSON.stringify({
-        bubble_id: s._id,
-        value: s.Valor,
-        date: s.data,
-        confirmed: s.conferido,
-        event_bubble_id: s.evento,
-      }, null, 2));
-    }
+    console.log(`  [DRY-RUN] UPSERT por bubble_id — ${raw.length} pagamentos do Bubble`);
+    const sample = raw.find(p => p.evento) || raw[0];
+    if (sample) console.log('  Amostra:', JSON.stringify({ bubble_id: sample._id, value: sample.Valor, confirmed: sample.conferido }, null, 2));
     return;
   }
 
-  let inserted = 0, noEvent = 0, errors = 0;
+  let upserted = 0, noEvent = 0, errors = 0;
 
-  for (const p of novos) {
+  for (const p of raw) {
     const eventId = eventIdMap[p.evento];
     if (!eventId) { noEvent++; continue; }
 
-    const { error } = await supabase.from('event_payments').insert({
+    const { error } = await supabase.from('event_payments').upsert({
       event_id:     eventId,
       bubble_id:    p._id,
       value:        num(p.Valor) ?? 0,
       payment_date: dateOnly(p.data),
       is_confirmed: bool(p.conferido),
       payment_type: 'outros',
-      notes:        null,
-    });
+    }, { onConflict: 'bubble_id', ignoreDuplicates: false });
 
     if (error) { console.error(`  ✗ pagamento ${p._id}:`, error.message); errors++; }
-    else inserted++;
+    else upserted++;
   }
 
-  console.log(`  ✅ ${inserted} inseridos | ${noEvent} sem evento | ${errors} erros`);
+  console.log(`  ✅ ${upserted} upserted | ${noEvent} sem evento | ${errors} erros`);
 }
 
 // ─── 4. VALORES ADICIONAIS ─────────────────────────────────────────────────────
@@ -353,36 +337,29 @@ async function syncAdditionals(eventIdMap) {
   const raw = await fetchAll('ValoresAdicionaisEventos');
   console.log(`  Bubble: ${raw.length} adicionais`);
 
-  const { data: existing } = await supabase.from('event_additional_values').select('bubble_id').not('bubble_id', 'is', null);
-  const existingIds = new Set((existing ?? []).map(v => v.bubble_id));
-  console.log(`  Supabase: ${existingIds.size} já migrados`);
-
-  const novos = raw.filter(v => !existingIds.has(v._id));
-  console.log(`  Novos para inserir: ${novos.length}`);
-
   if (DRY) {
-    console.log('  [DRY-RUN] Não altera adicionais existentes');
+    console.log(`  [DRY-RUN] UPSERT por bubble_id — ${raw.length} adicionais do Bubble`);
     return;
   }
 
-  let inserted = 0, noEvent = 0, errors = 0;
+  let upserted = 0, noEvent = 0, errors = 0;
 
-  for (const item of novos) {
+  for (const item of raw) {
     const eventId = eventIdMap[item.evento];
     if (!eventId) { noEvent++; continue; }
 
-    const { error } = await supabase.from('event_additional_values').insert({
+    const { error } = await supabase.from('event_additional_values').upsert({
       event_id:    eventId,
       bubble_id:   item._id,
       description: str(item['Descrição']) ?? 'Valor adicional',
       value:       num(item.valor) ?? 0,
-    });
+    }, { onConflict: 'bubble_id', ignoreDuplicates: false });
 
     if (error) { console.error(`  ✗ adicional ${item._id}:`, error.message); errors++; }
-    else inserted++;
+    else upserted++;
   }
 
-  console.log(`  ✅ ${inserted} inseridos | ${noEvent} sem evento | ${errors} erros`);
+  console.log(`  ✅ ${upserted} upserted | ${noEvent} sem evento | ${errors} erros`);
 }
 
 // ─── 5. DEGUSTAÇÕES ────────────────────────────────────────────────────────────
