@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Plus, ChevronDown, Info, Trash2 } from 'lucide-react';
+import { Search, Plus, ChevronDown, Info, Trash2, ChevronsUpDown, ChevronUp } from 'lucide-react';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 interface Orcamento {
@@ -50,6 +50,13 @@ export default function OrcamentosPage() {
   const [filter, setFilter]   = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'orcamentos' | 'gerador'>('orcamentos');
   const [showGerador, setShowGerador] = useState(false);
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = (col: string) => {
+    if (sortCol === col) setSortAsc(a => !a);
+    else { setSortCol(col); setSortAsc(true); }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -112,8 +119,26 @@ export default function OrcamentosPage() {
         (r.organizer ?? '').toLowerCase().includes(q),
       );
     }
+    if (sortCol) {
+      list = [...list].sort((a, b) => {
+        let va: string | number = '';
+        let vb: string | number = '';
+        if (sortCol === 'event_name')  { va = a.event_name ?? ''; vb = b.event_name ?? ''; }
+        if (sortCol === 'location')    { va = a.location_text ?? ''; vb = b.location_text ?? ''; }
+        if (sortCol === 'organizer')   { va = a.organizer ?? ''; vb = b.organizer ?? ''; }
+        if (sortCol === 'event_date')  { va = a.event_date ?? ''; vb = b.event_date ?? ''; }
+        if (sortCol === 'em_aberto')   {
+          va = a.created_at ? Math.floor((Date.now() - new Date(a.created_at).getTime()) / 86_400_000) : -1;
+          vb = b.created_at ? Math.floor((Date.now() - new Date(b.created_at).getTime()) / 86_400_000) : -1;
+        }
+        if (sortCol === 'status')      { va = a.status; vb = b.status; }
+        if (va < vb) return sortAsc ? -1 : 1;
+        if (va > vb) return sortAsc ? 1 : -1;
+        return 0;
+      });
+    }
     return list;
-  }, [rows, filter, search]);
+  }, [rows, filter, search, sortCol, sortAsc]);
 
   const countFor = (s: string) => {
     if (s === 'all')      return rows.filter(r => PIPELINE_STATUSES.includes(r.status) && !isExpired(r)).length;
@@ -219,12 +244,12 @@ export default function OrcamentosPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              <Th>Evento</Th>
-              <Th>Local</Th>
-              <Th>Assessoria</Th>
-              <Th>Data do evento</Th>
-              <Th>Em aberto</Th>
-              <Th>Status</Th>
+              <Th col="event_name"  sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Evento</Th>
+              <Th col="location"    sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Local</Th>
+              <Th col="organizer"   sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Assessoria</Th>
+              <Th col="event_date"  sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Data do evento</Th>
+              <Th col="em_aberto"   sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Em aberto</Th>
+              <Th col="status"      sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Status</Th>
               <Th></Th>
             </tr>
           </thead>
@@ -316,10 +341,27 @@ export default function OrcamentosPage() {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
-function Th({ children }: { children?: React.ReactNode }) {
+function Th({ children, col, sortCol, sortAsc, onSort }: {
+  children?: React.ReactNode;
+  col?: string;
+  sortCol?: string | null;
+  sortAsc?: boolean;
+  onSort?: (col: string) => void;
+}) {
+  const active = col && sortCol === col;
   return (
-    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap">
-      {children}
+    <th
+      className={`px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest whitespace-nowrap select-none ${col ? 'cursor-pointer' : ''} ${active ? 'text-primary' : 'text-muted-foreground/60'}`}
+      onClick={() => col && onSort?.(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {col && (
+          active
+            ? <ChevronUp className={`w-3 h-3 transition-transform ${sortAsc ? '' : 'rotate-180'}`} />
+            : <ChevronsUpDown className="w-3 h-3 opacity-30" />
+        )}
+      </span>
     </th>
   );
 }
