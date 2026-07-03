@@ -44,8 +44,8 @@ function fmtFull(d: string) {
   return `${dt.getDate().toString().padStart(2,'0')} de ${MONTH_FULL_PT[dt.getMonth()].toLowerCase()} de ${dt.getFullYear()}`;
 }
 
-const CONFIRMED_STATUS = ['confirmado'];
-const OPEN_STATUS = ['1contato', 'negociando', 'reservado'];
+const CONFIRMED_STATUS = ['confirmed', 'completed'];
+const OPEN_STATUS = ['lead', 'negotiating', 'tasting_scheduled'];
 const TASTING_OPEN = ['agendado', 'confirmado'];
 
 // ─── Bottom Nav ───────────────────────────────────────────────────────────────
@@ -253,13 +253,13 @@ function HomeScreen({
 
 // ─── Events Screen ────────────────────────────────────────────────────────────
 function EventsScreen({ events, loading }: { events: Event[]; loading: boolean }) {
-  const confirmed = events
+  const allConfirmed = events
     .filter(e => e.event_date && CONFIRMED_STATUS.includes(e.status))
     .sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''));
 
   const today = new Date().toISOString().slice(0, 10);
-  const upcoming = confirmed.filter(e => (e.event_date ?? '') >= today);
-  const past     = confirmed.filter(e => (e.event_date ?? '') < today).reverse();
+  const upcoming = allConfirmed.filter(e => (e.event_date ?? '') >= today);
+  const past     = allConfirmed.filter(e => (e.event_date ?? '') < today).reverse();
 
   return (
     <div className="flex-1 overflow-y-auto pb-24 p-4 space-y-4">
@@ -277,7 +277,7 @@ function EventsScreen({ events, loading }: { events: Event[]; loading: boolean }
           {past.length > 0 && (
             <Section title="Realizados" items={past} muted />
           )}
-          {confirmed.length === 0 && (
+          {allConfirmed.length === 0 && (
             <p className="text-center text-muted-foreground py-12 text-sm">Nenhum evento confirmado</p>
           )}
         </>
@@ -310,14 +310,14 @@ function Section({ title, items, muted }: { title: string; items: Event[]; muted
 
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
 const STATUS_LABEL: Record<string, string> = {
-  '1contato': '1° Contato',
-  negociando: 'Negociando',
-  reservado: 'Reservado',
+  lead:              '1º Contato',
+  negotiating:       'Negociando',
+  tasting_scheduled: 'Degustação',
 };
 const STATUS_COLOR: Record<string, string> = {
-  '1contato': 'bg-amber-100 text-amber-700',
-  negociando: 'bg-amber-200 text-amber-800',
-  reservado:  'bg-blue-100 text-blue-700',
+  lead:              'bg-sky-100 text-sky-700',
+  negotiating:       'bg-amber-100 text-amber-800',
+  tasting_scheduled: 'bg-purple-100 text-purple-700',
 };
 
 function QuotesScreen({ quotes, loading }: { quotes: Event[]; loading: boolean }) {
