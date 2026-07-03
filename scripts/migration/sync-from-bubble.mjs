@@ -249,9 +249,11 @@ async function syncEvents(clientIdMap) {
     const clientId = clientIdMap[ev.Cliente] ?? null;
     const contractDate = dateOnly(ev.dataQueFechouContrato);
 
+    const bubbleName = str(ev.NomeDoEvento);
     const record = {
       client_id:              clientId,
-      event_name:             str(ev.NomeDoEvento),
+      // só atualiza event_name se Bubble tiver um valor; preserva o nome existente no Supabase
+      ...(bubbleName !== null ? { event_name: bubbleName } : {}),
       event_type:             str(ev.Tipo_Do_Evento),
       status:                 mapStatus(ev.status),
       event_date:             dateOnly(ev.dataDoEvento),
@@ -370,20 +372,18 @@ async function syncTastings(eventIdMap) {
   console.log(`  Bubble: ${raw.length} sessões`);
 
   if (DRY) {
-    // Conta casais vinculados
-    let totalEventos = 0, totalLeads = 0;
+    let totalEventos = 0, totalConfirmados = 0, totalSemMatch = 0;
     for (const s of raw) {
-      totalEventos += (Array.isArray(s.eventos) ? s.eventos : []).length;
-      totalLeads   += (Array.isArray(s.leads)   ? s.leads   : []).length;
+      const evs = Array.isArray(s.eventos) ? s.eventos : [];
+      const conf = new Set(Array.isArray(s.eventosConfirmados) ? s.eventosConfirmados : []);
+      totalEventos += evs.length;
+      totalConfirmados += evs.filter(id => conf.has(id)).length;
+      totalSemMatch += evs.filter(id => !eventIdMap[id]).length;
     }
-    const semMatch = raw.flatMap(s => [
-      ...(Array.isArray(s.eventos) ? s.eventos : []),
-      ...(Array.isArray(s.leads)   ? s.leads   : []),
-    ]).filter(id => !eventIdMap[id]).length;
-
+    const totalNovos = totalEventos - totalConfirmados;
     console.log(`  [DRY-RUN] Vai RECRIAR todas as ${raw.length} sessões`);
-    console.log(`  Total de vínculos: ${totalEventos + totalLeads} (${totalEventos} fechados + ${totalLeads} leads)`);
-    console.log(`  IDs sem match no Supabase: ${semMatch}`);
+    console.log(`  Total vínculos: ${totalEventos} (${totalConfirmados} confirmados + ${totalNovos} novos/leads)`);
+    console.log(`  IDs sem match no Supabase: ${totalSemMatch}`);
     console.log('  ⚠  Degustações serão DELETADAS e recriadas do zero');
     const s = raw[0];
     if (s) console.log('  Amostra:', JSON.stringify({ date: s.data, tipo: s.TipoDeg, eventos: s.eventos?.length ?? 0, leads: s.leads?.length ?? 0 }, null, 2));
@@ -423,33 +423,22 @@ async function syncTastings(eventIdMap) {
     if (sErr) { errors.push(`sessão ${date}: ${sErr.message}`); continue; }
     sessOk++;
 
-    // Eventos fechados (confirmed)
+    // `eventos` = TODOS os eventos da sessão (leads + confirmados)
+    // `eventosConfirmados` = subconjunto já fechado/confirmado
+    const confirmadosSet = new Set(Array.isArray(s.eventosConfirmados) ? s.eventosConfirmados : []);
+
     for (const bubbleId of (Array.isArray(s.eventos) ? s.eventos : [])) {
       const eventId = eventIdMap[bubbleId];
       if (!eventId) { evtSkip++; continue; }
+      const snap = confirmadosSet.has(bubbleId) ? 'confirmed' : 'new';
       const { error } = await supabase.from('tasting_session_events').insert({
         session_id: sess.id,
         event_id:   eventId,
-        situation_snapshot: 'confirmed',
+        situation_snapshot: snap,
         is_second_tasting:  false,
         created_at: isoTs(s['Created Date']) ?? new Date().toISOString(),
       });
-      if (error) errors.push(`evt ${bubbleId}: ${error.message}`);
-      else evtOk++;
-    }
-
-    // Leads/negociação (new)
-    for (const bubbleId of (Array.isArray(s.leads) ? s.leads : [])) {
-      const eventId = eventIdMap[bubbleId];
-      if (!eventId) { evtSkip++; continue; }
-      const { error } = await supabase.from('tasting_session_events').insert({
-        session_id: sess.id,
-        event_id:   eventId,
-        situation_snapshot: 'new',
-        is_second_tasting:  false,
-        created_at: isoTs(s['Created Date']) ?? new Date().toISOString(),
-      });
-      if (error) errors.push(`lead ${bubbleId}: ${error.message}`);
+      if (error) errors.push(`evt ${bubbleId} (${snap}): ${error.message}`);
       else evtOk++;
     }
   }
