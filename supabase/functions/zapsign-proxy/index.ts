@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,15 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json' } });
+
+    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) return new Response(JSON.stringify({ error: 'Sessão inválida' }), { status: 401, headers: { ...CORS, 'Content-Type': 'application/json' } });
+
     const token = req.headers.get('x-zapsign-token');
     if (!token) return new Response(JSON.stringify({ error: 'Missing ZapSign token' }), { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } });
 

@@ -10,18 +10,30 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) return new Response(JSON.stringify({ error: "Sessão inválida" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const { data: role } = await userClient.from("user_roles").select("company_id").eq("user_id", user.id).single();
+    if (!role?.company_id) return new Response(JSON.stringify({ error: "Empresa não encontrada" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch all data
+    // Fetch all data filtered by company
     const [itemsRes, entriesRes, outputsRes] = await Promise.all([
-      supabase.from("stock_items").select("*"),
-      supabase.from("stock_entries").select("*").order("date", { ascending: false }).limit(200),
-      supabase.from("stock_outputs").select("*").order("date", { ascending: false }).limit(200),
+      supabase.from("stock_items").select("*").eq("company_id", role.company_id),
+      supabase.from("stock_entries").select("*").eq("company_id", role.company_id).order("date", { ascending: false }).limit(200),
+      supabase.from("stock_outputs").select("*").eq("company_id", role.company_id).order("date", { ascending: false }).limit(200),
     ]);
 
     const items = itemsRes.data || [];

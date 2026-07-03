@@ -10,6 +10,19 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) return new Response(JSON.stringify({ error: "Sessão inválida" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const { data: role } = await userClient.from("user_roles").select("company_id").eq("user_id", user.id).single();
+    if (!role?.company_id) return new Response(JSON.stringify({ error: "Empresa não encontrada" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -45,9 +58,12 @@ serve(async (req) => {
     const base64Data = imageDataUrl.split(",")[1];
     const binaryData = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Verify itemId belongs to the user's company before updating
+    const { data: item } = await supabase.from("stock_items").select("id").eq("id", itemId).eq("company_id", role.company_id).single();
+    if (!item) return new Response(JSON.stringify({ error: "Item não encontrado" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const filePath = `ai-generated/${itemId}.png`;
     const { error: uploadError } = await supabase.storage
