@@ -324,7 +324,7 @@ function EventsScreen({ events, loading }: { events: Event[]; loading: boolean }
   return (
     <div className="flex-1 overflow-y-auto pb-24">
       <HeroHeader title={year} sub={`${yearEvents.length} eventos`} />
-      <div className="px-4 -mt-4 space-y-4">
+      <div className="px-4 mt-4 space-y-4">
         {/* Year nav */}
         <div className="flex items-center justify-between">
           <button onClick={() => setYear(y => String(Number(y) - 1))} className="p-2 rounded-xl bg-white border border-border text-muted-foreground">
@@ -439,7 +439,7 @@ function QuotesScreen({ events, loading }: { events: Event[]; loading: boolean }
   return (
     <div className="flex-1 overflow-y-auto pb-24">
       <HeroHeader title="Orçamentos" sub={`${counts.all} em aberto`} />
-      <div className="px-4 -mt-4 space-y-3">
+      <div className="px-4 mt-4 space-y-3">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -564,7 +564,7 @@ function AgendaScreen({ events, sessions, loading }: { events: Event[]; sessions
   return (
     <div className="flex-1 overflow-y-auto pb-24">
       <HeroHeader title={MONTH_FULL[month]} sub={`${Object.values(dayEvents).flat().length + Object.values(dayTastings).flat().length} items · ${year}`} />
-      <div className="px-4 -mt-4 space-y-4">
+      <div className="px-4 mt-4 space-y-4">
         {/* Month nav */}
         <div className="bg-white rounded-2xl border border-border p-4">
           <div className="flex items-center justify-between mb-4">
@@ -694,7 +694,7 @@ function TastingsScreen({ sessions, loading }: { sessions: SessionExtra[]; loadi
   return (
     <div className="flex-1 overflow-y-auto pb-24">
       <HeroHeader title="Degustações" sub={`${upcoming.length} próximas · ${sessions.length} total`} />
-      <div className="px-4 -mt-4 space-y-3">
+      <div className="px-4 mt-4 space-y-3">
         {/* Tabs */}
         <div className="flex gap-2 bg-muted/40 rounded-2xl p-1">
           {TABS.map(t => (
