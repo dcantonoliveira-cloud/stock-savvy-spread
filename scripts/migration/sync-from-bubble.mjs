@@ -250,7 +250,7 @@ async function syncEvents(clientIdMap) {
     const clientId = clientIdMap[ev.Cliente] ?? null;
     const contractDate = dateOnly(ev.dataQueFechouContrato);
 
-    const bubbleName = str(ev.NomeDoEvento) ?? str(ev['Nome do Evento']) ?? str(ev.nomeDoEvento);
+    const bubbleName = str(ev.NomeDoEvento) ?? str(ev['Nome do Evento']) ?? str(ev.nomeDoEvento) ?? str(ev.NomeDoContratante);
 
     const record = {
       client_id:              clientId,

@@ -92,7 +92,7 @@ function mapStatus(raw) {
 function bubbleToSupabase(ev) {
   const contractDate = dateOnly(ev.dataQueFechouContrato);
   return {
-    event_name:              str(ev.NomeDoEvento) ?? str(ev['Nome do Evento']) ?? str(ev.nomeDoEvento),
+    event_name:              str(ev.NomeDoEvento) ?? str(ev['Nome do Evento']) ?? str(ev.nomeDoEvento) ?? str(ev.NomeDoContratante),
     event_type:              str(ev.Tipo_Do_Evento),
     status:                  mapStatus(ev.status),
     event_date:              dateOnly(ev.dataDoEvento),
@@ -216,7 +216,7 @@ async function main() {
         console.log(`  ✗ ${ev.bubble_id} — não encontrado na API do Bubble`);
         continue;
       }
-      const nome = str(bubbleEv.NomeDoEvento) ?? str(bubbleEv['Nome do Evento']) ?? str(bubbleEv.nomeDoEvento);
+      const nome = str(bubbleEv.NomeDoEvento) ?? str(bubbleEv['Nome do Evento']) ?? str(bubbleEv.nomeDoEvento) ?? str(bubbleEv.NomeDoContratante);
       const date = dateOnly(bubbleEv.dataDoEvento);
       console.log(`  ${nome ? '✔' : '✗'} ${ev.bubble_id}`);
       console.log(`    Bubble retornou ${Object.keys(bubbleEv).length} campos`);
