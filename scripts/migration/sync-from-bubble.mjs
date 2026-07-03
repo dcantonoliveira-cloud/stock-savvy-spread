@@ -39,7 +39,8 @@ const SUPA_KEY     = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPA_KEY) { console.error('❌  SUPABASE_SERVICE_ROLE_KEY não definido'); process.exit(1); }
 
-const DRY = process.argv.includes('--dry-run');
+const DRY   = process.argv.includes('--dry-run');
+const DEBUG = process.argv.includes('--debug-names');
 const supabase = createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } });
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -250,6 +251,15 @@ async function syncEvents(clientIdMap) {
     const contractDate = dateOnly(ev.dataQueFechouContrato);
 
     const bubbleName = str(ev.NomeDoEvento);
+
+    if (DEBUG && bubbleName === null) {
+      // Mostra todos os campos do registro para identificar o campo correto
+      console.log(`\n  [DEBUG] Evento sem nome (_id: ${ev._id}):`);
+      for (const [k, v] of Object.entries(ev)) {
+        if (v !== null && v !== undefined && v !== '') console.log(`    ${k}: ${JSON.stringify(v)}`);
+      }
+    }
+
     const record = {
       client_id:              clientId,
       // só atualiza event_name se Bubble tiver um valor; preserva o nome existente no Supabase
