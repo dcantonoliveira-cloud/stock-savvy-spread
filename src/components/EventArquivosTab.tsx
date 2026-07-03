@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
@@ -93,7 +94,7 @@ async function renderSection(innerHtml: string, widthPx: number, scale: number) 
   const { default: html2canvas } = await import('html2canvas');
   const el = document.createElement('div');
   el.style.cssText = `position:fixed;left:-9999px;top:0;width:${widthPx}px;background:white;padding:0;margin:0;`;
-  el.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:12.5pt;line-height:1.8;color:#111;word-break:break-word;">${innerHtml}</div>`;
+  el.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:12.5pt;line-height:1.8;color:#111;word-break:break-word;">${DOMPurify.sanitize(innerHtml)}</div>`;
   document.body.appendChild(el);
   await new Promise(r => setTimeout(r, 200));
   const canvas = await html2canvas(el, { scale, useCORS: true, backgroundColor: '#fff' });
