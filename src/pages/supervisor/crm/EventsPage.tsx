@@ -240,12 +240,23 @@ export default function EventsPage() {
 
   // ── Save event ────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!form.client_id) { toast.error('Selecione um cliente'); return; }
     if (!form.event_date) { toast.error('Informe a data do evento'); return; }
     setSaving(true);
 
+    let clientId = form.client_id || null;
+    if (!clientId && clientQuery.trim()) {
+      const { data: newClient } = await supabase.from('clients').insert({
+        name: clientQuery.trim(),
+        company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89',
+      }).select('id, name, phone, email').single();
+      if (newClient) {
+        clientId = newClient.id;
+        setClients(prev => [...prev, newClient as Client]);
+      }
+    }
+
     const payload = {
-      client_id: form.client_id || null,
+      client_id: clientId,
       event_name: form.event_name || null,
       event_type: form.event_type || null,
       status: form.status,
@@ -338,14 +349,21 @@ export default function EventsPage() {
 
       {/* Cliente */}
       <div>
-        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Cliente *</label>
+        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Cliente</label>
         <div className="relative">
           <input
             ref={clientSearchRef}
             value={clientQuery}
-            onChange={e => { setClientQuery(e.target.value); setClientDropOpen(true); setF('client_id',''); }}
+            onChange={e => {
+              const v = e.target.value;
+              setClientQuery(v);
+              setClientDropOpen(true);
+              setF('client_id', '');
+              if (!form.event_name) setF('event_name', v);
+            }}
             onFocus={() => setClientDropOpen(true)}
-            placeholder="Buscar cliente..."
+            onBlur={() => setTimeout(() => setClientDropOpen(false), 150)}
+            placeholder="Nome do cliente..."
             className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
           {form.client_id && selectedClient && (
