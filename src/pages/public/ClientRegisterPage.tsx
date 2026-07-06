@@ -50,7 +50,7 @@ export default function ClientRegisterPage() {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password: pass,
-      options: { data: { display_name: name.trim() || undefined } },
+      options: { data: { display_name: name.trim() || undefined, portal: true } },
     });
     if (authError || !authData.user) {
       setError(authError?.message ?? 'Erro ao criar conta. Tente novamente.');

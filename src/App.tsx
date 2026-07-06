@@ -151,22 +151,6 @@ function AppRoutes() {
     }
     return <LoginPage />;
   }
-  // Sem role mas acessando /portal → tela de código de acesso (cadastro de cliente)
-  if (!role && window.location.pathname.startsWith('/portal')) {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/portal" element={<ClientPortalLayout />}>
-            <Route index element={<PortalEventoPage />} />
-            <Route path="financeiro"  element={<PortalFinanceiroPage />} />
-            <Route path="arquivos"    element={<PortalArquivosPage />} />
-            <Route path="informacoes" element={<PortalInformacoesPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/portal" replace />} />
-        </Routes>
-      </Suspense>
-    );
-  }
   if (!role) return <NoRolePage />;
 
   if (role === 'client') {

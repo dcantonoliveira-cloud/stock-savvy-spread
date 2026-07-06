@@ -72,6 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
+    const { data: { user: fullUser } } = await supabase.auth.getUser();
+    const isPortalUser = fullUser?.user_metadata?.portal === true;
+
     const [rolesRes, permRes, profileRes, clientRes] = await Promise.all([
       supabase.from('user_roles').select('role').eq('user_id', userId),
       supabase.from('employee_permissions').select('*').eq('user_id', userId).maybeSingle(),
@@ -84,6 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const roles = rolesRes.data.map(r => r.role);
       resolvedRole = roles.includes('supervisor') ? 'supervisor' : roles.includes('client') ? 'client' : 'employee';
     } else if (clientRes.data) {
+      // Já tem portal vinculado
+      resolvedRole = 'client';
+    } else if (isPortalUser) {
+      // Cadastrou via portal mas ainda não vinculou o código
       resolvedRole = 'client';
     }
     setRole(resolvedRole);
