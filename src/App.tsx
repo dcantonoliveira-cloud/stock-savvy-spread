@@ -98,8 +98,8 @@ const ContractFormPage       = lazy(() => import("./pages/public/ContractFormPag
 const ClientPortalLayout     = lazy(() => import("./pages/portal/ClientPortalLayout"));
 const PortalEventoPage       = lazy(() => import("./pages/portal/PortalEventoPage"));
 const PortalFinanceiroPage   = lazy(() => import("./pages/portal/PortalFinanceiroPage"));
-const PortalContratoPage     = lazy(() => import("./pages/portal/PortalContratoPage"));
 const PortalArquivosPage     = lazy(() => import("./pages/portal/PortalArquivosPage"));
+const PortalInformacoesPage  = lazy(() => import("./pages/portal/PortalInformacoesPage"));
 
 const queryClient = new QueryClient();
 
@@ -159,9 +159,9 @@ function AppRoutes() {
         <Routes>
           <Route path="/portal" element={<ClientPortalLayout />}>
             <Route index element={<PortalEventoPage />} />
-            <Route path="financeiro" element={<PortalFinanceiroPage />} />
-            <Route path="contrato"   element={<PortalContratoPage />} />
-            <Route path="arquivos"   element={<PortalArquivosPage />} />
+            <Route path="financeiro"  element={<PortalFinanceiroPage />} />
+            <Route path="arquivos"    element={<PortalArquivosPage />} />
+            <Route path="informacoes" element={<PortalInformacoesPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/portal" replace />} />
         </Routes>

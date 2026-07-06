@@ -9,7 +9,7 @@ export default function ClientRegisterPage() {
   const navigate    = useNavigate();
   const token       = params.get('token') ?? '';
 
-  const [invite, setInvite] = useState<{ id: string; event_name: string; client_name: string } | null>(null);
+  const [invite, setInvite] = useState<{ id: string; event_id: string; company_id: string; event_name: string; client_name: string } | null>(null);
   const [loading, setLoading]   = useState(true);
   const [invalid, setInvalid]   = useState(false);
   const [alreadyUsed, setAlreadyUsed] = useState(false);
@@ -26,14 +26,15 @@ export default function ClientRegisterPage() {
     if (!token) { setInvalid(true); setLoading(false); return; }
     (async () => {
       const { data } = await (supabase.from as any)('client_portal_access')
-        .select('id, user_id, events(event_name, clients(name))')
+        .select('id, event_id, user_id, events(event_name, company_id, clients(name))')
         .eq('invite_token', token)
         .maybeSingle();
       if (!data) { setInvalid(true); setLoading(false); return; }
       if (data.user_id) { setAlreadyUsed(true); setLoading(false); return; }
       const eventName   = (data.events as any)?.event_name ?? 'seu evento';
       const clientName  = (data.events as any)?.clients?.name ?? '';
-      setInvite({ id: data.id, event_name: eventName, client_name: clientName });
+      const companyId   = (data.events as any)?.company_id ?? '';
+      setInvite({ id: data.id, event_id: data.event_id, company_id: companyId, event_name: eventName, client_name: clientName });
       if (clientName) setName(clientName);
       setLoading(false);
     })();
@@ -55,6 +56,15 @@ export default function ClientRegisterPage() {
       setError(authError?.message ?? 'Erro ao criar conta. Tente novamente.');
       setSubmitting(false);
       return;
+    }
+
+    // Cria role de cliente
+    if (invite!.company_id) {
+      await (supabase.from as any)('user_roles').insert({
+        user_id: authData.user.id,
+        company_id: invite!.company_id,
+        role: 'client',
+      });
     }
 
     // Vincula o user_id ao portal de acesso

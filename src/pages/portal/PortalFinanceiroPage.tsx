@@ -33,8 +33,8 @@ export default function PortalFinanceiroPage() {
   const pct         = total > 0 ? Math.round((paid / total) * 100) : 0;
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Financeiro</h1>
+    <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
+      <h1 className="text-2xl font-black text-foreground">Financeiro</h1>
 
       {/* Resumo */}
       <div className="grid grid-cols-3 gap-3">
