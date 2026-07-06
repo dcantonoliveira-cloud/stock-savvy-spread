@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ChevronRight, ChevronLeft, UtensilsCrossed,
@@ -71,6 +72,7 @@ function KpiCard({ label, value, sub, icon, accent = 'default', onClick }: KpiCa
 // ── main component ─────────────────────────────────────────────────────────
 export default function SupervisorDashboard() {
   const navigate    = useNavigate();
+  const { profile } = useAuth();
   const [events,   setEvents]   = useState<EventRow[]>([]);
   const [tastings, setTastings] = useState<TastingRow[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -197,7 +199,7 @@ export default function SupervisorDashboard() {
             {now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">
-            {greeting()}, Douglas
+            {greeting()}, {profile?.display_name?.split(' ')[0] ?? 'bem-vindo'}
           </h1>
         </div>
       </div>

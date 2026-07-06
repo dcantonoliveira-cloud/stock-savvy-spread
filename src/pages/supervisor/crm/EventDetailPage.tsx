@@ -821,8 +821,8 @@ export default function EventDetailPage() {
 
             {(form.menu_mode ?? 'text') === 'text' ? (
               <RichTextEditor
-                content={form.annex_1_text ?? form.menu_text ?? ''}
-                onChange={val => setF('annex_1_text', val)}
+                content={form.menu_text ?? ''}
+                onChange={val => setF('menu_text', val)}
                 placeholder="Descreva o cardápio do evento..."
               />
             ) : (
