@@ -424,20 +424,17 @@ async function syncTastings(eventIdMap) {
     // Apaga vínculos antigos desta sessão e recria (evita duplicatas de eventos)
     await supabase.from('tasting_session_events').delete().eq('session_id', sess.id);
 
-    const confirmadosSet = new Set(Array.isArray(s.eventosConfirmados) ? s.eventosConfirmados : []);
-
     for (const bubbleId of (Array.isArray(s.eventos) ? s.eventos : [])) {
       const eventId = eventIdMap[bubbleId];
       if (!eventId) { evtSkip++; continue; }
-      const snap = confirmadosSet.has(bubbleId) ? 'confirmed' : 'new';
       const { error } = await supabase.from('tasting_session_events').insert({
         session_id: sess.id,
         event_id:   eventId,
-        situation_snapshot: snap,
+        situation_snapshot: 'new',
         is_second_tasting:  false,
         created_at: isoTs(s['Created Date']) ?? new Date().toISOString(),
       });
-      if (error) errors.push(`evt ${bubbleId} (${snap}): ${error.message}`);
+      if (error) errors.push(`evt ${bubbleId}: ${error.message}`);
       else evtOk++;
     }
   }
