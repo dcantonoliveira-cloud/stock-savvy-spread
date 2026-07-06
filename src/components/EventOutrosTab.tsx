@@ -227,26 +227,12 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp, clientName, event
       {/* Status de acesso */}
       <div className="border-t border-border pt-4 mt-2">
         {portal?.user_id ? (
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm text-emerald-700">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              <span>Cliente cadastrado no portal.</span>
-              {portal.last_accessed_at && (
-                <span className="text-muted-foreground text-xs ml-1">Último acesso: {fmtDT(portal.last_accessed_at)}</span>
-              )}
-            </div>
-            <button
-              onClick={async () => {
-                if (!confirm('Isso vai excluir a conta do cliente e desvincular o portal completamente. Ele poderá se cadastrar novamente com o mesmo código.\n\nConfirmar?')) return;
-                const { error } = await (supabase.rpc as any)('delete_portal_client_user', { p_portal_id: portal.id });
-                if (error) { toast.error('Erro ao resetar: ' + error.message); return; }
-                setPortal(prev => prev ? { ...prev, user_id: null, first_accessed_at: null, last_accessed_at: null, invite_token: null, invite_sent_at: null } : prev);
-                toast.success('Portal resetado. O cliente pode se cadastrar novamente.');
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50 transition-colors shrink-0"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Resetar portal
-            </button>
+          <div className="flex items-center gap-2 text-sm text-emerald-700">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span>Cliente cadastrado no portal.</span>
+            {portal.last_accessed_at && (
+              <span className="text-muted-foreground text-xs ml-1">Último acesso: {fmtDT(portal.last_accessed_at)}</span>
+            )}
           </div>
         ) : portal?.invite_token ? (
           <div className="space-y-2">
@@ -271,6 +257,32 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp, clientName, event
             <UserPlus className="w-4 h-4" />
             Enviar convite de acesso ao cliente
           </button>
+        )}
+
+        {/* Resetar portal — sempre visível */}
+        {portal && (
+          <div className="mt-4 pt-4 border-t border-border flex justify-end">
+            <button
+              onClick={async () => {
+                if (!confirm('Isso vai excluir a conta do cliente, gerar um código novo e zerar o histórico de acesso.\n\nConfirmar?')) return;
+                const { data: newCode, error } = await (supabase.rpc as any)('delete_portal_client_user', { p_portal_id: portal.id });
+                if (error) { toast.error('Erro ao resetar: ' + error.message); return; }
+                setPortal(prev => prev ? {
+                  ...prev,
+                  user_id: null,
+                  first_accessed_at: null,
+                  last_accessed_at: null,
+                  invite_token: null,
+                  invite_sent_at: null,
+                  access_code: newCode ?? prev.access_code,
+                } : prev);
+                toast.success('Portal resetado. Novo código gerado.');
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Resetar portal
+            </button>
+          </div>
         )}
       </div>
     </div>
