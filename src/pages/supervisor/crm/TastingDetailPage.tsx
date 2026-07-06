@@ -398,7 +398,22 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       <Td className="text-muted-foreground">{ev?.organizer || '—'}</Td>
       <Td className="text-muted-foreground tabular-nums">{fmtDate(ev?.event_date ?? null)}</Td>
       <Td>
-        {sit ? <span className={`text-xs ${sit.cls}`}>{sit.label}</span> : '—'}
+        <button
+          title={row.situation_snapshot === 'new' ? 'Lead novo — clique para marcar como já confirmado' : 'Já confirmado antes da deg — clique para marcar como lead novo'}
+          onClick={async () => {
+            const next = row.situation_snapshot === 'new' ? 'confirmed' : 'new';
+            onUpdate({ situation_snapshot: next });
+            await supabase.from('tasting_session_events' as any)
+              .update({ situation_snapshot: next })
+              .eq('session_id', row.session_id)
+              .eq('event_id', row.event_id);
+          }}
+          className="flex items-center gap-1 group"
+        >
+          {sit
+            ? <span className={`text-xs ${sit.cls} group-hover:underline`}>{sit.label}</span>
+            : <span className="text-xs text-muted-foreground">—</span>}
+        </button>
       </Td>
       <Td>
         <StatusSelect
