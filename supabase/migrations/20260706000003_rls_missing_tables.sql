@@ -21,7 +21,7 @@ UPDATE public.tasting_sessions ts
 SET company_id = e.company_id
 FROM public.tasting_session_events tse
 JOIN public.events e ON e.id = tse.event_id
-WHERE tse.tasting_session_id = ts.id
+WHERE tse.session_id = ts.id
   AND ts.company_id IS NULL;
 
 -- Fallback: sessões sem eventos linkados → empresa padrão
