@@ -5,6 +5,7 @@ import {
   ChevronRight, ChevronLeft, UtensilsCrossed,
   CalendarCheck, FileText, Clock, TrendingUp, ArrowUpRight,
 } from 'lucide-react';
+import NotificationsPanel from '@/components/NotificationsPanel';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
@@ -542,6 +543,9 @@ export default function SupervisorDashboard() {
               </div>
             </div>
           )}
+
+          {/* Notificações */}
+          <NotificationsPanel />
         </div>
       </div>
 

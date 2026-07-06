@@ -13,6 +13,7 @@ interface Notif {
   type: NotifType | string;
   title: string;
   message: string | null;
+  actor_name: string | null;
   data: { link?: string; event_id?: string; session_id?: string } | null;
   read: boolean;
   created_at: string;
@@ -176,6 +177,9 @@ export default function NotificationsPage() {
                   </div>
                   {n.message && (
                     <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.message}</p>
+                  )}
+                  {n.actor_name && (
+                    <p className="text-[10px] text-muted-foreground/50 mt-0.5">{n.actor_name}</p>
                   )}
                 </div>
 
