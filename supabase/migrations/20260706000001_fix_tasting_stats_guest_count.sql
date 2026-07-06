@@ -14,8 +14,11 @@ select
   count(distinct tse.event_id) filter (where tse.situation_snapshot = 'new')                as novos,
   count(distinct tse.event_id) filter (where tse.situation_snapshot = 'new'
                                          and e.status in ('lead','negotiating','tasting_scheduled')) as em_aberto,
+  -- fechados: apenas leads novos que confirmaram (usado para % conversão)
   count(distinct tse.event_id) filter (where tse.situation_snapshot = 'new'
                                          and e.status in ('confirmed','completed'))          as fechados,
+  -- total_confirmados: todos os eventos confirmados da sessão (usado para display)
+  count(distinct tse.event_id) filter (where e.status in ('confirmed','completed'))          as total_confirmados,
   coalesce(sum(tse.guest_count), 0)                                                          as guests,
   (
     select coalesce(sum(ep.value), 0)

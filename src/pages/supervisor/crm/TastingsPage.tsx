@@ -27,6 +27,7 @@ interface SessionStats {
   novos: number;
   em_aberto: number;
   fechados: number;
+  total_confirmados: number;
   guests: number;
   total_pago: number;
 }
@@ -212,7 +213,8 @@ export default function TastingsPage() {
     const st       = statsMap[s.id];
     const total    = st?.total    ?? 0;
     const novos    = st?.novos    ?? 0;
-    const fechados = st?.fechados ?? 0;
+    const fechados          = st?.fechados          ?? 0;
+    const totalConfirmados  = st?.total_confirmados ?? 0;
     const emAberto = st?.em_aberto ?? 0;
     const guests   = st?.guests   ?? 0;
     const totalPago= st?.total_pago ?? 0;
@@ -226,7 +228,7 @@ export default function TastingsPage() {
         <span className={`text-sm ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>{s.type ?? '—'}</span>
         <Cell v={total}    bold muted={muted} />
         <Cell v={novos}         muted={muted} />
-        <Cell v={fechados}      muted={muted} />
+        <Cell v={totalConfirmados > 0 ? totalConfirmados : null} muted={muted} />
         <Cell v={emAberto > 0 ? emAberto : null} danger={emAberto > 0} muted={muted} />
         <Cell v={guests > 0 ? guests : null} muted={muted} />
         <div className="text-center border-l border-border/50 pl-3">
