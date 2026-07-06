@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ChevronRight, ChevronLeft, UtensilsCrossed,
-  CalendarCheck, FileText, Clock, TrendingUp, ArrowUpRight,
+  CalendarCheck, FileText, Clock, ArrowUpRight,
 } from 'lucide-react';
 import NotificationsPanel from '@/components/NotificationsPanel';
 import {
@@ -117,8 +117,7 @@ export default function SupervisorDashboard() {
 
   const activeEvents     = events.filter(e => e.status !== 'cancelled');
   const openBudgets      = activeEvents.filter(e => ['lead', 'negotiating'].includes(e.status));
-  const confirmedEvents  = activeEvents.filter(e => ['confirmed', 'completed'].includes(e.status));
-  const upcomingTastings = tastings.filter(t => t.scheduled_date >= today);
+const upcomingTastings = tastings.filter(t => t.scheduled_date >= today);
   const eventsThisMonth  = activeEvents.filter(e =>
     e.event_date?.startsWith(thisMonth) && ['confirmed', 'completed'].includes(e.status),
   ).length;
@@ -205,7 +204,7 @@ export default function SupervisorDashboard() {
       </div>
 
       {/* ── KPI cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <KpiCard
           label="Eventos este mês"
           value={eventsThisMonth}
@@ -233,20 +232,12 @@ export default function SupervisorDashboard() {
           path="/tastings"
           onClick={() => navigate('/tastings')}
         />
-        <KpiCard
-          label="Confirmados (total)"
-          value={confirmedEvents.length}
-          sub="confirmados e realizados"
-          icon={<TrendingUp className="w-4 h-4" />}
-          path="/events"
-          onClick={() => navigate('/events')}
-        />
       </div>
 
       {/* ── Main grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Left — chart + calendar */}
+        {/* Left — chart + calendar + pipeline + next events */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Chart */}
@@ -418,136 +409,100 @@ export default function SupervisorDashboard() {
               </div>
             )}
           </div>
-        </div>
 
-        {/* Right col */}
-        <div className="space-y-5">
+          {/* Pipeline + Next events side by side below calendar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
 
-          {/* Pipeline */}
-          <div className="bg-white border border-border rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-5">
-              <p className="text-sm font-semibold text-foreground">Pipeline</p>
-              <span className="text-[11px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-                {activeEvents.length} ativos
-              </span>
-            </div>
-            <div className="space-y-4">
-              {pipelineSteps.map((s, idx) => {
-                const count = activeEvents.filter(e => e.status === s).length;
-                const pct   = Math.round((count / pipelineMax) * 100);
-                const colors = ['bg-slate-300', 'bg-amber-400', 'bg-orange-400'];
-                return (
-                  <div key={s}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-medium text-muted-foreground">{STATUS_LABEL[s]}</span>
-                      <span className="text-xs font-bold tabular-nums text-foreground">{count}</span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${colors[idx]}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Next confirmed events */}
-          <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-              <p className="text-sm font-semibold text-foreground">Próximos eventos</p>
-              <button
-                onClick={() => navigate('/events')}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Ver todos
-              </button>
-            </div>
-            {nextConfirmed.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Nenhum evento confirmado.</p>
-            ) : (
-              <div className="divide-y divide-border/50">
-                {nextConfirmed.map(e => {
-                  const diff = e.event_date
-                    ? Math.round((new Date(e.event_date + 'T12:00:00').getTime() - Date.now()) / 86400000)
-                    : null;
+            {/* Pipeline */}
+            <div className="bg-white border border-border rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-5">
+                <p className="text-sm font-semibold text-foreground">Pipeline</p>
+                <span className="text-[11px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
+                  {activeEvents.length} ativos
+                </span>
+              </div>
+              <div className="space-y-4">
+                {pipelineSteps.map((s, idx) => {
+                  const count = activeEvents.filter(e => e.status === s).length;
+                  const pct   = Math.round((count / pipelineMax) * 100);
+                  const colors = ['bg-slate-300', 'bg-amber-400', 'bg-orange-400'];
                   return (
-                    <div
-                      key={e.id}
-                      onClick={() => navigate(`/events/${e.id}`)}
-                      className="px-5 py-3 flex items-center gap-3 hover:bg-muted/30 cursor-pointer transition-colors group"
-                    >
-                      <div className="shrink-0 w-8 text-center">
-                        <p className="text-[10px] font-bold text-muted-foreground/50 uppercase leading-none">
-                          {e.event_date ? MONTHS_SHORT[parseInt(e.event_date.split('-')[1]) - 1] : '—'}
-                        </p>
-                        <p className="text-base font-bold text-foreground tabular-nums leading-tight">
-                          {e.event_date ? e.event_date.split('-')[2].replace(/^0/, '') : '—'}
-                        </p>
+                    <div key={s}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">{STATUS_LABEL[s]}</span>
+                        <span className="text-xs font-bold tabular-nums text-foreground">{count}</span>
                       </div>
-                      <div className="w-px h-8 bg-border shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">{e.event_name}</p>
-                        {e.guest_count && (
-                          <p className="text-xs text-muted-foreground">{e.guest_count} convidados</p>
-                        )}
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${colors[idx]}`}
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
-                      {diff !== null && (
-                        <span className={`text-xs font-semibold shrink-0 ${diff <= 7 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                          {diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : `${diff}d`}
-                        </span>
-                      )}
                     </div>
                   );
                 })}
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Upcoming tastings */}
-          {upcomingTastings.length > 0 && (
+            {/* Next confirmed events */}
             <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
               <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                <p className="text-sm font-semibold text-foreground">Degustações</p>
+                <p className="text-sm font-semibold text-foreground">Próximos eventos</p>
                 <button
-                  onClick={() => navigate('/tastings')}
+                  onClick={() => navigate('/events')}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Ver todas
+                  Ver todos
                 </button>
               </div>
-              <div className="divide-y divide-border/50">
-                {upcomingTastings.slice(0, 4).map(t => {
-                  const diff = Math.round(
-                    (new Date(t.scheduled_date + 'T12:00:00').getTime() - Date.now()) / 86400000,
-                  );
-                  return (
-                    <div
-                      key={t.id}
-                      onClick={() => navigate(`/tastings/${t.id}`)}
-                      className="px-5 py-3 flex items-center gap-3 hover:bg-muted/30 cursor-pointer transition-colors"
-                    >
-                      <UtensilsCrossed className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-foreground">{t.type ?? 'Degustação'}</p>
-                        <p className="text-xs text-muted-foreground tabular-nums">
-                          {t.scheduled_date.split('T')[0].split('-').reverse().join('/')}
-                        </p>
+              {nextConfirmed.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Nenhum evento confirmado.</p>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {nextConfirmed.map(e => {
+                    const diff = e.event_date
+                      ? Math.round((new Date(e.event_date + 'T12:00:00').getTime() - Date.now()) / 86400000)
+                      : null;
+                    return (
+                      <div
+                        key={e.id}
+                        onClick={() => navigate(`/events/${e.id}`)}
+                        className="px-5 py-3 flex items-center gap-3 hover:bg-muted/30 cursor-pointer transition-colors group"
+                      >
+                        <div className="shrink-0 w-8 text-center">
+                          <p className="text-[10px] font-bold text-muted-foreground/50 uppercase leading-none">
+                            {e.event_date ? MONTHS_SHORT[parseInt(e.event_date.split('-')[1]) - 1] : '—'}
+                          </p>
+                          <p className="text-base font-bold text-foreground tabular-nums leading-tight">
+                            {e.event_date ? e.event_date.split('-')[2].replace(/^0/, '') : '—'}
+                          </p>
+                        </div>
+                        <div className="w-px h-8 bg-border shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground truncate">{e.event_name}</p>
+                          {e.guest_count && (
+                            <p className="text-xs text-muted-foreground">{e.guest_count} convidados</p>
+                          )}
+                        </div>
+                        {diff !== null && (
+                          <span className={`text-xs font-semibold shrink-0 ${diff <= 7 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                            {diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : `${diff}d`}
+                          </span>
+                        )}
                       </div>
-                      <span className={`text-xs font-semibold ${diff <= 3 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                        {diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : `${diff}d`}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Notificações */}
-          <NotificationsPanel />
+        {/* Right col — notifications full height */}
+        <div className="flex flex-col">
+          <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1">
+            <NotificationsPanel fullHeight />
+          </div>
         </div>
       </div>
 

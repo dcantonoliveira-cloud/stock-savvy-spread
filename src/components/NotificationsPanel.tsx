@@ -43,7 +43,7 @@ function Initials({ name }: { name: string | null }) {
   );
 }
 
-export default function NotificationsPanel() {
+export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolean }) {
   const navigate = useNavigate();
   const [notifs, setNotifs] = useState<Notif[]>([]);
 
@@ -75,8 +75,12 @@ export default function NotificationsPanel() {
 
   const unread = notifs.filter(n => !n.read).length;
 
+  const wrapCls = fullHeight
+    ? 'flex flex-col h-full'
+    : 'bg-white border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col';
+
   return (
-    <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col">
+    <div className={wrapCls}>
       {/* Header */}
       <div className="px-4 py-3.5 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -102,7 +106,7 @@ export default function NotificationsPanel() {
           <p className="text-xs">Sem notificações</p>
         </div>
       ) : (
-        <div className="divide-y divide-border/50 overflow-y-auto max-h-[420px]">
+        <div className={`divide-y divide-border/50 overflow-y-auto ${fullHeight ? 'flex-1 min-h-0' : 'max-h-[420px]'}`}>
           {notifs.map(n => {
             const cfg = TYPE_CFG[n.type] ?? DEFAULT_CFG;
             return (
