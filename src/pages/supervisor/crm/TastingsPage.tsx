@@ -364,7 +364,7 @@ function NewSessionModal({ onClose, onCreated }: { onClose: () => void; onCreate
       .from('tasting_sessions' as any)
       .insert({ scheduled_date: date, type, max_couples: parseInt(maxC) || 4, location: local, company_id: COMPANY_ID })
       .select().single();
-    if (error) { toast.error('Erro ao criar'); setSaving(false); return; }
+    if (error) { console.error('[TastingsPage] criar degustação:', error); toast.error('Erro ao criar: ' + error.message); setSaving(false); return; }
     toast.success('Degustação criada');
     onCreated(data as Session);
   };
