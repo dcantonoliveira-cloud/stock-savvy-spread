@@ -477,7 +477,8 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
       const { data } = await supabase.from('events')
         .select('id, event_name, event_date, status, organizer')
         .not('event_name', 'is', null).neq('event_name', '')
-        .ilike('event_name', `%${search}%`).limit(10);
+        .in('status', ['lead', 'negotiating', 'confirmed'])
+        .ilike('event_name', `%${search}%`).limit(20);
       setResults((data ?? []).filter((e: any) => !existingEventIds.includes(e.id)));
       setLoading(false);
     }, 300);
