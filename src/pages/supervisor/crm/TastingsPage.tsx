@@ -362,7 +362,7 @@ function NewSessionModal({ onClose, onCreated }: { onClose: () => void; onCreate
     setSaving(true);
     const { data, error } = await supabase
       .from('tasting_sessions' as any)
-      .insert({ scheduled_date: date, type, max_couples: parseInt(maxC) || 4, location: local, company_id: COMPANY_ID })
+      .insert({ scheduled_date: date, type, max_couples: parseInt(maxC) || 4, location: local })
       .select().single();
     if (error) { console.error('[TastingsPage] criar degustação:', error); toast.error('Erro ao criar: ' + error.message); setSaving(false); return; }
     toast.success('Degustação criada');
