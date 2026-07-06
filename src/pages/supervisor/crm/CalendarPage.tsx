@@ -28,7 +28,6 @@ type EventRow = {
   location_id: string | null;
   date_reserved: boolean | null;
   clients: { name: string | null } | null;
-  event_locations: { name: string | null } | null;
 };
 
 type AppointmentRow = {
@@ -87,7 +86,7 @@ export default function CalendarPage() {
       const [{ data }, { data: tsData }, { data: apptData }] = await Promise.all([
         supabase
           .from('events')
-          .select('id, event_name, event_date, status, total_value, guest_count, event_type, location_text, location_id, date_reserved, clients(name), event_locations(name)')
+          .select('id, event_name, event_date, status, total_value, guest_count, event_type, location_text, location_id, date_reserved, clients(name)')
           .gte('event_date', first)
           .lte('event_date', last)
           .not('event_name', 'is', null)
@@ -474,9 +473,9 @@ function EventCard({ ev, showDate, onOpen }: { ev: EventRow; showDate?: boolean;
           <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>
-      {(ev.location_text || ev.event_locations?.name) && (
+      {ev.location_text && (
         <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-          <MapPin className="w-3 h-3 shrink-0" />{ev.location_text || ev.event_locations?.name}
+          <MapPin className="w-3 h-3 shrink-0" />{ev.location_text}
         </p>
       )}
     </div>
