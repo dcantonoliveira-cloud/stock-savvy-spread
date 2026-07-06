@@ -40,6 +40,7 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [running, setRunning] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -311,39 +312,64 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
               <p className="text-sm text-muted-foreground">
                 Selecione o PDF de cada funcionário para <strong>{MONTHS[month]}/{year}</strong>.
               </p>
-              {selectedEmployees.map(e => (
-                <div key={e.id} className="flex items-center gap-3 p-3 border border-border rounded-xl">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
-                    {e.display_name[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{e.display_name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{e.email}</p>
-                  </div>
-                  {files[e.id] ? (
-                    <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">
-                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="truncate max-w-[140px]">{files[e.id].name}</span>
-                      <button onClick={e2 => { e2.stopPropagation(); setFiles(prev => { const n = {...prev}; delete n[e.id]; return n; }); }}
-                        className="text-emerald-600 hover:text-red-500 ml-1">
-                        <X className="w-3 h-3" />
-                      </button>
+              {selectedEmployees.map(e => {
+                const isDragging = dragging === e.id;
+                return (
+                  <div
+                    key={e.id}
+                    className={`flex items-center gap-3 p-3 border rounded-xl transition-colors ${
+                      isDragging
+                        ? 'border-primary bg-primary/5 border-solid'
+                        : files[e.id]
+                          ? 'border-emerald-200 bg-emerald-50/30'
+                          : 'border-border border-dashed'
+                    }`}
+                    onDragOver={ev => { ev.preventDefault(); setDragging(e.id); }}
+                    onDragLeave={() => setDragging(null)}
+                    onDrop={ev => {
+                      ev.preventDefault();
+                      setDragging(null);
+                      const file = ev.dataTransfer.files?.[0];
+                      if (file?.type === 'application/pdf') handleFileChange(e.id, file);
+                      else if (file) toast.error('Apenas arquivos PDF são aceitos');
+                    }}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
+                      {e.display_name[0].toUpperCase()}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => fileRefs.current[e.id]?.click()}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground border border-dashed border-border px-3 py-1.5 rounded-lg hover:border-primary hover:text-primary transition-colors">
-                      <Upload className="w-3.5 h-3.5" />
-                      Selecionar PDF
-                    </button>
-                  )}
-                  <input
-                    type="file" accept="application/pdf" className="hidden"
-                    ref={el => { fileRefs.current[e.id] = el; }}
-                    onChange={ev => handleFileChange(e.id, ev.target.files?.[0] ?? null)}
-                  />
-                </div>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{e.display_name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{e.email}</p>
+                    </div>
+                    {files[e.id] ? (
+                      <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate max-w-[140px]">{files[e.id].name}</span>
+                        <button onClick={e2 => { e2.stopPropagation(); setFiles(prev => { const n = {...prev}; delete n[e.id]; return n; }); }}
+                          className="text-emerald-600 hover:text-red-500 ml-1">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => fileRefs.current[e.id]?.click()}
+                        className={`flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-lg transition-colors ${
+                          isDragging
+                            ? 'border-primary text-primary bg-primary/5'
+                            : 'text-muted-foreground border-dashed border-border hover:border-primary hover:text-primary'
+                        }`}>
+                        <Upload className="w-3.5 h-3.5" />
+                        {isDragging ? 'Solte aqui' : 'Selecionar PDF'}
+                      </button>
+                    )}
+                    <input
+                      type="file" accept="application/pdf" className="hidden"
+                      ref={el => { fileRefs.current[e.id] = el; }}
+                      onChange={ev => handleFileChange(e.id, ev.target.files?.[0] ?? null)}
+                    />
+                  </div>
+                );
+              })}
               {!allFilesUploaded && (
                 <p className="text-xs text-amber-600 font-medium">
                   {selectedEmployees.filter(e => !files[e.id]).length} arquivo{selectedEmployees.filter(e => !files[e.id]).length > 1 ? 's' : ''} pendente{selectedEmployees.filter(e => !files[e.id]).length > 1 ? 's' : ''}
