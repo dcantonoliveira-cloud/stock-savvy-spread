@@ -502,7 +502,14 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
   }, [search]);
 
   const alloc = async (ev: any) => {
-    const snapshot = PIPELINE.includes(ev.status) ? 'new' : 'confirmed';
+    // Business rule: snapshot based on contract_signed_date vs session date
+    // 'new'       = no contract yet, OR contract signed AFTER session date (came as lead)
+    // 'confirmed' = contract signed BEFORE session date (already a confirmed client)
+    const [{ data: evDetail }] = await Promise.all([
+      supabase.from('events').select('contract_signed_date').eq('id', ev.id).single(),
+    ]);
+    const signedDate = (evDetail as any)?.contract_signed_date ?? null;
+    const snapshot = signedDate && signedDate < sessionDate ? 'confirmed' : 'new';
     await supabase.from('tasting_session_events' as any).insert({
       session_id: sessionId, event_id: ev.id, situation_snapshot: snapshot,
     });

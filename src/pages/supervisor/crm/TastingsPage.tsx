@@ -25,6 +25,7 @@ interface SessionStats {
   session_id: string;
   total: number;
   novos: number;
+  velhos: number;
   em_aberto: number;
   fechados: number;
   total_confirmados: number;
