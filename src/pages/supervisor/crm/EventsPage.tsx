@@ -93,6 +93,7 @@ export default function EventsPage() {
   const [month, setMonth] = useState<number | null>(today.getMonth());
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['confirmed']));
   const [filterOpen, setFilterOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'event_date' | 'contract_signed_date'>('event_date');
 
   // Sheets
   const [newOpen, setNewOpen] = useState(() => !!(location.state as any)?.openNew);
@@ -200,18 +201,28 @@ export default function EventsPage() {
   }, [events, year]);
 
   const filtered = useMemo(() => {
-    // Busca ativa: usa resultados vindos direto do banco (todos os anos)
     const pool = search.trim().length >= 2 ? searchResults : events;
-    return pool.filter(e => {
+    const result = pool.filter(e => {
       if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
-      if (search.trim().length >= 2) return true; // já filtrado pelo banco/searchResults
+      if (search.trim().length >= 2) return true;
       if (!e.event_date) return false;
       const d = new Date(e.event_date + 'T12:00:00');
       if (d.getFullYear() !== year) return false;
       if (month !== null && d.getMonth() !== month) return false;
       return true;
     });
-  }, [events, searchResults, year, month, search, statusFilter]);
+    if (sortBy === 'contract_signed_date') {
+      return [...result].sort((a, b) => {
+        const da = a.contract_signed_date ?? '';
+        const db = b.contract_signed_date ?? '';
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return db.localeCompare(da); // mais recente primeiro
+      });
+    }
+    return result;
+  }, [events, searchResults, year, month, search, statusFilter, sortBy]);
 
   const confirmedFiltered = filtered.filter(e => e.status === 'confirmed');
   const statsValue = confirmedFiltered.reduce((s,e) => s + (e.total_value ?? 0), 0);
@@ -703,8 +714,26 @@ export default function EventsPage() {
             {filterOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setFilterOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-40 w-52 bg-white border border-border rounded-xl shadow-xl p-3 space-y-1">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Filtrar por status</p>
+                <div className="absolute right-0 top-full mt-1 z-40 w-56 bg-white border border-border rounded-xl shadow-xl p-3 space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Ordenar por</p>
+                  {([
+                    ['event_date', 'Data do evento'],
+                    ['contract_signed_date', 'Fechamento (recente → antigo)'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setSortBy(key)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors text-left ${
+                        sortBy === key ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${sortBy === key ? 'bg-primary' : 'bg-border'}`} />
+                      {label}
+                    </button>
+                  ))}
+                  <div className="pt-2 pb-1 border-t border-border mt-2">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Filtrar por status</p>
+                  </div>
                   {Object.entries(STATUS_LABELS).map(([key, label]) => {
                     const active = statusFilter.has(key);
                     return (
