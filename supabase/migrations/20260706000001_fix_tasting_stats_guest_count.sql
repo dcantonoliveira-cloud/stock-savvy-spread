@@ -17,15 +17,15 @@ select
   -- fechados: apenas leads novos que confirmaram (usado para % conversão)
   count(distinct tse.event_id) filter (where tse.situation_snapshot = 'new'
                                          and e.status in ('confirmed','completed'))          as fechados,
-  -- total_confirmados: todos os eventos confirmados da sessão (usado para display)
-  count(distinct tse.event_id) filter (where e.status in ('confirmed','completed'))          as total_confirmados,
   coalesce(sum(tse.guest_count), 0)                                                          as guests,
   (
     select coalesce(sum(ep.value), 0)
     from tasting_session_events tse2
     join event_payments ep on ep.event_id = tse2.event_id and ep.payment_type = 'tasting'
     where tse2.session_id = tse.session_id
-  )                                                                                          as total_pago
+  )                                                                                          as total_pago,
+  -- total_confirmados: todos os eventos confirmados da sessão (usado para display da coluna)
+  count(distinct tse.event_id) filter (where e.status in ('confirmed','completed'))          as total_confirmados
 from tasting_session_events tse
 left join events e on e.id = tse.event_id
 group by tse.session_id;
