@@ -216,7 +216,8 @@ export default function TastingsPage() {
     const emAberto = st?.em_aberto ?? 0;
     const guests   = st?.guests   ?? 0;
     const totalPago= st?.total_pago ?? 0;
-    const conv     = novos > 0 ? Math.round((fechados / novos) * 100) : null;
+    const totalNovos = novos + fechados;
+    const conv     = totalNovos > 0 ? Math.round((fechados / totalNovos) * 100) : null;
     const money    = fmtMoney(totalPago);
     const muted    = !!isPast;
     return (

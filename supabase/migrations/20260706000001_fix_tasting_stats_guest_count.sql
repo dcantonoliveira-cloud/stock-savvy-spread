@@ -12,7 +12,7 @@ select
   count(distinct tse.event_id) filter (where tse.situation_snapshot = 'new')                as novos,
   count(distinct tse.event_id) filter (where tse.situation_snapshot = 'new'
                                          and e.status in ('lead','negotiating','tasting_scheduled')) as em_aberto,
-  count(distinct tse.event_id) filter (where e.status in ('confirmed','completed'))          as fechados,
+  count(distinct tse.event_id) filter (where tse.situation_snapshot = 'confirmed')           as fechados,
   coalesce(sum(tse.guest_count), 0)                                                          as guests,
   (
     select coalesce(sum(ep.value), 0)

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, Mail, MapPin, Briefcase,
   FileText, Edit2, Save, X, Loader2,
-  Eye, Download, Plus, ShieldCheck, Trash2,
+  Eye, Download, Plus, ShieldCheck, Trash2, KeyRound,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -131,6 +131,7 @@ export default function EmployeeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
   const [tab, setTab] = useState<'info' | 'holerites' | 'permissoes'>('info');
   const [form, setForm] = useState<Partial<Profile>>({});
 
@@ -253,6 +254,34 @@ export default function EmployeeDetailPage() {
   const handleField = (field: string, val: string) =>
     setForm(prev => ({ ...prev, [field]: val }));
 
+  const handleSendResetLink = async () => {
+    if (!profile) return;
+    setSendingReset(true);
+    try {
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { data, error } = await supabase.functions.invoke('generate-reset-link', {
+        body: { email: profile.email, redirectTo },
+      });
+      if (error || data?.error) {
+        toast.error(data?.error || 'Erro ao gerar link de redefinição');
+        return;
+      }
+      const link = data.link as string;
+      const name = profile.display_name.split(' ')[0];
+      const msg = encodeURIComponent(
+        `Olá ${name}! 👋\n\nAqui está o seu link para redefinir a senha do sistema Rondello:\n\n${link}\n\n_Este link expira em 24 horas._`
+      );
+      const phone = profile.phone?.replace(/\D/g, '');
+      const waUrl = phone
+        ? `https://wa.me/55${phone}?text=${msg}`
+        : `https://wa.me/?text=${msg}`;
+      window.open(waUrl, '_blank');
+      toast.success('Link gerado! WhatsApp aberto.');
+    } finally {
+      setSendingReset(false);
+    }
+  };
+
   const getSignedUrl = async (path: string) => {
     const { data } = await supabase.storage.from('payslips').createSignedUrl(path, 60);
     return data?.signedUrl;
@@ -324,11 +353,23 @@ export default function EmployeeDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           {myPerms.is_admin && !editing && (
-            <button onClick={() => setConfirmDelete(true)}
-              className="flex items-center gap-2 px-3 py-2 border border-red-200 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors">
-              <Trash2 className="w-3.5 h-3.5" />
-              Excluir
-            </button>
+            <>
+              <button
+                onClick={handleSendResetLink}
+                disabled={sendingReset}
+                title="Enviar link de redefinição de senha via WhatsApp"
+                className="flex items-center gap-2 px-3 py-2 border border-green-200 rounded-xl text-sm text-green-700 hover:bg-green-50 transition-colors disabled:opacity-50">
+                {sendingReset
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <KeyRound className="w-3.5 h-3.5" />}
+                Redefinir senha
+              </button>
+              <button onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-2 px-3 py-2 border border-red-200 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
+                Excluir
+              </button>
+            </>
           )}
           {!editing ? (
             <button onClick={() => setEditing(true)}

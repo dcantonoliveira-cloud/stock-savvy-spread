@@ -174,7 +174,7 @@ export default function TastingDetailPage() {
   const guests     = rows.reduce((s, r) => s + (r.guest_count ?? 0), 0);
   const totalPago  = rows.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
   const emAberto   = rows.filter(r => r.situation_snapshot === 'new' && r.events && PIPELINE.includes(r.events.status)).length;
-  const fechados   = rows.filter(r => r.events && CLOSED.includes(r.events.status)).length;
+  const fechados   = rows.filter(r => r.situation_snapshot === 'confirmed').length;
   const conv       = novos > 0 ? Math.round((fechados / novos) * 100) : null;
   const fmtMoney   = (v: number) => v === 0 ? 'R$ 0' : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
