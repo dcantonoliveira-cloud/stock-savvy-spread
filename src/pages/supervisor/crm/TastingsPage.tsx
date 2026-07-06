@@ -90,9 +90,12 @@ export default function TastingsPage() {
     setAbertoLoading(true);
     abertoLoaded.current = true;
 
+    const today = new Date().toISOString().split('T')[0];
+
     const { data: tse } = await supabase
       .from('tasting_session_events' as any)
-      .select('event_id, tasting_sessions(scheduled_date)');
+      .select('event_id, tasting_sessions!inner(scheduled_date)')
+      .lt('tasting_sessions.scheduled_date', today);
 
     if (!tse || tse.length === 0) { setAbertoRows([]); setAbertoLoading(false); return; }
 
