@@ -470,16 +470,32 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
   const [confirmEv, setConfirmEv] = useState<any | null>(null);
   const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     if (!search.trim()) { setResults([]); return; }
     const t = setTimeout(async () => {
       setLoading(true);
+      // Busca por cada palavra do termo para maior abrangência
+      const terms = search.trim().split(/\s+/).filter(Boolean);
       const { data } = await supabase.from('events')
         .select('id, event_name, event_date, status, organizer')
         .not('event_name', 'is', null).neq('event_name', '')
-        .in('status', ['lead', 'negotiating', 'confirmed'])
-        .ilike('event_name', `%${search}%`).limit(20);
-      setResults((data ?? []).filter((e: any) => !existingEventIds.includes(e.id)));
+        .in('status', ['lead', 'negotiating', 'tasting_scheduled', 'confirmed'])
+        .or(terms.map(t => `event_name.ilike.%${t}%`).join(','))
+        .or(`event_date.gt.${todayStr},event_date.is.null`)
+        .limit(30);
+
+      const PIPELINE_ORDER = ['lead', 'negotiating', 'tasting_scheduled'];
+      const filtered = (data ?? [])
+        .filter((e: any) => !existingEventIds.includes(e.id))
+        .sort((a: any, b: any) => {
+          const aOpen = PIPELINE_ORDER.includes(a.status) ? 0 : 1;
+          const bOpen = PIPELINE_ORDER.includes(b.status) ? 0 : 1;
+          if (aOpen !== bOpen) return aOpen - bOpen;
+          return (a.event_date ?? '').localeCompare(b.event_date ?? '');
+        });
+      setResults(filtered);
       setLoading(false);
     }, 300);
     return () => clearTimeout(t);
