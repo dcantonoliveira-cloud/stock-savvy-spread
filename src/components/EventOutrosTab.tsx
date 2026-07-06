@@ -199,10 +199,31 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
         </div>
       </div>
 
-      {/* Convite / status de acesso */}
+      {/* Código de acesso — sempre visível quando portal existe */}
+      {portal && (
+        <div className="border border-dashed border-border rounded-xl p-4 mb-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-0.5">Código de acesso do cliente</p>
+            <p className="text-xl font-black tracking-widest text-foreground font-mono">{portal.access_code}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">O cliente usa esse código para vincular a conta ao evento.</p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={copyCode}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
+              <Copy className="w-3.5 h-3.5" /> Copiar
+            </button>
+            <button onClick={regenCode}
+              title="Gerar novo código"
+              className="p-2 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Status de acesso */}
       <div className="border-t border-border pt-4 mt-2">
         {portal?.user_id ? (
-          // Cliente já tem conta
           <div className="flex items-center gap-2 text-sm text-emerald-700">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             <span>Cliente cadastrado no portal.</span>
@@ -211,7 +232,6 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
             )}
           </div>
         ) : portal?.invite_token ? (
-          // Convite enviado, aguardando cadastro
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-amber-700">
               <Clock className="w-4 h-4 text-amber-500" />
@@ -229,7 +249,6 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
             </div>
           </div>
         ) : (
-          // Sem convite
           <button onClick={sendInvite}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
             <UserPlus className="w-4 h-4" />

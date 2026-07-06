@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { CalendarDays, DollarSign, FolderOpen, Info, LogOut, Menu, X, Heart } from 'lucide-react';
+import { CalendarDays, DollarSign, FolderOpen, Info, LogOut, Menu, X, Heart, KeyRound, Loader2 } from 'lucide-react';
 import logoRondello from '@/assets/logo-rondello.png';
 
 export type PortalEvent = {
@@ -60,6 +60,58 @@ const NAV = [
   { to: '/portal/arquivos',     label: 'Arquivos',     icon: FolderOpen },
   { to: '/portal/informacoes',  label: 'Informações',  icon: Info },
 ];
+
+function EnterCodeScreen({ onLinked }: { onLinked: () => void }) {
+  const [code, setCode]       = useState('');
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setSaving(true);
+    setError('');
+    const { data, error: fnErr } = await (supabase.rpc as any)('link_portal_by_code', { p_code: code.trim().toUpperCase() });
+    setSaving(false);
+    if (fnErr || !data) {
+      setError('Código inválido ou já utilizado. Verifique com o buffet.');
+      return;
+    }
+    onLinked();
+  };
+
+  return (
+    <div className="flex-1 flex items-center justify-center px-4 py-16">
+      <div className="w-full max-w-sm text-center space-y-6">
+        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+          <KeyRound className="w-7 h-7 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-xl font-black text-foreground">Insira seu código de acesso</h2>
+          <p className="text-sm text-muted-foreground mt-1.5">O buffet enviou um código para você. Digite abaixo para vincular seu evento.</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            value={code}
+            onChange={e => setCode(e.target.value.toUpperCase())}
+            placeholder="Ex: AB12CD34EF"
+            maxLength={16}
+            className="w-full h-12 px-4 text-center text-lg font-bold tracking-widest border border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+          />
+          {error && <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
+          <button
+            type="submit"
+            disabled={saving || !code.trim()}
+            className="w-full h-11 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {saving ? 'Verificando…' : 'Acessar portal'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default function ClientPortalLayout() {
   const { user, signOut } = useAuth();
@@ -151,9 +203,10 @@ export default function ClientPortalLayout() {
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : !ctx.event ? (
-            <div className="text-center py-20 px-4">
-              <p className="text-muted-foreground">Nenhum evento vinculado à sua conta.</p>
-            </div>
+            <EnterCodeScreen onLinked={async () => {
+              setLoading(true);
+              loadPortalEvent(user!.id).then(c => { setCtx(c); setLoading(false); });
+            }} />
           ) : (
             <Outlet context={ctx} />
           )}
