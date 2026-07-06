@@ -43,8 +43,11 @@ export default function MeuPerfilPage() {
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
-    supabase.from('profiles').select('*').limit(1).single().then(({ data }) => {
-      if (data) setProfile(data as any);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase.from('profiles').select('*').eq('user_id', user.id).single().then(({ data }) => {
+        if (data) setProfile(data as any);
+      });
     });
   }, []);
 
