@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ChevronLeft, ChevronRight, Users, CalendarCheck,
-  TrendingUp, Clock, ExternalLink, UtensilsCrossed, Plus, X, CalendarPlus, Mail, MapPin,
+  Clock, ExternalLink, UtensilsCrossed, X, CalendarPlus, Mail, MapPin,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -195,12 +195,9 @@ export default function CalendarPage() {
           <StatChip icon={<CalendarCheck className="w-3.5 h-3.5 text-emerald-600" />}
                     label="Confirmados" value={`${confirmed.length} evento${confirmed.length !== 1 ? 's' : ''}`}
                     color="bg-emerald-50 border-emerald-100" />
-          <StatChip icon={<Users className="w-3.5 h-3.5 text-blue-600" />}
-                    label="Convidados" value={totalGuests > 0 ? totalGuests.toLocaleString('pt-BR') : '—'}
-                    color="bg-blue-50 border-blue-100" />
-          <StatChip icon={<TrendingUp className="w-3.5 h-3.5 text-primary" />}
-                    label="Receita prevista" value={totalRevenue > 0 ? fmtBRL(totalRevenue) : '—'}
-                    color="bg-primary/5 border-primary/10" />
+          <StatChip icon={<UtensilsCrossed className="w-3.5 h-3.5 text-violet-600" />}
+                    label="Degustações" value={tastings.length > 0 ? `${tastings.length}` : '—'}
+                    color="bg-violet-50 border-violet-100" />
         </div>
       </div>
 
@@ -223,6 +220,7 @@ export default function CalendarPage() {
               Carregando...
             </div>
           ) : (
+            <>
             <div className="grid grid-cols-7 divide-x divide-y divide-border">
               {cells.map((day, idx) => {
                 if (day === null) return <div key={`e${idx}`} className="h-28 bg-muted/20" />;
@@ -285,6 +283,27 @@ export default function CalendarPage() {
                 );
               })}
             </div>
+            {/* Legend — horizontal below calendar */}
+            <div className="px-4 py-3 border-t border-border flex items-center gap-5 flex-wrap">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Legenda</span>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-emerald-500" />
+                <span className="text-xs text-muted-foreground">Confirmado</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-amber-400" />
+                <span className="text-xs text-muted-foreground">Reservado / Negociando</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-purple-400" />
+                <span className="text-xs text-muted-foreground">Degustação</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-blue-400" />
+                <span className="text-xs text-muted-foreground">Compromisso</span>
+              </div>
+            </div>
+            </>
           )}
         </div>
 
@@ -368,28 +387,6 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* Legend */}
-          <div className="bg-white border border-border rounded-2xl p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-3">Legenda</p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-emerald-500" />
-                <span className="text-xs text-muted-foreground">Confirmado</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-amber-400" />
-                <span className="text-xs text-muted-foreground">Reservado (1° contato / negociando)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-purple-400" />
-                <span className="text-xs text-muted-foreground">Degustação</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-blue-400" />
-                <span className="text-xs text-muted-foreground">Compromisso</span>
-              </div>
-            </div>
-          </div>
 
         </div>
       </div>
