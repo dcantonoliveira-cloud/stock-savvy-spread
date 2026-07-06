@@ -40,14 +40,14 @@ export const EVENT_STATUS: Record<EventStatusKey, {
     cls: 'bg-emerald-100 text-emerald-800 border-emerald-300',
   },
   cancelled: {
-    label: 'Não fechou',
-    bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200',
-    cls: 'bg-rose-50 text-rose-500 border-rose-200',
-  },
-  lost: {
     label: 'Cancelado',
     bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300',
     cls: 'bg-red-100 text-red-700 border-red-300',
+  },
+  lost: {
+    label: 'Não fechou',
+    bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200',
+    cls: 'bg-rose-50 text-rose-500 border-rose-200',
   },
 };
 
