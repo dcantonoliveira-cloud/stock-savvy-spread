@@ -254,6 +254,7 @@ async function syncEvents(clientIdMap) {
 
     const record = {
       client_id:              clientId,
+      company_id:             'c56c2ccd-2c35-4ebb-b868-e153727e5d89',
       ...(bubbleName !== null ? { event_name: bubbleName } : {}),
       event_type:             str(ev.Tipo_Do_Evento),
       status:                 mapStatus(ev.status),
