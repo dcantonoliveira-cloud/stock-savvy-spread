@@ -137,12 +137,12 @@ export default function TastingsPage() {
   const past      = allSorted.filter(s => s.scheduled_date < now);
   const visiblePast = past.slice(0, visibleCount);
 
-  const cols = 'grid-cols-[140px_90px_1fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr]';
+  const cols = 'grid-cols-[140px_90px_1fr_1fr_1fr_1fr_1fr_1fr_1fr]';
 
   const TableHeader = () => (
     <div className={`px-5 py-2.5 grid ${cols} gap-3 bg-muted/30`}>
-      {['Data','Tipo','Total','Novos','Velhos','Fechados','Em aberto','Convidados','Conversão','Total pago'].map((h, i) => (
-        <span key={h} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center ${i <= 1 ? 'text-left' : ''} ${i === 8 ? 'border-l border-border pl-3' : ''}`}>{h}</span>
+      {['Data','Tipo','Total','Novos','Velhos','Em aberto','Convidados','Conversão','Total pago'].map((h, i) => (
+        <span key={h} className={`text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 text-center ${i <= 1 ? 'text-left' : ''} ${i === 7 ? 'border-l border-border pl-3' : ''}`}>{h}</span>
       ))}
     </div>
   );
@@ -166,7 +166,6 @@ export default function TastingsPage() {
         <Cell v={total}    bold  muted={isPast} />
         <Cell v={novos}          muted={isPast} />
         <Cell v={velhos}         muted={isPast} />
-        <Cell v={fechados > 0 ? fechados : null} muted={isPast} />
         <Cell v={emAberto > 0 ? emAberto : null} danger={emAberto > 0} />
         <Cell v={guests > 0 ? guests : null} muted={isPast} />
         <div className="text-center border-l border-border/50 pl-3">
