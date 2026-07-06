@@ -85,9 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resolvedRole = roles.includes('supervisor') ? 'supervisor' : roles.includes('client') ? 'client' : 'employee';
     } else if (clientRes.data) {
       resolvedRole = 'client';
-    } else {
-      // Sem role definido: trata como cliente potencial (vai para tela de código no portal)
-      resolvedRole = 'client';
     }
     setRole(resolvedRole);
 
