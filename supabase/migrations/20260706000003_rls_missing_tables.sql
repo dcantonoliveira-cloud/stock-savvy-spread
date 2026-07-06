@@ -36,13 +36,14 @@ CREATE POLICY "Tenant isolation tasting_sessions" ON public.tasting_sessions
   WITH CHECK (company_id = public.my_company_id());
 
 -- ─── 2. tasting_session_events ────────────────────────────────────
+-- Coluna de FK é session_id (não tasting_session_id)
 ALTER TABLE public.tasting_session_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Tenant isolation tasting_session_events" ON public.tasting_session_events;
 CREATE POLICY "Tenant isolation tasting_session_events" ON public.tasting_session_events
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM public.tasting_sessions ts
-      WHERE ts.id = tasting_session_id
+      WHERE ts.id = session_id
         AND ts.company_id = public.my_company_id()
     )
   );
