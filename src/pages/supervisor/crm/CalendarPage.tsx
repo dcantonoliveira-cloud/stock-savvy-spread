@@ -472,8 +472,10 @@ function EventCard({ ev, showDate, onOpen }: { ev: EventRow; showDate?: boolean;
           <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>
-      {ev.total_value != null && (
-        <p className="text-xs font-semibold text-foreground mt-2 text-right">{fmtBRL(ev.total_value)}</p>
+      {ev.location_text && (
+        <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+          <MapPin className="w-3 h-3 shrink-0" />{ev.location_text}
+        </p>
       )}
     </div>
   );
