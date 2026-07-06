@@ -47,7 +47,7 @@ import { STATUS_LABELS, STATUS_CLS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
 const STATUS_CLASSES: Record<string,string> = Object.fromEntries(ALL_STATUS_KEYS.map(k => [k, STATUS_CLS(k)]));
 const EVENT_TYPES = ['Aniversário','Batizado','Casamento','Confraternização','Corporativo','Debutante','Formatura','Outro'];
 const EMPTY_FORM = {
-  client_id: '', event_name: '', event_type: 'Casamento', status: 'lead',
+  client_id: '', client_phone: '', event_name: '', event_type: 'Casamento', status: 'lead',
   event_date: '', location_text: '', location_id: '',
   guest_count: '', children_50_pct: '0', non_paying_guests: '0',
   price_per_person: '', contract_value: '', total_value: '',
@@ -247,8 +247,10 @@ export default function EventsPage() {
     if (!clientId && clientQuery.trim()) {
       const { data: newClient } = await supabase.from('clients').insert({
         name: clientQuery.trim(),
+        phone: form.client_phone.trim() || null,
         company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89',
       }).select('id, name, phone, email').single();
+
       if (newClient) {
         clientId = newClient.id;
         setClients(prev => [...prev, newClient as Client]);
@@ -312,6 +314,7 @@ export default function EventsPage() {
     setLocationQuery(locName);
     setForm({
       client_id: event.client_id ?? '',
+      client_phone: c?.phone ?? '',
       event_name: event.event_name ?? '',
       event_type: event.event_type ?? 'Casamento',
       status: event.status,
@@ -376,7 +379,7 @@ export default function EventsPage() {
                   key={c.id}
                   type="button"
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 text-left"
-                  onClick={() => { setF('client_id', c.id); setClientQuery(c.name); setClientDropOpen(false); }}
+                  onClick={() => { setF('client_id', c.id); setF('client_phone', c.phone ?? ''); setClientQuery(c.name); setClientDropOpen(false); }}
                 >
                   <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
                     {c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}
@@ -388,6 +391,22 @@ export default function EventsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Telefone do cliente */}
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Telefone do Cliente</label>
+        <Input
+          value={form.client_phone}
+          onChange={e => {
+            setF('client_phone', e.target.value);
+            if (form.client_id) {
+              supabase.from('clients').update({ phone: e.target.value || null }).eq('id', form.client_id);
+            }
+          }}
+          placeholder="(11) 99999-9999"
+          className="h-9"
+        />
       </div>
 
       {/* Nome e Tipo */}
