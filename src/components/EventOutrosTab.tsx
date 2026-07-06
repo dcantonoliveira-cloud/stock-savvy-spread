@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Clock, Copy, Send, XCircle, Trash2, RefreshCw, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Clock, Copy, Send, XCircle, Trash2, RefreshCw, UserPlus, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 import { buildMessage, sendWhatsApp, openWhatsAppLink } from '@/lib/whatsapp';
@@ -224,12 +224,26 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
       {/* Status de acesso */}
       <div className="border-t border-border pt-4 mt-2">
         {portal?.user_id ? (
-          <div className="flex items-center gap-2 text-sm text-emerald-700">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span>Cliente cadastrado no portal.</span>
-            {portal.last_accessed_at && (
-              <span className="text-muted-foreground text-xs ml-1">Último acesso: {fmtDT(portal.last_accessed_at)}</span>
-            )}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-emerald-700">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>Cliente cadastrado no portal.</span>
+              {portal.last_accessed_at && (
+                <span className="text-muted-foreground text-xs ml-1">Último acesso: {fmtDT(portal.last_accessed_at)}</span>
+              )}
+            </div>
+            <button
+              onClick={async () => {
+                if (!confirm('Deseja resetar a conta do cliente? Ele precisará se cadastrar novamente usando o código de acesso.')) return;
+                const { error } = await (supabase.rpc as any)('reset_portal_client', { p_portal_id: portal.id });
+                if (error) { toast.error('Erro ao resetar: ' + error.message); return; }
+                setPortal(prev => prev ? { ...prev, user_id: null, first_accessed_at: null, last_accessed_at: null } : prev);
+                toast.success('Conta do cliente resetada. Ele precisará se cadastrar novamente.');
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50 transition-colors shrink-0"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Resetar conta
+            </button>
           </div>
         ) : portal?.invite_token ? (
           <div className="space-y-2">
