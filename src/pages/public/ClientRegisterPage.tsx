@@ -11,7 +11,6 @@ export default function ClientRegisterPage() {
 
   const [invite, setInvite] = useState<{ id: string; event_id: string; company_id: string; event_name: string; client_name: string } | null>(null);
   const [loading, setLoading]   = useState(true);
-  const [invalid, setInvalid]   = useState(false);
   const [alreadyUsed, setAlreadyUsed] = useState(false);
 
   const [name,     setName]     = useState('');
@@ -23,17 +22,18 @@ export default function ClientRegisterPage() {
   const [error,    setError]    = useState('');
 
   useEffect(() => {
-    if (!token) { setInvalid(true); setLoading(false); return; }
+    // Sem token: cadastro livre (vinculação pelo código de acesso após login)
+    if (!token) { setLoading(false); return; }
     (async () => {
       const { data } = await (supabase.from as any)('client_portal_access')
         .select('id, event_id, user_id, events(event_name, company_id, clients(name))')
         .eq('invite_token', token)
         .maybeSingle();
-      if (!data) { setInvalid(true); setLoading(false); return; }
+      if (!data) { setLoading(false); return; } // token inválido → cadastro livre mesmo
       if (data.user_id) { setAlreadyUsed(true); setLoading(false); return; }
-      const eventName   = (data.events as any)?.event_name ?? 'seu evento';
-      const clientName  = (data.events as any)?.clients?.name ?? '';
-      const companyId   = (data.events as any)?.company_id ?? '';
+      const eventName  = (data.events as any)?.event_name ?? 'seu evento';
+      const clientName = (data.events as any)?.clients?.name ?? '';
+      const companyId  = (data.events as any)?.company_id ?? '';
       setInvite({ id: data.id, event_id: data.event_id, company_id: companyId, event_name: eventName, client_name: clientName });
       if (clientName) setName(clientName);
       setLoading(false);
@@ -86,18 +86,6 @@ export default function ClientRegisterPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (invalid) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="text-center max-w-sm">
-          <img src={logoRondello} alt="Rondello" className="h-12 mx-auto mb-6" />
-          <p className="text-lg font-semibold text-foreground">Link inválido</p>
-          <p className="text-sm text-muted-foreground mt-2">Este link de convite não existe ou expirou. Solicite um novo ao buffet.</p>
-        </div>
       </div>
     );
   }
