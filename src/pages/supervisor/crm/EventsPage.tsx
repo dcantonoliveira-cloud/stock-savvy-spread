@@ -48,7 +48,7 @@ const STATUS_CLASSES: Record<string,string> = Object.fromEntries(ALL_STATUS_KEYS
 const EVENT_TYPES = ['Aniversário','Batizado','Casamento','Confraternização','Corporativo','Debutante','Formatura','Outro'];
 const EMPTY_FORM = {
   client_id: '', event_name: '', event_type: 'Casamento', status: 'lead',
-  event_date: '', location_text: '',
+  event_date: '', location_text: '', location_id: '',
   guest_count: '', children_50_pct: '0', non_paying_guests: '0',
   price_per_person: '', contract_value: '', total_value: '',
   pricing_mode: 'per_person',
@@ -106,6 +106,9 @@ export default function EventsPage() {
   const clientSearchRef = useRef<HTMLInputElement>(null);
   const [clientQuery, setClientQuery] = useState('');
   const [clientDropOpen, setClientDropOpen] = useState(false);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationDropOpen, setLocationDropOpen] = useState(false);
 
   // ── Load data ────────────────────────────────────────────────────
   const loadEvents = async (y: number) => {
@@ -173,10 +176,12 @@ export default function EventsPage() {
   // Carrega locais uma vez + eventos do ano inicial
   useEffect(() => {
     Promise.all([
-      supabase.from('event_locations').select('id, name'),
+      supabase.from('event_locations').select('id, name').order('name'),
       loadEvents(year),
     ]).then(([locRes]) => {
-      setLocationMap(new Map((locRes.data ?? []).map((l: any) => [l.id, l.name])));
+      const locs: { id: string; name: string }[] = locRes.data ?? [];
+      setLocations(locs);
+      setLocationMap(new Map(locs.map(l => [l.id, l.name])));
     });
   }, []);
 
@@ -246,6 +251,7 @@ export default function EventsPage() {
       status: form.status,
       event_date: form.event_date || null,
       location_text: form.location_text || null,
+      location_id: form.location_id || null,
       guest_count: parseInt(form.guest_count) || null,
       children_50_pct: parseInt(form.children_50_pct) || 0,
       non_paying_guests: parseInt(form.non_paying_guests) || 0,
@@ -276,6 +282,7 @@ export default function EventsPage() {
     setSaving(false);
     setForm({ ...EMPTY_FORM });
     setClientQuery('');
+    setLocationQuery('');
     loadEvents(year);
   };
 
@@ -290,6 +297,8 @@ export default function EventsPage() {
     setEditMode(true);
     const c = clients.find(cl => cl.id === event.client_id);
     setClientQuery(c?.name ?? '');
+    const locName = event.location_id ? (locationMap.get(event.location_id) ?? '') : (event.location_text ?? '');
+    setLocationQuery(locName);
     setForm({
       client_id: event.client_id ?? '',
       event_name: event.event_name ?? '',
@@ -297,6 +306,7 @@ export default function EventsPage() {
       status: event.status,
       event_date: event.event_date ?? '',
       location_text: event.location_text ?? '',
+      location_id: event.location_id ?? '',
       guest_count: String(event.guest_count ?? ''),
       children_50_pct: String(event.children_50_pct ?? '0'),
       non_paying_guests: String(event.non_paying_guests ?? '0'),
@@ -395,7 +405,63 @@ export default function EventsPage() {
       {/* Local */}
       <div>
         <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Local do Evento</label>
-        <Input value={form.location_text} onChange={e => setF('location_text', e.target.value)} placeholder="Ex: Fazenda São José" className="h-9" />
+        <div className="relative">
+          <input
+            value={locationQuery}
+            onChange={e => { setLocationQuery(e.target.value); setLocationDropOpen(true); setF('location_id', ''); setF('location_text', e.target.value); }}
+            onFocus={() => setLocationDropOpen(true)}
+            onBlur={() => setTimeout(() => setLocationDropOpen(false), 150)}
+            placeholder="Buscar ou criar local..."
+            className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+          />
+          {form.location_id && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-emerald-600 font-medium">✓</span>
+          )}
+          {locationDropOpen && (
+            <div className="absolute z-50 top-full mt-1 w-full bg-white border border-border rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+              {locations
+                .filter(l => !locationQuery || l.name.toLowerCase().includes(locationQuery.toLowerCase()))
+                .map(l => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 text-left"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { setF('location_id', l.id); setF('location_text', l.name); setLocationQuery(l.name); setLocationDropOpen(false); }}
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span>{l.name}</span>
+                  </button>
+                ))}
+              {locationQuery.trim() && !locations.some(l => l.name.toLowerCase() === locationQuery.trim().toLowerCase()) && (
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-primary/5 text-primary text-left font-medium border-t border-border"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={async () => {
+                    const name = locationQuery.trim();
+                    const { data, error } = await supabase.from('event_locations' as any).insert({ name, company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89' }).select('id, name').single();
+                    if (error || !data) { toast.error('Erro ao criar local'); return; }
+                    const newLoc = data as { id: string; name: string };
+                    setLocations(prev => [...prev, newLoc].sort((a, b) => a.name.localeCompare(b.name)));
+                    setLocationMap(prev => new Map([...prev, [newLoc.id, newLoc.name]]));
+                    setF('location_id', newLoc.id);
+                    setF('location_text', newLoc.name);
+                    setLocationQuery(newLoc.name);
+                    setLocationDropOpen(false);
+                    toast.success('Local criado!');
+                  }}
+                >
+                  <Plus className="w-3.5 h-3.5 shrink-0" />
+                  Criar "{locationQuery.trim()}"
+                </button>
+              )}
+              {!locationQuery && locations.length === 0 && (
+                <p className="px-3 py-2 text-xs text-muted-foreground">Nenhum local cadastrado. Digite para criar.</p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Convidados */}
@@ -636,7 +702,7 @@ export default function EventsPage() {
               </>
             )}
           </div>
-          <Button onClick={() => { setForm({...EMPTY_FORM}); setClientQuery(''); setNewOpen(true); loadClients(); }}
+          <Button onClick={() => { setForm({...EMPTY_FORM}); setClientQuery(''); setLocationQuery(''); setNewOpen(true); loadClients(); }}
             className="gap-1.5 shrink-0 rounded-lg h-9 px-4">
             <Plus className="w-4 h-4" />
             Novo Evento
