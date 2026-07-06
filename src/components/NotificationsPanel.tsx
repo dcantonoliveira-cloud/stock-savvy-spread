@@ -50,7 +50,7 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('app_notifications')
-      .select('id, type, title, message, actor_name, data, read, created_at')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) console.error('[NotificationsPanel] erro:', error.message);
