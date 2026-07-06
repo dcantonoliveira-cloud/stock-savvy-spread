@@ -228,7 +228,7 @@ export default function TastingsPage() {
         <span className={`text-sm ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>{s.type ?? '—'}</span>
         <Cell v={total}    bold muted={muted} />
         <Cell v={novos}         muted={muted} />
-        <Cell v={totalConfirmados > 0 ? totalConfirmados : null} muted={muted} />
+        <Cell v={fechados > 0 ? fechados : null} muted={muted} />
         <Cell v={emAberto > 0 ? emAberto : null} danger={emAberto > 0} muted={muted} />
         <Cell v={guests > 0 ? guests : null} muted={muted} />
         <div className="text-center border-l border-border/50 pl-3">
