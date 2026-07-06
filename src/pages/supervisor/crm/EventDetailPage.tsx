@@ -75,6 +75,7 @@ interface EventDetail {
   paid_value: number | null;
   menu_text: string | null;
   menu_mode: string | null;
+  annex_1_text: string | null;
   schedule_text: string | null;
   schedule_file_url: string | null;
   schedule_file_name: string | null;
@@ -280,6 +281,7 @@ export default function EventDetailPage() {
       witness_2_email: data.witness_2_email ?? null,
       menu_text: data.menu_text ?? null,
       menu_mode: data.menu_mode ?? 'text',
+      annex_1_text: data.annex_1_text ?? null,
       schedule_text: data.schedule_text ?? null,
       pricing_mode: data.pricing_mode ?? 'per_person',
       contract_value: toNum(data.contract_value),
@@ -819,8 +821,8 @@ export default function EventDetailPage() {
 
             {(form.menu_mode ?? 'text') === 'text' ? (
               <RichTextEditor
-                content={form.menu_text ?? ''}
-                onChange={val => setF('menu_text', val)}
+                content={form.annex_1_text ?? form.menu_text ?? ''}
+                onChange={val => setF('annex_1_text', val)}
                 placeholder="Descreva o cardápio do evento..."
               />
             ) : (

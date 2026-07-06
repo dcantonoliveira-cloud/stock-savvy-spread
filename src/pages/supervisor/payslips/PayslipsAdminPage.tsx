@@ -57,9 +57,17 @@ export default function PayslipsAdminPage() {
   useEffect(() => { loadEmployees(); load(); }, []);
 
   const loadEmployees = async () => {
+    const { data: myProfile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+      .single();
+    const companyId = (myProfile as any)?.company_id;
+    if (!companyId) return;
     const { data } = await supabase
       .from('profiles')
       .select('user_id, display_name, email')
+      .eq('company_id', companyId)
       .order('display_name');
     setEmployees((data ?? []).map((p: any) => ({ id: p.user_id, display_name: p.display_name, email: p.email })));
   };

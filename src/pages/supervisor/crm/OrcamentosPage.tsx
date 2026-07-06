@@ -397,6 +397,7 @@ function Count({ n }: { n: number }) {
 
 const ALL_STATUS_OPTIONS = [
   ...PIPELINE_STATUSES.map(s => ({ key: s, ...STATUS_CONFIG[s] })),
+  { key: 'confirmed', label: 'Confirmado', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
   { key: 'cancelled', label: 'Não fechou', bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200' },
   { key: 'lost', label: 'Cancelado', bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200' },
 ];

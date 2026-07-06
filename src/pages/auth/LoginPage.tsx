@@ -121,24 +121,13 @@ export default function LoginPage() {
             {loading ? 'Aguarde...' : isForgotPassword ? 'Enviar link de redefinição' : isSignUp ? 'Criar Conta' : 'Entrar'}
           </Button>
           {!isForgotPassword && (
-            <>
-              <button
-                type="button"
-                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
-                onClick={() => { setIsSignUp(!isSignUp); }}
-              >
-                {isSignUp ? 'Já tem conta? Entrar' : 'Primeiro acesso? Criar conta'}
-              </button>
-              {!isSignUp && (
-                <button
-                  type="button"
-                  className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setIsForgotPassword(true)}
-                >
-                  Esqueci minha senha
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setIsForgotPassword(true)}
+            >
+              Esqueci minha senha
+            </button>
           )}
           {isForgotPassword && (
             <button
