@@ -53,17 +53,18 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
-    if (error) console.error('[NotificationsPanel] erro:', error.message);
-    setNotifs((data ?? []) as Notif[]);
+    console.log('[NotificationsPanel] data:', data?.length, 'error:', error?.message);
+    if (!error) setNotifs((data ?? []) as Notif[]);
   }, []);
 
   useEffect(() => {
-    load();
+    // Pequeno delay garante que a sessão Supabase esteja pronta
+    const t = setTimeout(load, 300);
     const ch = supabase
       .channel('notif-panel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_notifications' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_notifications' }, load)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { clearTimeout(t); supabase.removeChannel(ch); };
   }, [load]);
 
   const handleClick = async (n: Notif) => {
