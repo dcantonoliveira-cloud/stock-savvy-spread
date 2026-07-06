@@ -48,7 +48,7 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = Object.fromEn
 
 const SITUATION_CFG: Record<string, { label: string; cls: string }> = {
   new:       { label: 'Cliente novo',   cls: 'text-muted-foreground' },
-  confirmed: { label: 'Evento fechado', cls: 'text-emerald-600 font-semibold' },
+  confirmed: { label: 'Já confirmado',  cls: 'text-emerald-600 font-semibold' },
 };
 
 const fmtDate = (d: string | null) => {
@@ -57,7 +57,6 @@ const fmtDate = (d: string | null) => {
   return `${day}/${m}/${String(y).slice(2)}`;
 };
 
-// Converts Bubble BB-code format to HTML for the rich text editor
 function parseBubbleContent(text: string): string {
   if (!text || !text.includes('[')) return text;
   return text
@@ -82,17 +81,19 @@ export default function TastingDetailPage() {
   const location = useLocation();
   const stateFrom  = (location.state as any)?.from  ?? '/tastings';
   const stateLabel = (location.state as any)?.fromLabel ?? 'Degustações';
-  const [session, setSession]   = useState<Session | null>(null);
-  const [rows, setRows]         = useState<SessionEvent[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [tab, setTab]           = useState<'guests' | 'menu' | 'info'>('guests');
-  const [allocOpen, setAllocOpen] = useState(false);
-  const [menuText, setMenuText]       = useState('');
-  const [notes, setNotes]             = useState('');
-  const [maxCouples, setMaxCouples]   = useState<number | null>(null);
-  const [venue, setVenue]             = useState('');
-  const [responsible, setResponsible] = useState('');
-  const [costPerCouple, setCostPerCouple] = useState<number | null>(null);
+
+  const [session,      setSession]      = useState<Session | null>(null);
+  const [rows,         setRows]         = useState<SessionEvent[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [tab,          setTab]          = useState<'guests' | 'menu' | 'info'>('guests');
+  const [allocOpen,    setAllocOpen]    = useState(false);
+  const [menuText,     setMenuText]     = useState('');
+  const [notes,        setNotes]        = useState('');
+  const [maxCouples,   setMaxCouples]   = useState<number | null>(null);
+  const [venue,        setVenue]        = useState('');
+  const [responsible,  setResponsible]  = useState('');
+  const [costPerCouple,setCostPerCouple]= useState<number | null>(null);
+
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fields = useRef({
     menu_text: '', notes: '',
@@ -104,23 +105,21 @@ export default function TastingDetailPage() {
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
-    const { data: sess } = await supabase
-      .from('tasting_sessions' as any).select('*').eq('id', id).single();
-    const { data: evts } = await supabase
-      .from('tasting_session_events' as any)
-      .select('*, events(id, event_name, event_date, status, organizer, clients(name))')
-      .eq('session_id', id);
+    const [{ data: sess }, { data: evts }] = await Promise.all([
+      supabase.from('tasting_sessions' as any).select('*').eq('id', id).single(),
+      supabase.from('tasting_session_events' as any)
+        .select('*, events(id, event_name, event_date, status, organizer)')
+        .eq('session_id', id),
+    ]);
 
     if (!sess) { navigate('/tastings'); return; }
     const s = sess as Session;
 
-    // Parse Bubble BB-code on first load and save HTML back
     const rawMenu  = s.menu_text ?? '';
     const rawNotes = s.notes ?? '';
     const parsedMenu  = parseBubbleContent(rawMenu);
     const parsedNotes = parseBubbleContent(rawNotes);
-    const needsSave = parsedMenu !== rawMenu || parsedNotes !== rawNotes;
-    if (needsSave) {
+    if (parsedMenu !== rawMenu || parsedNotes !== rawNotes) {
       await supabase.from('tasting_sessions' as any)
         .update({ menu_text: parsedMenu, notes: parsedNotes }).eq('id', id);
     }
@@ -144,23 +143,10 @@ export default function TastingDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const updateRow = async (rowId: string, patch: Partial<SessionEvent>) => {
-    setRows(prev => prev.map(r => r.id === rowId ? { ...r, ...patch } : r));
-    const { events: _, ...dbPatch } = patch as any;
-    if (Object.keys(dbPatch).length > 0) {
-      await supabase.from('tasting_session_events' as any).update(dbPatch).eq('id', rowId);
-    }
-  };
-
-  const removeRow = async (rowId: string) => {
-    setRows(prev => prev.filter(r => r.id !== rowId));
-    await supabase.from('tasting_session_events' as any).delete().eq('id', rowId);
-  };
-
   const saveSession = useCallback(async (patch: Partial<Session>) => {
     if (!id) return;
-    await supabase.from('tasting_sessions' as any).update(patch).eq('id', id);
-    toast.success('Salvo', { duration: 1500 });
+    const { error } = await supabase.from('tasting_sessions' as any).update(patch).eq('id', id);
+    if (error) toast.error('Erro ao salvar');
   }, [id]);
 
   const scheduleAutoSave = useCallback(() => {
@@ -168,15 +154,31 @@ export default function TastingDetailPage() {
     autoSaveTimer.current = setTimeout(() => saveSession(fields.current as Partial<Session>), 1200);
   }, [saveSession]);
 
-  // Stats
-  const total      = rows.length;
-  const novos      = rows.filter(r => r.situation_snapshot === 'new').length;
-  const guests     = rows.reduce((s, r) => s + (r.guest_count ?? 0), 0);
-  const totalPago  = rows.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
-  const emAberto   = rows.filter(r => r.situation_snapshot === 'new' && r.events && PIPELINE.includes(r.events.status)).length;
-  const fechados   = rows.filter(r => r.situation_snapshot === 'new' && r.events && CLOSED.includes(r.events.status)).length;
-  const conv       = novos > 0 ? Math.round((fechados / novos) * 100) : null;
-  const fmtMoney   = (v: number) => v === 0 ? 'R$ 0' : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const updateRow = async (rowId: string, patch: Partial<SessionEvent>) => {
+    setRows(prev => prev.map(r => r.id === rowId ? { ...r, ...patch } : r));
+    const { events: _, ...dbPatch } = patch as any;
+    if (Object.keys(dbPatch).length > 0) {
+      const { error } = await supabase.from('tasting_session_events' as any).update(dbPatch).eq('id', rowId);
+      if (error) toast.error('Erro ao salvar');
+    }
+  };
+
+  const removeRow = async (rowId: string) => {
+    setRows(prev => prev.filter(r => r.id !== rowId));
+    const { error } = await supabase.from('tasting_session_events' as any).delete().eq('id', rowId);
+    if (error) toast.error('Erro ao remover');
+  };
+
+  // Stats (computed from local rows, mirroring the VIEW logic)
+  const total    = rows.length;
+  const novos    = rows.filter(r => r.situation_snapshot === 'new').length;
+  const velhos   = rows.filter(r => r.situation_snapshot === 'confirmed').length;
+  const emAberto = rows.filter(r => r.situation_snapshot === 'new' && r.events && PIPELINE.includes(r.events.status)).length;
+  const fechados = rows.filter(r => r.situation_snapshot === 'new' && r.events && CLOSED.includes(r.events.status)).length;
+  const guests   = rows.reduce((s, r) => s + (r.guest_count ?? 0), 0);
+  const totalPago= rows.reduce((s, r) => s + (r.paid_amount ?? 0), 0);
+  const conv     = novos > 0 ? Math.round((fechados / novos) * 100) : null;
+  const fmtMoney = (v: number) => v === 0 ? 'R$ 0' : `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -202,10 +204,8 @@ export default function TastingDetailPage() {
             {session.type && <p className="text-sm text-muted-foreground mt-0.5">{session.type}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setAllocOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
+            <button onClick={() => setAllocOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
               <Plus className="w-4 h-4" />
               Alocar clientes
             </button>
@@ -218,14 +218,18 @@ export default function TastingDetailPage() {
 
         {/* Stats bar */}
         <div className="px-8 py-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
-          <StatCard label="Eventos"       value={total} />
+          <StatChip label="Eventos"       value={total} />
           <StatDivider />
-          <StatCard label="Clientes novos" value={novos} />
-          <StatCard label="Em aberto"      value={emAberto} danger={emAberto > 0} />
-          {conv !== null && <StatCard label="Conversão" value={`${conv}%`} accent />}
+          <StatChip label="Novos"         value={novos} />
+          <StatChip label="Velhos"        value={velhos} />
+          <StatChip label="Fechados"      value={fechados} />
+          <StatChip label="Em aberto"     value={emAberto} danger={emAberto > 0} />
           <StatDivider />
-          <StatCard label="Total pago"  value={fmtMoney(totalPago)} muted />
-          <StatCard label="Convidados" value={guests} muted />
+          <StatChip label="Convidados"    value={guests} muted />
+          <StatChip label="Conversão"     value={conv !== null ? `${conv}%` : null}
+            accent={conv !== null && conv >= 50}
+            warn={conv !== null && conv > 0 && conv < 50} />
+          <StatChip label="Total pago"    value={totalPago > 0 ? fmtMoney(totalPago) : null} muted />
         </div>
 
         {/* Tabs */}
@@ -242,7 +246,6 @@ export default function TastingDetailPage() {
       {/* CONTENT */}
       <div className="px-8 py-6">
 
-        {/* ── Guests tab ── */}
         {tab === 'guests' && (
           <div className="space-y-4">
             <div className="bg-white border border-border rounded-2xl overflow-hidden">
@@ -272,14 +275,15 @@ export default function TastingDetailPage() {
                       sessionDate={session.scheduled_date}
                       onUpdate={patch => updateRow(row.id, patch)}
                       onRemove={() => removeRow(row.id)}
-                      onNavigate={() => navigate(`/events/${row.event_id}`, { state: { from: `/tastings/${session.id}`, fromLabel: `Degustação ${fmtDate(session.scheduled_date)}` } })}
+                      onNavigate={() => navigate(`/events/${row.event_id}`, {
+                        state: { from: `/tastings/${session.id}`, fromLabel: `Degustação ${fmtDate(session.scheduled_date)}` }
+                      })}
                     />
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Observações below table */}
             <div className="bg-white border border-border rounded-2xl p-6">
               <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">
                 Observações importantes
@@ -293,7 +297,6 @@ export default function TastingDetailPage() {
           </div>
         )}
 
-        {/* ── Menu tab ── */}
         {tab === 'menu' && (
           <div className="bg-white border border-border rounded-2xl p-6">
             <label className="block text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Cardápio</label>
@@ -305,29 +308,28 @@ export default function TastingDetailPage() {
           </div>
         )}
 
-        {/* ── Info tab ── */}
         {tab === 'info' && (
           <div className="space-y-4 max-w-3xl">
             <div className="bg-white border border-border rounded-2xl p-6 space-y-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">Sessão</p>
               <div className="grid grid-cols-2 gap-4">
+                <InfoField label="Máx. casais">
+                  <input type="number" min={1} value={maxCouples ?? ''}
+                    onChange={e => { const v = e.target.value ? parseInt(e.target.value) : null; setMaxCouples(v); fields.current.max_couples = v; scheduleAutoSave(); }}
+                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    placeholder="—" />
+                </InfoField>
                 <InfoField label="Local / salão">
                   <input value={venue}
                     onChange={e => { setVenue(e.target.value); fields.current.location = e.target.value; scheduleAutoSave(); }}
                     className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
                     placeholder="Ex: Salão Jardim" />
                 </InfoField>
-                <InfoField label="Assessora responsável">
+                <InfoField label="Responsável">
                   <input value={responsible}
                     onChange={e => { setResponsible(e.target.value); fields.current.responsible = e.target.value; scheduleAutoSave(); }}
                     className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
                     placeholder="Nome da assessora" />
-                </InfoField>
-                <InfoField label="Máx. de casais">
-                  <input type="number" min={1} value={maxCouples ?? ''}
-                    onChange={e => { const v = e.target.value ? parseInt(e.target.value) : null; setMaxCouples(v); fields.current.max_couples = v; scheduleAutoSave(); }}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="—" />
                 </InfoField>
                 <InfoField label="Custo por casal (R$)">
                   <input type="number" min={0} step={0.01} value={costPerCouple ?? ''}
@@ -336,6 +338,13 @@ export default function TastingDetailPage() {
                     placeholder="0,00" />
                 </InfoField>
               </div>
+              <InfoField label="Observações">
+                <RichTextEditor
+                  content={notes}
+                  onChange={html => { setNotes(html); fields.current.notes = html; scheduleAutoSave(); }}
+                  placeholder="Observações gerais da sessão..."
+                />
+              </InfoField>
             </div>
           </div>
         )}
@@ -365,24 +374,24 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
   onRemove: () => void;
   onNavigate: () => void;
 }) {
-  const [paid, setPaid]             = useState(row.paid_amount != null ? String(row.paid_amount) : '');
-  const [guestCount, setGuestCount] = useState<string>(row.guest_count != null ? String(row.guest_count) : '');
+  const [paid,       setPaid]       = useState(row.paid_amount != null ? String(row.paid_amount) : '');
+  const [guestCount, setGuestCount] = useState(row.guest_count != null ? String(row.guest_count) : '');
   const guestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ev  = row.events;
   const sit = SITUATION_CFG[row.situation_snapshot ?? ''];
 
-  const handlePaidBlur = async () => {
+  const handlePaidBlur = () => {
     const v = parseFloat(paid.replace(',', '.'));
-    if (isNaN(v)) return;
-    onUpdate({ paid_amount: v });
-    if (ev?.id && v > 0) {
-      await supabase.from('event_payments' as any).upsert({
-        event_id: ev.id, value: v,
-        notes: 'Pagamento de degustação', source: 'degustacao',
-        payment_date: sessionDate, is_confirmed: true,
-      });
-      toast.success('Valor registrado no evento');
-    }
+    if (!isNaN(v)) onUpdate({ paid_amount: v });
+  };
+
+  const toggleSnapshot = async () => {
+    const next = row.situation_snapshot === 'new' ? 'confirmed' : 'new';
+    onUpdate({ situation_snapshot: next });
+    await supabase.from('tasting_session_events' as any)
+      .update({ situation_snapshot: next })
+      .eq('session_id', row.session_id)
+      .eq('event_id', row.event_id);
   };
 
   return (
@@ -399,15 +408,8 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       <Td className="text-muted-foreground tabular-nums">{fmtDate(ev?.event_date ?? null)}</Td>
       <Td>
         <button
-          title={row.situation_snapshot === 'new' ? 'Lead novo — clique para marcar como já confirmado' : 'Já confirmado antes da deg — clique para marcar como lead novo'}
-          onClick={async () => {
-            const next = row.situation_snapshot === 'new' ? 'confirmed' : 'new';
-            onUpdate({ situation_snapshot: next });
-            await supabase.from('tasting_session_events' as any)
-              .update({ situation_snapshot: next })
-              .eq('session_id', row.session_id)
-              .eq('event_id', row.event_id);
-          }}
+          title="Automático pela data do contrato — clique para corrigir"
+          onClick={toggleSnapshot}
           className="flex items-center gap-1 group"
         >
           {sit
@@ -420,7 +422,10 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
           value={ev?.status ?? ''}
           onChange={async (next) => {
             onUpdate({ events: ev ? { ...ev, status: next } : ev });
-            if (ev?.id) await supabase.from('events').update({ status: next }).eq('id', ev.id);
+            if (ev?.id) {
+              const { error } = await supabase.from('events').update({ status: next }).eq('id', ev.id);
+              if (error) toast.error('Erro ao atualizar status');
+            }
           }}
         />
       </Td>
@@ -464,9 +469,9 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
   onClose: () => void;
   onAdded: () => void;
 }) {
-  const [search, setSearch]   = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [search,    setSearch]    = useState('');
+  const [results,   setResults]   = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
   const [confirmEv, setConfirmEv] = useState<any | null>(null);
   const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
 
@@ -475,8 +480,7 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
   useEffect(() => {
     if (!search.trim()) { setResults([]); return; }
     const t = setTimeout(async () => {
-      setLoading(true);
-      // Busca por cada palavra do termo para maior abrangência
+      setSearching(true);
       const terms = search.trim().split(/\s+/).filter(Boolean);
       const { data } = await supabase.from('events')
         .select('id, event_name, event_date, status, organizer')
@@ -486,36 +490,32 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
         .or(`event_date.gt.${todayStr},event_date.is.null`)
         .limit(30);
 
-      const PIPELINE_ORDER = ['lead', 'negotiating', 'tasting_scheduled'];
+      const OPEN = ['lead', 'negotiating', 'tasting_scheduled'];
       const filtered = (data ?? [])
         .filter((e: any) => !existingEventIds.includes(e.id))
         .sort((a: any, b: any) => {
-          const aOpen = PIPELINE_ORDER.includes(a.status) ? 0 : 1;
-          const bOpen = PIPELINE_ORDER.includes(b.status) ? 0 : 1;
+          const aOpen = OPEN.includes(a.status) ? 0 : 1;
+          const bOpen = OPEN.includes(b.status) ? 0 : 1;
           if (aOpen !== bOpen) return aOpen - bOpen;
           return (a.event_date ?? '').localeCompare(b.event_date ?? '');
         });
       setResults(filtered);
-      setLoading(false);
+      setSearching(false);
     }, 300);
     return () => clearTimeout(t);
   }, [search]);
 
   const alloc = async (ev: any) => {
-    // Business rule: snapshot based on contract_signed_date vs session date
-    // 'new'       = no contract yet, OR contract signed AFTER session date (came as lead)
-    // 'confirmed' = contract signed BEFORE session date (already a confirmed client)
-    const [{ data: evDetail }] = await Promise.all([
-      supabase.from('events').select('contract_signed_date').eq('id', ev.id).single(),
-    ]);
+    const { data: evDetail } = await supabase.from('events').select('contract_signed_date').eq('id', ev.id).single();
     const signedDate = (evDetail as any)?.contract_signed_date ?? null;
     const snapshot = signedDate && signedDate < sessionDate ? 'confirmed' : 'new';
-    await supabase.from('tasting_session_events' as any).insert({
+
+    const { error } = await supabase.from('tasting_session_events' as any).insert({
       session_id: sessionId, event_id: ev.id, situation_snapshot: snapshot,
     });
+    if (error) { toast.error('Erro ao alocar evento'); return; }
     toast.success(`${ev.event_name} alocado`);
 
-    // Busca telefone do cliente e endereço da empresa para popup de WhatsApp
     const [{ data: evData }, { data: companyData }] = await Promise.all([
       supabase.from('events').select('clients(name, phone)').eq('id', ev.id).single(),
       supabase.from('companies' as any).select('endereco').single(),
@@ -564,8 +564,8 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
               </div>
             )}
             <div className="space-y-1 max-h-72 overflow-y-auto">
-              {loading && <p className="text-sm text-muted-foreground text-center py-4">Buscando...</p>}
-              {!loading && search && results.length === 0 && (
+              {searching && <p className="text-sm text-muted-foreground text-center py-4">Buscando...</p>}
+              {!searching && search && results.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento encontrado.</p>
               )}
               {results.map(ev => (
@@ -585,7 +585,6 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
         </div>
       </div>
 
-      {/* Over-limit confirmation */}
       {confirmEv && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmEv(null)} />
@@ -656,13 +655,13 @@ function StatusSelect({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function StatCard({ label, value, danger, accent, muted }: {
-  label: string; value: string | number; danger?: boolean; accent?: boolean; muted?: boolean;
+function StatChip({ label, value, danger, accent, warn, muted }: {
+  label: string; value: string | number | null; danger?: boolean; accent?: boolean; warn?: boolean; muted?: boolean;
 }) {
   return (
     <div className="flex flex-col items-center px-3 py-1.5 rounded-xl bg-muted/40 min-w-[64px]">
-      <span className={`text-base font-bold leading-none mb-0.5 ${danger ? 'text-red-500' : accent ? 'text-primary' : muted ? 'text-muted-foreground' : 'text-foreground'}`}>
-        {value}
+      <span className={`text-base font-bold leading-none mb-0.5 ${danger ? 'text-red-500' : accent ? 'text-emerald-600' : warn ? 'text-amber-500' : muted ? 'text-muted-foreground' : 'text-foreground'}`}>
+        {value ?? '—'}
       </span>
       <span className="text-[10px] text-muted-foreground/70 whitespace-nowrap">{label}</span>
     </div>
