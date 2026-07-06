@@ -2,30 +2,33 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type ZapiConfig = { instance_id: string; token: string; client_token?: string };
 
-export type MessageTemplateKey = 'payment' | 'file' | 'tasting' | 'review';
+export type MessageTemplateKey = 'payment' | 'file' | 'tasting' | 'review' | 'portal_invite';
 
 export type MessageTemplates = Record<MessageTemplateKey, string>;
 
 // Defaults — substituídos pelos templates salvos em Configurações
 export const DEFAULT_TEMPLATES: MessageTemplates = {
-  payment: `Olá, {{clientName}}! 😊\n\nRegistramos seu pagamento de *{{value}}* referente ao evento *{{eventName}}*.\n\nQualquer dúvida, estamos à disposição! 🎉\n\n— Rondello Buffet`,
-  file:    `Olá, {{clientName}}! 📎\n\nUm novo arquivo foi adicionado ao seu evento *{{eventName}}*:\n\n*{{fileName}}*\n\nAcesse o portal do cliente para visualizar.\n\n— Rondello Buffet`,
-  tasting: `Olá, {{clientName}}! 🍽️\n\nSua degustação foi agendada para o dia *{{date}}*.\n\nAguardamos vocês com muito carinho para essa experiência especial!\n\n— Rondello Buffet`,
-  review:  `Olá, {{clientName}}! ⭐\n\nFoi uma honra realizar o *{{eventName}}*!\n\nGostaríamos muito de saber sua opinião sobre nossos serviços. Sua avaliação é muito importante para nós!\n\nObrigado pela confiança!\n— Rondello Buffet`,
+  payment:       `Olá, {{clientName}}! 😊\n\nRegistramos seu pagamento de *{{value}}* referente ao evento *{{eventName}}*.\n\nQualquer dúvida, estamos à disposição! 🎉\n\n— Rondello Buffet`,
+  file:          `Olá, {{clientName}}! 📎\n\nUm novo arquivo foi adicionado ao seu evento *{{eventName}}*:\n\n*{{fileName}}*\n\nAcesse o portal do cliente para visualizar.\n\n— Rondello Buffet`,
+  tasting:       `Olá, {{clientName}}! 🍽️\n\nSua degustação foi agendada para o dia *{{date}}*.\n\nAguardamos vocês com muito carinho para essa experiência especial!\n\n— Rondello Buffet`,
+  review:        `Olá, {{clientName}}! ⭐\n\nFoi uma honra realizar o *{{eventName}}*!\n\nGostaríamos muito de saber sua opinião sobre nossos serviços. Sua avaliação é muito importante para nós!\n\nObrigado pela confiança!\n— Rondello Buffet`,
+  portal_invite: `Olá, {{clientName}}! 🎉\n\nSeu portal do cliente está pronto! Por lá você acompanha tudo sobre o seu evento *{{eventName}}*: financeiro, arquivos e informações da festa.\n\n*Como acessar:*\n1. Acesse: {{portalUrl}}\n2. Crie sua conta\n3. Use o código: *{{accessCode}}*\n\n— Rondello Buffet`,
 };
 
 export const TEMPLATE_LABELS: Record<MessageTemplateKey, string> = {
-  payment: 'Pagamento adicionado',
-  file:    'Arquivo incluído',
-  tasting: 'Degustação agendada',
-  review:  'Pedido de avaliação',
+  payment:       'Pagamento adicionado',
+  file:          'Arquivo incluído',
+  tasting:       'Degustação agendada',
+  review:        'Pedido de avaliação',
+  portal_invite: 'Convite ao portal do cliente',
 };
 
 export const TEMPLATE_VARS: Record<MessageTemplateKey, string[]> = {
-  payment: ['{{clientName}}', '{{value}}', '{{eventName}}'],
-  file:    ['{{clientName}}', '{{eventName}}', '{{fileName}}'],
-  tasting: ['{{clientName}}', '{{date}}', '{{address}}'],
-  review:  ['{{clientName}}', '{{eventName}}'],
+  payment:       ['{{clientName}}', '{{value}}', '{{eventName}}'],
+  file:          ['{{clientName}}', '{{eventName}}', '{{fileName}}'],
+  tasting:       ['{{clientName}}', '{{date}}', '{{address}}'],
+  review:        ['{{clientName}}', '{{eventName}}'],
+  portal_invite: ['{{clientName}}', '{{eventName}}', '{{accessCode}}', '{{portalUrl}}'],
 };
 
 // Busca templates salvos no banco (provider = 'whatsapp_messages')

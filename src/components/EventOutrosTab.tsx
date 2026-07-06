@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Clock, Copy, Send, XCircle, Trash2, RefreshCw, UserPlus, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
-import { buildMessage, sendWhatsApp, openWhatsAppLink } from '@/lib/whatsapp';
+import { buildMessage, sendWhatsApp, openWhatsAppLink, getMessageTemplates } from '@/lib/whatsapp';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,10 +47,12 @@ const fmtDT = (iso: string) =>
 
 // ── Portal do Cliente ─────────────────────────────────────────────────────────
 
-function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
+function PortalSection({ eventId, clientEmail, clientWhatsapp, clientName, eventName }: {
   eventId: string;
   clientEmail?: string | null;
   clientWhatsapp?: string | null;
+  clientName?: string | null;
+  eventName?: string | null;
 }) {
   const [portal, setPortal] = useState<PortalAccess | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,22 +128,23 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp }: {
     const phone = p.whatsapp ?? clientWhatsapp;
     if (!phone) { toast.error('Preencha o WhatsApp do cliente antes de enviar o convite'); return; }
 
-    // Gera token único
-    const token = crypto.randomUUID().replace(/-/g, '');
     await (supabase as any).from('client_portal_access')
-      .update({ invite_token: token, invite_sent_at: new Date().toISOString() })
+      .update({ invite_sent_at: new Date().toISOString() })
       .eq('id', p.id);
-    setPortal(prev => prev ? { ...prev, invite_token: token, invite_sent_at: new Date().toISOString() } : prev);
+    setPortal(prev => prev ? { ...prev, invite_sent_at: new Date().toISOString() } : prev);
 
-    const link = `${window.location.origin}/portal/cadastro?token=${token}`;
-    const msg  = `Olá! 🎉\n\nSeu portal do cliente está pronto.\nAcesse o link abaixo para criar sua conta e acompanhar tudo sobre o seu evento:\n\n${link}\n\n— Rondello Buffet`;
+    const portalUrl = `${window.location.origin}/portal/cadastro`;
+    const templates = await getMessageTemplates();
+    const raw = templates.portal_invite;
+    const msg = raw
+      .replace(/\{\{clientName\}\}/g, clientName ?? '')
+      .replace(/\{\{eventName\}\}/g,  eventName ?? '')
+      .replace(/\{\{accessCode\}\}/g, p.access_code)
+      .replace(/\{\{portalUrl\}\}/g,  portalUrl);
 
-    const { ok, error } = await sendWhatsApp(phone, msg);
+    const { ok } = await sendWhatsApp(phone, msg);
     if (ok) { toast.success('Convite enviado por WhatsApp!'); }
-    else {
-      // fallback: abre wa.me
-      openWhatsAppLink(phone, msg);
-    }
+    else { openWhatsAppLink(phone, msg); }
   };
 
   const copyInviteLink = () => {
@@ -517,7 +520,7 @@ export default function EventOutrosTab({
 }: EventOutrosTabProps) {
   return (
     <div className="space-y-4">
-      <PortalSection eventId={eventId} clientEmail={clientEmail} clientWhatsapp={clientWhatsapp} />
+      <PortalSection eventId={eventId} clientEmail={clientEmail} clientWhatsapp={clientWhatsapp} clientName={clientName} eventName={eventName} />
       <ActionsSection
         eventId={eventId}
         clientWhatsapp={clientWhatsapp}

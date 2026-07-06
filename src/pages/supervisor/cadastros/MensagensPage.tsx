@@ -7,7 +7,7 @@ import {
   MessageTemplateKey, MessageTemplates, invalidateTemplateCache,
 } from '@/lib/whatsapp';
 
-const KEYS: MessageTemplateKey[] = ['payment', 'file', 'tasting', 'review'];
+const KEYS: MessageTemplateKey[] = ['payment', 'file', 'tasting', 'review', 'portal_invite'];
 
 async function loadSavedTemplates(): Promise<Partial<MessageTemplates>> {
   const { data } = await (supabase.from as any)('company_integrations')
