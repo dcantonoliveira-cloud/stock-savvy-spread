@@ -3,7 +3,10 @@
 -- 2. Fix total_confirmados to only count velhos (already-confirmed before attending), not novos-who-later-confirmed
 -- 3. Ensure em_aberto and fechados only count novos (already correct, just clarifying)
 
-create or replace view public.tasting_session_stats
+-- Drop and recreate because PostgreSQL cannot rename columns with create or replace view
+drop view if exists public.tasting_session_stats;
+
+create view public.tasting_session_stats
   with (security_invoker = true)
 as
 select
