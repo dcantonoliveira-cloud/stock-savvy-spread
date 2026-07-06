@@ -5,7 +5,9 @@
 -- em_aberto= leads ainda em negociação
 -- total_pago = soma de event_payments com payment_type = 'tasting'
 
-create or replace view tasting_session_stats as
+create or replace view public.tasting_session_stats
+  with (security_invoker = true)
+as
 select
   tse.session_id,
   count(distinct tse.event_id)                                                               as total,
