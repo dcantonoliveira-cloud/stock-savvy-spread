@@ -203,42 +203,42 @@ const upcomingTastings = tastings.filter(t => t.scheduled_date >= today);
         </div>
       </div>
 
-      {/* ── KPI cards ── */}
-      <div className="grid grid-cols-3 gap-4">
-        <KpiCard
-          label="Eventos este mês"
-          value={eventsThisMonth}
-          sub="confirmados e realizados"
-          icon={<CalendarCheck className="w-4 h-4" />}
-          accent="emerald"
-          path="/events"
-          onClick={() => navigate('/events')}
-        />
-        <KpiCard
-          label="Orçamentos abertos"
-          value={openBudgets.length}
-          sub="aguardando fechamento"
-          icon={<FileText className="w-4 h-4" />}
-          accent="amber"
-          path="/orcamentos"
-          onClick={() => navigate('/orcamentos')}
-        />
-        <KpiCard
-          label="Próximas degustações"
-          value={upcomingTastings.length}
-          sub="agendadas"
-          icon={<UtensilsCrossed className="w-4 h-4" />}
-          accent="blue"
-          path="/tastings"
-          onClick={() => navigate('/tastings')}
-        />
-      </div>
-
       {/* ── Main grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        {/* Left — chart + calendar + pipeline + next events */}
+        {/* Left — KPIs + chart + calendar + pipeline + next events */}
         <div className="lg:col-span-2 space-y-6">
+
+          {/* KPI cards */}
+          <div className="grid grid-cols-3 gap-4">
+            <KpiCard
+              label="Eventos este mês"
+              value={eventsThisMonth}
+              sub="confirmados e realizados"
+              icon={<CalendarCheck className="w-4 h-4" />}
+              accent="emerald"
+              path="/events"
+              onClick={() => navigate('/events')}
+            />
+            <KpiCard
+              label="Orçamentos abertos"
+              value={openBudgets.length}
+              sub="aguardando fechamento"
+              icon={<FileText className="w-4 h-4" />}
+              accent="amber"
+              path="/orcamentos"
+              onClick={() => navigate('/orcamentos')}
+            />
+            <KpiCard
+              label="Próximas degustações"
+              value={upcomingTastings.length}
+              sub="agendadas"
+              icon={<UtensilsCrossed className="w-4 h-4" />}
+              accent="blue"
+              path="/tastings"
+              onClick={() => navigate('/tastings')}
+            />
+          </div>
 
           {/* Chart */}
           <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
@@ -498,11 +498,9 @@ const upcomingTastings = tastings.filter(t => t.scheduled_date >= today);
           </div>
         </div>
 
-        {/* Right col — notifications full height */}
-        <div className="flex flex-col">
-          <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1">
-            <NotificationsPanel fullHeight />
-          </div>
+        {/* Right col — notifications */}
+        <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col sticky top-4">
+          <NotificationsPanel fullHeight />
         </div>
       </div>
 

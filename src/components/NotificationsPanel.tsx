@@ -48,11 +48,12 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
   const [notifs, setNotifs] = useState<Notif[]>([]);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('app_notifications')
       .select('id, type, title, message, actor_name, data, read, created_at')
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(50);
+    if (error) console.error('[NotificationsPanel] erro:', error.message);
     setNotifs((data ?? []) as Notif[]);
   }, []);
 
@@ -76,7 +77,7 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
   const unread = notifs.filter(n => !n.read).length;
 
   const wrapCls = fullHeight
-    ? 'flex flex-col h-full'
+    ? 'flex flex-col'
     : 'bg-white border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col';
 
   return (
@@ -106,7 +107,7 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
           <p className="text-xs">Sem notificações</p>
         </div>
       ) : (
-        <div className={`divide-y divide-border/50 overflow-y-auto ${fullHeight ? 'flex-1 min-h-0' : 'max-h-[420px]'}`}>
+        <div className={`divide-y divide-border/50 overflow-y-auto ${fullHeight ? 'max-h-[calc(100vh-220px)]' : 'max-h-[420px]'}`}>
           {notifs.map(n => {
             const cfg = TYPE_CFG[n.type] ?? DEFAULT_CFG;
             return (
