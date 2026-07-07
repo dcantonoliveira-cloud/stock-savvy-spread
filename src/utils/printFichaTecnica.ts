@@ -167,7 +167,7 @@ function buildPage1Html(event: FichaEvent, customFields: CustomField[], company:
   <div style="margin-top:16px;display:flex;align-items:baseline;justify-content:space-between;gap:16px;">
     <div>
       <div style="${FONT}font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;">Evento</div>
-      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;line-height:1.1;color:#0E2A45;margin-top:4px;">${event.event_name ?? '—'}</h1>
+      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;line-height:1.1;color:#0E2A45;margin-top:4px;word-break:keep-all;hyphens:none;">${event.event_name ?? '—'}</h1>
     </div>
     <div style="text-align:right;flex-shrink:0;">
       ${event.location_text ? `<div style="${FONT}font-size:10px;color:#6B6B6B;">${event.location_text}</div>` : ''}

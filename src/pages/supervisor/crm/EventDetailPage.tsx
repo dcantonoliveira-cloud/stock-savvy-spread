@@ -213,6 +213,7 @@ export default function EventDetailPage() {
   const [tab, setTab] = useState('Ficha Técnica');
   const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
   const [allocTastingOpen, setAllocTastingOpen] = useState(false);
+  const [obsModal, setObsModal] = useState<{ open: boolean; text: string; customFields: any[]; company: any } | null>(null);
   const [form, setForm] = useState<Partial<EventDetail>>({});
   const [clientForm, setClientForm] = useState<Record<string, string>>({});
   const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -382,11 +383,16 @@ export default function EventDetailPage() {
     const valMap: Record<string, string> = {};
     (fieldVals ?? []).forEach((r: any) => { valMap[r.field_id] = r.value ?? ''; });
     const customFields = (fieldDefs ?? []).map((d: any) => ({ name: d.name, value: valMap[d.id] ?? '' }));
-    printFichaTecnica(
-      { ...event, ...form } as any,
-      customFields,
-      company as any,
-    );
+    const merged = { ...event, ...form } as any;
+    // Abre modal de revisão das observações antes de imprimir
+    setObsModal({ open: true, text: merged.notes ?? '', customFields, company });
+  };
+
+  const handleFichaTecnicaPrint = () => {
+    if (!obsModal || !event) return;
+    const merged = { ...event, ...form, notes: obsModal.text } as any;
+    printFichaTecnica(merged, obsModal.customFields, obsModal.company);
+    setObsModal(null);
   };
 
   const handleFechamento = async () => {
@@ -435,6 +441,34 @@ export default function EventDetailPage() {
 
   return (
     <div className="-m-8">
+
+      {/* Modal de revisão de observações antes de imprimir Ficha Técnica */}
+      {obsModal?.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col gap-4 p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-foreground">Observações para impressão</h2>
+              <button onClick={() => setObsModal(null)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground -mt-1">Edite livremente — estas alterações <strong>não serão salvas</strong> no banco de dados.</p>
+            <textarea
+              className="w-full border border-border rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+              rows={12}
+              value={obsModal.text}
+              onChange={e => setObsModal(prev => prev ? { ...prev, text: e.target.value } : prev)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setObsModal(null)}>Cancelar</Button>
+              <Button size="sm" onClick={handleFichaTecnicaPrint}>
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                Gerar PDF
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TOP BAR */}
       <div className="sticky top-14 z-30 bg-white border-b border-border shadow-sm">
