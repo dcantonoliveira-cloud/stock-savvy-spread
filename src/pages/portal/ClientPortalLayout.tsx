@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { CalendarDays, DollarSign, FolderOpen, Info, LogOut, Menu, X, Heart, KeyRound, Loader2 } from 'lucide-react';
+import { CalendarDays, DollarSign, FolderOpen, Info, LogOut, Menu, X, Heart, KeyRound, Loader2, ListChecks } from 'lucide-react';
 import logoRondello from '@/assets/logo-rondello.png';
 
 export type PortalEvent = {
@@ -57,6 +57,7 @@ export async function loadPortalEvent(userId: string): Promise<PortalContextType
 const NAV = [
   { to: '/portal',              label: 'Início',       icon: CalendarDays, end: true },
   { to: '/portal/financeiro',   label: 'Financeiro',   icon: DollarSign },
+  { to: '/portal/checklist',    label: 'Checklist',    icon: ListChecks },
   { to: '/portal/arquivos',     label: 'Arquivos',     icon: FolderOpen },
   { to: '/portal/informacoes',  label: 'Informações',  icon: Info },
 ];
@@ -120,10 +121,11 @@ function EnterCodeScreen({ onLinked }: { onLinked: () => void }) {
 }
 
 const PAGE_MAP: Record<string, string> = {
-  '/portal':            'inicio',
-  '/portal/financeiro': 'financeiro',
-  '/portal/arquivos':   'arquivos',
-  '/portal/informacoes':'informacoes',
+  '/portal':             'inicio',
+  '/portal/financeiro':  'financeiro',
+  '/portal/checklist':   'checklist',
+  '/portal/arquivos':    'arquivos',
+  '/portal/informacoes': 'informacoes',
 };
 
 export default function ClientPortalLayout() {

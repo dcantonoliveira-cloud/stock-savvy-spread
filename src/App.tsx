@@ -101,6 +101,7 @@ const PortalEventoPage       = lazy(() => import("./pages/portal/PortalEventoPag
 const PortalFinanceiroPage   = lazy(() => import("./pages/portal/PortalFinanceiroPage"));
 const PortalArquivosPage     = lazy(() => import("./pages/portal/PortalArquivosPage"));
 const PortalInformacoesPage  = lazy(() => import("./pages/portal/PortalInformacoesPage"));
+const PortalChecklistPage    = lazy(() => import("./pages/portal/PortalChecklistPage"));
 
 const queryClient = new QueryClient();
 
@@ -164,6 +165,7 @@ function AppRoutes() {
             <Route path="financeiro"  element={<PortalFinanceiroPage />} />
             <Route path="arquivos"    element={<PortalArquivosPage />} />
             <Route path="informacoes" element={<PortalInformacoesPage />} />
+            <Route path="checklist"   element={<PortalChecklistPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/portal" replace />} />
         </Routes>
