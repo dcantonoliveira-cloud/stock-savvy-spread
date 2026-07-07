@@ -96,10 +96,12 @@ CREATE POLICY "Event files isolation"
     )
   );
 
--- ── 5. events — clientes só veem o próprio evento ────────────────────────────
+-- ── 5. events — supervisores têm acesso total; clientes só veem o próprio evento
 DROP POLICY IF EXISTS "Tenant isolation events" ON public.events;
+DROP POLICY IF EXISTS "Events isolation"        ON public.events;
 
-CREATE POLICY "Events isolation"
+-- SELECT: supervisores veem todos da empresa; clientes só o próprio
+CREATE POLICY "Events select isolation"
   ON public.events FOR SELECT
   USING (
     company_id = public.my_company_id()
@@ -114,4 +116,26 @@ CREATE POLICY "Events isolation"
         WHERE user_id = auth.uid() AND event_id = events.id
       )
     )
+  );
+
+-- INSERT / UPDATE / DELETE: apenas supervisores (não clientes)
+CREATE POLICY "Events insert"
+  ON public.events FOR INSERT
+  WITH CHECK (
+    company_id = public.my_company_id()
+    AND NOT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'client')
+  );
+
+CREATE POLICY "Events update"
+  ON public.events FOR UPDATE
+  USING (
+    company_id = public.my_company_id()
+    AND NOT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'client')
+  );
+
+CREATE POLICY "Events delete"
+  ON public.events FOR DELETE
+  USING (
+    company_id = public.my_company_id()
+    AND NOT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'client')
   );
