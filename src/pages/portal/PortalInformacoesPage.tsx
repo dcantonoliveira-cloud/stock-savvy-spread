@@ -31,7 +31,6 @@ export default function PortalInformacoesPage() {
   if (!event) return null;
 
   const pax = event.price_per_person ? fmtBRL(event.price_per_person) : null;
-  const mealVal = event.professional_meal_value ? fmtBRL(event.professional_meal_value) : null;
 
   return (
     <div className="max-w-lg mx-auto px-4 py-8 space-y-5">
@@ -58,7 +57,7 @@ export default function PortalInformacoesPage() {
 
       <Section title="Profissionais do buffet">
         <Row label="Qtd. profissionais"   value={event.professional_count} />
-        <Row label="Valor alim. prof."    value={mealVal} />
+
         <Row label="Alimentação prof."    value={event.professional_meal_type} />
       </Section>
 
