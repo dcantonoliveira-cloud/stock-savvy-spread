@@ -49,9 +49,9 @@ const fmtBRL = (v: number | null) =>
 
 // ─── estilos inline ─────────────────────────────────────────────────────────
 const FONT   = `font-family:'Libre Franklin',Arial,sans-serif;`;
-const LBL_S  = `${FONT}font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#A29D92;font-weight:700;margin-bottom:8px;display:block;`;
-const VAL_S  = `${FONT}font-size:15.5px;color:#0E2A45;font-weight:500;border-bottom:1.5px solid #E2DED8;padding-bottom:9px;min-height:26px;word-break:break-word;display:block;`;
-const VEMPTY = `${FONT}font-size:15.5px;color:transparent;border-bottom:1.5px solid #EDEAE2;padding-bottom:9px;min-height:26px;display:block;`;
+const LBL_S  = `${FONT}font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:#A29D92;font-weight:700;margin-bottom:7px;display:block;`;
+const VAL_S  = `${FONT}font-size:13.5px;color:#0E2A45;font-weight:500;border-bottom:1.5px solid #E2DED8;padding-bottom:8px;min-height:22px;word-break:break-word;display:block;`;
+const VEMPTY = `${FONT}font-size:13.5px;color:transparent;border-bottom:1.5px solid #EDEAE2;padding-bottom:8px;min-height:22px;display:block;`;
 
 interface Field { label: string; value: string | null; cols?: 1 | 2 | 3 | 4; skipIfEmpty?: boolean }
 
@@ -66,7 +66,7 @@ function grid(fields: Field[]): string {
     const span = Math.min(f.cols ?? 1, TOTAL);
     const pct  = (span / TOTAL * 100).toFixed(4) + '%';
     const v    = f.value?.trim() || '';
-    const cell = `<td style="width:${pct};padding:0 18px 28px 0;vertical-align:top;" colspan="${span}">
+    const cell = `<td style="width:${pct};padding:0 18px 22px 0;vertical-align:top;" colspan="${span}">
       <span style="${LBL_S}">${f.label}</span>
       <span style="${v ? VAL_S : VEMPTY}">${v || '&nbsp;'}</span>
     </td>`;
@@ -80,7 +80,7 @@ function grid(fields: Field[]): string {
       const ns   = Math.min(nf.cols ?? 1, TOTAL - used);
       const npct = (ns / TOTAL * 100).toFixed(4) + '%';
       const nv   = nf.value?.trim() || '';
-      usedInRow.push(`<td style="width:${npct};padding:0 18px 28px 0;vertical-align:top;" colspan="${ns}">
+      usedInRow.push(`<td style="width:${npct};padding:0 18px 22px 0;vertical-align:top;" colspan="${ns}">
         <span style="${LBL_S}">${nf.label}</span>
         <span style="${nv ? VAL_S : VEMPTY}">${nv || '&nbsp;'}</span>
       </td>`);
@@ -98,8 +98,8 @@ function grid(fields: Field[]): string {
 }
 
 function divider(title: string): string {
-  return `<div style="display:flex;align-items:center;gap:10px;margin:28px 0 16px;">
-    <span style="${FONT}font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">${title}</span>
+  return `<div style="display:flex;align-items:center;gap:10px;margin:22px 0 13px;">
+    <span style="${FONT}font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">${title}</span>
     <div style="flex:1;height:1px;background:#E7E3DB;"></div>
   </div>`;
 }
@@ -147,7 +147,7 @@ function buildPage1Html(event: FichaEvent, customFields: CustomField[], company:
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#fff;${FONT}}</style>
 </head><body>
-<div style="width:794px;background:#fff;padding:42px 56px 52px;position:relative;overflow:hidden;">
+<div style="width:794px;background:#fff;padding:38px 54px 48px;position:relative;overflow:hidden;">
 
   <!-- Watermark -->
   <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:440px;height:440px;right:-110px;bottom:-110px;opacity:.04;pointer-events:none;">
@@ -167,7 +167,7 @@ function buildPage1Html(event: FichaEvent, customFields: CustomField[], company:
   <div style="margin-top:16px;display:flex;align-items:baseline;justify-content:space-between;gap:16px;">
     <div>
       <div style="${FONT}font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;">Evento</div>
-      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:46px;line-height:1.1;color:#0E2A45;margin-top:6px;word-break:keep-all;hyphens:none;">${event.event_name ?? '—'}</h1>
+      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:40px;line-height:1.1;color:#0E2A45;margin-top:6px;word-spacing:6px;hyphens:none;">${event.event_name ?? '—'}</h1>
     </div>
     <div style="text-align:right;flex-shrink:0;">
       ${event.location_text ? `<div style="${FONT}font-size:10px;color:#6B6B6B;">${event.location_text}</div>` : ''}
@@ -202,7 +202,7 @@ function buildPage2Html(event: FichaEvent, company: FichaCompany | null): string
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#fff;${FONT}}</style>
 </head><body>
-<div style="width:794px;background:#fff;padding:42px 56px 52px;position:relative;overflow:hidden;">
+<div style="width:794px;background:#fff;padding:38px 54px 48px;position:relative;overflow:hidden;">
 
   <!-- Watermark -->
   <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:440px;height:440px;right:-110px;bottom:-110px;opacity:.04;pointer-events:none;">
