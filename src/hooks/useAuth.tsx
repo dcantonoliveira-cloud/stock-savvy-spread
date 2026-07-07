@@ -71,9 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<{ display_name: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserData = async (userId: string) => {
-    const { data: { user: fullUser } } = await supabase.auth.getUser();
-    const isPortalUser = fullUser?.user_metadata?.portal === true;
+  const fetchUserData = async (userId: string, sessionUser?: User | null) => {
+    // user_metadata vem do JWT (memória) — sem round-trip extra ao servidor
+    const isPortalUser = (sessionUser ?? user)?.user_metadata?.portal === true;
 
     const [rolesRes, permRes, profileRes, clientRes] = await Promise.all([
       supabase.from('user_roles').select('role').eq('user_id', userId),
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         currentUserId = session.user.id;
         setUser(session.user);
-        setTimeout(() => fetchUserData(session.user.id), 0);
+        setTimeout(() => fetchUserData(session.user.id, session.user), 0);
       } else {
         currentUserId = null;
         setUser(null);
@@ -139,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         currentUserId = session.user.id;
         setUser(session.user);
-        fetchUserData(session.user.id);
+        fetchUserData(session.user.id, session.user);
       }
       setLoading(false);
     });

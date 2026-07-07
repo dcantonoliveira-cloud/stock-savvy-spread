@@ -32,7 +32,7 @@ const STATUS_MAP = {
 };
 
 export default function PayslipsAdminPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const employeeFilter = searchParams.get('employee');
@@ -60,7 +60,7 @@ export default function PayslipsAdminPage() {
     const { data: myProfile } = await supabase
       .from('profiles')
       .select('company_id')
-      .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+      .eq('user_id', user?.id ?? '')
       .single();
     const companyId = (myProfile as any)?.company_id;
     if (!companyId) return;
@@ -111,7 +111,7 @@ export default function PayslipsAdminPage() {
       const { data: myProfile } = await supabase
         .from('profiles')
         .select('company_id')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '')
+        .eq('user_id', user?.id ?? '')
         .single();
       const companyId = (myProfile as any)?.company_id;
       if (!companyId) throw new Error('Empresa não encontrada no perfil do usuário');
@@ -153,7 +153,7 @@ export default function PayslipsAdminPage() {
             title,
             status: 'draft',
             current_version: 1,
-            created_by: (await supabase.auth.getUser()).data.user?.id,
+            created_by: user?.id,
           })
           .select('id')
           .single();
@@ -178,7 +178,7 @@ export default function PayslipsAdminPage() {
           storage_path: path,
           file_size: form.file.size,
           sha256_hash: hash,
-          uploaded_by: (await supabase.auth.getUser()).data.user?.id,
+          uploaded_by: user?.id,
           is_current: true,
         });
       if (vErr) throw vErr;
@@ -193,7 +193,7 @@ export default function PayslipsAdminPage() {
       await supabase.from('payslip_audit_logs' as any).insert({
         payslip_id: payslipId,
         company_id: companyId,
-        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_id: user?.id,
         action: version === 1 ? 'payslip_created' : 'new_version_created',
         details: { version, hash, employee: emp?.display_name },
       });
@@ -204,7 +204,7 @@ export default function PayslipsAdminPage() {
       load();
 
       // Enviar notificações (email + whatsapp) em background
-      const session = (await supabase.auth.getSession()).data.session;
+      const session = (await supabase.auth.getSession()).data.session; // access_token para edge function
       const signUrl = `${window.location.origin}/meus-holerites/${payslipId}`;
       supabase.functions.invoke('send-payslip-notification', {
         body: {

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
 import jsPDF from 'jspdf';
+import { getCompany } from '@/lib/companyCache';
 
 // ── tipos ─────────────────────────────────────────────────────────────────────
 interface Tasting {
@@ -214,12 +215,12 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: tData }, { data: evData }, { data: compData }, { data: fData }, { data: zapCfg }] = await Promise.all([
+      const [{ data: tData }, { data: evData }, compData, { data: fData }, { data: zapCfg }] = await Promise.all([
         supabase.from('tasting_session_events' as any)
           .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
           .eq('event_id', eventId),
         supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text,zapsign_data').eq('id', eventId).single(),
-        supabase.from('companies').select('id,witness_1_name,witness_1_cpf,witness_1_email,signer_name,signer_email,logo_base64,name').limit(1).single(),
+        getCompany(),
         supabase.from('event_files' as any).select('id,name,url,created_at').eq('event_id', eventId).order('created_at'),
         supabase.from('company_integrations' as any).select('api_key').eq('provider','zapsign').maybeSingle(),
       ]);
@@ -238,7 +239,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         if (d.zapsign_data) setZapData(d.zapsign_data as ZapData);
       }
       if (compData) {
-        const c = compData as any;
+        const c = compData;
         setWitness1Name(c.witness_1_name ?? ''); setWitness1Cpf(c.witness_1_cpf ?? '');
         setWitness1Email(c.witness_1_email ?? '');
         setSignerName(c.signer_name ?? ''); setSignerEmail(c.signer_email ?? '');

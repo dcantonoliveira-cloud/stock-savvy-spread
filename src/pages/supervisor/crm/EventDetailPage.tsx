@@ -18,6 +18,7 @@ import EventOutrosTab from '@/components/EventOutrosTab';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 import { printFechamento } from '@/utils/printFechamento';
 import { printFichaTecnica } from '@/utils/printFichaTecnica';
+import { getCompany } from '@/lib/companyCache';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -373,10 +374,10 @@ export default function EventDetailPage() {
 
   const handleFichaTecnica = async () => {
     if (!event || !id) return;
-    const [{ data: fieldDefs }, { data: fieldVals }, { data: companies }] = await Promise.all([
+    const [{ data: fieldDefs }, { data: fieldVals }, company] = await Promise.all([
       supabase.from('event_field_definitions' as any).select('id, name, sort_order').eq('is_active', true).order('sort_order'),
       supabase.from('event_field_values' as any).select('field_id, value').eq('event_id', id),
-      supabase.from('companies').select('name, logo_base64, endereco, telefone, website').limit(1),
+      getCompany(),
     ]);
     const valMap: Record<string, string> = {};
     (fieldVals ?? []).forEach((r: any) => { valMap[r.field_id] = r.value ?? ''; });
@@ -384,22 +385,22 @@ export default function EventDetailPage() {
     printFichaTecnica(
       { ...event, ...form } as any,
       customFields,
-      ((companies ?? [])[0] ?? null) as any,
+      company as any,
     );
   };
 
   const handleFechamento = async () => {
     if (!event || !id) return;
-    const [{ data: payments }, { data: additionals }, { data: companies }] = await Promise.all([
+    const [{ data: payments }, { data: additionals }, company] = await Promise.all([
       supabase.from('event_payments' as any).select('payment_date, value, notes, is_confirmed').eq('event_id', id).order('payment_date'),
       supabase.from('event_additional_values' as any).select('description, value').eq('event_id', id),
-      supabase.from('companies').select('name, logo_base64, razao_social, cnpj, banco, agencia, conta, endereco, telefone, website').limit(1),
+      getCompany(),
     ]);
     printFechamento(
       { ...event, ...form },
       (payments ?? []) as any,
       (additionals ?? []) as any,
-      ((companies ?? [])[0] ?? null) as any,
+      company as any,
     );
   };
 

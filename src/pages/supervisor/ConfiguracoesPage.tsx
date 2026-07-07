@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { invalidateCompanyCache } from '@/lib/companyCache';
 import {
   Upload, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle,
   User, Building2, Plug, Camera, Lock, MessageCircle, Save, ChevronDown, ChevronUp,
@@ -834,7 +835,7 @@ export default function ConfiguracoesPage() {
     clearTimeout(timers.current[field]);
     timers.current[field] = setTimeout(async () => {
       const { error } = await supabase.from('companies').update({ [field]: value }).eq('id', company.id);
-      if (error) toast.error('Erro ao salvar'); else toast.success('Salvo');
+      if (error) toast.error('Erro ao salvar'); else { toast.success('Salvo'); invalidateCompanyCache(); }
     }, 1000);
   };
 
