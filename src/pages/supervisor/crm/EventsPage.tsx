@@ -112,16 +112,31 @@ export default function EventsPage() {
   const [locationDropOpen, setLocationDropOpen] = useState(false);
 
   // ── Load data ────────────────────────────────────────────────────
+  const EVENT_SELECT = 'id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)';
+
   const loadEvents = async (y: number) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('events')
-      .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
+      .select(EVENT_SELECT)
       .gte('event_date', `${y}-01-01`)
       .lte('event_date', `${y}-12-31`)
       .not('event_name', 'is', null)
       .neq('event_name', '')
       .order('event_date', { ascending: true });
+    if (error) console.error('events query error:', error);
+    setEvents((data as EventRow[]) ?? []);
+    setLoading(false);
+  };
+
+  const loadAllEvents = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('events')
+      .select(EVENT_SELECT)
+      .not('event_name', 'is', null)
+      .neq('event_name', '')
+      .order('contract_signed_date', { ascending: false });
     if (error) console.error('events query error:', error);
     setEvents((data as EventRow[]) ?? []);
     setLoading(false);
@@ -177,8 +192,20 @@ export default function EventsPage() {
     });
   }, []);
 
-  // Re-carrega eventos quando o ano muda
-  useEffect(() => { loadEvents(year); }, [year]);
+  // Re-carrega eventos quando o ano muda (só quando não estiver no modo fechamento)
+  useEffect(() => {
+    if (sortBy === 'contract_signed_date') return;
+    loadEvents(year);
+  }, [year]);
+
+  // Quando muda o sort: carrega todos (fechamento) ou apenas o ano atual (data do evento)
+  useEffect(() => {
+    if (sortBy === 'contract_signed_date') {
+      loadAllEvents();
+    } else {
+      loadEvents(year);
+    }
+  }, [sortBy]);
 
   // ── Derived data ─────────────────────────────────────────────────
   const monthsWithEvents = useMemo(() => {
@@ -195,8 +222,9 @@ export default function EventsPage() {
     const pool = search.trim().length >= 2 ? searchResults : events;
     const result = pool.filter(e => {
       if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
+      // Ordenação por fechamento ignora filtro de mês/ano — mostra todos os eventos
+      if (sortBy === 'contract_signed_date') return true;
       if (search.trim().length >= 2) return true;
-      // Quando ordenando por fechamento, filtra pelo contract_signed_date
       const dateField = e.event_date;
       if (!dateField) return false;
       const d = new Date(dateField + 'T12:00:00');
