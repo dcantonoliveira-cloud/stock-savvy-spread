@@ -108,6 +108,19 @@ export default function CalendarPage() {
       const visible = (data ?? []).filter((e: any) =>
         e.status === 'confirmed' || e.status === 'completed' || e.date_reserved === true
       );
+      // Resolve location_id → location_text para eventos sem location_text
+      const missingLocIds = [...new Set(
+        visible.filter((e: any) => !e.location_text && e.location_id).map((e: any) => e.location_id)
+      )];
+      if (missingLocIds.length > 0) {
+        const { data: locs } = await supabase.from('event_locations' as any)
+          .select('id, name').in('id', missingLocIds);
+        const locMap = Object.fromEntries((locs ?? []).map((l: any) => [l.id, l.name]));
+        visible.forEach((e: any) => {
+          if (!e.location_text && e.location_id && locMap[e.location_id])
+            e.location_text = locMap[e.location_id];
+        });
+      }
       setEvents(visible as EventRow[]);
       setTastings((tsData ?? []) as TastingRow[]);
       setAppointments((apptData ?? []) as AppointmentRow[]);
