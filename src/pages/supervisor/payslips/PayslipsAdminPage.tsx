@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
   Upload, FileText, Eye, Download,
-  Plus, Loader2, X, ArrowLeft, Search, Layers,
+  Plus, Loader2, X, ArrowLeft, Search, Layers, Trash2,
 } from 'lucide-react';
 import BulkPayslipUpload from '@/components/payslips/BulkPayslipUpload';
 import { sha256Hex } from '@/lib/payslipPdf';
@@ -104,6 +104,18 @@ export default function PayslipsAdminPage() {
 
     setPayslips(rows as unknown as Payslip[]);
     setLoading(false);
+  };
+
+  const deletePayslip = async (p: Payslip) => {
+    if (!confirm(`Excluir holerite de ${(p as any).profiles?.display_name ?? 'funcionário'} (${(() => { const [y, mo] = p.reference_month.split('-'); return `${MONTHS[parseInt(mo) - 1]}/${y}`; })()})?`)) return;
+    // Deleta o arquivo do storage
+    const { data: fileData } = await supabase.storage.from('payslips').list(`${p.employee_id}/`);
+    const toRemove = (fileData ?? []).filter((f: any) => f.name.includes(p.id));
+    if (toRemove.length > 0) await supabase.storage.from('payslips').remove(toRemove.map((f: any) => `${p.employee_id}/${f.name}`));
+    const { error } = await supabase.from('payslips' as any).delete().eq('id', p.id);
+    if (error) { toast.error('Erro ao excluir holerite'); return; }
+    toast.success('Holerite excluído');
+    load();
   };
 
   const handleUpload = async () => {
@@ -459,10 +471,14 @@ export default function PayslipsAdminPage() {
                       </button>
                       {sig && (
                         <button onClick={() => viewSignedPdf(sig.signed_pdf_path ?? null, p.title)}
-                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors" title="Baixar PDF assinado">
+                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors" title="Ver PDF assinado">
                           <Download className="w-4 h-4" />
                         </button>
                       )}
+                      <button onClick={() => deletePayslip(p)}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors" title="Excluir holerite">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
