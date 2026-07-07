@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useNavigationType } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -83,6 +83,7 @@ export default function EventsPage() {
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
   const location = useLocation();
+  const navType = useNavigationType(); // 'POP' = voltou, 'PUSH'/'REPLACE' = navegação nova
 
   const [events, setEvents] = useState<EventRow[]>([]);
   const [searchResults, setSearchResults] = useState<EventRow[]>([]);
@@ -92,14 +93,19 @@ export default function EventsPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [year, setYear] = useState(() => {
-    const saved = sessionStorage.getItem('eventsPage_year');
-    return saved ? parseInt(saved) : today.getFullYear();
+    if (navType === 'POP') {
+      const saved = sessionStorage.getItem('eventsPage_year');
+      if (saved) return parseInt(saved);
+    }
+    return today.getFullYear();
   });
   const [month, setMonth] = useState<number | null>(() => {
-    const saved = sessionStorage.getItem('eventsPage_month');
-    if (saved === null) return today.getMonth();
-    if (saved === 'null') return null;
-    return parseInt(saved);
+    if (navType === 'POP') {
+      const saved = sessionStorage.getItem('eventsPage_month');
+      if (saved === 'null') return null;
+      if (saved !== null) return parseInt(saved);
+    }
+    return today.getMonth();
   });
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['confirmed']));
   const [filterOpen, setFilterOpen] = useState(false);
