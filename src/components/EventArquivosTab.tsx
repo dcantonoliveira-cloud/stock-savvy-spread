@@ -96,8 +96,8 @@ async function renderSection(innerHtml: string, widthPx: number, scale: number) 
   const el = document.createElement('div');
   el.style.cssText = `position:fixed;left:-9999px;top:0;width:${widthPx}px;background:white;padding:0;margin:0;`;
   el.innerHTML = `<style>
-    p { margin:0 0 0.75em 0; }
-    p:empty, p br:only-child { display:block; min-height:1.2em; }
+    p { margin:0 0 0.3em 0; }
+    p:empty, p br:only-child { display:block; min-height:0.8em; }
     h1,h2,h3 { margin:0.8em 0 0.4em 0; }
     ul,ol { margin:0.5em 0 0.5em 1.5em; padding:0; }
     li { margin-bottom:0.2em; }
