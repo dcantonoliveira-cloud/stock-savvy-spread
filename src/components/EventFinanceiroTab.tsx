@@ -315,9 +315,9 @@ export default function EventFinanceiroTab({
             <p className="text-[11px] uppercase font-semibold text-emerald-600/70 mb-1">Valor Pago</p>
             <p className="text-xl font-bold text-emerald-700">{fmtBRL(paidTotal)}</p>
           </div>
-          <div className={`p-4 rounded-xl border ${balance > 0 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'}`}>
-            <p className={`text-[11px] uppercase font-semibold mb-1 ${balance > 0 ? 'text-amber-600/70' : 'text-emerald-600/70'}`}>Saldo</p>
-            <p className={`text-xl font-bold ${balance > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{fmtBRL(balance)}</p>
+          <div className={`p-4 rounded-xl border ${balance > 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
+            <p className={`text-[11px] uppercase font-semibold mb-1 ${balance > 0 ? 'text-red-400' : 'text-emerald-600/70'}`}>Saldo</p>
+            <p className={`text-xl font-bold ${balance > 0 ? 'text-red-500' : 'text-emerald-700'}`}>{fmtBRL(balance)}</p>
           </div>
           <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 flex flex-col justify-between">
             <p className="text-[11px] uppercase font-semibold text-blue-600/70 mb-1">% Pago</p>
