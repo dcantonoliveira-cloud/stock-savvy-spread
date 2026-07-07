@@ -140,19 +140,17 @@ export default function EventsPage() {
       setSearchLoading(true);
       const q = `%${search.trim()}%`;
 
-      // Busca por event_name, location_text e organizer direto na tabela events
-      const { data: byEvent } = await supabase
-        .from('events')
-        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)')
-        .or(`event_name.ilike.${q},location_text.ilike.${q},organizer.ilike.${q}`)
-        .order('event_date', { ascending: false });
-
-      // Busca por nome/telefone/email do cliente
-      const { data: byClient } = await supabase
-        .from('events')
-        .select('id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients!inner(id, name, phone, email)')
-        .or(`name.ilike.${q},phone.ilike.${q},email.ilike.${q}`, { foreignTable: 'clients' })
-        .order('event_date', { ascending: false });
+      const sel = 'id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id';
+      const [{ data: byEvent }, { data: byClient }] = await Promise.all([
+        supabase.from('events')
+          .select(`${sel}, clients(id, name, phone, email)`)
+          .or(`event_name.ilike.${q},location_text.ilike.${q},organizer.ilike.${q}`)
+          .order('event_date', { ascending: false }),
+        supabase.from('events')
+          .select(`${sel}, clients!inner(id, name, phone, email)`)
+          .or(`name.ilike.${q},phone.ilike.${q},email.ilike.${q}`, { foreignTable: 'clients' })
+          .order('event_date', { ascending: false }),
+      ]);
 
       // Merge sem duplicatas, mantendo order do byEvent primeiro
       const seen = new Set<string>();

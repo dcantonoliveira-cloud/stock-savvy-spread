@@ -84,27 +84,14 @@ export default function SupervisorDashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [ev1, ev2, ev3, tsRes] = await Promise.all([
+      const [evRes, tsRes] = await Promise.all([
         supabase.from('events').select('id, event_name, event_date, status, guest_count, created_at')
-          .gte('event_date', `${now.getFullYear() - 1}-01-01`).lte('event_date', `${now.getFullYear() - 1}-12-31`)
-          .not('event_name', 'is', null).neq('event_name', ''),
-        supabase.from('events').select('id, event_name, event_date, status, guest_count, created_at')
-          .gte('event_date', `${now.getFullYear()}-01-01`).lte('event_date', `${now.getFullYear()}-12-31`)
-          .not('event_name', 'is', null).neq('event_name', ''),
-        supabase.from('events').select('id, event_name, event_date, status, guest_count, created_at')
-          .gte('event_date', `${now.getFullYear() + 1}-01-01`).lte('event_date', `${now.getFullYear() + 1}-12-31`)
+          .gte('event_date', `${now.getFullYear() - 1}-01-01`)
+          .lte('event_date', `${now.getFullYear() + 1}-12-31`)
           .not('event_name', 'is', null).neq('event_name', ''),
         supabase.from('tasting_sessions' as any).select('id, scheduled_date, type').order('scheduled_date', { ascending: true }),
       ]);
-      const allEvents = [
-        ...((ev1.data ?? []) as EventRow[]),
-        ...((ev2.data ?? []) as EventRow[]),
-        ...((ev3.data ?? []) as EventRow[]),
-      ];
-      console.log('[dashboard] ev1', ev1.data?.length, ev1.error);
-      console.log('[dashboard] ev2', ev2.data?.length, ev2.error);
-      console.log('[dashboard] ev3', ev3.data?.length, ev3.error);
-      console.log('[dashboard] total events', allEvents.length);
+      const allEvents = (evRes.data ?? []) as EventRow[];
       setEvents(allEvents);
       setTastings((tsRes.data ?? []) as TastingRow[]);
       setLoading(false);

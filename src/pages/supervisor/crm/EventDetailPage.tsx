@@ -227,16 +227,16 @@ export default function EventDetailPage() {
     supabase.from('events').select('*, clients(id, name, phone, email, cpf, rg, address, zip_code, source)').eq('id', id).single()
       .then(async ({ data, error }) => {
         if (error || !data) { toast.error('Evento não encontrado'); navigate('/events'); return; }
-        // fallback: busca nome do local se location_text estiver vazio mas location_id existir
         let eventData = data as EventDetail;
-        if (!eventData.location_text && eventData.location_id) {
-          const { data: loc } = await supabase.from('event_locations' as any).select('name').eq('id', eventData.location_id).single();
-          if (loc) eventData = { ...eventData, location_text: (loc as any).name };
-        }
-        // fallback: busca nome do produto se product_name estiver vazio mas product_id existir
-        if (!eventData.product_name && eventData.product_id) {
-          const { data: prod } = await supabase.from('event_products' as any).select('name').eq('id', eventData.product_id).single();
-          if (prod) eventData = { ...eventData, product_name: (prod as any).name };
+        const needsLoc  = !eventData.location_text && !!eventData.location_id;
+        const needsProd = !eventData.product_name  && !!eventData.product_id;
+        if (needsLoc || needsProd) {
+          const [locRes, prodRes] = await Promise.all([
+            needsLoc  ? supabase.from('event_locations' as any).select('name').eq('id', eventData.location_id).single() : Promise.resolve({ data: null }),
+            needsProd ? supabase.from('event_products'  as any).select('name').eq('id', eventData.product_id ).single() : Promise.resolve({ data: null }),
+          ]);
+          if (locRes.data)  eventData = { ...eventData, location_text: (locRes.data  as any).name };
+          if (prodRes.data) eventData = { ...eventData, product_name:  (prodRes.data as any).name };
         }
         setEvent(eventData);
         setForm(eventData);
@@ -1026,13 +1026,16 @@ function AllocTastingModal({ eventId, eventName, onClose }: { eventId: string; e
 
       if (!sessData) { setLoading(false); return; }
 
-      // Conta casais em cada sessão
-      const counts = await Promise.all(sessData.map(async (s: any) => {
-        const { count } = await (supabase.from as any)('tasting_session_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('session_id', s.id);
-        return { ...s, current_count: count ?? 0 };
-      }));
+      // Conta casais em cada sessão — uma única query com group-by via RPC ou contagem por session_id
+      const sessionIds = sessData.map((s: any) => s.id);
+      const { data: tseRows } = await (supabase.from as any)('tasting_session_events')
+        .select('session_id')
+        .in('session_id', sessionIds);
+      const countMap: Record<string, number> = {};
+      for (const row of (tseRows ?? []) as any[]) {
+        countMap[row.session_id] = (countMap[row.session_id] ?? 0) + 1;
+      }
+      const counts = sessData.map((s: any) => ({ ...s, current_count: countMap[s.id] ?? 0 }));
 
       setSessions(counts);
       setLoading(false);
