@@ -8,7 +8,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const BUBBLE_BASE  = 'https://rondellobuffet-app.com.br/api/1.1/obj';
+const BUBBLE_BASE  = 'https://rondelloemcasa.bubbleapps.io/api/1.1/obj';
 const BUBBLE_TOKEN = 'b4b3c4138bb1000811d5a3c0ba47a238';
 const SUPABASE_URL = 'https://vfrtvnzptaazhzfirflm.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || 'sb_secret_Al-4U7Sa5TSXj7DEk8d-BA_B9HuCqHB';
