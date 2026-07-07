@@ -143,7 +143,7 @@ export default function ClientPortalLayout() {
   const logAccess = useCallback((path: string) => {
     const page = PAGE_MAP[path];
     if (!page || !user) return;
-    (supabase.rpc as any)('log_portal_access', { p_page: page }).catch(() => {});
+    (supabase.rpc as any)('log_portal_access', { p_page: page }).then(null, () => {});
   }, [user]);
 
   useEffect(() => {
