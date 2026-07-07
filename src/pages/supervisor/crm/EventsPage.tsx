@@ -91,8 +91,16 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState<number | null>(today.getMonth());
+  const [year, setYear] = useState(() => {
+    const saved = sessionStorage.getItem('eventsPage_year');
+    return saved ? parseInt(saved) : today.getFullYear();
+  });
+  const [month, setMonth] = useState<number | null>(() => {
+    const saved = sessionStorage.getItem('eventsPage_month');
+    if (saved === null) return today.getMonth();
+    if (saved === 'null') return null;
+    return parseInt(saved);
+  });
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['confirmed']));
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'event_date' | 'contract_signed_date'>('event_date');
@@ -643,18 +651,18 @@ export default function EventsPage() {
       <aside className="w-48 shrink-0 self-start sticky top-6">
         <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border">
-          <button onClick={() => setYear(y => y-1)} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground">
+          <button onClick={() => setYear(y => { const n = y-1; sessionStorage.setItem('eventsPage_year', String(n)); return n; })} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-sm font-bold text-foreground">{year}</span>
-          <button onClick={() => setYear(y => y+1)} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground">
+          <button onClick={() => setYear(y => { const n = y+1; sessionStorage.setItem('eventsPage_year', String(n)); return n; })} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
         <nav className="px-2 py-2 space-y-0.5">
           <button
-            onClick={() => setMonth(null)}
+            onClick={() => { sessionStorage.setItem('eventsPage_month', 'null'); setMonth(null); }}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
               month === null ? 'bg-primary text-white font-semibold' : 'text-muted-foreground hover:bg-muted'
             }`}
@@ -671,7 +679,7 @@ export default function EventsPage() {
             return (
               <button
                 key={idx}
-                onClick={() => setMonth(idx)}
+                onClick={() => { sessionStorage.setItem('eventsPage_month', String(idx)); setMonth(idx); }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                   isSelected ? 'bg-primary text-white font-semibold'
                   : isPast ? 'text-muted-foreground/55 hover:bg-muted hover:text-muted-foreground'
