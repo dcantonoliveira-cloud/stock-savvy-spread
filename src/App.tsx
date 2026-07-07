@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -155,6 +156,7 @@ function AppRoutes() {
 
   if (role === 'client') {
     return (
+      <ErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/portal" element={<ClientPortalLayout />}>
@@ -166,19 +168,23 @@ function AppRoutes() {
           <Route path="*" element={<Navigate to="/portal" replace />} />
         </Routes>
       </Suspense>
+      </ErrorBoundary>
     );
   }
 
   if (role === 'supervisor') {
     if (isMobile) {
       return (
+        <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
           <MobileSupervisorApp />
         </Suspense>
+        </ErrorBoundary>
       );
     }
     return (
       <SupervisorLayout>
+        <ErrorBoundary>
         <Suspense fallback={<PageLoader />}>
           <SupervisorRouteGuard>
           <Routes>
@@ -251,12 +257,14 @@ function AppRoutes() {
           </Routes>
           </SupervisorRouteGuard>
         </Suspense>
+        </ErrorBoundary>
       </SupervisorLayout>
     );
   }
 
   return (
     <EmployeeLayout>
+      <ErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={permissions.access_stock ? <EmployeeDashboard /> : <Navigate to="/materiais" replace />} />
@@ -268,6 +276,7 @@ function AppRoutes() {
           <Route path="*" element={<Navigate to={permissions.access_stock ? "/" : "/materiais"} replace />} />
         </Routes>
       </Suspense>
+      </ErrorBoundary>
     </EmployeeLayout>
   );
 }
