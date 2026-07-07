@@ -97,11 +97,11 @@ async function renderSection(innerHtml: string, widthPx: number, scale: number) 
   el.style.cssText = `position:fixed;left:-9999px;top:0;width:${widthPx}px;background:white;padding:0;margin:0;`;
   el.innerHTML = `<style>
     /* Defaults — inline styles do editor têm prioridade */
-    * { box-sizing:border-box; }
-    body, div { font-family:'Times New Roman',Times,serif; font-size:11.5pt; color:#111; }
-    p { margin:0; line-height:1.5; word-break:break-word; }
-    p:empty { min-height:0.65em; }
-    p br:only-child { display:block; height:0.65em; }
+    * { box-sizing:border-box; font-family:'Times New Roman',Times,serif !important; }
+    body, div { font-size:11.5pt; color:#111; }
+    p { margin:0 0 0.45em 0; line-height:1.55; word-break:break-word; }
+    p:empty { margin:0; min-height:0.7em; }
+    p br:only-child { display:block; height:0.7em; }
     h1,h2,h3 { margin:0.5em 0 0.2em 0; }
     ul,ol { margin:0.3em 0 0.3em 1.5em; padding:0; }
     li { margin-bottom:0.1em; }
@@ -120,7 +120,7 @@ async function renderSection(innerHtml: string, widthPx: number, scale: number) 
   return canvas;
 }
 
-async function buildPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = []): Promise<jsPDF> {
+async function buildPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null): Promise<jsPDF> {
   const SCALE=2, PW_MM=210, PH_MM=297, MX_MM=12, HEADER_MM=38, FOOTER_MM=20;
   const CONTENT_W_MM=PW_MM-MX_MM*2, CONTENT_H_MM=PH_MM-HEADER_MM-FOOTER_MM;
   const PX_PER_MM=3.7795, CONTAINER_W_PX=Math.round(CONTENT_W_MM*PX_PER_MM);
@@ -135,11 +135,15 @@ async function buildPDF(html: string, eventName: string, logoBase64: string | nu
     return pages;
   });
   const totalPages=sectionPages.reduce((s,p)=>s+p.length,0);
+  const fmtD=(d:string|null|undefined)=>{if(!d)return'';const[y,m,day]=d.split('-');return`${day}/${m}/${y}`;};
   const addHeaderFooter=(pageNum:number)=>{
     if(logoBase64){try{pdf.addImage(logoBase64,'PNG',MX_MM,5,0,22);}catch{}}
     pdf.setDrawColor(160,140,100);pdf.setLineWidth(0.35);pdf.line(MX_MM,HEADER_MM-4,PW_MM-MX_MM,HEADER_MM-4);
-    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(120,110,90);
-    pdf.text(eventName,PW_MM-MX_MM,14,{align:'right'});
+    pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(80,70,55);
+    pdf.text(eventName,PW_MM-MX_MM,12,{align:'right'});
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(120,110,90);
+    const sub=[fmtD(eventDate),eventLocation].filter(Boolean).join('  ·  ');
+    if(sub) pdf.text(sub,PW_MM-MX_MM,17.5,{align:'right'});
     pdf.line(MX_MM,PH_MM-FOOTER_MM+2,PW_MM-MX_MM,PH_MM-FOOTER_MM+2);
     pdf.setFontSize(7.5);pdf.setTextColor(140,130,110);
     pdf.text((companyName??'').trim(),MX_MM,PH_MM-FOOTER_MM+7);
@@ -161,14 +165,14 @@ async function buildPDF(html: string, eventName: string, logoBase64: string | nu
   return pdf;
 }
 
-async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = []) {
-  const pdf = await buildPDF(html, eventName, logoBase64, companyName, annexes);
+async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null) {
+  const pdf = await buildPDF(html, eventName, logoBase64, companyName, annexes, eventDate, eventLocation);
   const co=(companyName??'').trim().toUpperCase(), ev=(eventName??'Evento').trim();
   pdf.save(`CONTRATO ${co} - ${ev}.pdf`);
 }
 
-async function contractPDFBase64(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = []): Promise<string> {
-  const pdf = await buildPDF(html, eventName, logoBase64, companyName, annexes);
+async function contractPDFBase64(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null): Promise<string> {
+  const pdf = await buildPDF(html, eventName, logoBase64, companyName, annexes, eventDate, eventLocation);
   return pdf.output('datauristring').split(',')[1];
 }
 
@@ -393,7 +397,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
 
     setSendingZap(true);
     try {
-      const base64 = await contractPDFBase64(contractText, event.event_name ?? 'Contrato', companyLogo, companyName, [annex1, annex2].filter(Boolean));
+      const base64 = await contractPDFBase64(contractText, event.event_name ?? 'Contrato', companyLogo, companyName, [annex1, annex2].filter(Boolean), event.event_date, event.location_text);
       const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
       const res = await fetch(`${proxyBase}?path=/api/v1/docs/`, {
         method: 'POST',
@@ -560,7 +564,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
             {contractGenerated && (
               <>
                 <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">Contrato gerado</span>
-                <button onClick={async()=>{setGeneratingPdf(true);try{await downloadContractPDF(contractText,event.event_name??'Contrato',companyLogo,companyName,[annex1,annex2].filter(Boolean));}catch(e){toast.error('Erro ao gerar PDF');}finally{setGeneratingPdf(false);}}}
+                <button onClick={async()=>{setGeneratingPdf(true);try{await downloadContractPDF(contractText,event.event_name??'Contrato',companyLogo,companyName,[annex1,annex2].filter(Boolean),event.event_date,event.location_text);}catch(e){toast.error('Erro ao gerar PDF');}finally{setGeneratingPdf(false);}}}
                   disabled={generatingPdf}
                   className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
                   title="Baixar PDF">
