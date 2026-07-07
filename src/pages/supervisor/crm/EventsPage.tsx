@@ -968,16 +968,16 @@ export default function EventsPage() {
                       })()}
                     </td>
                     {/* CONTRATO */}
-                    <td className="px-3 py-2 text-center hidden lg:table-cell">
+                    <td className="pr-3 py-2 text-right hidden lg:table-cell w-10">
                       {(() => {
                         const zap = ev.zapsign_data as any;
                         const allZapSigned = zap?.signers?.length > 0 && zap.signers.every((s: any) => s.status === 'signed');
                         const manualSigned = ev.contract_signed || !!ev.contract_signed_url;
                         if (allZapSigned || manualSigned)
-                          return <span title="Contrato assinado" className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-600"><FileText className="w-3.5 h-3.5" /></span>;
+                          return <FileText title="Contrato assinado" className="w-3.5 h-3.5 text-emerald-500 inline" />;
                         if (zap?.signers?.length > 0)
-                          return <span title="Aguardando assinaturas" className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-500"><FileText className="w-3.5 h-3.5" /></span>;
-                        return <span className="text-muted-foreground/25 text-xs">—</span>;
+                          return <FileText title="Aguardando assinaturas" className="w-3.5 h-3.5 text-amber-400 inline" />;
+                        return <span className="text-muted-foreground/20 text-xs">—</span>;
                       })()}
                     </td>
                     {/* AÇÕES */}
