@@ -56,6 +56,7 @@ const EMPTY_FORM = {
   pricing_mode: 'per_person',
   contract_signed: false, contract_signed_date: '', is_paid_in_full: false,
   notes: '',
+  organizer: '',
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -329,6 +330,7 @@ export default function EventsPage() {
       contract_signed_date: form.contract_signed_date || null,
       is_paid_in_full: form.is_paid_in_full,
       notes: form.notes || null,
+      organizer: form.organizer || null,
     };
 
     if (editMode && detailEvent) {
@@ -383,6 +385,7 @@ export default function EventsPage() {
       contract_signed_date: event.contract_signed_date ?? '',
       is_paid_in_full: event.is_paid_in_full ?? false,
       notes: event.notes ?? '',
+      organizer: event.organizer ?? '',
     });
   };
 
@@ -632,6 +635,17 @@ export default function EventsPage() {
             <Input type="date" value={form.contract_signed_date} onChange={e => setF('contract_signed_date', e.target.value)} className="h-9" />
           </div>
         )}
+      </div>
+
+      {/* Assessora */}
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Assessora</label>
+        <Input
+          value={form.organizer}
+          onChange={e => setF('organizer', e.target.value)}
+          placeholder="Nome da assessora..."
+          className="h-9"
+        />
       </div>
 
       {/* Observações */}
