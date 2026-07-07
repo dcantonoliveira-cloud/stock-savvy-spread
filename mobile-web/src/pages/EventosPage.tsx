@@ -1,47 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
-import { fetchAllEventos, fetchLocaisMap } from '../api/bubble';
-import { BubbleEvento } from '../types';
-import { isFechado } from '../lib/eventFilters';
+import { fetchAllEvents } from '../api/supabase';
+import type { Event } from '../types';
+import { isFechado, eventDisplayName, eventLocationName } from '../lib/eventFilters';
 
 const MONTHS      = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                      'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-// ── Event card ───────────────────────────────────────────────────────────────
-
-function EventCard({ event, past, locaisMap }: { event: BubbleEvento; past?: boolean; locaisMap: Record<string, string> }) {
-  const localNome = event.LocalDoEvento ? (locaisMap[event.LocalDoEvento] ?? '') : '';
-  const date    = event.dataDoEvento ? new Date(event.dataDoEvento) : null;
+function EventCard({ event, past }: { event: Event; past?: boolean }) {
+  const localNome = eventLocationName(event);
+  const date    = event.event_date ? new Date(event.event_date) : null;
   const day     = date?.toLocaleDateString('pt-BR', { day: '2-digit' });
   const weekday = date?.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','').toUpperCase();
 
   return (
     <Link
-      to={`/eventos/${event._id}`}
+      to={`/eventos/${event.id}`}
       className={`flex items-center gap-4 rounded-3xl p-4 transition-all active:scale-[0.99] ${
-        past
-          ? 'bg-white/60 opacity-60'
-          : 'bg-white shadow-sm shadow-black/5'
+        past ? 'bg-white/60 opacity-60' : 'bg-white shadow-sm shadow-black/5'
       }`}
     >
-      {/* Date block */}
       <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${
         past ? 'bg-gray-100' : 'bg-gold-50'
       }`}>
-        <span className={`text-[10px] font-bold ${past ? 'text-gray-400' : 'text-gold-400'}`}>
-          {weekday}
-        </span>
+        <span className={`text-[10px] font-bold ${past ? 'text-gray-400' : 'text-gold-400'}`}>{weekday}</span>
         <span className={`text-2xl font-black leading-none ${past ? 'text-gray-500' : 'text-ron-900'}`}>
           {day ?? '—'}
         </span>
       </div>
-
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <p className={`font-bold truncate text-base ${past ? 'text-gray-500' : 'text-gray-900'}`}>
-          {event.NomeDoEvento ?? event.NomeDoContratante ?? '—'}
+          {eventDisplayName(event)}
         </p>
         <div className="flex items-center gap-3 mt-1 flex-wrap">
           {localNome && (
@@ -50,15 +41,14 @@ function EventCard({ event, past, locaisMap }: { event: BubbleEvento; past?: boo
               <span className="truncate">{localNome}</span>
             </span>
           )}
-          {event.QtdConvidados != null && (
+          {event.guest_count != null && (
             <span className="flex items-center gap-1 text-xs text-gray-400">
               <Users className="w-3 h-3" />
-              {event.QtdConvidados}
+              {event.guest_count}
             </span>
           )}
         </div>
       </div>
-
       <ArrowRight className={`w-4 h-4 shrink-0 ${past ? 'text-gray-200' : 'text-gray-300'}`} />
     </Link>
   );
@@ -68,24 +58,17 @@ function Skeleton() {
   return <div className="h-20 bg-black/5 rounded-3xl animate-pulse" />;
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
-
 export default function EventosPage() {
   const now = new Date();
   const [year, setYear]     = useState(now.getFullYear());
   const [month, setMonth]   = useState(now.getMonth());
-  const [events, setEvents] = useState<BubbleEvento[]>([]);
-  const [locaisMap, setLocaisMap] = useState<Record<string, string>>({});
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchAllEventos({ sortOrder: 'desc' })
-      .then((results) => {
-        const fechados = results.filter(isFechado);
-        setEvents(fechados);
-        fetchLocaisMap(fechados).then(setLocaisMap);
-      })
+    fetchAllEvents()
+      .then((results) => setEvents(results.filter(isFechado)))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -93,8 +76,8 @@ export default function EventosPage() {
   const countsByMonth = useMemo(() => {
     const counts = Array(12).fill(0);
     events.forEach((e) => {
-      if (!e.dataDoEvento) return;
-      const d = new Date(e.dataDoEvento);
+      if (!e.event_date) return;
+      const d = new Date(e.event_date);
       if (d.getFullYear() === year) counts[d.getMonth()]++;
     });
     return counts;
@@ -103,20 +86,17 @@ export default function EventosPage() {
   const monthEvents = useMemo(() =>
     events
       .filter((e) => {
-        if (!e.dataDoEvento) return false;
-        const d = new Date(e.dataDoEvento);
+        if (!e.event_date) return false;
+        const d = new Date(e.event_date);
         return d.getFullYear() === year && d.getMonth() === month;
       })
-      .sort((a, b) => new Date(a.dataDoEvento!).getTime() - new Date(b.dataDoEvento!).getTime()),
+      .sort((a, b) => new Date(a.event_date!).getTime() - new Date(b.event_date!).getTime()),
     [events, year, month]
   );
 
-  const upcoming = monthEvents.filter((e) => e.dataDoEvento && new Date(e.dataDoEvento) >= now);
-  const past     = monthEvents.filter((e) => e.dataDoEvento && new Date(e.dataDoEvento) <  now);
-
-  const yearTotal = events.filter(
-    (e) => new Date(e.dataDoEvento ?? '').getFullYear() === year
-  ).length;
+  const upcoming = monthEvents.filter((e) => e.event_date && new Date(e.event_date) >= now);
+  const past     = monthEvents.filter((e) => e.event_date && new Date(e.event_date) <  now);
+  const yearTotal = events.filter((e) => new Date(e.event_date ?? '').getFullYear() === year).length;
 
   useEffect(() => {
     const el = tabsRef.current?.querySelector(`[data-month="${month}"]`) as HTMLElement | null;
@@ -125,15 +105,10 @@ export default function EventosPage() {
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
+      {loading && <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />}
 
-      {loading && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
-      )}
-
-      {/* ── Header ───────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="sticky top-0 z-40 bg-[#f2f2f2]/95 backdrop-blur-xl pt-safe">
-
-        {/* Year selector */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <button
             onClick={() => setYear((y) => y - 1)}
@@ -155,7 +130,6 @@ export default function EventosPage() {
           </button>
         </div>
 
-        {/* Month tabs */}
         <div ref={tabsRef} className="flex gap-2 overflow-x-auto px-4 py-2 scrollbar-none">
           {MONTHS.map((m, i) => {
             const active = i === month;
@@ -166,14 +140,10 @@ export default function EventosPage() {
                 data-month={i}
                 onClick={() => setMonth(i)}
                 className={`shrink-0 flex flex-col items-center px-3.5 py-2 rounded-2xl transition-all ${
-                  active
-                    ? 'bg-ron-900 shadow-lg shadow-ron-900/30'
-                    : 'bg-white shadow-sm'
+                  active ? 'bg-ron-900 shadow-lg shadow-ron-900/30' : 'bg-white shadow-sm'
                 }`}
               >
-                <span className={`text-[11px] font-bold ${active ? 'text-gold-200' : 'text-gray-500'}`}>
-                  {m}
-                </span>
+                <span className={`text-[11px] font-bold ${active ? 'text-gold-200' : 'text-gray-500'}`}>{m}</span>
                 <span className={`text-base font-black leading-tight ${active ? 'text-white' : count > 0 ? 'text-ron-800' : 'text-gray-300'}`}>
                   {count > 0 ? count : '·'}
                 </span>
@@ -183,13 +153,10 @@ export default function EventosPage() {
         </div>
       </div>
 
-      {/* ── Content ──────────────────────────────────────────────────── */}
+      {/* Content */}
       <div className="px-4 pt-2 space-y-5">
-
         {loading ? (
-          <div className="space-y-3 pt-2">
-            <Skeleton /><Skeleton /><Skeleton />
-          </div>
+          <div className="space-y-3 pt-2"><Skeleton /><Skeleton /><Skeleton /></div>
         ) : monthEvents.length === 0 ? (
           <div className="bg-white rounded-3xl p-10 text-center mt-4">
             <p className="text-5xl mb-3">📅</p>
@@ -198,38 +165,27 @@ export default function EventosPage() {
           </div>
         ) : (
           <>
-            {/* Upcoming */}
             {upcoming.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-black text-gray-900 uppercase tracking-widest">
-                    Próximos
-                  </span>
-                  <span className="text-xs font-bold text-gray-400 bg-white px-2 py-0.5 rounded-full shadow-sm">
-                    {upcoming.length}
-                  </span>
+                  <span className="text-xs font-black text-gray-900 uppercase tracking-widest">Próximos</span>
+                  <span className="text-xs font-bold text-gray-400 bg-white px-2 py-0.5 rounded-full shadow-sm">{upcoming.length}</span>
                 </div>
                 <div className="space-y-2.5">
-                  {upcoming.map((e) => <EventCard key={e._id} event={e} locaisMap={locaisMap} />)}
+                  {upcoming.map((e) => <EventCard key={e.id} event={e} />)}
                 </div>
               </div>
             )}
-
-            {/* Past */}
             {past.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-2 h-2 rounded-full bg-gray-300" />
-                  <span className="text-xs font-black text-gray-400 uppercase tracking-widest">
-                    Realizados
-                  </span>
-                  <span className="text-xs font-bold text-gray-300 bg-white px-2 py-0.5 rounded-full shadow-sm">
-                    {past.length}
-                  </span>
+                  <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Realizados</span>
+                  <span className="text-xs font-bold text-gray-300 bg-white px-2 py-0.5 rounded-full shadow-sm">{past.length}</span>
                 </div>
                 <div className="space-y-2.5">
-                  {past.map((e) => <EventCard key={e._id} event={e} past locaisMap={locaisMap} />)}
+                  {past.map((e) => <EventCard key={e.id} event={e} past />)}
                 </div>
               </div>
             )}

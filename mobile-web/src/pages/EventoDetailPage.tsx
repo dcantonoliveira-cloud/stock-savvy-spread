@@ -1,32 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, Download, FileText, MapPin, Users } from 'lucide-react';
-import {
-  fetchAssessoria, fetchEvento, fetchLocal,
-  fetchPagamentosForEvento, fetchProduto, fetchValoresAdicionaisForEvento,
-} from '../api/bubble';
-import { BubbleEvento, BubblePagamento, BubbleValorAdicional } from '../types';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, MapPin, Users } from 'lucide-react';
+import { fetchEvent, fetchPaymentsForEvent } from '../api/supabase';
+import type { Event, EventPayment } from '../types';
 import { fmtCurrency, fmtDate } from '../lib/format';
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Strip Bubble rich-text markup like [ml][ul][li ...] */
-function stripBubbleRichText(text: string): string {
-  return text
-    .replace(/\[([^\]]+)\]/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-/** Extract a display filename from a Bubble file URL */
-function fileNameFromUrl(url: string): string {
-  try {
-    const parts = decodeURIComponent(url).split('/');
-    return parts[parts.length - 1] || 'Arquivo';
-  } catch {
-    return 'Arquivo';
-  }
-}
+import { eventDisplayName, eventLocationName } from '../lib/eventFilters';
 
 // ── Field components ─────────────────────────────────────────────────────────
 
@@ -41,107 +19,86 @@ function Field({ label, value }: { label: string; value?: string | number | null
 }
 
 function FieldGrid({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-3xl px-5 shadow-sm divide-y divide-gray-100">
-      {children}
-    </div>
-  );
+  return <div className="bg-white rounded-3xl px-5 shadow-sm divide-y divide-gray-100">{children}</div>;
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-3 mt-1">
-      {children}
-    </p>
+    <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-3 mt-1">{children}</p>
   );
 }
 
 // ── Tab: Ficha Técnica ────────────────────────────────────────────────────────
 
-function FichaTecnica({
-  e, localNome, assessoriaNome, produtoNome,
-}: {
-  e: BubbleEvento; localNome?: string; assessoriaNome?: string; produtoNome?: string;
-}) {
-  const duracao = e['duraçãoDoEvento'] ?? e['duração do evento'];
-
+function FichaTecnica({ e }: { e: Event }) {
   return (
     <div className="space-y-4">
-
       <div>
         <SectionTitle>Evento</SectionTitle>
         <FieldGrid>
-          <Field label="Nome do Evento"    value={e.NomeDoEvento} />
-          <Field label="Tipo"              value={e['Tipo_Do_Evento']} />
-          <Field label="Local"             value={localNome ?? e['Local Do Evento_TXT'] ?? e.LocalDoEvento} />
-          <Field label="Data"              value={fmtDate(e.dataDoEvento)} />
-          <Field label="Produto escolhido" value={produtoNome || undefined} />
-          <Field label="Horário cerimônia" value={e.HorarioCerimonia} />
-          <Field label="Duração"           value={duracao != null ? `${duracao}h` : null} />
-          <Field label="Preço negociado"   value={e['PreçoCombinado'] != null ? fmtCurrency(e['PreçoCombinado']!) : null} />
-          <Field label="Valor total"       value={e.ValorTotalEvento != null ? fmtCurrency(e.ValorTotalEvento) : null} />
+          <Field label="Nome do Evento"    value={e.event_name} />
+          <Field label="Tipo"              value={e.event_type} />
+          <Field label="Local"             value={eventLocationName(e) || undefined} />
+          <Field label="Data"              value={fmtDate(e.event_date ?? undefined)} />
+          <Field label="Horário cerimônia" value={e.ceremony_time} />
+          <Field label="Horas adicionais"  value={e.additional_hours != null ? `${e.additional_hours}h` : null} />
+          <Field label="Valor total"       value={e.total_value != null ? fmtCurrency(e.total_value) : null} />
         </FieldGrid>
       </div>
 
       <div>
         <SectionTitle>Convidados</SectionTitle>
         <FieldGrid>
-          <Field label="Quantidade"           value={e.QtdConvidados} />
-          <Field label="Crianças 50%"         value={e['Crianças50%']} />
-          <Field label="Não pagantes"         value={e.CriançasNãoPagantes} />
-          <Field label="Horas adicionais"     value={e.QtdHorasAdicionais} />
-          <Field label="Convidados por mesa"  value={e.QuantidadeConvidadosPorMesa} />
-          <Field label="Qtd. de mesas"        value={e.QuantidadeDeMesas} />
-          <Field label="Local do bolo"        value={e['localizaçãoMesaBolo']} />
+          <Field label="Quantidade"          value={e.guest_count} />
+          <Field label="Crianças 50%"        value={e.children_50_pct} />
+          <Field label="Não pagantes"        value={e.non_paying_guests} />
+          <Field label="Convidados por mesa" value={e.guests_per_table} />
+          <Field label="Qtd. de mesas"       value={e.table_count} />
+          <Field label="Local do bolo"       value={e.cake_table_location} />
         </FieldGrid>
       </div>
 
       <div>
         <SectionTitle>Equipe & Profissionais</SectionTitle>
         <FieldGrid>
-          <Field label="Qtd. profissionais"   value={e.QuantidadeProfissionais} />
-          <Field label="Tipo alim. prof."     value={e.tipoAlimentProf} />
-          <Field label="Valor alim. prof."    value={e['AlimentaçãoProfissionais'] != null ? fmtCurrency(e['AlimentaçãoProfissionais']!) : null} />
-          <Field label="Organizador(a)"       value={e['Organizador(a) escolhido']} />
-          <Field label="Decorador"            value={e.Decorador} />
-          <Field label="Confeiteiro(a)"       value={e.Confeiteira} />
-          <Field label="Banda / DJ"           value={e['Banda/DjEscolhido']} />
-          <Field label="Horário banda/DJ"     value={e.HorarioBanda} />
-          <Field label="Foto / Filmagem"      value={e['Foto/Filmagem']} />
-          <Field label="Bartender"            value={e.Bartender} />
-          <Field label="Outros profissionais" value={e.OutrosProfissionais} />
-          <Field label="Atrações à parte"     value={e.AtracoesAParte} />
-          <Field label="Assessoria"           value={assessoriaNome || undefined} />
+          <Field label="Qtd. profissionais"   value={e.professional_count} />
+          <Field label="Tipo alim. prof."     value={e.professional_meal_type} />
+          <Field label="Valor alim. prof."    value={e.professional_meal_value != null ? fmtCurrency(e.professional_meal_value) : null} />
+          <Field label="Organizador(a)"       value={e.organizer} />
+          <Field label="Decorador"            value={e.decorator} />
+          <Field label="Confeiteiro(a)"       value={e.pastry_chef} />
+          <Field label="Banda / DJ"           value={e.band_dj} />
+          <Field label="Horário banda/DJ"     value={e.band_dj_time} />
+          <Field label="Foto / Filmagem"      value={e.photo_video} />
+          <Field label="Bartender"            value={e.bartender} />
+          <Field label="Outros profissionais" value={e.other_professionals} />
+          <Field label="Atrações à parte"     value={e.extra_attractions} />
         </FieldGrid>
       </div>
 
       <div>
         <SectionTitle>Setup</SectionTitle>
         <FieldGrid>
-          <Field label="Coquetel boas-vindas" value={e.CoquetelDeBoasVindas} />
-          <Field label="Vinho"                value={e.vinho} />
+          <Field label="Coquetel boas-vindas" value={e.welcome_cocktail} />
+          <Field label="Vinho"                value={e.wine} />
           <Field label="Whisky"               value={e.whisky} />
-          <Field label="Cerveja"              value={e.Cerveja} />
-          <Field label="Porta guardanapo"     value={e.PortaGuardanapo} />
-          <Field label="Toalha"               value={e.Toalha} />
+          <Field label="Cerveja"              value={e.beer} />
+          <Field label="Porta guardanapo"     value={e.napkin_holder} />
+          <Field label="Toalha"               value={e.tablecloth} />
           <Field label="Rechaud"              value={e.rechaud} />
-          <Field label="Sousplát"             value={e['Sousplát']} />
-          <Field label="Aparador"             value={e.Aparador} />
-          <Field label="Qtd. aparadores"      value={e['Qtd aparadores']} />
-          <Field label="Tam. aparadores"      value={e['Tamanho dos aparadores']} />
-          <Field label="Taça"                 value={e['taça']} />
-          <Field label="Sala dos noivos"      value={e['sala dos noivos']} />
-          <Field label="Espaço kids"          value={e['espaço kids']} />
+          <Field label="Sousplát"             value={e.sousplat} />
+          <Field label="Aparador"             value={e.sideboard} />
+          <Field label="Taça"                 value={e.glass_type} />
+          <Field label="Sala dos noivos"      value={e.bridal_suite} />
+          <Field label="Espaço kids"          value={e.kids_area} />
         </FieldGrid>
       </div>
 
-      {e['Observações'] && (
+      {e.notes && (
         <div>
           <SectionTitle>Observações</SectionTitle>
           <div className="bg-white rounded-3xl p-5 shadow-sm">
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-              {stripBubbleRichText(e['Observações'])}
-            </p>
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{e.notes}</p>
           </div>
         </div>
       )}
@@ -149,48 +106,22 @@ function FichaTecnica({
   );
 }
 
-// ── Tab: Cardápio ─────────────────────────────────────────────────────────────
-
-function CardapioTab({ e }: { e: BubbleEvento }) {
-  const raw = e.CardapioEvento;
-  if (!raw) {
-    return (
-      <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
-        <p className="text-4xl mb-3">🍽️</p>
-        <p className="font-bold text-gray-700">Cardápio não definido</p>
-        <p className="text-sm text-gray-400 mt-1">O cardápio ainda não foi escolhido para este evento</p>
-      </div>
-    );
-  }
-  return (
-    <div className="bg-white rounded-3xl p-5 shadow-sm">
-      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-        {stripBubbleRichText(raw)}
-      </p>
-    </div>
-  );
-}
-
 // ── Tab: Financeiro ───────────────────────────────────────────────────────────
 
-function FinanceiroTab({ e }: { e: BubbleEvento }) {
-  const [pagamentos, setPagamentos]   = useState<BubblePagamento[]>([]);
-  const [adicionais, setAdicionais]   = useState<BubbleValorAdicional[]>([]);
-  const [loading, setLoading]         = useState(true);
+function FinanceiroTab({ e }: { e: Event }) {
+  const [payments, setPayments] = useState<EventPayment[]>([]);
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
-    Promise.allSettled([
-      fetchPagamentosForEvento(e._id),
-      fetchValoresAdicionaisForEvento(e._id),
-    ]).then(([pgRes, vaRes]) => {
-      if (pgRes.status === 'fulfilled') setPagamentos(pgRes.value.response.results);
-      if (vaRes.status === 'fulfilled') setAdicionais(vaRes.value.response.results);
-    }).finally(() => setLoading(false));
-  }, [e._id]);
+    fetchPaymentsForEvent(e.id)
+      .then(setPayments)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [e.id]);
 
-  const valorTotal  = e.ValorTotalEvento ?? 0;
-  const valorPago   = pagamentos.reduce((s, p) => s + (p.Valor ?? 0), 0);
-  const saldo       = valorTotal - valorPago;
+  const valorTotal = e.total_value ?? 0;
+  const valorPago  = e.paid_value ?? payments.filter(p => p.is_confirmed).reduce((s, p) => s + (p.value ?? 0), 0);
+  const saldo      = valorTotal - valorPago;
 
   if (loading) {
     return (
@@ -202,8 +133,6 @@ function FinanceiroTab({ e }: { e: BubbleEvento }) {
 
   return (
     <div className="space-y-4">
-
-      {/* Resumo */}
       <div>
         <SectionTitle>Resumo Financeiro</SectionTitle>
         <div className="grid grid-cols-3 gap-3">
@@ -228,144 +157,57 @@ function FinanceiroTab({ e }: { e: BubbleEvento }) {
         </div>
       </div>
 
-      {/* Valores adicionais */}
-      {adicionais.length > 0 && (
-        <div>
-          <SectionTitle>Valores Adicionais</SectionTitle>
-          <div className="bg-white rounded-3xl shadow-sm divide-y divide-gray-100 overflow-hidden">
-            {adicionais.map((va) => (
-              <div key={va._id} className="flex items-center justify-between px-5 py-3.5">
-                <p className="text-sm text-gray-700 font-medium flex-1 truncate pr-4">
-                  {va['Descrição'] ?? '—'}
-                </p>
-                <p className="text-sm font-black text-ron-900 shrink-0">
-                  {va.valor != null ? fmtCurrency(va.valor) : '—'}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Pagamentos */}
       <div>
         <SectionTitle>Pagamentos</SectionTitle>
-        {pagamentos.length === 0 ? (
+        {payments.length === 0 ? (
           <div className="bg-white rounded-3xl p-8 text-center shadow-sm">
             <p className="text-gray-400 text-sm font-medium">Nenhum pagamento registrado</p>
           </div>
         ) : (
           <div className="bg-white rounded-3xl shadow-sm divide-y divide-gray-100 overflow-hidden">
-            {pagamentos.map((pg) => (
-              <div key={pg._id} className="flex items-center gap-3 px-5 py-3.5">
+            {payments.map((pg) => (
+              <div key={pg.id} className="flex items-center gap-3 px-5 py-3.5">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-gray-700 font-semibold">
-                      {pg.data ? fmtDate(pg.data) : '—'}
+                      {pg.payment_date ? fmtDate(pg.payment_date) : '—'}
                     </p>
-                    {pg.conferido && (
+                    {pg.is_confirmed && (
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     )}
                   </div>
                 </div>
                 <p className="text-sm font-black text-ron-900 shrink-0">
-                  {pg.Valor != null ? fmtCurrency(pg.Valor) : '—'}
+                  {pg.value != null ? fmtCurrency(pg.value) : '—'}
                 </p>
               </div>
             ))}
           </div>
         )}
       </div>
-
     </div>
   );
 }
 
-// ── Tab: Arquivos ─────────────────────────────────────────────────────────────
+// ── Tabs ─────────────────────────────────────────────────────────────────────
 
-function ArquivosTab({ e }: { e: BubbleEvento }) {
-  const arquivos = e.Arquivos_Internos ?? [];
-
-  if (arquivos.length === 0) {
-    return (
-      <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
-        <p className="text-4xl mb-3">📁</p>
-        <p className="font-bold text-gray-700">Nenhum arquivo</p>
-        <p className="text-sm text-gray-400 mt-1">Não há contratos ou propostas anexados</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-3xl shadow-sm divide-y divide-gray-100 overflow-hidden">
-      {arquivos.map((url, i) => {
-        const isUrl = url.startsWith('http');
-        const name  = isUrl ? fileNameFromUrl(url) : `Arquivo ${i + 1}`;
-        const ext   = name.split('.').pop()?.toUpperCase() ?? 'FILE';
-
-        return (
-          <a
-            key={i}
-            href={isUrl ? url : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`flex items-center gap-4 px-5 py-4 transition-colors ${isUrl ? 'active:bg-gray-50' : 'opacity-50'}`}
-          >
-            <div className="w-10 h-10 rounded-2xl bg-ron-50 flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5 text-ron-700" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{ext}</p>
-            </div>
-            {isUrl && <Download className="w-4 h-4 text-gray-300 shrink-0" />}
-          </a>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Tabs config ───────────────────────────────────────────────────────────────
-
-const TABS = ['Ficha Técnica', 'Cardápio', 'Financeiro', 'Arquivos'];
+const TABS = ['Ficha Técnica', 'Financeiro'];
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EventoDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [evento, setEvento]                   = useState<BubbleEvento | null>(null);
-  const [localNome, setLocalNome]             = useState<string>('');
-  const [assessoriaNome, setAssessoriaNome]   = useState<string>('');
-  const [produtoNome, setProdutoNome]         = useState<string>('');
-  const [loading, setLoading]                 = useState(true);
-  const [error, setError]                     = useState(false);
-  const [activeTab, setActiveTab]             = useState(0);
+  const { id }    = useParams<{ id: string }>();
+  const navigate  = useNavigate();
+  const [evento, setEvento]     = useState<Event | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!id) return;
-    fetchEvento(id)
-      .then((r) => {
-        const ev = r.response;
-        setEvento(ev);
-        if (ev.LocalDoEvento) {
-          fetchLocal(ev.LocalDoEvento)
-            .then((lr) => setLocalNome(lr.response.Nome ?? ''))
-            .catch(() => {});
-        }
-        if (ev.Assessoria) {
-          fetchAssessoria(ev.Assessoria)
-            .then((ar) => setAssessoriaNome(ar.response.Nome ?? ''))
-            .catch(() => {});
-        }
-        if (ev.ProdutoEscolhido) {
-          fetchProduto(ev.ProdutoEscolhido)
-            .then((pr) => setProdutoNome(pr.response.Nome ?? ''))
-            .catch(() => {});
-        }
-      })
+    fetchEvent(id)
+      .then(setEvento)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [id]);
@@ -379,27 +221,19 @@ export default function EventoDetailPage() {
   function renderTab() {
     if (!evento) return null;
     switch (activeTab) {
-      case 0: return <FichaTecnica e={evento} localNome={localNome || undefined} assessoriaNome={assessoriaNome || undefined} produtoNome={produtoNome || undefined} />;
-      case 1: return <CardapioTab e={evento} />;
-      case 2: return <FinanceiroTab e={evento} />;
-      case 3: return <ArquivosTab e={evento} />;
+      case 0: return <FichaTecnica e={evento} />;
+      case 1: return <FinanceiroTab e={evento} />;
       default: return null;
     }
   }
 
-  const date = evento?.dataDoEvento ? new Date(evento.dataDoEvento) : null;
-
   return (
     <div className="pb-36 max-w-lg mx-auto">
+      {loading && <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />}
 
-      {loading && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
-      )}
-
-      {/* ── Hero header ────────────────────────────────────────────── */}
+      {/* Hero header */}
       <div className="bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-6 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-36 h-36 bg-white/5 rounded-full" />
-
         <button
           onClick={() => navigate(-1)}
           className="w-9 h-9 rounded-2xl bg-white/15 flex items-center justify-center mb-4"
@@ -415,31 +249,31 @@ export default function EventoDetailPage() {
         ) : (
           <>
             <h1 className="text-2xl font-black text-white leading-tight">
-              {evento?.NomeDoEvento ?? 'Evento'}
+              {evento ? eventDisplayName(evento) : 'Evento'}
             </h1>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-              {date && (
+              {evento?.event_date && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <Calendar className="w-3.5 h-3.5" />
-                  {fmtDate(evento?.dataDoEvento)}
+                  {fmtDate(evento.event_date)}
                 </span>
               )}
-              {(localNome || evento?.['Local Do Evento_TXT']) && (
+              {evento && eventLocationName(evento) && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <MapPin className="w-3.5 h-3.5" />
-                  {localNome || evento?.['Local Do Evento_TXT']}
+                  {eventLocationName(evento)}
                 </span>
               )}
-              {evento?.QtdConvidados != null && (
+              {evento?.guest_count != null && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <Users className="w-3.5 h-3.5" />
-                  {evento.QtdConvidados} convidados
+                  {evento.guest_count} convidados
                 </span>
               )}
-              {evento?.HorarioCerimonia && (
+              {evento?.ceremony_time && (
                 <span className="flex items-center gap-1.5 text-gold-300/70 text-sm font-medium">
                   <Clock className="w-3.5 h-3.5" />
-                  {evento.HorarioCerimonia}
+                  {evento.ceremony_time}
                 </span>
               )}
             </div>
@@ -447,12 +281,9 @@ export default function EventoDetailPage() {
         )}
       </div>
 
-      {/* ── Tab bar ────────────────────────────────────────────────── */}
+      {/* Tab bar */}
       <div className="sticky top-0 z-40 bg-[#f2f2f2]/95 backdrop-blur-xl">
-        <div
-          ref={tabsRef}
-          className="flex gap-0 overflow-x-auto scrollbar-none px-4 pt-3 pb-2"
-        >
+        <div ref={tabsRef} className="flex gap-0 overflow-x-auto scrollbar-none px-4 pt-3 pb-2">
           {TABS.map((tab, i) => (
             <button
               key={tab}
@@ -470,22 +301,18 @@ export default function EventoDetailPage() {
         </div>
       </div>
 
-      {/* ── Tab content ────────────────────────────────────────────── */}
+      {/* Tab content */}
       <div className="px-4 pt-4">
         {loading ? (
           <div className="space-y-3">
-            {[1,2,3,4].map((i) => (
-              <div key={i} className="h-14 bg-black/5 rounded-2xl animate-pulse" />
-            ))}
+            {[1,2,3,4].map((i) => <div key={i} className="h-14 bg-black/5 rounded-2xl animate-pulse" />)}
           </div>
         ) : error ? (
           <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
             <p className="text-4xl mb-3">⚠️</p>
             <p className="text-gray-500">Erro ao carregar o evento.</p>
           </div>
-        ) : (
-          renderTab()
-        )}
+        ) : renderTab()}
       </div>
     </div>
   );

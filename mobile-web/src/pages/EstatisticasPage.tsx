@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchAllEventos } from '../api/bubble';
-import { BubbleEvento } from '../types';
+import { fetchAllEvents } from '../api/supabase';
+import type { Event } from '../types';
 import { fmtCurrency } from '../lib/format';
+import { statusLabel } from '../lib/eventFilters';
 
 const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -24,12 +25,12 @@ function StatCard({
 }
 
 export default function EstatisticasPage() {
-  const [events, setEvents] = useState<BubbleEvento[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAllEventos()
-      .then((results) => setEvents(results))
+    fetchAllEvents()
+      .then(setEvents)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -40,32 +41,30 @@ export default function EstatisticasPage() {
 
     const byStatus: Record<string, number> = {};
     events.forEach((e) => {
-      const k = (e.status ?? 'Pendente');
+      const k = statusLabel(e.status ?? '');
       byStatus[k] = (byStatus[k] ?? 0) + 1;
     });
 
     const byMonth: number[] = Array(12).fill(0);
     events.forEach((e) => {
-      if (!e.dataDoEvento) return;
-      const d = new Date(e.dataDoEvento);
+      if (!e.event_date) return;
+      const d = new Date(e.event_date);
       if (d.getFullYear() === currentYear) byMonth[d.getMonth()]++;
     });
 
-    const totalRevenue = events.reduce((s, e) => s + (e.PreçoCombinado ?? 0), 0);
-    const fechadosRevenue = events
-      .filter((e) => e.status === 'Fechado')
-      .reduce((s, e) => s + (e.PreçoCombinado ?? 0), 0);
+    const confirmedEvents = events.filter((e) => e.status === 'confirmed' || e.status === 'completed');
+    const totalRevenue    = confirmedEvents.reduce((s, e) => s + (e.total_value ?? 0), 0);
 
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const thisMonth = events.filter((e) => {
-      if (!e.dataDoEvento) return false;
-      const d = new Date(e.dataDoEvento);
+    const thisMonth  = events.filter((e) => {
+      if (!e.event_date) return false;
+      const d = new Date(e.event_date);
       return d >= monthStart && d <= monthEnd;
     });
 
     const maxByMonth = Math.max(...byMonth, 1);
-    return { byStatus, byMonth, totalRevenue, fechadosRevenue, thisMonth, maxByMonth };
+    return { byStatus, byMonth, totalRevenue, thisMonth, maxByMonth };
   }, [events]);
 
   const currentMonthName = new Date().toLocaleDateString('pt-BR', { month: 'long' });
@@ -73,7 +72,7 @@ export default function EstatisticasPage() {
   return (
     <div className="pb-36 max-w-lg mx-auto">
 
-      {/* ── Hero header ──────────────────────────────────────────────── */}
+      {/* Hero */}
       <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-20 overflow-hidden">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="absolute -bottom-8 -left-6  w-36 h-36 bg-white/5 rounded-full" />
@@ -84,38 +83,25 @@ export default function EstatisticasPage() {
 
       <div className="px-4 space-y-5">
 
-        {/* ── KPI grid ────────────────────────────────────────────────── */}
+        {/* KPI grid */}
         <div className="grid grid-cols-2 gap-3 -mt-10">
           {loading ? (
-            <>
-              {[1,2,3,4].map(i => (
-                <div key={i} className="h-24 bg-black/5 rounded-3xl animate-pulse" />
-              ))}
-            </>
+            <>{[1,2,3,4].map(i => <div key={i} className="h-24 bg-black/5 rounded-3xl animate-pulse" />)}</>
           ) : (
             <>
               <StatCard label="Total de Eventos" value={events.length} accent />
-              <StatCard
-                label="Este Mês"
-                value={stats.thisMonth.length}
-                sub={currentMonthName}
-              />
+              <StatCard label="Este Mês" value={stats.thisMonth.length} sub={currentMonthName} />
               {stats.totalRevenue > 0 && (
-                <StatCard label="Receita Total" value={fmtCurrency(stats.totalRevenue)} />
-              )}
-              {stats.fechadosRevenue > 0 && (
-                <StatCard label="Fechados" value={fmtCurrency(stats.fechadosRevenue)} />
+                <StatCard label="Receita (confirmados)" value={fmtCurrency(stats.totalRevenue)} />
               )}
             </>
           )}
         </div>
 
-        {/* ── Status breakdown ────────────────────────────────────────── */}
+        {/* Status breakdown */}
         {!loading && Object.keys(stats.byStatus).length > 0 && (
           <div className="bg-white rounded-3xl p-5 shadow-sm">
-            <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-4">
-              Por Status
-            </p>
+            <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-4">Por Status</p>
             <div className="space-y-3.5">
               {Object.entries(stats.byStatus)
                 .sort(([, a], [, b]) => b - a)
@@ -128,10 +114,7 @@ export default function EstatisticasPage() {
                         <span className="text-gray-400 font-medium">{count} <span className="text-gray-300">({pct}%)</span></span>
                       </div>
                       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-ron-800 transition-all duration-700"
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className="h-full rounded-full bg-ron-800 transition-all duration-700" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );
@@ -140,7 +123,7 @@ export default function EstatisticasPage() {
           </div>
         )}
 
-        {/* ── Monthly bar chart ───────────────────────────────────────── */}
+        {/* Monthly bar chart */}
         {!loading && (
           <div className="bg-white rounded-3xl p-5 shadow-sm">
             <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-4">
@@ -152,14 +135,10 @@ export default function EstatisticasPage() {
                 const isCurrent = i === new Date().getMonth();
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    {count > 0 && (
-                      <span className="text-[9px] font-bold text-gray-400">{count}</span>
-                    )}
+                    {count > 0 && <span className="text-[9px] font-bold text-gray-400">{count}</span>}
                     <div className="w-full flex items-end" style={{ height: 72 }}>
                       <div
-                        className={`w-full rounded-t-xl transition-all duration-700 ${
-                          isCurrent ? 'bg-ron-800' : 'bg-gold-200'
-                        }`}
+                        className={`w-full rounded-t-xl transition-all duration-700 ${isCurrent ? 'bg-ron-800' : 'bg-gold-200'}`}
                         style={{ height: `${Math.max(heightPct, count > 0 ? 8 : 2)}%` }}
                       />
                     </div>

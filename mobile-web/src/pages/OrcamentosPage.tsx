@@ -1,117 +1,85 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Calendar, MapPin, FileText, UtensilsCrossed } from 'lucide-react';
-import { fetchAllEventos, fetchAllDegustacoes, fetchLocaisMap } from '../api/bubble';
-import { BubbleEvento } from '../types';
+import { fetchAllEvents, fetchAllTastings } from '../api/supabase';
+import type { Event, TastingSession } from '../types';
 import { fmtDate } from '../lib/format';
-
-// Statuses shown by default (open prospects)
-const DEFAULT_STATUSES = ['1º contato', 'negociando'];
+import { eventDisplayName, eventLocationName, statusLabel, statusBadgeClass } from '../lib/eventFilters';
 
 const ALL_FILTERS = [
-  { key: 'abertos',    label: 'Em aberto',  statuses: ['1º contato', 'negociando'] },
-  { key: '1contato',   label: '1º Contato', statuses: ['1º contato'] },
-  { key: 'negociando', label: 'Negociando', statuses: ['negociando'] },
-  { key: 'naofechou',  label: 'Não fechou', statuses: ['não fechou'] },
-  { key: 'cancelado',  label: 'Cancelado',  statuses: ['cancelado'] },
+  { key: 'abertos',    label: 'Em aberto',  statuses: ['lead', 'negotiating', 'tasting_scheduled'] },
+  { key: 'lead',       label: '1º Contato', statuses: ['lead'] },
+  { key: 'negociando', label: 'Negociando', statuses: ['negotiating'] },
+  { key: 'tasting',    label: 'Degustação', statuses: ['tasting_scheduled'] },
+  { key: 'naofechou',  label: 'Não fechou', statuses: ['lost'] },
+  { key: 'cancelado',  label: 'Cancelado',  statuses: ['cancelled'] },
 ];
-
-const STATUS_STYLE: Record<string, string> = {
-  '1º contato':  'bg-violet-50 text-violet-700 border-violet-200',
-  'negociando':  'bg-blue-50   text-blue-700   border-blue-200',
-  'não fechou':  'bg-gray-100  text-gray-600   border-gray-200',
-  'cancelado':   'bg-red-50    text-red-700    border-red-200',
-};
-
-function statusStyle(s?: string) {
-  return STATUS_STYLE[(s ?? '').toLowerCase()] ?? 'bg-gray-100 text-gray-500 border-gray-200';
-}
 
 function Skeleton() {
   return <div className="h-20 bg-black/5 rounded-3xl animate-pulse" />;
 }
 
 export default function OrcamentosPage() {
-  const [eventos, setEventos]           = useState<BubbleEvento[]>([]);
-  const [locaisMap, setLocaisMap]       = useState<Record<string, string>>({});
-  // map: eventId → tasting date string
-  const [degMap, setDegMap]             = useState<Record<string, string>>({});
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState(false);
-  const [filter, setFilter]             = useState('abertos');
-  const [search, setSearch]             = useState('');
+  const [eventos, setEventos]   = useState<Event[]>([]);
+  const [tastings, setTastings] = useState<TastingSession[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(false);
+  const [filter, setFilter]     = useState('abertos');
+  const [search, setSearch]     = useState('');
 
   useEffect(() => {
-    Promise.all([fetchAllEventos(), fetchAllDegustacoes()])
-      .then(async ([allEventos, allDegs]) => {
-        // Keep only non-closed prospects with a name
-        const prospects = allEventos.filter((e) => {
-          const s = (e.status ?? '').toLowerCase();
-          return (
-            e.NomeDoEvento?.trim() &&
-            ['1º contato', 'negociando', 'não fechou', 'cancelado'].includes(s)
-          );
+    Promise.all([fetchAllEvents(), fetchAllTastings()])
+      .then(([allEvents, allTastings]) => {
+        const prospects = allEvents.filter((e) => {
+          const EXCLUIDOS = new Set(['confirmed', 'completed']);
+          return !EXCLUIDOS.has(e.status) && e.event_name?.trim();
         });
         setEventos(prospects);
-
-        // Build eventId → tasting date map from all degustações
-        const map: Record<string, string> = {};
-        for (const deg of allDegs) {
-          if (!deg.data) continue;
-          const ids = [...(deg.eventos ?? []), ...(deg.Eventos ?? []), ...(deg.evento ? [deg.evento] : [])];
-          for (const eid of ids) {
-            // Keep the earliest future tasting date per event
-            if (!map[eid] || deg.data < map[eid]) map[eid] = deg.data;
-          }
-        }
-        setDegMap(map);
-
-        const locMap = await fetchLocaisMap(prospects);
-        setLocaisMap(locMap);
+        setTastings(allTastings);
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
-  const activeStatuses = ALL_FILTERS.find((f) => f.key === filter)?.statuses ?? DEFAULT_STATUSES;
+  // Map eventId → earliest tasting date
+  const degMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const t of tastings) {
+      for (const eid of (t.event_ids ?? [])) {
+        if (!map[eid] || t.scheduled_date < map[eid]) map[eid] = t.scheduled_date;
+      }
+    }
+    return map;
+  }, [tastings]);
+
+  const activeStatuses = ALL_FILTERS.find((f) => f.key === filter)?.statuses ?? ['lead', 'negotiating'];
 
   const filtered = useMemo(() => {
     const now = new Date();
     const q = search.trim().toLowerCase();
 
-    let list = eventos.filter((e) =>
-      activeStatuses.includes((e.status ?? '').toLowerCase())
-    );
+    let list = eventos.filter((e) => activeStatuses.includes(e.status ?? ''));
 
-    // Without search: "Em aberto" only shows future events
     if (!q && filter === 'abertos') {
-      list = list.filter((e) =>
-        e.dataDoEvento ? new Date(e.dataDoEvento) >= now : true
-      );
+      list = list.filter((e) => e.event_date ? new Date(e.event_date) >= now : true);
     }
 
-    // With search: include past events too, filter by name
     if (q) {
-      list = list.filter((e) =>
-        (e.NomeDoEvento ?? '').toLowerCase().includes(q)
-      );
+      list = list.filter((e) => eventDisplayName(e).toLowerCase().includes(q));
     }
 
     return list.sort((a, b) => {
-      const da = a.dataDoEvento ? new Date(a.dataDoEvento).getTime() : 0;
-      const db = b.dataDoEvento ? new Date(b.dataDoEvento).getTime() : 0;
+      const da = a.event_date ? new Date(a.event_date).getTime() : 0;
+      const db = b.event_date ? new Date(b.event_date).getTime() : 0;
       return da - db;
     });
   }, [eventos, filter, search, activeStatuses]);
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
+      {loading && <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />}
 
-      {loading && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
-      )}
-
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      {/* Hero */}
       <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pb-8 overflow-hidden min-h-[130px] flex flex-col justify-end">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="relative">
@@ -123,8 +91,7 @@ export default function OrcamentosPage() {
       </div>
 
       <div className="px-4 space-y-3 pt-4">
-
-        {/* ── Search ───────────────────────────────────────────────────── */}
+        {/* Search */}
         <input
           type="text"
           value={search}
@@ -133,16 +100,14 @@ export default function OrcamentosPage() {
           className="w-full bg-white rounded-2xl px-4 py-3 text-sm text-gray-700 placeholder-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-ron-800/20"
         />
 
-        {/* ── Filter tabs ──────────────────────────────────────────────── */}
+        {/* Filter tabs */}
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
           {ALL_FILTERS.map((f) => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
               className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm ${
-                filter === f.key
-                  ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30'
-                  : 'bg-white text-gray-500'
+                filter === f.key ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30' : 'bg-white text-gray-500'
               }`}
             >
               {f.label}
@@ -150,11 +115,9 @@ export default function OrcamentosPage() {
           ))}
         </div>
 
-        {/* ── List ─────────────────────────────────────────────────────── */}
+        {/* List */}
         {loading ? (
-          <div className="space-y-3">
-            <Skeleton /><Skeleton /><Skeleton />
-          </div>
+          <div className="space-y-3"><Skeleton /><Skeleton /><Skeleton /></div>
         ) : error ? (
           <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
             <p className="text-4xl mb-3">⚠️</p>
@@ -171,29 +134,27 @@ export default function OrcamentosPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map((e) => {
-              const local = e.LocalDoEvento ? (locaisMap[e.LocalDoEvento] ?? '') : '';
+              const local = eventLocationName(e);
               return (
                 <Link
-                  key={e._id}
-                  to={`/eventos/${e._id}`}
+                  key={e.id}
+                  to={`/eventos/${e.id}`}
                   className="flex items-center gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1.5">
                       <p className="font-bold text-gray-900 text-sm leading-tight flex-1 truncate">
-                        {e.NomeDoEvento ?? '—'}
+                        {eventDisplayName(e)}
                       </p>
-                      {e.status && (
-                        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black border ${statusStyle(e.status)}`}>
-                          {e.status}
-                        </span>
-                      )}
+                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black border ${statusBadgeClass(e.status)}`}>
+                        {statusLabel(e.status)}
+                      </span>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
-                      {e.dataDoEvento && (
+                      {e.event_date && (
                         <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
                           <Calendar className="w-3 h-3 text-gold-400" />
-                          {fmtDate(e.dataDoEvento)}
+                          {fmtDate(e.event_date)}
                         </span>
                       )}
                       {local && (
@@ -202,10 +163,10 @@ export default function OrcamentosPage() {
                           <span className="truncate max-w-[140px]">{local}</span>
                         </span>
                       )}
-                      {degMap[e._id] && (
+                      {degMap[e.id] && (
                         <span className="flex items-center gap-1 text-xs text-violet-600 font-medium">
                           <UtensilsCrossed className="w-3 h-3" />
-                          Deg. {fmtDate(degMap[e._id])}
+                          Deg. {fmtDate(degMap[e.id])}
                         </span>
                       )}
                     </div>

@@ -1,61 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, MapPin, UtensilsCrossed, Users } from 'lucide-react';
-import { fetchAllDegustacoes, fetchAllEventos, fetchLocaisMap } from '../api/bubble';
-import { BubbleEvento, BubbleDegustacao } from '../types';
-import { isFechado, isReserva } from '../lib/eventFilters';
-// fmtTime not needed — Degustação records have no time field
+import { fetchAllEvents, fetchAllTastings } from '../api/supabase';
+import type { Event, TastingSession } from '../types';
+import { isFechado, eventDisplayName, eventLocationName } from '../lib/eventFilters';
 
-const WEEKDAYS   = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
-const MONTHS     = [
+const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+const MONTHS   = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
 
-// ── Unified calendar item type ────────────────────────────────────────────────
-
 type CalItem =
-  | { kind: 'fechado'; event: BubbleEvento }
-  | { kind: 'reserva'; event: BubbleEvento }
-  | { kind: 'degust';  degu:  BubbleDegustacao };
+  | { kind: 'fechado'; event: Event }
+  | { kind: 'degust';  tasting: TastingSession };
 
-function getDateKey(item: CalItem): string | undefined {
-  if (item.kind === 'degust') return item.degu.data?.slice(0, 10);
-  return item.event.dataDoEvento?.slice(0, 10);
+function getDateKey(item: CalItem): string {
+  if (item.kind === 'degust') return item.tasting.scheduled_date.slice(0, 10);
+  return item.event.event_date?.slice(0, 10) ?? '';
 }
 
-// ── Item cards ────────────────────────────────────────────────────────────────
-
-function EventoCard({
-  item, locaisMap,
-}: {
-  item: Extract<CalItem, { kind: 'fechado' | 'reserva' }>;
-  locaisMap: Record<string, string>;
-}) {
+function EventoCard({ item }: { item: Extract<CalItem, { kind: 'fechado' }> }) {
   const e     = item.event;
-  const local = e.LocalDoEvento ? (locaisMap[e.LocalDoEvento] ?? '') : '';
-
+  const local = eventLocationName(e);
   return (
     <Link
-      to={`/eventos/${e._id}`}
+      to={`/eventos/${e.id}`}
       className="flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform"
     >
-      {/* color bar */}
-      <div className={`w-1 self-stretch rounded-full shrink-0 ${
-        item.kind === 'fechado' ? 'bg-ron-900' : 'bg-gold-400'
-      }`} />
-
+      <div className="w-1 self-stretch rounded-full shrink-0 bg-ron-900" />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-bold text-gray-900 text-sm flex-1 truncate">
-            {e.NomeDoEvento ?? e.NomeDoContratante ?? '—'}
-          </p>
-          {item.kind === 'reserva' && (
-            <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-gold-50 text-gold-600 border border-gold-200">
-              Reserva
-            </span>
-          )}
-        </div>
+        <p className="font-bold text-gray-900 text-sm flex-1 truncate">{eventDisplayName(e)}</p>
         <div className="flex items-center gap-3 mt-1 flex-wrap">
           {local && (
             <span className="flex items-center gap-1 text-xs text-gray-400 truncate">
@@ -63,10 +38,9 @@ function EventoCard({
               <span className="truncate max-w-[140px]">{local}</span>
             </span>
           )}
-          {e.QtdConvidados != null && (
+          {e.guest_count != null && (
             <span className="flex items-center gap-1 text-xs text-gray-400">
-              <Users className="w-3 h-3" />
-              {e.QtdConvidados}
+              <Users className="w-3 h-3" />{e.guest_count}
             </span>
           )}
         </div>
@@ -76,72 +50,52 @@ function EventoCard({
 }
 
 function DegustacaoCard({ item }: { item: Extract<CalItem, { kind: 'degust' }> }) {
-  const d = item.degu;
   return (
     <div className="flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm">
-      {/* color bar — violet for tastings */}
       <div className="w-1 self-stretch rounded-full shrink-0 bg-violet-400" />
-
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-bold text-gray-900 text-sm flex-1 truncate">
-            Degustação
-          </p>
+          <p className="font-bold text-gray-900 text-sm flex-1 truncate">Degustação</p>
           <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-violet-50 text-violet-700 border border-violet-200 flex items-center gap-1">
-            <UtensilsCrossed className="w-2.5 h-2.5" />
-            Degust.
+            <UtensilsCrossed className="w-2.5 h-2.5" /> Degust.
           </span>
         </div>
-        {d.convidados != null && (
-          <p className="text-xs text-gray-400 mt-1">{d.convidados} convidados</p>
-        )}
-        {d['Observações'] && (
-          <p className="text-xs text-gray-400 mt-0.5 truncate">{d['Observações']}</p>
+        {item.tasting.max_couples != null && (
+          <p className="text-xs text-gray-400 mt-1">{item.tasting.max_couples} casais</p>
         )}
       </div>
     </div>
   );
 }
 
-function ItemCard({ item, locaisMap }: { item: CalItem; locaisMap: Record<string, string> }) {
+function ItemCard({ item }: { item: CalItem }) {
   if (item.kind === 'degust') return <DegustacaoCard item={item} />;
-  return <EventoCard item={item} locaisMap={locaisMap} />;
+  return <EventoCard item={item} />;
 }
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CalendarioPage() {
   const today = new Date();
-  const [year, setYear]     = useState(today.getFullYear());
-  const [month, setMonth]   = useState(today.getMonth());
+  const [year, setYear]       = useState(today.getFullYear());
+  const [month, setMonth]     = useState(today.getMonth());
   const [selected, setSelected] = useState<number | null>(today.getDate());
-  const [events, setEvents]         = useState<BubbleEvento[]>([]);
-  const [degustacoes, setDegustacoes] = useState<BubbleDegustacao[]>([]);
-  const [locaisMap, setLocaisMap]   = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents]       = useState<Event[]>([]);
+  const [tastings, setTastings]   = useState<TastingSession[]>([]);
+  const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
-    Promise.all([fetchAllEventos(), fetchAllDegustacoes()])
-      .then(([evResults, degus]) => {
-        setEvents(evResults);
-        setDegustacoes(degus);
-        fetchLocaisMap(evResults).then(setLocaisMap);
-      })
+    Promise.all([fetchAllEvents(), fetchAllTastings()])
+      .then(([evts, tsts]) => { setEvents(evts); setTastings(tsts); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Build unified calendar items ──────────────────────────────────────────
   const allItems = useMemo<CalItem[]>(() => {
     const items: CalItem[] = [];
     events.filter(isFechado).forEach((e) => items.push({ kind: 'fechado', event: e }));
-    events.filter(isReserva).forEach((e) => items.push({ kind: 'reserva', event: e }));
-    // Degustação records have no Status field — show all (they are scheduled sessions)
-    degustacoes.forEach((d) => items.push({ kind: 'degust', degu: d }));
+    tastings.forEach((t) => items.push({ kind: 'degust', tasting: t }));
     return items;
-  }, [events, degustacoes]);
+  }, [events, tastings]);
 
-  // ── Map items by date key ─────────────────────────────────────────────────
   const byDate = useMemo(() => {
     const map = new Map<string, CalItem[]>();
     allItems.forEach((item) => {
@@ -154,15 +108,12 @@ export default function CalendarioPage() {
     return map;
   }, [allItems]);
 
-  // ── Calendar navigation ───────────────────────────────────────────────────
   const prevMonth = () => {
-    if (month === 0) { setYear((y) => y - 1); setMonth(11); }
-    else setMonth((m) => m - 1);
+    if (month === 0) { setYear((y) => y - 1); setMonth(11); } else setMonth((m) => m - 1);
     setSelected(null);
   };
   const nextMonth = () => {
-    if (month === 11) { setYear((y) => y + 1); setMonth(0); }
-    else setMonth((m) => m + 1);
+    if (month === 11) { setYear((y) => y + 1); setMonth(0); } else setMonth((m) => m + 1);
     setSelected(null);
   };
 
@@ -173,7 +124,7 @@ export default function CalendarioPage() {
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  const selectedKey = selected != null
+  const selectedKey   = selected != null
     ? `${year}-${String(month + 1).padStart(2, '0')}-${String(selected).padStart(2, '0')}`
     : null;
   const selectedItems = selectedKey ? (byDate.get(selectedKey) ?? []) : [];
@@ -186,25 +137,18 @@ export default function CalendarioPage() {
   }).length;
 
   const selectedDayLabel = selected != null
-    ? new Date(year, month, selected).toLocaleDateString('pt-BR', {
-        weekday: 'long', day: 'numeric', month: 'long',
-      })
+    ? new Date(year, month, selected).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
     : '';
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
+      {loading && <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />}
 
-      {loading && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
-      )}
-
-      {/* ── Hero ──────────────────────────────────────────────────────── */}
+      {/* Hero */}
       <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-8 overflow-hidden">
         <div className="absolute -top-10 -right-10 w-56 h-56 bg-white/5 rounded-full" />
         <div className="relative">
-          <h1 className="text-4xl font-black text-white tracking-tight leading-none">
-            {MONTHS[month]}
-          </h1>
+          <h1 className="text-4xl font-black text-white tracking-tight leading-none">{MONTHS[month]}</h1>
           <p className="text-white/35 text-xs font-bold mt-1.5 uppercase tracking-[0.15em]">
             {loading ? '…' : `${monthItemCount} item${monthItemCount !== 1 ? 's' : ''} · ${year}`}
           </p>
@@ -212,87 +156,58 @@ export default function CalendarioPage() {
       </div>
 
       <div className="px-4 space-y-4 pt-4">
-
-        {/* ── Month navigator ───────────────────────────────────────────── */}
+        {/* Month navigator */}
         <div className="flex items-center justify-between">
-          <button
-            onClick={prevMonth}
-            className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center"
-          >
+          <button onClick={prevMonth} className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center">
             <ChevronLeft className="w-4 h-4 text-gray-600" />
           </button>
           <p className="font-black text-gray-900 text-base">{MONTHS[month]} {year}</p>
-          <button
-            onClick={nextMonth}
-            className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center"
-          >
+          <button onClick={nextMonth} className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center">
             <ChevronRight className="w-4 h-4 text-gray-600" />
           </button>
         </div>
 
-        {/* ── Calendar grid ─────────────────────────────────────────────── */}
+        {/* Calendar grid */}
         <div className="bg-white rounded-3xl p-4 shadow-sm">
-          {/* Legend */}
           <div className="flex items-center gap-3 mb-3 px-1">
             <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
               <span className="w-2 h-2 rounded-full bg-ron-900 inline-block" /> Fechado
-            </span>
-            <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
-              <span className="w-2 h-2 rounded-full bg-gold-400 inline-block" /> Reserva
             </span>
             <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
               <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" /> Degust.
             </span>
           </div>
 
-          {/* Weekday headers */}
           <div className="grid grid-cols-7 mb-2">
             {WEEKDAYS.map((d, i) => (
-              <div key={i} className="text-center text-[11px] font-black text-gray-300 py-1">
-                {d}
-              </div>
+              <div key={i} className="text-center text-[11px] font-black text-gray-300 py-1">{d}</div>
             ))}
           </div>
 
-          {/* Day cells */}
           <div className="grid grid-cols-7 gap-y-1">
             {cells.map((day, idx) => {
               if (!day) return <div key={`e-${idx}`} />;
-
-              const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const dayItems  = byDate.get(key) ?? [];
-              const isToday   = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-              const isSel     = day === selected;
-
-              // Collect dot colors (up to 3, deduplicated by type)
+              const key      = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const dayItems = byDate.get(key) ?? [];
+              const isToday  = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+              const isSel    = day === selected;
               const dots: string[] = [];
               if (dayItems.some((i) => i.kind === 'fechado')) dots.push('bg-ron-900');
-              if (dayItems.some((i) => i.kind === 'reserva') && dots.length < 3) dots.push('bg-gold-400');
               if (dayItems.some((i) => i.kind === 'degust')  && dots.length < 3) dots.push('bg-violet-400');
-
               return (
                 <button
                   key={key}
                   onClick={() => setSelected(day === selected ? null : day)}
                   className={`flex flex-col items-center py-1.5 rounded-2xl transition-all ${
-                    isSel    ? 'bg-ron-900 shadow-lg shadow-ron-900/30'
-                    : isToday ? 'bg-gold-50'
-                    : ''
+                    isSel ? 'bg-ron-900 shadow-lg shadow-ron-900/30' : isToday ? 'bg-gold-50' : ''
                   }`}
                 >
                   <span className={`text-[13px] font-bold leading-none ${
-                    isSel    ? 'text-white'
-                    : isToday ? 'text-ron-900'
-                    : 'text-gray-800'
-                  }`}>
-                    {day}
-                  </span>
+                    isSel ? 'text-white' : isToday ? 'text-ron-900' : 'text-gray-800'
+                  }`}>{day}</span>
                   <div className="flex gap-0.5 mt-1 h-1.5">
                     {dots.map((cls, di) => (
-                      <span
-                        key={di}
-                        className={`w-1.5 h-1.5 rounded-full ${isSel ? 'bg-white/60' : cls}`}
-                      />
+                      <span key={di} className={`w-1.5 h-1.5 rounded-full ${isSel ? 'bg-white/60' : cls}`} />
                     ))}
                   </div>
                 </button>
@@ -301,7 +216,7 @@ export default function CalendarioPage() {
           </div>
         </div>
 
-        {/* ── Selected day items ─────────────────────────────────────────── */}
+        {/* Selected day items */}
         {selected && (
           <div>
             <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-3 capitalize">
@@ -314,9 +229,7 @@ export default function CalendarioPage() {
               </div>
             ) : (
               <div className="space-y-2.5">
-                {selectedItems.map((item, i) => (
-                  <ItemCard key={i} item={item} locaisMap={locaisMap} />
-                ))}
+                {selectedItems.map((item, i) => <ItemCard key={i} item={item} />)}
               </div>
             )}
           </div>

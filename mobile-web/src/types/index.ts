@@ -1,153 +1,91 @@
-// ---------------------------------------------------------------------------
-// Bubble.io data types for Rondello Buffet management.
-// Field names match EXACTLY what the Bubble Data API returns.
-// ---------------------------------------------------------------------------
+// Supabase data types for Rondello Buffet mobile app.
 
-export interface BubbleEvento {
-  _id: string;
+export interface Event {
+  id: string;
 
-  // Core identification
-  NomeDoEvento?: string;
-  dataDoEvento?: string;         // ISO date string
-  status?: string;               // "Fechado" | "Cancelado" | "Não fechou" | "Negociando" | "1º Contato"
-  Data_reservada?: boolean;
+  // Core
+  event_name: string | null;
+  event_date: string | null;
+  status: string;               // 'confirmed' | 'completed' | 'lead' | 'negotiating' | 'lost' | 'cancelled'
+  event_type: string | null;
 
-  // Location (reference ID to Locais_eventos)
-  LocalDoEvento?: string;
-  'Local Do Evento_TXT'?: string;
-
-  // Event details
-  Tipo_Do_Evento?: string;
-  HorarioCerimonia?: string;
-  'duraçãoDoEvento'?: number | string;
-  'duração do evento'?: number | string;
-  ProdutoEscolhido?: string;
-  PreçoCombinado?: number;
-  ValorTotalEvento?: number;     // Total do evento (base para Financeiro)
-  Quitado?: boolean;
+  // Location
+  location_id: string | null;
+  location_text: string | null;
+  event_locations?: { name: string } | null;
 
   // Guests
-  QtdConvidados?: number;
-  'Crianças50%'?: number;
-  CriançasNãoPagantes?: number;
-  QtdHorasAdicionais?: number;
-  QuantidadeConvidadosPorMesa?: number;
+  guest_count: number | null;
+  children_50_pct: number | null;
+  non_paying_guests: number | null;
+  guests_per_table: number | null;
+  table_count: number | null;
+  cake_table_location: string | null;
+  additional_hours: number | null;
 
-  // Observations & Cardápio
-  'Observações'?: string;
-  CardapioEvento?: string;       // Cardápio escolhido (rich text)
+  // Financial
+  total_value: number | null;
+  paid_value: number | null;
+  is_paid_in_full: boolean | null;
 
-  // Professionals / Team
-  QuantidadeProfissionais?: number;
-  'AlimentaçãoProfissionais'?: number;
-  tipoAlimentProf?: string;
-  'Organizador(a) escolhido'?: string;
-  Decorador?: string;
-  Confeiteira?: string;
-  'Banda/DjEscolhido'?: string;
-  HorarioBanda?: string;
-  'Foto/Filmagem'?: string;
-  Bartender?: string;
-  OutrosProfissionais?: string;
-  AtracoesAParte?: string;
-  Assessoria?: string;
+  // Ceremony
+  ceremony_time: string | null;
 
-  // Setup / Equipment
-  CoquetelDeBoasVindas?: string;
-  vinho?: string;
-  whisky?: string;
-  Cerveja?: string;
-  PortaGuardanapo?: string;
-  Toalha?: string;
-  rechaud?: string;
-  'Sousplát'?: string;
-  Aparador?: string;
-  'Qtd aparadores'?: string;
-  'Tamanho dos aparadores'?: string;
-  'taça'?: string;
-  'sala dos noivos'?: string;
-  'espaço kids'?: string;
-  QuantidadeDeMesas?: number;
-  'localizaçãoMesaBolo'?: string;
+  // Professionals
+  professional_count: number | null;
+  professional_meal_value: number | null;
+  professional_meal_type: string | null;
+  organizer: string | null;
+  decorator: string | null;
+  pastry_chef: string | null;
+  band_dj: string | null;
+  band_dj_time: string | null;
+  photo_video: string | null;
+  bartender: string | null;
+  other_professionals: string | null;
+  extra_attractions: string | null;
 
-  // Linked records (list of IDs)
-  pagamentos?: string[];
-  ValoresAdicionais?: string[];
-  'Degustações'?: string[];      // linked degustações — usado para filtro orçamentos
-  Arquivos_Internos?: string[];  // file attachments (contracts, proposals)
-  PagouDegustacao?: boolean;
+  // Setup
+  welcome_cocktail: string | null;
+  wine: string | null;
+  whisky: string | null;
+  beer: string | null;
+  napkin_holder: string | null;
+  tablecloth: string | null;
+  rechaud: string | null;
+  sousplat: string | null;
+  sideboard: string | null;
+  glass_type: string | null;
+  bridal_suite: string | null;
+  kids_area: string | null;
 
-  // Client data (kept for future use, may not be directly on evento)
-  NomeDoContratante?: string;
-  ContatoDoContratante?: string;
-  Telefone?: string;
-  Email?: string;
-  CPF?: string;
-  Endereco?: string;
+  // Notes
+  notes: string | null;
+
+  // Client
+  client_id: string | null;
+  clients?: { id: string; name: string; phone: string | null } | null;
+
+  // Contract
+  contract_signed_url: string | null;
 }
 
-export interface BubbleLocal {
-  _id: string;
-  Nome?: string;
+export interface TastingSession {
+  id: string;
+  scheduled_date: string;
+  type: string | null;
+  max_couples: number | null;
+  // from tasting_session_stats view
+  total?: number | null;
+  fechados?: number | null;
+  // linked event count (from tasting_session_events)
+  event_ids?: string[];
 }
 
-export interface BubbleAssessoria {
-  _id: string;
-  Nome?: string;
-}
-
-export interface BubbleProduto {
-  _id: string;
-  Nome?: string;
-}
-
-export interface BubblePagamento {
-  _id: string;
-  data?: string;
-  Valor?: number;
-  conferido?: boolean;
-  evento?: string;
-}
-
-export interface BubbleValorAdicional {
-  _id: string;
-  'Descrição'?: string;
-  valor?: number;
-  evento?: string;
-}
-
-export interface BubbleDegustacao {
-  _id: string;
-  data?: string;
-  convidados?: number;
-  EventosFechado?: number; // clientes com contrato fechado nesta deg
-  PrimeiraDeg?: number;    // clientes novos (1ª degustação)
-  'Observações'?: string;
-  'Cardápio'?: string;
-  tipo_degust?: string;
-  eventos?: string[];      // lista de IDs dos eventos vinculados
-  Eventos?: string[];      // fallback capitalização alternativa
-  evento?: string;         // campo legado single-event
-}
-
-export interface BubbleConvidadoDeg {
-  _id: string;
-  qtd?: number;
-  evento?: string;       // event ID reference
-  'Degustação'?: string; // degustação ID reference
-}
-
-export interface BubbleListResponse<T> {
-  status: string;
-  response: {
-    cursor: number;
-    results: T[];
-    count: number;
-    remaining: number;
-  };
-}
-
-export interface BubbleSingleResponse<T> {
-  status: string;
-  response: T;
+export interface EventPayment {
+  id: string;
+  payment_date: string | null;
+  value: number;
+  is_confirmed: boolean | null;
+  type: string | null;
 }

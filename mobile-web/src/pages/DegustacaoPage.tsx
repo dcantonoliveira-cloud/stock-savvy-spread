@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Calendar, ClipboardList, UtensilsCrossed } from 'lucide-react';
-import { fetchAllDegustacoes } from '../api/bubble';
-import { BubbleDegustacao } from '../types';
+import { fetchAllTastings } from '../api/supabase';
+import type { TastingSession } from '../types';
 import { fmtDate } from '../lib/format';
 
 const FILTERS = ['Todas', 'Próximas', 'Realizadas'];
@@ -13,14 +13,14 @@ function Skeleton() {
 
 export default function DegustacaoPage() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<BubbleDegustacao[]>([]);
+  const [items, setItems]   = useState<TastingSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError]   = useState(false);
   const [filter, setFilter] = useState('Todas');
 
   useEffect(() => {
-    fetchAllDegustacoes()
-      .then((all) => setItems(all))
+    fetchAllTastings()
+      .then(setItems)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
@@ -29,38 +29,31 @@ export default function DegustacaoPage() {
 
   const filtered = useMemo(() => {
     switch (filter) {
-      case 'Próximas':
-        return items.filter((d) => d.data && new Date(d.data) >= now);
-      case 'Realizadas':
-        return items.filter((d) => d.data && new Date(d.data) < now);
-      default:
-        return items;
+      case 'Próximas':  return items.filter((d) => new Date(d.scheduled_date) >= now);
+      case 'Realizadas': return items.filter((d) => new Date(d.scheduled_date) < now);
+      default: return items;
     }
   }, [items, filter]);
 
-  // Sort filtered: upcoming first, then past
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      const da = a.data ? new Date(a.data).getTime() : 0;
-      const db = b.data ? new Date(b.data).getTime() : 0;
-      const aFuture = a.data ? new Date(a.data) >= now : false;
-      const bFuture = b.data ? new Date(b.data) >= now : false;
+      const da = new Date(a.scheduled_date).getTime();
+      const db = new Date(b.scheduled_date).getTime();
+      const aFuture = new Date(a.scheduled_date) >= now;
+      const bFuture = new Date(b.scheduled_date) >= now;
       if (aFuture && !bFuture) return -1;
       if (!aFuture && bFuture) return 1;
-      return aFuture ? da - db : db - da; // upcoming asc, past desc
+      return aFuture ? da - db : db - da;
     });
   }, [filtered]);
 
-  const upcoming = items.filter((d) => d.data && new Date(d.data) >= now).length;
+  const upcoming = items.filter((d) => new Date(d.scheduled_date) >= now).length;
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
+      {loading && <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />}
 
-      {loading && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />
-      )}
-
-      {/* ── Hero header ──────────────────────────────────────────────── */}
+      {/* Hero */}
       <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pb-8 overflow-hidden min-h-[130px] flex flex-col justify-end">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="relative">
@@ -72,17 +65,14 @@ export default function DegustacaoPage() {
       </div>
 
       <div className="px-4 space-y-4 pt-4">
-
-        {/* ── Filter tabs ─────────────────────────────────────────────── */}
+        {/* Filter tabs */}
         <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
           {FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm ${
-                filter === f
-                  ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30'
-                  : 'bg-white text-gray-500'
+                filter === f ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30' : 'bg-white text-gray-500'
               }`}
             >
               {f}
@@ -90,11 +80,9 @@ export default function DegustacaoPage() {
           ))}
         </div>
 
-        {/* ── List ────────────────────────────────────────────────────── */}
+        {/* List */}
         {loading ? (
-          <div className="space-y-3">
-            <Skeleton /><Skeleton /><Skeleton />
-          </div>
+          <div className="space-y-3"><Skeleton /><Skeleton /><Skeleton /></div>
         ) : error ? (
           <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
             <p className="text-4xl mb-3">⚠️</p>
@@ -111,62 +99,40 @@ export default function DegustacaoPage() {
         ) : (
           <div className="space-y-3">
             {sorted.map((d) => {
-              const isPast = d.data ? new Date(d.data) < now : false;
+              const isPast = new Date(d.scheduled_date) < now;
+              const eventCount = d.event_ids?.length ?? 0;
               return (
                 <button
-                  key={d._id}
-                  onClick={() => navigate(`/degustacoes/${d._id}`)}
+                  key={d.id}
+                  onClick={() => navigate(`/degustacoes/${d.id}`)}
                   className={`w-full text-left flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform ${isPast ? 'opacity-60' : ''}`}
                 >
-                  {/* color bar */}
                   <div className={`w-1 self-stretch rounded-full shrink-0 ${isPast ? 'bg-gray-300' : 'bg-violet-400'}`} />
-
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-bold text-gray-900 text-sm flex-1">
-                        Degustação
-                      </p>
+                      <p className="font-bold text-gray-900 text-sm flex-1">Degustação</p>
                       <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black border ${
-                        isPast
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-violet-50 text-violet-700 border-violet-200'
+                        isPast ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-violet-50 text-violet-700 border-violet-200'
                       }`}>
                         {isPast ? 'Realizada' : 'Agendada'}
                       </span>
                     </div>
-
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5">
-                      {d.data && (
+                      <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                        <Calendar className="w-3.5 h-3.5 text-gold-400" />
+                        {fmtDate(d.scheduled_date)}
+                      </span>
+                      {eventCount > 0 && (
                         <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                          <Calendar className="w-3.5 h-3.5 text-gold-400" />
-                          {fmtDate(d.data)}
+                          <ClipboardList className="w-3.5 h-3.5 text-gold-400" />
+                          {eventCount} evento{eventCount !== 1 ? 's' : ''}
+                          {d.fechados != null && (
+                            <span className="text-emerald-500 ml-1">· {d.fechados} fech.</span>
+                          )}
                         </span>
                       )}
-                      {(() => {
-                        const evList = d.eventos ?? d.Eventos;
-                        const total = evList?.length;
-                        if (!total) return null;
-                        return (
-                          <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                            <ClipboardList className="w-3.5 h-3.5 text-gold-400" />
-                            {total} evento{total !== 1 ? 's' : ''}
-                            {(d.PrimeiraDeg != null || d.EventosFechado != null) && (
-                              <span className="ml-1">
-                                {d.PrimeiraDeg != null && (
-                                  <span className="text-violet-400"> · {d.PrimeiraDeg} nov.</span>
-                                )}
-                                {d.EventosFechado != null && (
-                                  <span className="text-emerald-500"> · {d.EventosFechado} fech.</span>
-                                )}
-                              </span>
-                            )}
-                          </span>
-                        );
-                      })()}
                     </div>
-
                   </div>
-
                   <ArrowRight className="w-4 h-4 text-gray-200 shrink-0 mt-0.5" />
                 </button>
               );
