@@ -49,9 +49,9 @@ const fmtBRL = (v: number | null) =>
 
 // ─── estilos inline ─────────────────────────────────────────────────────────
 const FONT   = `font-family:'Libre Franklin',Arial,sans-serif;`;
-const LBL_S  = `${FONT}font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:700;margin-bottom:4px;display:block;`;
-const VAL_S  = `${FONT}font-size:11px;color:#0E2A45;font-weight:500;border-bottom:1px solid #E2DED8;padding-bottom:4px;min-height:18px;word-break:break-word;display:block;`;
-const VEMPTY = `${FONT}font-size:11px;color:transparent;border-bottom:1px solid #EDEAE2;padding-bottom:4px;min-height:18px;display:block;`;
+const LBL_S  = `${FONT}font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:#A29D92;font-weight:700;margin-bottom:6px;display:block;`;
+const VAL_S  = `${FONT}font-size:13px;color:#0E2A45;font-weight:500;border-bottom:1.5px solid #E2DED8;padding-bottom:7px;min-height:22px;word-break:break-word;display:block;`;
+const VEMPTY = `${FONT}font-size:13px;color:transparent;border-bottom:1.5px solid #EDEAE2;padding-bottom:7px;min-height:22px;display:block;`;
 
 interface Field { label: string; value: string | null; cols?: 1 | 2 | 3 | 4; skipIfEmpty?: boolean }
 
@@ -66,7 +66,7 @@ function grid(fields: Field[]): string {
     const span = Math.min(f.cols ?? 1, TOTAL);
     const pct  = (span / TOTAL * 100).toFixed(4) + '%';
     const v    = f.value?.trim() || '';
-    const cell = `<td style="width:${pct};padding:0 14px 14px 0;vertical-align:top;" colspan="${span}">
+    const cell = `<td style="width:${pct};padding:0 16px 20px 0;vertical-align:top;" colspan="${span}">
       <span style="${LBL_S}">${f.label}</span>
       <span style="${v ? VAL_S : VEMPTY}">${v || '&nbsp;'}</span>
     </td>`;
@@ -80,7 +80,7 @@ function grid(fields: Field[]): string {
       const ns   = Math.min(nf.cols ?? 1, TOTAL - used);
       const npct = (ns / TOTAL * 100).toFixed(4) + '%';
       const nv   = nf.value?.trim() || '';
-      usedInRow.push(`<td style="width:${npct};padding:0 14px 14px 0;vertical-align:top;" colspan="${ns}">
+      usedInRow.push(`<td style="width:${npct};padding:0 16px 20px 0;vertical-align:top;" colspan="${ns}">
         <span style="${LBL_S}">${nf.label}</span>
         <span style="${nv ? VAL_S : VEMPTY}">${nv || '&nbsp;'}</span>
       </td>`);
@@ -99,7 +99,7 @@ function grid(fields: Field[]): string {
 
 function divider(title: string): string {
   return `<div style="display:flex;align-items:center;gap:10px;margin:20px 0 12px;">
-    <span style="${FONT}font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">${title}</span>
+    <span style="${FONT}font-size:10px;letter-spacing:.20em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">${title}</span>
     <div style="flex:1;height:1px;background:#E7E3DB;"></div>
   </div>`;
 }
@@ -115,8 +115,8 @@ function buildPage1Html(event: FichaEvent, customFields: CustomField[], company:
     { label: 'Nome do Evento',       value: event.event_name,      cols: 2 },
     { label: 'Tipo de Evento',       value: event.event_type },
     { label: 'Data',                 value: fmtDate(event.event_date) },
-    { label: 'Produto / Menu',       value: event.product_name,    cols: 2, skipIfEmpty: true },
-    { label: 'Local',                value: event.location_text,   cols: 2, skipIfEmpty: true },
+    { label: 'Produto / Menu',       value: event.product_name,    cols: 3, skipIfEmpty: true },
+    { label: 'Local',                value: event.location_text,             skipIfEmpty: true },
     { label: 'Horário de Início',    value: event.ceremony_time },
     { label: 'Duração',              value: event.duration_hours ? `${event.duration_hours}h` : null },
     { label: 'Horas Adicionais',     value: event.additional_hours ? `+${event.additional_hours}h` : null, skipIfEmpty: true },
@@ -167,7 +167,7 @@ function buildPage1Html(event: FichaEvent, customFields: CustomField[], company:
   <div style="margin-top:16px;display:flex;align-items:baseline;justify-content:space-between;gap:16px;">
     <div>
       <div style="${FONT}font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;">Evento</div>
-      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;line-height:1.1;color:#0E2A45;margin-top:4px;word-break:keep-all;hyphens:none;">${event.event_name ?? '—'}</h1>
+      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:36px;line-height:1.1;color:#0E2A45;margin-top:5px;word-break:keep-all;hyphens:none;">${event.event_name ?? '—'}</h1>
     </div>
     <div style="text-align:right;flex-shrink:0;">
       ${event.location_text ? `<div style="${FONT}font-size:10px;color:#6B6B6B;">${event.location_text}</div>` : ''}
