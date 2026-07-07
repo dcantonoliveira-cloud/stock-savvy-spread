@@ -75,7 +75,7 @@ function section(title: string, content: string) {
     </div>`;
 }
 
-export function printFichaTecnica(
+export async function printFichaTecnica(
   event: FichaEvent,
   customFields: CustomField[],
   company: FichaCompany | null,
@@ -207,14 +207,62 @@ export function printFichaTecnica(
   </div>
 
 </div>
-<script>
-  document.fonts.ready.then(function(){setTimeout(function(){window.print();},300);});
-</script>
 </body>
 </html>`;
 
-  const win = window.open('', '_blank', 'width=900,height=900');
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
+  // Renderiza em elemento oculto e baixa como PDF
+  const SCALE = 2;
+  const A4_W_MM = 210, A4_H_MM = 297, PX_PER_MM = 3.7795;
+  const PAGE_W_PX = Math.round(A4_W_MM * PX_PER_MM);
+
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1px;border:none;visibility:hidden;';
+  document.body.appendChild(frame);
+
+  await new Promise<void>(resolve => {
+    frame.onload = () => resolve();
+    frame.srcdoc = html;
+  });
+
+  // Aguarda fontes e imagens
+  await new Promise(r => setTimeout(r, 600));
+
+  const { default: html2canvas } = await import('html2canvas');
+  const { default: jsPDF } = await import('jspdf');
+
+  const el = frame.contentDocument?.body?.firstElementChild as HTMLElement;
+  if (!el) { document.body.removeChild(frame); return; }
+
+  const canvas = await html2canvas(el, {
+    scale: SCALE,
+    useCORS: true,
+    backgroundColor: '#fff',
+    windowWidth: 794,
+  });
+  document.body.removeChild(frame);
+
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const imgW = A4_W_MM;
+  const imgH = (canvas.height / canvas.width) * imgW;
+  const pageH = A4_H_MM;
+
+  // Divide em páginas se necessário
+  let posY = 0;
+  let pageNum = 0;
+  while (posY < imgH) {
+    if (pageNum > 0) pdf.addPage();
+    const srcY = Math.round((posY / imgH) * canvas.height);
+    const srcH = Math.min(Math.round((pageH / imgH) * canvas.height), canvas.height - srcY);
+    const slice = document.createElement('canvas');
+    slice.width = canvas.width;
+    slice.height = srcH;
+    slice.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+    const sliceH = (srcH / canvas.width) * imgW;
+    pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, imgW, sliceH);
+    posY += pageH;
+    pageNum++;
+  }
+
+  const name = (event.event_name ?? 'Evento').trim();
+  pdf.save(`FICHA TÉCNICA - ${name}.pdf`);
 }
