@@ -92,15 +92,18 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const isBackNavigation = navType === 'POP' &&
+    (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'back_forward';
+
   const [year, setYear] = useState(() => {
-    if (navType === 'POP') {
+    if (isBackNavigation) {
       const saved = sessionStorage.getItem('eventsPage_year');
       if (saved) return parseInt(saved);
     }
     return today.getFullYear();
   });
   const [month, setMonth] = useState<number | null>(() => {
-    if (navType === 'POP') {
+    if (isBackNavigation) {
       const saved = sessionStorage.getItem('eventsPage_month');
       if (saved === 'null') return null;
       if (saved !== null) return parseInt(saved);
