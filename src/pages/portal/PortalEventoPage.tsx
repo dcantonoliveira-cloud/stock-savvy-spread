@@ -133,7 +133,7 @@ export default function PortalEventoPage() {
       <div className="space-y-3 pt-1">
         <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/50 text-center">Fale com a gente</p>
         <a
-          href="https://wa.me/5515991437552"
+          href="https://wa.me/5515997650209"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-3 w-full py-3.5 rounded-2xl bg-emerald-500 text-white font-semibold text-sm shadow-sm hover:bg-emerald-600 active:scale-95 transition-all"
@@ -142,13 +142,13 @@ export default function PortalEventoPage() {
           Falar com o Rondello
         </a>
         <a
-          href="https://www.instagram.com/rondellobuffet"
+          href="https://www.instagram.com/buffetrondello"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-3 w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white font-semibold text-sm shadow-sm active:scale-95 transition-all"
         >
           <Instagram className="w-4 h-4" />
-          @rondellobuffet
+          @buffetrondello
         </a>
       </div>
 
