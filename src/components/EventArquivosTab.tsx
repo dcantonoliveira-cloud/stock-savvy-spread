@@ -95,7 +95,16 @@ async function renderSection(innerHtml: string, widthPx: number, scale: number) 
   const { default: html2canvas } = await import('html2canvas');
   const el = document.createElement('div');
   el.style.cssText = `position:fixed;left:-9999px;top:0;width:${widthPx}px;background:white;padding:0;margin:0;`;
-  el.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:11.5pt;line-height:1.65;color:#111;word-break:break-word;white-space:pre-wrap;">${DOMPurify.sanitize(innerHtml)}</div>`;
+  el.innerHTML = `<style>
+    p { margin:0 0 0.75em 0; }
+    p:empty, p br:only-child { display:block; min-height:1.2em; }
+    h1,h2,h3 { margin:0.8em 0 0.4em 0; }
+    ul,ol { margin:0.5em 0 0.5em 1.5em; padding:0; }
+    li { margin-bottom:0.2em; }
+    strong { font-weight:bold; }
+    em { font-style:italic; }
+  </style>
+  <div style="font-family:'Times New Roman',Times,serif;font-size:11.5pt;line-height:1.65;color:#111;word-break:break-word;">${DOMPurify.sanitize(innerHtml)}</div>`;
   document.body.appendChild(el);
   await new Promise(r => setTimeout(r, 200));
   const canvas = await html2canvas(el, { scale, useCORS: true, backgroundColor: '#fff' });
