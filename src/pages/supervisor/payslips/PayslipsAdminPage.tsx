@@ -42,6 +42,7 @@ export default function PayslipsAdminPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterSearch, setFilterSearch] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -244,7 +245,7 @@ export default function PayslipsAdminPage() {
       .single();
     if (!ver) return;
     const url = await getSignedUrl((ver as any).storage_path);
-    if (url) window.open(url, '_blank');
+    if (url) setPreviewUrl(url);
   };
 
   const viewSignedPdf = async (signedPdfPath: string | null, payslipTitle: string) => {
@@ -554,6 +555,21 @@ export default function PayslipsAdminPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF preview modal */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col" style={{ height: '90vh' }}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
+              <span className="text-sm font-semibold text-foreground">Visualizar holerite</span>
+              <button onClick={() => setPreviewUrl(null)} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <iframe src={previewUrl} className="flex-1 w-full rounded-b-2xl" title="Holerite" />
           </div>
         </div>
       )}
