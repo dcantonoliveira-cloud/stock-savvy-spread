@@ -17,6 +17,7 @@ const PAGE_LABELS: Record<string, string> = {
   financeiro:  'Financeiro',
   arquivos:    'Arquivos',
   informacoes: 'Informações',
+  checklist:   'Checklist',
 };
 
 type EventRow = { id: string; status: string; event_date: string | null; total_value: number | null; event_name: string | null; event_type: string | null };
@@ -82,7 +83,7 @@ export default function ClientsPage() {
     if (tab !== 'acessos') return;
     setLogsLoad(true);
     (supabase.from as any)('portal_access_logs')
-      .select('id, page, accessed_at, event_id, events(event_name, clients(name))')
+      .select('id, page, pages, accessed_at, accessed_date, event_id, events(event_name, clients(name))')
       .order('accessed_at', { ascending: false })
       .limit(200)
       .then(({ data }: any) => { setLogs(data ?? []); setLogsLoad(false); });
@@ -104,11 +105,12 @@ export default function ClientsPage() {
 
   // stats de páginas mais acessadas
   const pageCounts = logs.reduce<Record<string, number>>((acc, l) => {
-    acc[l.page] = (acc[l.page] ?? 0) + 1;
+    const pages: string[] = l.pages?.length ? l.pages : (l.page ? [l.page] : []);
+    pages.forEach(p => { acc[p] = (acc[p] ?? 0) + 1; });
     return acc;
   }, {});
   const topPages = Object.entries(pageCounts).sort((a, b) => b[1] - a[1]);
-  const totalAccesses = logs.length;
+  const totalAccesses = Object.values(pageCounts).reduce((s, n) => s + n, 0);
 
   return (
     <div>
@@ -205,7 +207,7 @@ export default function ClientsPage() {
                 <thead>
                   <tr className="border-b border-border text-xs bg-muted/30">
                     <th className="text-left px-5 py-2.5 font-semibold text-muted-foreground">CLIENTE / EVENTO</th>
-                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">PÁGINA</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">PÁGINAS VISITADAS</th>
                     <th className="text-right px-5 py-2.5 font-semibold text-muted-foreground">QUANDO</th>
                   </tr>
                 </thead>
@@ -217,10 +219,14 @@ export default function ClientsPage() {
                         <p className="text-xs text-muted-foreground">{(log.events as any)?.event_name ?? '—'}</p>
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                          <Smartphone className="w-3 h-3" />
-                          {PAGE_LABELS[log.page] ?? log.page}
-                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {(log.pages?.length ? log.pages : (log.page ? [log.page] : [])).map((p: string) => (
+                            <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                              <Smartphone className="w-3 h-3" />
+                              {PAGE_LABELS[p] ?? p}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-5 py-2.5 text-right text-xs text-muted-foreground whitespace-nowrap">
                         {new Date(log.accessed_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
