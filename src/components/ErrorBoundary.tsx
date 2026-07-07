@@ -13,12 +13,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
-    // Chunk antigo após deploy novo → recarrega automaticamente uma vez
     if (error.message?.includes('Failed to fetch dynamically imported module') ||
         error.message?.includes('Importing a module script failed')) {
-      const reloadKey = 'chunk_reload_attempted';
-      if (!sessionStorage.getItem(reloadKey)) {
-        sessionStorage.setItem(reloadKey, '1');
+      const key = '__chunk_reload__';
+      const last = parseInt(sessionStorage.getItem(key) ?? '0', 10);
+      const now = Date.now();
+      // Permite reload se não houve tentativa nos últimos 10 segundos (evita loop)
+      if (now - last > 10_000) {
+        sessionStorage.setItem(key, String(now));
         window.location.reload();
       }
     }

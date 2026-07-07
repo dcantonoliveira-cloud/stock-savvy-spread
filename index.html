@@ -7,27 +7,28 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script>
       // Recarrega automaticamente quando um chunk de deploy antigo falha ao carregar
+      function tryChunkReload() {
+        var key = '__chunk_reload__';
+        var last = parseInt(sessionStorage.getItem(key) || '0', 10);
+        var now = Date.now();
+        if (now - last > 10000) {
+          sessionStorage.setItem(key, String(now));
+          window.location.reload(true);
+        }
+      }
       window.addEventListener('error', function(e) {
         var msg = e.message || (e.error && e.error.message) || '';
         if (msg.indexOf('Failed to fetch dynamically imported module') !== -1 ||
             msg.indexOf('Importing a module script failed') !== -1 ||
             msg.indexOf('Unable to preload CSS') !== -1) {
-          var key = '__chunk_reload__';
-          if (!sessionStorage.getItem(key)) {
-            sessionStorage.setItem(key, '1');
-            window.location.reload(true);
-          }
+          tryChunkReload();
         }
       }, true);
       window.addEventListener('unhandledrejection', function(e) {
         var msg = (e.reason && e.reason.message) || String(e.reason || '');
         if (msg.indexOf('Failed to fetch dynamically imported module') !== -1 ||
             msg.indexOf('Importing a module script failed') !== -1) {
-          var key = '__chunk_reload__';
-          if (!sessionStorage.getItem(key)) {
-            sessionStorage.setItem(key, '1');
-            window.location.reload(true);
-          }
+          tryChunkReload();
         }
       });
     </script>
