@@ -109,7 +109,7 @@ export default function TastingDetailPage() {
     const [{ data: sess }, { data: evts }] = await Promise.all([
       supabase.from('tasting_sessions' as any).select('*').eq('id', id).single(),
       supabase.from('tasting_session_events' as any)
-        .select('*, events(id, event_name, event_date, location_text, status, organizer)')
+        .select('*, events(id, event_name, event_date, location_text, location_id, status, organizer, event_locations(name))')
         .eq('session_id', id),
     ]);
 
@@ -408,7 +408,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       </Td>
       <Td className="text-muted-foreground max-w-[100px] truncate">{ev?.organizer || '—'}</Td>
       <Td className="text-muted-foreground tabular-nums whitespace-nowrap">{fmtDate(ev?.event_date ?? null)}</Td>
-      <Td className="text-muted-foreground max-w-[110px] truncate">{ev?.location_text || '—'}</Td>
+      <Td className="text-muted-foreground max-w-[110px] truncate">{ev?.location_text || (ev as any)?.event_locations?.name || '—'}</Td>
       <Td>
         <button
           title="Automático pela data do contrato — clique para corrigir"
