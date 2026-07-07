@@ -47,40 +47,201 @@ const fmtDate = (d: string | null) => {
 const fmtBRL = (v: number | null) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
 
-const COLS = 4;
-const CELL = `style="width:25%;padding:0 12px 14px 0;vertical-align:top;"`;
-const LBL  = `style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:700;margin-bottom:3px;"`;
-const VAL  = `style="font-size:11px;color:#0E2A45;font-weight:500;border-bottom:1px solid #EDEAE2;padding-bottom:3px;min-height:16px;word-break:break-word;"`;
-const VAL_EMPTY = `style="font-size:11px;color:transparent;border-bottom:1px solid #F0EDE6;padding-bottom:3px;min-height:16px;"`;
+// ─── estilos inline ─────────────────────────────────────────────────────────
+const FONT   = `font-family:'Libre Franklin',Arial,sans-serif;`;
+const LBL_S  = `${FONT}font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:700;margin-bottom:4px;display:block;`;
+const VAL_S  = `${FONT}font-size:11px;color:#0E2A45;font-weight:500;border-bottom:1px solid #E2DED8;padding-bottom:4px;min-height:18px;word-break:break-word;display:block;`;
+const VEMPTY = `${FONT}font-size:11px;color:transparent;border-bottom:1px solid #EDEAE2;padding-bottom:4px;min-height:18px;display:block;`;
 
-function grid(fields: { label: string; value: string | null; wide?: boolean; html?: boolean; skipIfEmpty?: boolean }[]) {
-  const filtered = fields.filter(f => !f.skipIfEmpty || (f.value && f.value.trim()));
+interface Field { label: string; value: string | null; cols?: 1 | 2 | 3 | 4; skipIfEmpty?: boolean }
+
+function grid(fields: Field[]): string {
+  const TOTAL = 4;
+  const visible = fields.filter(f => !f.skipIfEmpty || (f.value?.trim()));
   const rows: string[] = [];
   let i = 0;
-  while (i < filtered.length) {
-    const rowFields = filtered.slice(i, i + COLS);
-    const cells = rowFields.map(f => {
-      const v = f.value?.trim() || '';
-      return `<td ${CELL}><div ${LBL}>${f.label}</div><div ${f.html ? `style="font-size:11px;color:#2B2B2B;line-height:1.5;"` : (v ? VAL : VAL_EMPTY)}>${v || '&nbsp;'}</div></td>`;
-    });
-    // Preenche colunas vazias
-    while (cells.length < COLS) cells.push(`<td ${CELL}></td>`);
-    rows.push(`<tr>${cells.join('')}</tr>`);
-    i += COLS;
+
+  while (i < visible.length) {
+    const f = visible[i];
+    const span = Math.min(f.cols ?? 1, TOTAL);
+    const pct  = (span / TOTAL * 100).toFixed(4) + '%';
+    const v    = f.value?.trim() || '';
+    const cell = `<td style="width:${pct};padding:0 14px 14px 0;vertical-align:top;" colspan="${span}">
+      <span style="${LBL_S}">${f.label}</span>
+      <span style="${v ? VAL_S : VEMPTY}">${v || '&nbsp;'}</span>
+    </td>`;
+
+    // verifica se ainda cabe na linha atual
+    const usedInRow: string[] = [cell];
+    let used = span;
+    i++;
+    while (used < TOTAL && i < visible.length) {
+      const nf   = visible[i];
+      const ns   = Math.min(nf.cols ?? 1, TOTAL - used);
+      const npct = (ns / TOTAL * 100).toFixed(4) + '%';
+      const nv   = nf.value?.trim() || '';
+      usedInRow.push(`<td style="width:${npct};padding:0 14px 14px 0;vertical-align:top;" colspan="${ns}">
+        <span style="${LBL_S}">${nf.label}</span>
+        <span style="${nv ? VAL_S : VEMPTY}">${nv || '&nbsp;'}</span>
+      </td>`);
+      used += ns;
+      i++;
+    }
+    // preenche colunas restantes
+    if (used < TOTAL) {
+      usedInRow.push(`<td style="width:${((TOTAL - used) / TOTAL * 100).toFixed(4)}%;padding:0;" colspan="${TOTAL - used}"></td>`);
+    }
+    rows.push(`<tr>${usedInRow.join('')}</tr>`);
   }
+
   return `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${rows.join('')}</table>`;
 }
 
-function section(title: string, content: string) {
-  if (!content.trim()) return '';
-  return `
-    <div style="margin-top:20px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">${title}</div>
-        <div style="flex:1;height:1px;background:#EAE6DE;"></div>
-      </div>
-      ${content}
-    </div>`;
+function divider(title: string): string {
+  return `<div style="display:flex;align-items:center;gap:10px;margin:20px 0 12px;">
+    <span style="${FONT}font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">${title}</span>
+    <div style="flex:1;height:1px;background:#E7E3DB;"></div>
+  </div>`;
+}
+
+function buildPage1Html(event: FichaEvent, customFields: CustomField[], company: FichaCompany | null): string {
+  const today     = new Date().toLocaleDateString('pt-BR');
+  const footerLine = [company?.endereco, company?.telefone, company?.website].filter(Boolean).join(' · ');
+  const logoHtml  = company?.logo_base64
+    ? `<img src="${company.logo_base64}" alt="Logo" style="height:52px;width:auto;">`
+    : `<span style="${FONT}font-size:20px;font-weight:700;color:#0E2A45;">${company?.name ?? 'Rondello Buffet'}</span>`;
+
+  const infoFields: Field[] = [
+    { label: 'Nome do Evento',       value: event.event_name,      cols: 2 },
+    { label: 'Tipo de Evento',       value: event.event_type },
+    { label: 'Data',                 value: fmtDate(event.event_date) },
+    { label: 'Produto / Menu',       value: event.product_name,    cols: 2, skipIfEmpty: true },
+    { label: 'Local',                value: event.location_text,   cols: 2, skipIfEmpty: true },
+    { label: 'Horário de Início',    value: event.ceremony_time },
+    { label: 'Duração',              value: event.duration_hours ? `${event.duration_hours}h` : null },
+    { label: 'Horas Adicionais',     value: event.additional_hours ? `+${event.additional_hours}h` : null, skipIfEmpty: true },
+    { label: 'Convidados',           value: event.guest_count != null ? String(event.guest_count) : null },
+    { label: 'Crianças (50%)',       value: event.children_50_pct ? String(event.children_50_pct) : null, skipIfEmpty: true },
+    { label: 'Não Pagantes',         value: event.non_paying_guests ? String(event.non_paying_guests) : null, skipIfEmpty: true },
+    { label: 'Qtd. Profissionais',   value: event.professional_count ? String(event.professional_count) : null, skipIfEmpty: true },
+    { label: 'Alim. Profissionais',  value: event.professional_meal_type, skipIfEmpty: true },
+  ];
+
+  const equipeFields: Field[] = [
+    { label: 'Organizadora',         value: event.organizer },
+    { label: 'Decorador(a)',         value: event.decorator },
+    { label: 'Confeiteiro(a)',       value: event.pastry_chef },
+    { label: 'Banda / DJ',          value: event.band_dj },
+    { label: 'Foto / Filmagem',     value: event.photo_video },
+    { label: 'Bartender',            value: event.bartender },
+    { label: 'Outros Profissionais', value: event.other_professionals, cols: 2, skipIfEmpty: true },
+    { label: 'Atrações à Parte',     value: event.extra_attractions,   cols: 2, skipIfEmpty: true },
+  ];
+
+  const customSection = customFields.length > 0
+    ? divider('Detalhes da Festa') + grid(customFields.map(f => ({ label: f.name, value: f.value })))
+    : '';
+
+  return `<!DOCTYPE html><html><head>
+  <meta charset="utf-8">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#fff;${FONT}}</style>
+</head><body>
+<div style="width:794px;background:#fff;padding:36px 52px 48px;position:relative;overflow:hidden;">
+
+  <!-- Watermark -->
+  <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:440px;height:440px;right:-110px;bottom:-110px;opacity:.04;pointer-events:none;">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;">
+    ${logoHtml}
+    <div style="text-align:right;">
+      <div style="${FONT}font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:#C2A263;font-weight:600;">Ficha Técnica</div>
+      <div style="${FONT}font-size:8px;letter-spacing:.10em;color:#9A968D;margin-top:3px;">Emitido em ${today}</div>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid #E7E3DB;margin-top:14px;"></div>
+
+  <!-- Título -->
+  <div style="margin-top:16px;display:flex;align-items:baseline;justify-content:space-between;gap:16px;">
+    <div>
+      <div style="${FONT}font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;">Evento</div>
+      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;line-height:1.1;color:#0E2A45;margin-top:4px;">${event.event_name ?? '—'}</h1>
+    </div>
+    <div style="text-align:right;flex-shrink:0;">
+      ${event.location_text ? `<div style="${FONT}font-size:10px;color:#6B6B6B;">${event.location_text}</div>` : ''}
+      ${event.event_date   ? `<div style="${FONT}font-size:14px;font-weight:600;color:#0E2A45;margin-top:2px;">${fmtDate(event.event_date)}</div>` : ''}
+    </div>
+  </div>
+
+  <div style="border-top:1px solid #E7E3DB;margin-top:14px;"></div>
+
+  ${divider('Informações do Evento')}${grid(infoFields)}
+  ${divider('Equipe & Fornecedores')}${grid(equipeFields)}
+  ${customSection}
+
+  <!-- Footer -->
+  <div style="margin-top:32px;padding-top:14px;border-top:1px solid #E7E3DB;display:flex;justify-content:space-between;align-items:flex-end;">
+    <div style="${FONT}font-size:8.5px;color:#B0ABA0;">${footerLine}</div>
+    <div style="font-family:'Cormorant Garamond',serif;font-size:18px;color:#C2A263;font-weight:600;">Rondello Buffet</div>
+  </div>
+
+</div></body></html>`;
+}
+
+function buildPage2Html(event: FichaEvent, company: FichaCompany | null): string {
+  const today      = new Date().toLocaleDateString('pt-BR');
+  const footerLine = [company?.endereco, company?.telefone, company?.website].filter(Boolean).join(' · ');
+  const logoHtml   = company?.logo_base64
+    ? `<img src="${company.logo_base64}" alt="Logo" style="height:40px;width:auto;">`
+    : `<span style="${FONT}font-size:16px;font-weight:700;color:#0E2A45;">${company?.name ?? 'Rondello Buffet'}</span>`;
+
+  return `<!DOCTYPE html><html><head>
+  <meta charset="utf-8">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#fff;${FONT}}</style>
+</head><body>
+<div style="width:794px;background:#fff;padding:36px 52px 48px;position:relative;overflow:hidden;">
+
+  <!-- Watermark -->
+  <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:440px;height:440px;right:-110px;bottom:-110px;opacity:.04;pointer-events:none;">
+
+  <!-- Header mini -->
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;">
+    ${logoHtml}
+    <div style="text-align:right;">
+      <div style="${FONT}font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:#C2A263;font-weight:600;">Observações</div>
+      <div style="${FONT}font-size:8px;letter-spacing:.10em;color:#9A968D;margin-top:3px;">${event.event_name ?? ''}</div>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid #E7E3DB;margin-top:14px;margin-bottom:20px;"></div>
+
+  <div style="width:100%;font-size:11.5px;color:#2B2B2B;line-height:1.7;background:#FAFAF8;border:1px solid #E2DED8;border-radius:5px;padding:18px 20px;">
+    ${event.notes ?? ''}
+  </div>
+
+  <!-- Footer -->
+  <div style="margin-top:32px;padding-top:14px;border-top:1px solid #E7E3DB;display:flex;justify-content:space-between;align-items:flex-end;">
+    <div style="${FONT}font-size:8.5px;color:#B0ABA0;">${footerLine}</div>
+    <div style="font-family:'Cormorant Garamond',serif;font-size:18px;color:#C2A263;font-weight:600;">Rondello Buffet</div>
+  </div>
+
+</div></body></html>`;
+}
+
+async function renderHtml(html: string): Promise<HTMLCanvasElement> {
+  const { default: html2canvas } = await import('html2canvas');
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1px;border:none;visibility:hidden;';
+  document.body.appendChild(frame);
+  await new Promise<void>(r => { frame.onload = () => r(); frame.srcdoc = html; });
+  await new Promise(r => setTimeout(r, 700));
+  const el = frame.contentDocument?.body?.firstElementChild as HTMLElement;
+  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#fff', windowWidth: 794 });
+  document.body.removeChild(frame);
+  return canvas;
 }
 
 export async function printFichaTecnica(
@@ -88,173 +249,47 @@ export async function printFichaTecnica(
   customFields: CustomField[],
   company: FichaCompany | null,
 ) {
-  const today = new Date().toLocaleDateString('pt-BR');
-  const isPpx = event.pricing_mode !== 'fixed';
-  const footerLine = [company?.endereco, company?.telefone, company?.website].filter(Boolean).join(' · ');
-
-  const logoHtml = company?.logo_base64
-    ? `<img src="${company.logo_base64}" alt="Logo" style="height:52px;width:auto;">`
-    : `<span style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:#0E2A45;">${company?.name ?? 'Rondello Buffet'}</span>`;
-
-  // Seção 1: Informações do evento
-  const infoContent = grid([
-    { label: 'Nome do Evento',        value: event.event_name },
-    { label: 'Tipo de Evento',        value: event.event_type },
-    { label: 'Data',                  value: fmtDate(event.event_date) },
-    { label: 'Local',                 value: event.location_text },
-    { label: 'Produto / Menu',        value: event.product_name },
-    { label: 'Horário de Início',     value: event.ceremony_time },
-    { label: 'Duração',               value: event.duration_hours ? `${event.duration_hours}h` : null },
-    { label: 'Horas Adicionais',      value: event.additional_hours ? `+${event.additional_hours}h` : null },
-    { label: 'Convidados',            value: event.guest_count != null ? String(event.guest_count) : null },
-    { label: 'Crianças (50%)',        value: event.children_50_pct ? String(event.children_50_pct) : null },
-    { label: 'Não Pagantes',          value: event.non_paying_guests ? String(event.non_paying_guests) : null },
-    { label: 'Qtd. Profissionais',    value: event.professional_count ? String(event.professional_count) : null },
-    { label: 'Alim. Profissionais',   value: event.professional_meal_type },
-  ]);
-
-  // Seção 2: Equipe & Fornecedores
-  const equipeContent = grid([
-    { label: 'Organizadora',          value: event.organizer },
-    { label: 'Decorador(a)',          value: event.decorator },
-    { label: 'Confeiteiro(a)',        value: event.pastry_chef },
-    { label: 'Banda / DJ',           value: event.band_dj },
-    { label: 'Foto / Filmagem',      value: event.photo_video },
-    { label: 'Bartender',             value: event.bartender },
-    { label: 'Outros Profissionais',  value: event.other_professionals },
-    { label: 'Atrações à Parte',      value: event.extra_attractions },
-  ]);
-
-  // Seção 3: Detalhes (campos customizados) — reutiliza grid()
-  const detalhesSection = customFields.length > 0
-    ? section('Detalhes da Festa', grid(customFields.map(f => ({ label: f.name, value: f.value }))))
-    : '';
-
-  // Observações
-  const obsSection = event.notes && event.notes.trim() ? `
-    <div style="margin-top:20px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">Observações</div>
-        <div style="flex:1;height:1px;background:#EAE6DE;"></div>
-      </div>
-      <div style="width:100%;font-size:11px;color:#2B2B2B;line-height:1.65;background:#FAFAF8;border:1px solid #EDEAE2;border-radius:4px;padding:14px 16px;box-sizing:border-box;">
-        ${event.notes}
-      </div>
-    </div>` : '';
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Ficha Técnica — ${event.event_name ?? 'Evento'}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{background:#E7E4DD;font-family:'Libre Franklin',sans-serif;}
-    @media print{body{background:#fff;}.page{box-shadow:none!important;margin:0!important;}}
-  </style>
-</head>
-<body>
-<div class="page" style="width:794px;min-height:1123px;margin:32px auto;background:#FFFFFF;box-shadow:0 8px 40px rgba(14,42,69,.10);padding:36px 52px 48px;position:relative;overflow:hidden;">
-
-  <!-- Emblem watermark -->
-  <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:480px;height:480px;right:-130px;bottom:-130px;opacity:.04;pointer-events:none;user-select:none;">
-
-  <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;">
-    ${logoHtml}
-    <div style="text-align:right;">
-      <div style="font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#C2A263;font-weight:600;">Ficha Técnica</div>
-      <div style="font-size:9px;letter-spacing:.10em;text-transform:uppercase;color:#9A968D;margin-top:3px;">Emitido em ${today}</div>
-    </div>
-  </div>
-
-  <div style="border-top:1px solid #E7E3DB;margin-top:16px;"></div>
-
-  <!-- Título do evento -->
-  <div style="margin-top:18px;display:flex;align-items:baseline;justify-content:space-between;gap:16px;">
-    <div>
-      <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;">Evento</div>
-      <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:32px;line-height:1.1;color:#0E2A45;margin-top:4px;">${event.event_name ?? '—'}</h1>
-    </div>
-    <div style="text-align:right;flex-shrink:0;">
-      ${event.location_text ? `<div style="font-size:11px;color:#6B6B6B;">${event.location_text}</div>` : ''}
-      ${event.event_date ? `<div style="font-size:15px;font-weight:600;color:#0E2A45;margin-top:2px;">${fmtDate(event.event_date)}</div>` : ''}
-    </div>
-  </div>
-
-
-  <div style="border-top:1px solid #E7E3DB;margin-top:16px;"></div>
-
-  ${section('Informações do Evento', infoContent)}
-  ${equipeContent ? section('Equipe & Fornecedores', equipeContent) : ''}
-  ${detalhesSection}
-  ${obsSection}
-
-  <!-- Footer -->
-  <div style="margin-top:32px;padding-top:16px;border-top:1px solid #E7E3DB;display:flex;justify-content:space-between;align-items:flex-end;">
-    <div style="font-size:9px;letter-spacing:.06em;color:#B0ABA0;">${footerLine}</div>
-    <div style="font-family:'Cormorant Garamond',serif;font-size:18px;color:#C2A263;font-weight:600;">Rondello Buffet</div>
-  </div>
-
-</div>
-</body>
-</html>`;
-
-  // Renderiza em elemento oculto e baixa como PDF
-  const SCALE = 2;
-  const A4_W_MM = 210, A4_H_MM = 297, PX_PER_MM = 3.7795;
-  const PAGE_W_PX = Math.round(A4_W_MM * PX_PER_MM);
-
-  const frame = document.createElement('iframe');
-  frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1px;border:none;visibility:hidden;';
-  document.body.appendChild(frame);
-
-  await new Promise<void>(resolve => {
-    frame.onload = () => resolve();
-    frame.srcdoc = html;
-  });
-
-  // Aguarda fontes e imagens
-  await new Promise(r => setTimeout(r, 600));
-
-  const { default: html2canvas } = await import('html2canvas');
   const { default: jsPDF } = await import('jspdf');
 
-  const el = frame.contentDocument?.body?.firstElementChild as HTMLElement;
-  if (!el) { document.body.removeChild(frame); return; }
+  const page1Html = buildPage1Html(event, customFields, company);
+  const hasObs    = !!(event.notes?.trim());
+  const page2Html = hasObs ? buildPage2Html(event, company) : null;
 
-  const canvas = await html2canvas(el, {
-    scale: SCALE,
-    useCORS: true,
-    backgroundColor: '#fff',
-    windowWidth: 794,
-  });
-  document.body.removeChild(frame);
+  // Renderiza cada página separadamente
+  const canvases = await Promise.all([
+    renderHtml(page1Html),
+    ...(page2Html ? [renderHtml(page2Html)] : []),
+  ]);
 
+  const A4_W = 210, A4_H = 297;
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const imgW = A4_W_MM;
-  const imgH = (canvas.height / canvas.width) * imgW;
-  const pageH = A4_H_MM;
 
-  // Divide em páginas se necessário
-  let posY = 0;
-  let pageNum = 0;
-  while (posY < imgH) {
-    if (pageNum > 0) pdf.addPage();
-    const srcY = Math.round((posY / imgH) * canvas.height);
-    const srcH = Math.min(Math.round((pageH / imgH) * canvas.height), canvas.height - srcY);
-    const slice = document.createElement('canvas');
-    slice.width = canvas.width;
-    slice.height = srcH;
-    slice.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
-    const sliceH = (srcH / canvas.width) * imgW;
-    pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, imgW, sliceH);
-    posY += pageH;
-    pageNum++;
-  }
+  canvases.forEach((canvas, i) => {
+    if (i > 0) pdf.addPage();
+    const imgH = (canvas.height / canvas.width) * A4_W;
+
+    if (imgH <= A4_H) {
+      // cabe numa página
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, A4_W, imgH);
+    } else {
+      // fatiamento se o conteúdo for mais alto que A4
+      const PX_PER_MM = canvas.width / A4_W;
+      const pageHpx   = Math.round(A4_H * PX_PER_MM);
+      let srcY = 0, first = true;
+      while (srcY < canvas.height) {
+        if (!first) pdf.addPage();
+        const srcH   = Math.min(pageHpx, canvas.height - srcY);
+        const slice  = document.createElement('canvas');
+        slice.width  = canvas.width;
+        slice.height = srcH;
+        slice.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+        const sliceH = (srcH / canvas.width) * A4_W;
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, A4_W, sliceH);
+        srcY += pageHpx;
+        first = false;
+      }
+    }
+  });
 
   const name = (event.event_name ?? 'Evento').trim();
   pdf.save(`FICHA TÉCNICA - ${name}.pdf`);
