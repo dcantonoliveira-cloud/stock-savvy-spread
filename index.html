@@ -5,6 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Rondello Estoque</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Recarrega automaticamente quando um chunk de deploy antigo falha ao carregar
+      window.addEventListener('error', function(e) {
+        var msg = e.message || (e.error && e.error.message) || '';
+        if (msg.indexOf('Failed to fetch dynamically imported module') !== -1 ||
+            msg.indexOf('Importing a module script failed') !== -1 ||
+            msg.indexOf('Unable to preload CSS') !== -1) {
+          var key = '__chunk_reload__';
+          if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, '1');
+            window.location.reload(true);
+          }
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(e) {
+        var msg = (e.reason && e.reason.message) || String(e.reason || '');
+        if (msg.indexOf('Failed to fetch dynamically imported module') !== -1 ||
+            msg.indexOf('Importing a module script failed') !== -1) {
+          var key = '__chunk_reload__';
+          if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, '1');
+            window.location.reload(true);
+          }
+        }
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
