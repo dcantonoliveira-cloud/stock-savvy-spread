@@ -72,7 +72,7 @@ function EnterCodeScreen({ onLinked }: { onLinked: () => void }) {
     setSaving(true);
     setError('');
     const { data: { user } } = await supabase.auth.getUser();
-    const { data, error: fnErr } = await (supabase.rpc as any)('link_portal_by_code', { p_code: code.trim().toUpperCase(), p_user_id: user?.id });
+    const { data, error: fnErr } = await (supabase.rpc as any)('link_portal_by_code', { p_code: code.trim().toUpperCase() });
     setSaving(false);
     if (fnErr || !data) {
       setError('Código inválido ou já utilizado. Verifique com o buffet.');
