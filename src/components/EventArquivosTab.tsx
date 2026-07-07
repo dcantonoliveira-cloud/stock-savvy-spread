@@ -484,20 +484,27 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   };
 
   const AnnexBlock = ({ n, content, show, onRemove }: { n: 1 | 2; content: string; show: boolean; onRemove: () => void }) => {
+    const [collapsed, setCollapsed] = useState(false);
     if (!show) return null;
     return (
       <div className="mt-4 border-t border-border pt-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Anexo {n}</span>
+          <button
+            onClick={() => setCollapsed(v => !v)}
+            className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
+          >
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+            Anexo {n}
+          </button>
           <div className="flex items-center gap-2">
-            {annexModels.length > 0 && (
+            {!collapsed && annexModels.length > 0 && (
               <select className="text-xs border border-border rounded-lg px-2 py-1.5 bg-background" defaultValue=""
                 onChange={e => { const m=annexModels.find(x=>x.id===e.target.value); if(m) handleAnnex(n,m.content??''); e.currentTarget.value=''; }}>
                 <option value="" disabled>Usar modelo...</option>
                 {annexModels.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             )}
-            {content && (
+            {!collapsed && content && (
               <button onClick={() => saveAnnexAsModel(content)}
                 className="text-xs border border-border rounded-lg px-2 py-1.5 hover:bg-muted transition-colors text-muted-foreground whitespace-nowrap">
                 Salvar como modelo
@@ -508,7 +515,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
             </button>
           </div>
         </div>
-        <RichTextEditor content={content} onChange={html => handleAnnex(n, html)} placeholder="Conteúdo do anexo..." />
+        {!collapsed && <RichTextEditor content={content} onChange={html => handleAnnex(n, html)} placeholder="Conteúdo do anexo..." />}
       </div>
     );
   };
