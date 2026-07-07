@@ -65,10 +65,18 @@ export default function PayslipsAdminPage() {
       .single();
     const companyId = (myProfile as any)?.company_id;
     if (!companyId) return;
+    // Busca apenas usuários com role = 'employee' (exclui supervisors, portais e contas de teste)
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'employee');
+    const employeeIds = (roles ?? []).map((r: any) => r.user_id);
+    if (employeeIds.length === 0) return;
     const { data } = await supabase
       .from('profiles')
       .select('user_id, display_name, email')
       .eq('company_id', companyId)
+      .in('user_id', employeeIds)
       .order('display_name');
     setEmployees((data ?? []).map((p: any) => ({ id: p.user_id, display_name: p.display_name, email: p.email })));
   };
