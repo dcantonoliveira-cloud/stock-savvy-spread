@@ -14,7 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 const BUBBLE_BASE  = 'https://rondelloemcasa.bubbleapps.io/api/1.1/obj';
 const BUBBLE_TOKEN = 'b4b3c4138bb1000811d5a3c0ba47a238';
 const SUPABASE_URL = 'https://vfrtvnzptaazhzfirflm.supabase.co';
-const SUPABASE_KEY = 'sb_secret_Al-4U7Sa5TSXj7DEk8d-BA_B9HuCqHB';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 if (DRY_RUN) console.log('⚠️  DRY RUN — nenhuma alteração será salva\n');
