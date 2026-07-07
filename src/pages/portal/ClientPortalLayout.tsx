@@ -74,7 +74,12 @@ function EnterCodeScreen({ onLinked }: { onLinked: () => void }) {
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error: fnErr } = await (supabase.rpc as any)('link_portal_by_code', { p_code: code.trim().toUpperCase() });
     setSaving(false);
-    if (fnErr || !data) {
+    if (fnErr) {
+      console.error('[portal] link_portal_by_code error:', fnErr);
+      setError(`Erro técnico: ${fnErr.message}`);
+      return;
+    }
+    if (!data) {
       setError('Código inválido ou já utilizado. Verifique com o buffet.');
       return;
     }

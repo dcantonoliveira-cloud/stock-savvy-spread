@@ -150,7 +150,7 @@ function buildPage1Html(event: FichaEvent, customFields: CustomField[], company:
 <div style="width:794px;background:#fff;padding:38px 54px 48px;position:relative;overflow:hidden;">
 
   <!-- Watermark -->
-  <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:440px;height:440px;right:-110px;bottom:-110px;opacity:.04;pointer-events:none;">
+  <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:400px;height:400px;right:-60px;bottom:0;opacity:.04;pointer-events:none;">
 
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;">
@@ -205,7 +205,7 @@ function buildPage2Html(event: FichaEvent, company: FichaCompany | null): string
 <div style="width:794px;background:#fff;padding:38px 54px 48px;position:relative;overflow:hidden;">
 
   <!-- Watermark -->
-  <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:440px;height:440px;right:-110px;bottom:-110px;opacity:.04;pointer-events:none;">
+  <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:400px;height:400px;right:-60px;bottom:0;opacity:.04;pointer-events:none;">
 
   <!-- Header mini -->
   <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;">
