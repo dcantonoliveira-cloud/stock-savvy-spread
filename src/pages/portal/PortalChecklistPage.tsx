@@ -14,7 +14,7 @@ type CheckItem = {
 
 const CHECKLIST: CheckItem[] = [
   { id: 0,  label: 'Contrato assinado' },
-  { id: 1,  label: 'Agendamento da segunda degustação' },
+  { id: 1,  label: 'Agendamento da segunda degustação', note: 'mais ou menos 2 meses antes da festa' },
   { id: 2,  label: 'Envio dos pratos para provar na segunda degustação' },
   { id: 3,  label: 'Segunda degustação realizada' },
   { id: 4,  label: 'Definição do cardápio final',              deadline: 'até 15 dias antes da festa' },
