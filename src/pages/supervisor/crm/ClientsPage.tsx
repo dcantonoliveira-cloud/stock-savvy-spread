@@ -86,7 +86,7 @@ export default function ClientsPage() {
       .order('accessed_at', { ascending: false })
       .limit(200)
       .then(({ data }: any) => { setLogs(data ?? []); setLogsLoad(false); });
-  }, []);
+  }, [tab]);
 
   const filtered = clients.filter(c => {
     if (!search) return true;
