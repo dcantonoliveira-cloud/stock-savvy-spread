@@ -453,12 +453,13 @@ export default function EventDetailPage() {
               </button>
             </div>
             <p className="text-xs text-muted-foreground -mt-1">Edite livremente — estas alterações <strong>não serão salvas</strong> no banco de dados.</p>
-            <textarea
-              className="w-full border border-border rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-              rows={12}
-              value={obsModal.text}
-              onChange={e => setObsModal(prev => prev ? { ...prev, text: e.target.value } : prev)}
-            />
+            <div className="border border-border rounded-xl overflow-hidden min-h-[280px]">
+              <RichTextEditor
+                content={obsModal.text}
+                onChange={html => setObsModal(prev => prev ? { ...prev, text: html } : prev)}
+                placeholder="Escreva as observações..."
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setObsModal(null)}>Cancelar</Button>
               <Button size="sm" onClick={handleFichaTecnicaPrint}>
