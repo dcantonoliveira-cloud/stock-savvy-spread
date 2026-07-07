@@ -109,7 +109,7 @@ export default function TastingDetailPage() {
     const [{ data: sess }, { data: evts }] = await Promise.all([
       supabase.from('tasting_sessions' as any).select('*').eq('id', id).single(),
       supabase.from('tasting_session_events' as any)
-        .select('*, events(id, event_name, event_date, location_text, location_id, status, organizer, event_locations(name))')
+        .select('*, events(id, event_name, event_date, location_text, location_id, status, organizer)')
         .eq('session_id', id),
     ]);
 
@@ -138,7 +138,28 @@ export default function TastingDetailPage() {
       location: s.location ?? '', responsible: s.responsible ?? '',
       cost_per_couple: s.cost_per_couple ?? null,
     };
-    setRows((evts ?? []) as SessionEvent[]);
+
+    // Resolve location name for events that use location_id without location_text
+    const rows = (evts ?? []) as SessionEvent[];
+    const missingLocationIds = rows
+      .map(r => (r as any).events?.location_id)
+      .filter((locId, i) => locId && !(rows[i] as any).events?.location_text);
+
+    if (missingLocationIds.length > 0) {
+      const { data: locs } = await supabase
+        .from('event_locations' as any)
+        .select('id, name')
+        .in('id', missingLocationIds);
+      const locMap = Object.fromEntries((locs ?? []).map((l: any) => [l.id, l.name]));
+      rows.forEach(r => {
+        const ev = (r as any).events;
+        if (ev && !ev.location_text && ev.location_id && locMap[ev.location_id]) {
+          ev.location_text = locMap[ev.location_id];
+        }
+      });
+    }
+
+    setRows(rows);
     setLoading(false);
   }, [id, navigate]);
 
@@ -408,7 +429,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       </Td>
       <Td className="text-muted-foreground max-w-[100px] truncate">{ev?.organizer || '—'}</Td>
       <Td className="text-muted-foreground tabular-nums whitespace-nowrap">{fmtDate(ev?.event_date ?? null)}</Td>
-      <Td className="text-muted-foreground max-w-[110px] truncate">{ev?.location_text || (ev as any)?.event_locations?.name || '—'}</Td>
+      <Td className="text-muted-foreground max-w-[110px] truncate">{ev?.location_text || '—'}</Td>
       <Td>
         <button
           title="Automático pela data do contrato — clique para corrigir"
