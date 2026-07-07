@@ -247,15 +247,22 @@ export default function PayslipsAdminPage() {
     if (url) window.open(url, '_blank');
   };
 
-  const viewSignedPdf = async (sigId: string) => {
+  const viewSignedPdf = async (sigId: string, payslipTitle: string) => {
     const { data: sig } = await supabase
       .from('electronic_signatures' as any)
       .select('signed_pdf_path')
       .eq('id', sigId)
       .single();
     if (!sig || !(sig as any).signed_pdf_path) return toast.error('PDF assinado não disponível');
-    const url = await getSignedUrl((sig as any).signed_pdf_path);
-    if (url) window.open(url, '_blank');
+    const { data } = await supabase.storage.from('payslips').createSignedUrl((sig as any).signed_pdf_path, 300);
+    if (!data?.signedUrl) return toast.error('Erro ao gerar link de download');
+    const a = document.createElement('a');
+    a.href = data.signedUrl;
+    a.download = `${payslipTitle} - assinado.pdf`;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const base = employeeFilter
@@ -447,8 +454,8 @@ export default function PayslipsAdminPage() {
                         <Eye className="w-4 h-4" />
                       </button>
                       {sig && (
-                        <button onClick={() => viewSignedPdf(sig.id)}
-                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors" title="Ver PDF assinado">
+                        <button onClick={() => viewSignedPdf(sig.id, p.title)}
+                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors" title="Baixar PDF assinado">
                           <Download className="w-4 h-4" />
                         </button>
                       )}
