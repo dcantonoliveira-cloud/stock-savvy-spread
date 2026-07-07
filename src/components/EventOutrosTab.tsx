@@ -252,7 +252,7 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp, clientName, event
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 w-fit">
             <button onClick={sendInvite}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
               <UserPlus className="w-4 h-4" />
