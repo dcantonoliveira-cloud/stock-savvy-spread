@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { CalendarDays, DollarSign, FolderOpen, Info, LogOut, Menu, X, Heart, KeyRound, Loader2 } from 'lucide-react';
@@ -119,9 +119,17 @@ function EnterCodeScreen({ onLinked }: { onLinked: () => void }) {
   );
 }
 
+const PAGE_MAP: Record<string, string> = {
+  '/portal':            'inicio',
+  '/portal/financeiro': 'financeiro',
+  '/portal/arquivos':   'arquivos',
+  '/portal/informacoes':'informacoes',
+};
+
 export default function ClientPortalLayout() {
   const { user, signOut } = useAuth();
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const [ctx, setCtx] = useState<PortalContextType>({ event: null, portalId: null });
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -130,6 +138,17 @@ export default function ClientPortalLayout() {
     if (!user) return;
     loadPortalEvent(user.id).then(c => { setCtx(c); setLoading(false); });
   }, [user]);
+
+  // Loga acesso a cada página visitada
+  const logAccess = useCallback((path: string) => {
+    const page = PAGE_MAP[path];
+    if (!page || !user) return;
+    (supabase.rpc as any)('log_portal_access', { p_page: page }).catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    if (ctx.event) logAccess(location.pathname);
+  }, [location.pathname, ctx.event]);
 
   const handleSignOut = async () => { await signOut(); navigate('/login'); };
 

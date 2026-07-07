@@ -2,7 +2,22 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, Search, Loader2, UserX } from 'lucide-react';
+import { Users, Search, Loader2, UserX, Smartphone, BarChart2, Clock } from 'lucide-react';
+
+type AccessLog = {
+  id: string;
+  page: string;
+  accessed_at: string;
+  event_id: string;
+  events?: { event_name: string | null; clients?: { name: string | null } | null } | null;
+};
+
+const PAGE_LABELS: Record<string, string> = {
+  inicio:      'Início',
+  financeiro:  'Financeiro',
+  arquivos:    'Arquivos',
+  informacoes: 'Informações',
+};
 
 type EventRow = { id: string; status: string; event_date: string | null; total_value: number | null; event_name: string | null; event_type: string | null };
 
@@ -43,9 +58,12 @@ function fmtDate(iso: string) {
 }
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [clients,  setClients]  = useState<Client[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [search,   setSearch]   = useState('');
+  const [tab,      setTab]      = useState<'clientes' | 'acessos'>('clientes');
+  const [logs,     setLogs]     = useState<AccessLog[]>([]);
+  const [logsLoad, setLogsLoad] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -58,6 +76,16 @@ export default function ClientsPage() {
       setLoading(false);
     };
     load();
+  }, []);
+
+  useEffect(() => {
+    if (tab !== 'acessos') return;
+    setLogsLoad(true);
+    (supabase.from as any)('portal_access_logs')
+      .select('id, page, accessed_at, event_id, events(event_name, clients(name))')
+      .order('accessed_at', { ascending: false })
+      .limit(200)
+      .then(({ data }: any) => { setLogs(data ?? []); setLogsLoad(false); });
   }, []);
 
   const filtered = clients.filter(c => {
@@ -74,24 +102,50 @@ export default function ClientsPage() {
   const totalNeg = clients.filter(c => c.events.some(e => e.status === 'negotiating')).length;
   const totalConf = clients.filter(c => c.events.some(e => e.status === 'confirmed')).length;
 
+  // stats de páginas mais acessadas
+  const pageCounts = logs.reduce<Record<string, number>>((acc, l) => {
+    acc[l.page] = (acc[l.page] ?? 0) + 1;
+    return acc;
+  }, {});
+  const topPages = Object.entries(pageCounts).sort((a, b) => b[1] - a[1]);
+  const totalAccesses = logs.length;
+
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-display font-bold text-primary">Clientes</h1>
           <span className="text-xs font-semibold bg-primary/10 text-primary px-2.5 py-1 rounded-full">
             {clients.length}
           </span>
         </div>
-        <div className="relative max-w-xs w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, telefone ou e-mail..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        {tab === 'clientes' && (
+          <div className="relative max-w-xs w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, telefone ou e-mail..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Abas */}
+      <div className="flex gap-1 mb-5 bg-muted/50 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setTab('clientes')}
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'clientes' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <Users className="w-3.5 h-3.5" /> Clientes
+        </button>
+        <button
+          onClick={() => setTab('acessos')}
+          className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === 'acessos' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <Smartphone className="w-3.5 h-3.5" /> Acessos ao app
+        </button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -110,6 +164,75 @@ export default function ClientsPage() {
         ))}
       </div>
 
+      {tab === 'acessos' ? (
+        <div className="space-y-5">
+          {/* Stats de páginas */}
+          {!logsLoad && logs.length > 0 && (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {topPages.map(([page, count]) => (
+                <Card key={page} className="glass-card">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <BarChart2 className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{PAGE_LABELS[page] ?? page}</p>
+                      <p className="text-xl font-bold text-foreground">{count}</p>
+                      <p className="text-[10px] text-muted-foreground">{Math.round(count / totalAccesses * 100)}% dos acessos</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Lista de acessos recentes */}
+          <div className="bg-white rounded-xl border border-border overflow-hidden">
+            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Últimos acessos</span>
+              {logs.length > 0 && <span className="ml-auto text-xs text-muted-foreground">{logs.length} registros</span>}
+            </div>
+            {logsLoad ? (
+              <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+            ) : logs.length === 0 ? (
+              <div className="py-14 text-center text-sm text-muted-foreground">
+                <Smartphone className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                Nenhum acesso registrado ainda.
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs bg-muted/30">
+                    <th className="text-left px-5 py-2.5 font-semibold text-muted-foreground">CLIENTE / EVENTO</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">PÁGINA</th>
+                    <th className="text-right px-5 py-2.5 font-semibold text-muted-foreground">QUANDO</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {logs.map(log => (
+                    <tr key={log.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-5 py-2.5">
+                        <p className="font-medium text-foreground">{(log.events as any)?.clients?.name ?? '—'}</p>
+                        <p className="text-xs text-muted-foreground">{(log.events as any)?.event_name ?? '—'}</p>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          <Smartphone className="w-3 h-3" />
+                          {PAGE_LABELS[log.page] ?? log.page}
+                        </span>
+                      </td>
+                      <td className="px-5 py-2.5 text-right text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(log.accessed_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="bg-white rounded-xl border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -182,6 +305,7 @@ export default function ClientsPage() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
