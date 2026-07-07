@@ -34,6 +34,7 @@ interface SessionEvent {
     id: string;
     event_name: string | null;
     event_date: string | null;
+    location_text: string | null;
     status: string;
     organizer: string | null;
   } | null;
@@ -108,7 +109,7 @@ export default function TastingDetailPage() {
     const [{ data: sess }, { data: evts }] = await Promise.all([
       supabase.from('tasting_sessions' as any).select('*').eq('id', id).single(),
       supabase.from('tasting_session_events' as any)
-        .select('*, events(id, event_name, event_date, status, organizer)')
+        .select('*, events(id, event_name, event_date, location_text, status, organizer)')
         .eq('session_id', id),
     ]);
 
@@ -255,6 +256,7 @@ export default function TastingDetailPage() {
                     <Th>Evento</Th>
                     <Th>Assessor(a)</Th>
                     <Th>Data do evento</Th>
+                    <Th>Local</Th>
                     <Th>Situação</Th>
                     <Th>Status atual</Th>
                     <Th center>Qtd pessoas</Th>
@@ -264,7 +266,7 @@ export default function TastingDetailPage() {
                 </thead>
                 <tbody>
                   {rows.length === 0 ? (
-                    <tr><td colSpan={8} className="py-12 text-center text-muted-foreground text-sm">
+                    <tr><td colSpan={9} className="py-12 text-center text-muted-foreground text-sm">
                       Nenhum evento alocado. Clique em "Alocar clientes" para adicionar.
                     </td></tr>
                   ) : rows.map((row, i) => (
@@ -406,6 +408,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
       </Td>
       <Td className="text-muted-foreground">{ev?.organizer || '—'}</Td>
       <Td className="text-muted-foreground tabular-nums">{fmtDate(ev?.event_date ?? null)}</Td>
+      <Td className="text-muted-foreground">{ev?.location_text || '—'}</Td>
       <Td>
         <button
           title="Automático pela data do contrato — clique para corrigir"
