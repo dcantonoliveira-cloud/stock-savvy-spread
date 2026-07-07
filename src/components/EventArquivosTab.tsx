@@ -153,7 +153,9 @@ async function buildPDF(html: string, eventName: string, logoBase64: string | nu
   let globalPage=0;
   canvases.forEach((canvas,si)=>{
     sectionPages[si].forEach(({srcY,srcH},pi)=>{
-      if(globalPage>0)pdf.addPage();
+      // Não adiciona página extra aqui quando é o início de uma nova seção —
+      // a página já foi criada pelo bloco de transição entre seções abaixo.
+      if(globalPage>0 && !(pi===0 && si>0))pdf.addPage();
       const slice=document.createElement('canvas');slice.width=canvas.width;slice.height=srcH;
       slice.getContext('2d')!.drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,srcH);
       const imgH=srcH/(PX_PER_MM*SCALE);
