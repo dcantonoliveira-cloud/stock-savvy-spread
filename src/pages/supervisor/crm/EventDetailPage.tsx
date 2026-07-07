@@ -445,7 +445,7 @@ export default function EventDetailPage() {
       {/* Modal de revisão de observações antes de imprimir Ficha Técnica */}
       {obsModal?.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col gap-4 p-6">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col gap-4 p-6 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-foreground">Observações para impressão</h2>
               <button onClick={() => setObsModal(null)} className="text-muted-foreground hover:text-foreground transition-colors">
