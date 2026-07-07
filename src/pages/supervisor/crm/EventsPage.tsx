@@ -197,7 +197,7 @@ export default function EventsPage() {
       if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
       if (search.trim().length >= 2) return true;
       // Quando ordenando por fechamento, filtra pelo contract_signed_date
-      const dateField = sortBy === 'contract_signed_date' ? e.contract_signed_date : e.event_date;
+      const dateField = e.event_date;
       if (!dateField) return false;
       const d = new Date(dateField + 'T12:00:00');
       if (d.getFullYear() !== year) return false;
