@@ -33,6 +33,8 @@ type EventRow = {
   is_paid_in_full: boolean | null;
   contract_signed: boolean | null;
   contract_signed_date: string | null;
+  contract_signed_url: string | null;
+  zapsign_data: { signers?: { status: string }[] } | null;
   notes: string | null;
   client_id: string | null;
   clients: { id: string; name: string; phone: string | null; email: string | null } | null;
@@ -112,7 +114,7 @@ export default function EventsPage() {
   const [locationDropOpen, setLocationDropOpen] = useState(false);
 
   // ── Load data ────────────────────────────────────────────────────
-  const EVENT_SELECT = 'id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, notes, client_id, clients(id, name, phone, email)';
+  const EVENT_SELECT = 'id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, contract_signed_url, zapsign_data, notes, client_id, clients(id, name, phone, email)';
 
   const loadEvents = async (y: number) => {
     setLoading(true);
@@ -853,6 +855,7 @@ export default function EventsPage() {
                 <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-center">STATUS</th>
                 <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-center hidden lg:table-cell">FECHAMENTO</th>
                 <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-center">PGTO</th>
+                <th className="px-3 py-2.5 text-[11px] font-semibold text-muted-foreground tracking-wide text-center hidden lg:table-cell">CONTRATO</th>
                 <th className="w-4"></th>
               </tr>
             </thead>
@@ -962,6 +965,19 @@ export default function EventsPage() {
                             </div>
                           </div>
                         );
+                      })()}
+                    </td>
+                    {/* CONTRATO */}
+                    <td className="px-3 py-2 text-center hidden lg:table-cell">
+                      {(() => {
+                        const zap = ev.zapsign_data as any;
+                        const allZapSigned = zap?.signers?.length > 0 && zap.signers.every((s: any) => s.status === 'signed');
+                        const manualSigned = ev.contract_signed || !!ev.contract_signed_url;
+                        if (allZapSigned || manualSigned)
+                          return <span title="Contrato assinado" className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-600"><FileText className="w-3.5 h-3.5" /></span>;
+                        if (zap?.signers?.length > 0)
+                          return <span title="Aguardando assinaturas" className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-500"><FileText className="w-3.5 h-3.5" /></span>;
+                        return <span className="text-muted-foreground/25 text-xs">—</span>;
                       })()}
                     </td>
                     {/* AÇÕES */}
