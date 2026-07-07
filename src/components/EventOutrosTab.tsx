@@ -252,11 +252,18 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp, clientName, event
             </div>
           </div>
         ) : (
-          <button onClick={sendInvite}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
-            <UserPlus className="w-4 h-4" />
-            Enviar convite de acesso ao cliente
-          </button>
+          <div className="flex flex-col gap-1">
+            <button onClick={sendInvite}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+              <UserPlus className="w-4 h-4" />
+              Enviar convite de acesso ao cliente
+            </button>
+            {portal?.invite_sent_at && (
+              <p className="text-xs text-muted-foreground pl-1">
+                Último envio: {fmtDT(portal.invite_sent_at)}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Resetar portal — sempre visível */}
