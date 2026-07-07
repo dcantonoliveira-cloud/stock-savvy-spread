@@ -1,12 +1,29 @@
-import { useOutletContext } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useOutletContext, Link } from 'react-router-dom';
 import type { PortalContextType } from './ClientPortalLayout';
+import { supabase } from '@/integrations/supabase/client';
 import logoRondello from '@/assets/logo-rondello.png';
-import { MapPin, Users, CalendarDays, Clock, Phone, Instagram, Heart } from 'lucide-react';
+import { MapPin, Users, CalendarDays, Clock, Phone, Instagram, Heart, CheckCircle2, Circle, ChevronRight, DollarSign } from 'lucide-react';
 
 const fmtDateLong = (d: string) =>
   new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
   });
+
+const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const CHECKLIST_LABELS = [
+  'Contrato assinado',
+  'Agendamento da segunda degustação',
+  'Envio dos pratos para provar na segunda degustação',
+  'Segunda degustação realizada',
+  'Definição do cardápio final',
+  'Confirmação de convidados',
+  'Confirmação de staffs',
+  'Definição de brunch da noiva e/ou Noivo',
+  'Escolha de materiais',
+  'Quitação do evento',
+];
 
 function Countdown({ days }: { days: number }) {
   if (days < 0) return (
@@ -24,19 +41,15 @@ function Countdown({ days }: { days: number }) {
     </div>
   );
 
-  // divide em meses, semanas e dias para deixar mais bonito
   const months = Math.floor(days / 30);
   const weeks  = Math.floor((days % 30) / 7);
   const rest   = days % 7;
 
   return (
     <div className="rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/80 p-7 text-white shadow-xl relative overflow-hidden">
-      {/* fundo decorativo */}
       <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full bg-white/5" />
       <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/5" />
-
       <p className="text-[11px] font-bold uppercase tracking-[.22em] text-white/60 text-center mb-5">Contagem regressiva</p>
-
       <div className="flex items-end justify-center gap-5">
         {months > 0 && (
           <div className="text-center">
@@ -55,7 +68,6 @@ function Countdown({ days }: { days: number }) {
           <p className="text-[11px] text-white/60 mt-1 uppercase tracking-wide">dia{rest !== 1 ? 's' : ''}</p>
         </div>
       </div>
-
       <div className="mt-5 flex items-center justify-center gap-2">
         <Heart className="w-3.5 h-3.5 text-rose-300 fill-rose-300" />
         <p className="text-sm text-white/70">até a festa!</p>
@@ -66,12 +78,45 @@ function Countdown({ days }: { days: number }) {
 }
 
 export default function PortalEventoPage() {
-  const { event } = useOutletContext<PortalContextType>();
+  const { event, portalId } = useOutletContext<PortalContextType>();
+  const [paid,       setPaid]       = useState<number | null>(null);
+  const [checkDone,  setCheckDone]  = useState<Set<number>>(new Set());
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!event?.id || !portalId) return;
+    Promise.all([
+      // pagamentos confirmados
+      (supabase.from as any)('event_payments')
+        .select('value')
+        .eq('event_id', event.id)
+        .eq('is_confirmed', true),
+      // checklist
+      (supabase.from as any)('client_portal_access')
+        .select('checklist_done')
+        .eq('id', portalId)
+        .maybeSingle(),
+    ]).then(([{ data: pays }, { data: chk }]) => {
+      setPaid((pays ?? []).reduce((s: number, p: any) => s + (p.value ?? 0), 0));
+      if (chk?.checklist_done) setCheckDone(new Set(chk.checklist_done));
+      setDataLoaded(true);
+    });
+  }, [event?.id, portalId]);
+
   if (!event) return null;
 
   const daysLeft = event.event_date
     ? Math.ceil((new Date(event.event_date + 'T12:00:00').getTime() - Date.now()) / 86400000)
     : null;
+
+  const total   = event.total_value ?? 0;
+  const balance = total - (paid ?? 0);
+
+  // próximos 3 itens não feitos do checklist
+  const nextSteps = CHECKLIST_LABELS
+    .map((label, id) => ({ id, label }))
+    .filter(item => !checkDone.has(item.id))
+    .slice(0, 3);
 
   return (
     <div className="max-w-lg mx-auto px-4 py-8 space-y-5">
@@ -129,7 +174,79 @@ export default function PortalEventoPage() {
         )}
       </div>
 
-      {/* Contato & Redes */}
+      {/* Resumo financeiro */}
+      {dataLoaded && total > 0 && (
+        <Link to="/portal/financeiro" className="block">
+          <div className="bg-white border border-border rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">Financeiro</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+            </div>
+            <div className="grid grid-cols-3 divide-x divide-border/50">
+              <div className="px-4 py-3.5 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 mb-1">Total</p>
+                <p className="text-sm font-bold text-foreground">{fmtBRL(total)}</p>
+              </div>
+              <div className="px-4 py-3.5 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 mb-1">Pago</p>
+                <p className="text-sm font-bold text-emerald-600">{fmtBRL(paid ?? 0)}</p>
+              </div>
+              <div className="px-4 py-3.5 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 mb-1">Saldo</p>
+                <p className={`text-sm font-bold ${balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                  {fmtBRL(balance)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Link>
+      )}
+
+      {/* Próximos passos do checklist */}
+      {dataLoaded && nextSteps.length > 0 && (
+        <Link to="/portal/checklist" className="block">
+          <div className="bg-white border border-border rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">Próximos passos</p>
+                <span className="text-[10px] font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                  {CHECKLIST_LABELS.length - checkDone.size} restantes
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+            </div>
+            <ul className="divide-y divide-border/50">
+              {nextSteps.map(item => (
+                <li key={item.id} className="flex items-center gap-3 px-5 py-3">
+                  <Circle className="w-4 h-4 text-border shrink-0" />
+                  <p className="text-sm text-foreground">{item.label}</p>
+                </li>
+              ))}
+              {CHECKLIST_LABELS.length - checkDone.size > 3 && (
+                <li className="px-5 py-2.5 text-xs text-muted-foreground/60 text-center">
+                  + {CHECKLIST_LABELS.length - checkDone.size - 3} mais no checklist completo
+                </li>
+              )}
+            </ul>
+          </div>
+        </Link>
+      )}
+
+      {/* Tudo feito! */}
+      {dataLoaded && nextSteps.length === 0 && (
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-4">
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-800">Checklist completo!</p>
+            <p className="text-xs text-emerald-700/70 mt-0.5">Tudo certo por aqui. Agora é só curtir a festa 🎉</p>
+          </div>
+        </div>
+      )}
+
+      {/* Contato */}
       <div className="space-y-3 pt-1">
         <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/50 text-center">Fale com a gente</p>
         <a
