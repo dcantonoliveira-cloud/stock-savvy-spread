@@ -1,15 +1,17 @@
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import TextAlign from '@tiptap/extension-text-align';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  Bold, Italic, Underline, Strikethrough,
+  Bold, Italic, Strikethrough,
   List, ListOrdered, Link as LinkIcon,
-  Image as ImageIcon, Heading1, Heading2, AlignLeft,
+  Image as ImageIcon, Heading1, Heading2,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Palette, Minus,
 } from 'lucide-react';
 
@@ -56,6 +58,7 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Escre
       StarterKit,
       TextStyle,
       Color,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Image.configure({ inline: false, allowBase64: true }),
       Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-primary underline' } }),
       Placeholder.configure({ placeholder }),
@@ -69,14 +72,12 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Escre
     },
   });
 
-  // Sync external content changes (initial load)
   useEffect(() => {
     if (editor && content && editor.getHTML() !== content) {
       editor.commands.setContent(content, false);
     }
   }, [content, editor]);
 
-  // Close color picker on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (colorRef.current && !colorRef.current.contains(e.target as Node)) {
@@ -134,8 +135,21 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Escre
         <ToolbarBtn active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Título 2">
           <Heading2 className="w-3.5 h-3.5" />
         </ToolbarBtn>
-        <ToolbarBtn active={editor.isActive('paragraph')} onClick={() => editor.chain().focus().setParagraph().run()} title="Parágrafo normal">
+
+        <div className="w-px h-4 bg-border mx-1" />
+
+        {/* Alignment */}
+        <ToolbarBtn active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} title="Alinhar à esquerda">
           <AlignLeft className="w-3.5 h-3.5" />
+        </ToolbarBtn>
+        <ToolbarBtn active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} title="Centralizar">
+          <AlignCenter className="w-3.5 h-3.5" />
+        </ToolbarBtn>
+        <ToolbarBtn active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} title="Alinhar à direita">
+          <AlignRight className="w-3.5 h-3.5" />
+        </ToolbarBtn>
+        <ToolbarBtn active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()} title="Justificar">
+          <AlignJustify className="w-3.5 h-3.5" />
         </ToolbarBtn>
 
         <div className="w-px h-4 bg-border mx-1" />
@@ -150,7 +164,6 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Escre
 
         <div className="w-px h-4 bg-border mx-1" />
 
-        {/* Divider */}
         <ToolbarBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Linha divisória">
           <Minus className="w-3.5 h-3.5" />
         </ToolbarBtn>

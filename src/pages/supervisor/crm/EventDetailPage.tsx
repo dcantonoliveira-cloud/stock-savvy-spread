@@ -459,11 +459,11 @@ export default function EventDetailPage() {
                   <MapPin className="w-3 h-3" />{event.location_text}
                 </span>
               )}
-              {event.guest_count && (
+              {(form.guest_count ?? event.guest_count) ? (
                 <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
-                  <Users className="w-3 h-3" />{event.guest_count} convidados
+                  <Users className="w-3 h-3" />{form.guest_count ?? event.guest_count} convidados
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
 

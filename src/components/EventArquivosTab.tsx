@@ -214,13 +214,12 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: tData }, { data: evData }, { data: compData }, { data: axData }, { data: fData }, { data: zapCfg }] = await Promise.all([
+      const [{ data: tData }, { data: evData }, { data: compData }, { data: fData }, { data: zapCfg }] = await Promise.all([
         supabase.from('tasting_session_events' as any)
           .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
           .eq('event_id', eventId),
         supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text,zapsign_data').eq('id', eventId).single(),
         supabase.from('companies').select('id,witness_1_name,witness_1_cpf,witness_1_email,signer_name,signer_email,logo_base64,name').limit(1).single(),
-        supabase.from('annex_models' as any).select('id,name,content').order('name'),
         supabase.from('event_files' as any).select('id,name,url,created_at').eq('event_id', eventId).order('created_at'),
         supabase.from('company_integrations' as any).select('api_key').eq('provider','zapsign').maybeSingle(),
       ]);
@@ -245,7 +244,12 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         setSignerName(c.signer_name ?? ''); setSignerEmail(c.signer_email ?? '');
         if (c.logo_base64) setCompanyLogo(c.logo_base64);
         if (c.name) setCompanyName(c.name);
-        if (c.id) setCompanyId(c.id);
+        if (c.id) {
+          setCompanyId(c.id);
+          const { data: axData } = await supabase.from('annex_models' as any)
+            .select('id,name,content').eq('company_id', c.id).order('name');
+          setAnnexModels((axData ?? []) as AnnexModel[]);
+        }
       }
       if (zapCfg) {
         try {
@@ -262,7 +266,6 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         const { data: anyTpl } = await supabase.from('contract_templates' as any).select('content').limit(1).single();
         if (anyTpl) setContractTemplate((anyTpl as any).content ?? '');
       }
-      setAnnexModels((axData ?? []) as AnnexModel[]);
       setFiles((fData ?? []) as EventFile[]);
     };
     load();

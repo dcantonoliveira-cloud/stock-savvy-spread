@@ -1,5 +1,4 @@
-// Abre o fechamento em nova janela com o design exato do Claude Design
-// e dispara o print automaticamente.
+import jsPDF from 'jspdf';
 
 interface Payment { payment_date: string | null; value: number; is_confirmed: boolean }
 interface Additional { description: string | null; value: number }
@@ -25,12 +24,12 @@ const fmtDate = (d: string | null) => {
   return `${day}/${m}/${y}`;
 };
 
-export function printFechamento(
+function buildHtml(
   event: EventData,
   payments: Payment[],
   additionals: Additional[],
   company: Company | null,
-) {
+): string {
   const isPpx    = event.pricing_mode !== 'fixed';
   const guests   = event.guest_count ?? 0;
   const children = event.children_50_pct ?? 0;
@@ -51,7 +50,6 @@ export function printFechamento(
   const clientTitle = event.event_name ?? event.clients?.name ?? 'Evento';
   const today = new Date().toLocaleDateString('pt-BR');
 
-  // ── Linhas da tabela Resumo ────────────────────────────────────────────────
   const resumoRows: { label: string; note?: string; qty?: string; unit?: string; total: number }[] = [];
   if (isPpx) {
     if (paying > 0)  resumoRows.push({ label: 'Convidados pagantes', qty: String(paying), unit: fmtBRL(ppx), total: paying * ppx });
@@ -82,7 +80,7 @@ export function printFechamento(
 
   const logoHtml = company?.logo_base64
     ? `<img src="${company.logo_base64}" alt="Logo" style="height:58px;width:auto;">`
-    : `<span style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:#0E2A45;">${company?.name ?? 'Rondello Buffet'}</span>`;
+    : `<span style="font-family:Georgia,serif;font-size:22px;font-weight:600;color:#0E2A45;">${company?.name ?? 'Rondello Buffet'}</span>`;
 
   const billingHtml = (company?.razao_social || company?.cnpj || company?.banco) ? `
     <div style="font-size:10.5px;color:#7C7C7C;line-height:1.75;">
@@ -94,29 +92,8 @@ export function printFechamento(
 
   const footerLine = [company?.endereco, company?.telefone, company?.website].filter(Boolean).join(' · ');
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Fechamento — ${clientTitle}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{background:#E7E4DD;font-family:'Libre Franklin',sans-serif;color:#2B2B2B;}
-    @media print{
-      body{background:#fff;}
-      .page{box-shadow:none!important;margin:0!important;}
-    }
-  </style>
-</head>
-<body>
-<div class="page" style="width:794px;min-height:1123px;margin:32px auto;background:#FFFFFF;box-shadow:0 8px 40px rgba(14,42,69,.10);padding:40px 56px;position:relative;overflow:hidden;">
-
-  <!-- Emblem watermark -->
-  <img src="${window.location.origin}/emblem-rondello.png" alt="" style="position:absolute;width:520px;height:520px;right:-150px;bottom:-150px;opacity:.045;pointer-events:none;user-select:none;">
+  return `
+<div style="width:794px;background:#FFFFFF;padding:40px 56px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#2B2B2B;box-sizing:border-box;">
 
   <!-- Header -->
   <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;">
@@ -132,7 +109,7 @@ export function printFechamento(
   <!-- Title -->
   <div style="text-align:center;margin-top:22px;">
     <div style="font-size:11px;letter-spacing:.42em;text-transform:uppercase;color:#C2A263;font-weight:600;padding-left:.42em;">Fechamento</div>
-    <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:42px;line-height:1.06;color:#0E2A45;margin:8px 0 0;">${clientTitle}</h1>
+    <h1 style="font-family:Georgia,serif;font-weight:600;font-size:38px;line-height:1.1;color:#0E2A45;margin:8px 0 0;">${clientTitle}</h1>
   </div>
 
   <!-- Stats strip -->
@@ -166,13 +143,13 @@ export function printFechamento(
           <th style="font-weight:600;padding:0 0 9px;text-align:right;">Total</th>
         </tr>
       </thead>
-      <tbody style="font-variant-numeric:tabular-nums;">
+      <tbody>
         ${resumoHtml}
       </tbody>
     </table>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;background:#0E2A45;color:#FFFFFF;padding:13px 18px;border-radius:3px;">
       <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:#C9D4E0;">Total do evento</span>
-      <span style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;">${fmtBRL(grand)}</span>
+      <span style="font-size:18px;font-weight:700;">${fmtBRL(grand)}</span>
     </div>
   </div>
 
@@ -182,17 +159,17 @@ export function printFechamento(
       <h2 style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#0E2A45;font-weight:600;white-space:nowrap;">Pagamentos efetuados</h2>
       <div style="flex:1;height:1px;background:#EAE6DE;"></div>
     </div>
-    <div style="font-size:12.5px;font-variant-numeric:tabular-nums;">
+    <div style="font-size:12.5px;">
       ${paymentsHtml}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid #E7E3DB;padding:12px 16px;border-radius:3px;">
         <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;">Total pago</span>
-        <span style="font-size:16px;font-weight:600;color:#0E2A45;font-variant-numeric:tabular-nums;">${fmtBRL(totalPaid)}</span>
+        <span style="font-size:16px;font-weight:600;color:#0E2A45;">${fmtBRL(totalPaid)}</span>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;background:${isQuitado ? '#F0FDF4' : '#F7F1E5'};border:1px solid ${isQuitado ? '#BBF7D0' : '#E4D4B2'};padding:12px 16px;border-radius:3px;">
         <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:${isQuitado ? '#15803D' : '#A07E2E'};font-weight:600;">${isQuitado ? 'Quitado' : 'A pagar'}</span>
-        <span style="font-size:16px;font-weight:700;color:#0E2A45;font-variant-numeric:tabular-nums;">${fmtBRL(Math.abs(balance))}</span>
+        <span style="font-size:16px;font-weight:700;color:#0E2A45;">${fmtBRL(Math.abs(balance))}</span>
       </div>
     </div>
   </div>
@@ -201,24 +178,66 @@ export function printFechamento(
   <div style="margin-top:34px;padding-top:18px;border-top:1px solid #E7E3DB;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;">
     ${billingHtml}
     <div style="text-align:right;font-size:10.5px;color:#A29D92;line-height:1.7;margin-left:auto;">
-      <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:#C2A263;font-weight:600;letter-spacing:.01em;">Rondello Buffet</div>
+      <div style="font-family:Georgia,serif;font-size:20px;color:#C2A263;font-weight:600;letter-spacing:.01em;">${company?.name ?? 'Rondello Buffet'}</div>
     </div>
   </div>
 
   ${footerLine ? `<div style="margin-top:16px;text-align:center;font-size:9.5px;letter-spacing:.06em;color:#B0ABA0;">${footerLine}</div>` : ''}
 
-</div>
-<script>
-  // Aguarda as fontes carregarem antes de imprimir
-  document.fonts.ready.then(function() {
-    setTimeout(function() { window.print(); }, 300);
-  });
-</script>
-</body>
-</html>`;
+</div>`;
+}
 
-  const win = window.open('', '_blank', 'width=900,height=900');
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
+export async function downloadFechamento(
+  event: EventData,
+  payments: Payment[],
+  additionals: Additional[],
+  company: Company | null,
+) {
+  const { default: html2canvas } = await import('html2canvas');
+
+  const inner = buildHtml(event, payments, additionals, company);
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:white;';
+  wrapper.innerHTML = inner;
+  document.body.appendChild(wrapper);
+
+  await new Promise(r => setTimeout(r, 150));
+
+  const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: '#fff' });
+  document.body.removeChild(wrapper);
+
+  const PW_MM = 210, PH_MM = 297, MX_MM = 0;
+  const CONTENT_W_MM = PW_MM - MX_MM * 2;
+  const PX_PER_MM = canvas.width / CONTENT_W_MM;
+  const pageHeightPx = Math.round(PH_MM * PX_PER_MM);
+
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  let srcY = 0;
+  let pageNum = 0;
+
+  while (srcY < canvas.height) {
+    const srcH = Math.min(pageHeightPx, canvas.height - srcY);
+    const slice = document.createElement('canvas');
+    slice.width = canvas.width;
+    slice.height = srcH;
+    slice.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+    const imgH = (srcH / canvas.width) * CONTENT_W_MM;
+    if (pageNum > 0) pdf.addPage();
+    pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, CONTENT_W_MM, imgH);
+    srcY += srcH;
+    pageNum++;
+  }
+
+  const name = event.event_name ?? event.clients?.name ?? 'Evento';
+  pdf.save(`FECHAMENTO - ${name}.pdf`);
+}
+
+// mantém compatibilidade legada (não usado mais, mas não quebra imports)
+export function printFechamento(
+  event: EventData,
+  payments: Payment[],
+  additionals: Additional[],
+  company: Company | null,
+) {
+  downloadFechamento(event, payments, additionals, company);
 }
