@@ -34,6 +34,10 @@ export async function getCompany(): Promise<CompanyData | null> {
       cache = data as CompanyData | null;
       pending = null;
       return cache;
+    })
+    .catch(() => {
+      pending = null; // permite retry na próxima chamada
+      return null;
     });
   return pending;
 }
