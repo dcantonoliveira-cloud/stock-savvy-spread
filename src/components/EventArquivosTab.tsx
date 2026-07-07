@@ -95,7 +95,7 @@ async function renderSection(innerHtml: string, widthPx: number, scale: number) 
   const { default: html2canvas } = await import('html2canvas');
   const el = document.createElement('div');
   el.style.cssText = `position:fixed;left:-9999px;top:0;width:${widthPx}px;background:white;padding:0;margin:0;`;
-  el.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:12.5pt;line-height:1.8;color:#111;word-break:break-word;">${DOMPurify.sanitize(innerHtml)}</div>`;
+  el.innerHTML = `<div style="font-family:'Times New Roman',Times,serif;font-size:11.5pt;line-height:1.65;color:#111;word-break:break-word;white-space:pre-wrap;">${DOMPurify.sanitize(innerHtml)}</div>`;
   document.body.appendChild(el);
   await new Promise(r => setTimeout(r, 200));
   const canvas = await html2canvas(el, { scale, useCORS: true, backgroundColor: '#fff' });
@@ -104,7 +104,7 @@ async function renderSection(innerHtml: string, widthPx: number, scale: number) 
 }
 
 async function buildPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = []): Promise<jsPDF> {
-  const SCALE=2, PW_MM=210, PH_MM=297, MX_MM=12, HEADER_MM=34, FOOTER_MM=16;
+  const SCALE=2, PW_MM=210, PH_MM=297, MX_MM=12, HEADER_MM=38, FOOTER_MM=20;
   const CONTENT_W_MM=PW_MM-MX_MM*2, CONTENT_H_MM=PH_MM-HEADER_MM-FOOTER_MM;
   const PX_PER_MM=3.7795, CONTAINER_W_PX=Math.round(CONTENT_W_MM*PX_PER_MM);
   const pageHeightPx=Math.round(CONTENT_H_MM*PX_PER_MM*SCALE);
