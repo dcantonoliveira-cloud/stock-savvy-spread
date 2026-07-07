@@ -399,16 +399,16 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
   return (
     <tr className={`hover:bg-slate-50 transition-colors ${isLast ? '' : 'border-b border-border/50'}`}>
       <Td>
-        <div className="flex items-center gap-1.5">
-          <span className="font-medium text-foreground">{ev?.event_name ?? '—'}</span>
+        <div className="flex items-center gap-1 max-w-[160px]">
+          <span className="font-medium text-foreground truncate">{ev?.event_name ?? '—'}</span>
           <button onClick={onNavigate} className="text-muted-foreground/40 hover:text-primary transition-colors shrink-0">
             <ExternalLink className="w-3 h-3" />
           </button>
         </div>
       </Td>
-      <Td className="text-muted-foreground">{ev?.organizer || '—'}</Td>
-      <Td className="text-muted-foreground tabular-nums">{fmtDate(ev?.event_date ?? null)}</Td>
-      <Td className="text-muted-foreground">{ev?.location_text || '—'}</Td>
+      <Td className="text-muted-foreground max-w-[100px] truncate">{ev?.organizer || '—'}</Td>
+      <Td className="text-muted-foreground tabular-nums whitespace-nowrap">{fmtDate(ev?.event_date ?? null)}</Td>
+      <Td className="text-muted-foreground max-w-[110px] truncate">{ev?.location_text || '—'}</Td>
       <Td>
         <button
           title="Automático pela data do contrato — clique para corrigir"
@@ -441,7 +441,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
               onUpdate({ guest_count: e.target.value ? parseInt(e.target.value) : null });
             }, 800);
           }}
-          className="w-14 text-center text-sm border border-border rounded-lg px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/20" />
+          className="w-12 text-center text-xs border border-border rounded-lg px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/20" />
       </Td>
       <Td>
         <div className="flex items-center gap-1">
@@ -449,7 +449,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
           <input type="text" value={paid}
             onChange={e => setPaid(e.target.value)}
             onBlur={handlePaidBlur}
-            className="w-24 text-sm border border-border rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-20 text-xs border border-border rounded-lg px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
             placeholder="0" />
         </div>
       </Td>
@@ -631,14 +631,14 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function Th({ children, center }: { children?: React.ReactNode; center?: boolean }) {
   return (
-    <th className={`px-4 py-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap ${center ? 'text-center' : 'text-left'}`}>
+    <th className={`px-2 py-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap ${center ? 'text-center' : 'text-left'}`}>
       {children}
     </th>
   );
 }
 
 function Td({ children, className = '', center }: { children?: React.ReactNode; className?: string; center?: boolean }) {
-  return <td className={`px-4 py-3 text-sm ${center ? 'text-center' : ''} ${className}`}>{children}</td>;
+  return <td className={`px-2 py-2.5 text-xs ${center ? 'text-center' : ''} ${className}`}>{children}</td>;
 }
 
 const STATUS_OPTIONS = Object.entries(STATUS_CFG).map(([value, { label }]) => ({ value, label }));
