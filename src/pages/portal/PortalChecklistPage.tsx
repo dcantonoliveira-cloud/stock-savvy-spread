@@ -20,7 +20,7 @@ const CHECKLIST: CheckItem[] = [
   { id: 4,  label: 'Definição do cardápio final',              deadline: 'até 15 dias antes da festa' },
   { id: 5,  label: 'Confirmação de convidados',                deadline: 'até 15 dias antes da festa' },
   { id: 6,  label: 'Confirmação de staffs',                   deadline: 'até 15 dias antes da festa' },
-  { id: 7,  label: 'Definição de brunch da noiva', note: 'se necessário', deadline: 'até 15 dias antes da festa', optional: true },
+  { id: 7,  label: 'Definição de brunch da noiva e/ou Noivo', deadline: 'até 15 dias antes da festa', optional: true },
   { id: 8,  label: 'Escolha de materiais', note: 'sousplat, toalhas, taças, talheres...', deadline: 'até 15 dias antes da festa' },
   { id: 9,  label: 'Quitação do evento',                      deadline: 'até 15 dias antes da festa' },
 ];
