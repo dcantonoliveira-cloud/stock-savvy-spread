@@ -137,13 +137,15 @@ async function buildPDF(html: string, eventName: string, logoBase64: string | nu
   const totalPages=sectionPages.reduce((s,p)=>s+p.length,0);
   const fmtD=(d:string|null|undefined)=>{if(!d)return'';const[y,m,day]=d.split('-');return`${day}/${m}/${y}`;};
   const addHeaderFooter=(pageNum:number)=>{
-    if(logoBase64){try{pdf.addImage(logoBase64,'PNG',MX_MM,5,0,22);}catch{}}
+    if(logoBase64){try{pdf.addImage(logoBase64,'PNG',MX_MM,6,0,18);}catch{}}
     pdf.setDrawColor(160,140,100);pdf.setLineWidth(0.35);pdf.line(MX_MM,HEADER_MM-4,PW_MM-MX_MM,HEADER_MM-4);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150,130,90);
+    pdf.text('CONTRATO',PW_MM-MX_MM,9,{align:'right'});
     pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(80,70,55);
-    pdf.text(eventName,PW_MM-MX_MM,12,{align:'right'});
+    pdf.text(eventName,PW_MM-MX_MM,14,{align:'right'});
     pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(120,110,90);
     const sub=[fmtD(eventDate),eventLocation].filter(Boolean).join('  ·  ');
-    if(sub) pdf.text(sub,PW_MM-MX_MM,17.5,{align:'right'});
+    if(sub) pdf.text(sub,PW_MM-MX_MM,19,{align:'right'});
     pdf.line(MX_MM,PH_MM-FOOTER_MM+2,PW_MM-MX_MM,PH_MM-FOOTER_MM+2);
     pdf.setFontSize(7.5);pdf.setTextColor(140,130,110);
     pdf.text((companyName??'').trim(),MX_MM,PH_MM-FOOTER_MM+7);
