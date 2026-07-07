@@ -47,31 +47,39 @@ const fmtDate = (d: string | null) => {
 const fmtBRL = (v: number | null) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
 
-// Renderiza uma grade de campos
+const COLS = 4;
+const CELL = `style="width:25%;padding:0 12px 14px 0;vertical-align:top;"`;
+const LBL  = `style="font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:700;margin-bottom:3px;"`;
+const VAL  = `style="font-size:11px;color:#0E2A45;font-weight:500;border-bottom:1px solid #EDEAE2;padding-bottom:3px;min-height:16px;word-break:break-word;"`;
+const VAL_EMPTY = `style="font-size:11px;color:transparent;border-bottom:1px solid #F0EDE6;padding-bottom:3px;min-height:16px;"`;
+
 function grid(fields: { label: string; value: string | null; wide?: boolean; html?: boolean; skipIfEmpty?: boolean }[]) {
-  return fields
-    .filter(f => !f.skipIfEmpty || (f.value && f.value.trim()))
-    .map(f => `
-      <div style="grid-column:${f.wide ? 'span 2' : 'span 1'};">
-        <div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;margin-bottom:4px;">${f.label}</div>
-        ${f.html
-          ? `<div style="font-size:11px;color:#2B2B2B;line-height:1.6;">${f.value || ''}</div>`
-          : `<div style="font-size:12px;color:${f.value ? '#0E2A45' : 'transparent'};font-weight:500;border-bottom:1px solid #EDEAE2;padding-bottom:4px;min-height:18px;">${f.value || '&nbsp;'}</div>`}
-      </div>`)
-    .join('');
+  const filtered = fields.filter(f => !f.skipIfEmpty || (f.value && f.value.trim()));
+  const rows: string[] = [];
+  let i = 0;
+  while (i < filtered.length) {
+    const rowFields = filtered.slice(i, i + COLS);
+    const cells = rowFields.map(f => {
+      const v = f.value?.trim() || '';
+      return `<td ${CELL}><div ${LBL}>${f.label}</div><div ${f.html ? `style="font-size:11px;color:#2B2B2B;line-height:1.5;"` : (v ? VAL : VAL_EMPTY)}>${v || '&nbsp;'}</div></td>`;
+    });
+    // Preenche colunas vazias
+    while (cells.length < COLS) cells.push(`<td ${CELL}></td>`);
+    rows.push(`<tr>${cells.join('')}</tr>`);
+    i += COLS;
+  }
+  return `<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${rows.join('')}</table>`;
 }
 
 function section(title: string, content: string) {
   if (!content.trim()) return '';
   return `
-    <div style="margin-top:22px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-        <h2 style="font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;margin:0;">${title}</h2>
+    <div style="margin-top:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">${title}</div>
         <div style="flex:1;height:1px;background:#EAE6DE;"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px 20px;align-items:start;">
-        ${content}
-      </div>
+      ${content}
     </div>`;
 }
 
@@ -117,34 +125,19 @@ export async function printFichaTecnica(
     { label: 'Atrações à Parte',      value: event.extra_attractions },
   ]);
 
-  // Seção 3: Detalhes (campos customizados)
-  const customContent = customFields
-    .map(f => `
-      <div>
-        <div style="font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;margin-bottom:4px;">${f.name}</div>
-        <div style="font-size:12px;color:#0E2A45;font-weight:500;border-bottom:1px solid #EDEAE2;padding-bottom:4px;">${f.value}</div>
-      </div>`)
-    .join('');
-
-  const detalhesSection = customFields.length > 0 ? `
-    <div style="margin-top:22px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-        <h2 style="font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;margin:0;">Detalhes da Festa</h2>
-        <div style="flex:1;height:1px;background:#EAE6DE;"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px 20px;align-items:start;">
-        ${customContent}
-      </div>
-    </div>` : '';
+  // Seção 3: Detalhes (campos customizados) — reutiliza grid()
+  const detalhesSection = customFields.length > 0
+    ? section('Detalhes da Festa', grid(customFields.map(f => ({ label: f.name, value: f.value }))))
+    : '';
 
   // Observações
   const obsSection = event.notes && event.notes.trim() ? `
-    <div style="margin-top:22px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-        <h2 style="font-size:11px;letter-spacing:.20em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;margin:0;">Observações</h2>
+    <div style="margin-top:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#0E2A45;font-weight:700;white-space:nowrap;">Observações</div>
         <div style="flex:1;height:1px;background:#EAE6DE;"></div>
       </div>
-      <div style="font-size:11.5px;color:#2B2B2B;line-height:1.75;background:#FAFAF8;border:1px solid #EDEAE2;border-radius:4px;padding:14px 16px;">
+      <div style="width:100%;font-size:11px;color:#2B2B2B;line-height:1.65;background:#FAFAF8;border:1px solid #EDEAE2;border-radius:4px;padding:14px 16px;box-sizing:border-box;">
         ${event.notes}
       </div>
     </div>` : '';
