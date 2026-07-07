@@ -22,7 +22,7 @@ interface Payslip {
   id: string; title: string; status: string; reference_month: string;
   employee_id: string; published_at: string | null; created_at: string;
   profiles?: { display_name: string; email: string };
-  electronic_signatures?: { id: string; signed_at_utc: string; signature_hash: string }[];
+  electronic_signatures?: { id: string; signed_at_utc: string; signature_hash: string; signed_pdf_path: string | null }[];
 }
 
 const STATUS_MAP = {
@@ -76,7 +76,7 @@ export default function PayslipsAdminPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from('payslips' as any)
-      .select('id, title, status, reference_month, employee_id, published_at, created_at, electronic_signatures(id, signed_at_utc, signature_hash)')
+      .select('id, title, status, reference_month, employee_id, published_at, created_at, electronic_signatures(id, signed_at_utc, signature_hash, signed_pdf_path)')
       .order('reference_month', { ascending: false });
     if (error) { console.error('[holerites] load error:', error); }
 
@@ -247,14 +247,9 @@ export default function PayslipsAdminPage() {
     if (url) window.open(url, '_blank');
   };
 
-  const viewSignedPdf = async (sigId: string, payslipTitle: string) => {
-    const { data: sig } = await supabase
-      .from('electronic_signatures' as any)
-      .select('signed_pdf_path')
-      .eq('id', sigId)
-      .single();
-    if (!sig || !(sig as any).signed_pdf_path) return toast.error('PDF assinado não disponível');
-    const { data } = await supabase.storage.from('payslips').createSignedUrl((sig as any).signed_pdf_path, 300);
+  const viewSignedPdf = async (signedPdfPath: string | null, payslipTitle: string) => {
+    if (!signedPdfPath) return toast.error('PDF assinado não disponível');
+    const { data } = await supabase.storage.from('payslips').createSignedUrl(signedPdfPath, 300);
     if (!data?.signedUrl) return toast.error('Erro ao gerar link de download');
     const a = document.createElement('a');
     a.href = data.signedUrl;
@@ -454,7 +449,7 @@ export default function PayslipsAdminPage() {
                         <Eye className="w-4 h-4" />
                       </button>
                       {sig && (
-                        <button onClick={() => viewSignedPdf(sig.id, p.title)}
+                        <button onClick={() => viewSignedPdf(sig.signed_pdf_path ?? null, p.title)}
                           className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors" title="Baixar PDF assinado">
                           <Download className="w-4 h-4" />
                         </button>
