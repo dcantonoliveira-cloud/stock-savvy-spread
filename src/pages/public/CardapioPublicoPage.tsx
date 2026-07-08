@@ -25,6 +25,7 @@ interface TastingToday {
 interface LeadData {
   name: string;
   event_date: string | null;
+  registered_at: string; // ISO timestamp — determina almoço vs jantar
 }
 
 // ── Days Countdown ────────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ function LeadForm({ tastingId, onDone }: { tastingId: string; onDone: (lead: Lea
         event_date: eventDate || null,
         source:     como || null,
       });
-      const lead: LeadData = { name: name.trim(), event_date: eventDate || null };
+      const lead: LeadData = { name: name.trim(), event_date: eventDate || null, registered_at: new Date().toISOString() };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(lead));
       onDone(lead);
     } catch {
@@ -276,7 +277,17 @@ export default function CardapioPublicoPage() {
 
   useEffect(() => { void (async () => {
     const today = new Date().toISOString().split('T')[0];
-    const hour  = new Date().getHours();
+
+    // Hora de referência = quando a pessoa se registrou (não hora atual)
+    const stored = localStorage.getItem(STORAGE_KEY);
+    let refHour = new Date().getHours();
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.registered_at) refHour = new Date(parsed.registered_at).getHours();
+      } catch { /* usa hora atual como fallback */ }
+    }
+    const hour = refHour;
 
     const { data, error } = await (supabase as any)
       .from('tasting_sessions')
