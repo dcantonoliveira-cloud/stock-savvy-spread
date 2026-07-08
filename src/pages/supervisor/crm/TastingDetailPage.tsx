@@ -220,10 +220,20 @@ export default function TastingDetailPage() {
               <span>›</span>
               <span className="text-foreground">{fmtDate(session.scheduled_date)}</span>
             </div>
-            <h1 className="text-xl font-bold text-foreground leading-tight">
-              Degustação — {fmtDate(session.scheduled_date)}
-            </h1>
-            {session.type && <p className="text-sm text-muted-foreground mt-0.5">{session.type}</p>}
+            <div className="flex items-center gap-2.5 mt-0.5">
+              <h1 className="text-xl font-bold text-foreground leading-tight">
+                Degustação — {fmtDate(session.scheduled_date)}
+              </h1>
+              {session.type && (
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${
+                  session.type.toLowerCase() === 'jantar'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {session.type}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button onClick={() => setAllocOpen(true)}
