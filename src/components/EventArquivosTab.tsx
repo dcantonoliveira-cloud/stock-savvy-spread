@@ -792,8 +792,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           eventId={eventId}
           eventName={event.event_name ?? 'Evento'}
           onClose={() => setShowAllocTasting(false)}
-          onAllocated={() => {
+          onAllocated={(wa) => {
             setShowAllocTasting(false);
+            if (wa) setWaTrigger(wa);
             // recarrega degustações
             (supabase.from('tasting_session_events' as any)
               .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
@@ -818,7 +819,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
 import { createPortal } from 'react-dom';
 
 function AllocTastingModal({ eventId, eventName, onClose, onAllocated }: {
-  eventId: string; eventName: string; onClose: () => void; onAllocated: () => void;
+  eventId: string; eventName: string; onClose: () => void; onAllocated: (wa: WhatsAppTrigger | null) => void;
 }) {
   const [sessions, setSessions] = useState<{ id: string; scheduled_date: string | null; type: string | null; max_couples: number | null; current_count: number }[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -846,13 +847,31 @@ function AllocTastingModal({ eventId, eventName, onClose, onAllocated }: {
     })();
   }, []);
 
-  const alloc = async (session: { id: string }) => {
+  const alloc = async (session: { id: string; scheduled_date: string | null }) => {
     setSaving(session.id);
     const { error } = await (supabase.from as any)('tasting_session_events')
       .insert({ session_id: session.id, event_id: eventId, situation_snapshot: 'new' });
     if (error) { toast.error('Erro ao alocar'); setSaving(null); return; }
     toast.success('Evento alocado na degustação!');
-    onAllocated();
+
+    // Tenta montar trigger de WhatsApp
+    let waTrigger: WhatsAppTrigger | null = null;
+    try {
+      const [{ data: evData }, { data: compData }] = await Promise.all([
+        supabase.from('events').select('clients(name, phone)').eq('id', eventId).single(),
+        (supabase.from as any)('companies').select('endereco').single(),
+      ]);
+      const client = (evData as any)?.clients;
+      if (client?.phone && session.scheduled_date) {
+        const [y, m, d] = session.scheduled_date.split('-');
+        const dateFmt = `${d}/${m}/${y}`;
+        const address = (compData as any)?.endereco ?? '';
+        const text = await buildMessage('tasting', { clientName: client.name ?? '', date: dateFmt, address });
+        waTrigger = { phone: client.phone, clientName: client.name ?? 'Cliente', message: text };
+      }
+    } catch {}
+
+    onAllocated(waTrigger);
   };
 
   const fmtD = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
