@@ -51,6 +51,7 @@ export default function OrcamentosPage() {
   const [activeTab, setActiveTab] = useState<'orcamentos' | 'gerador'>('orcamentos');
   const [showGerador, setShowGerador] = useState(false);
   const [sortCol, setSortCol] = useState<string | null>(null);
+  const [iframeToken, setIframeToken] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
 
   const handleSort = (col: string) => {
@@ -82,6 +83,9 @@ export default function OrcamentosPage() {
     load();
     supabase.from('companies').select('features').limit(1).single().then(({ data }) => {
       if ((data as any)?.features?.gerador_orcamentos) setShowGerador(true);
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      setIframeToken(data.session?.access_token ?? null);
     });
   }, []);
 
@@ -171,7 +175,7 @@ export default function OrcamentosPage() {
       {/* ── Gerador (iframe) ── */}
       {activeTab === 'gerador' && (
         <iframe
-          src="/orcamento.html"
+          src={iframeToken ? `/orcamento.html?token=${iframeToken}` : '/orcamento.html'}
           className="w-full rounded-2xl border border-border"
           style={{ height: 'calc(100vh - 160px)' }}
           title="Gerador de Orçamentos"

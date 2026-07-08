@@ -59,6 +59,11 @@
       _supa = (typeof supabase !== 'undefined' && supabase.createClient)
         ? supabase.createClient(SUPA_URL, SUPA_KEY)
         : null;
+      /* Autenticar com token passado via URL param (ex: ?token=...) */
+      var _urlToken = new URLSearchParams(window.location.search).get('token');
+      if (_supa && _urlToken) {
+        _supa.auth.setSession({ access_token: _urlToken, refresh_token: '' }).catch(function(){});
+      }
     } catch(e) { console.warn('Supabase init failed:', e); }
   </script>
 
@@ -2735,50 +2740,52 @@
         cliente, pacotes, pagina2, fraseCapa, sobreTexto,
         incluirCardapio, cardapioSelecionados
       };
-      var body = JSON.stringify({
-        cliente_json:  JSON.stringify(cliente),
-        nome_evento:   cliente.tipo || '',
-        tipo_pacote:   nomePacotes,
-        valor_total:   total,
-        data_geracao:  new Date().toISOString(),
-        dados_json:    JSON.stringify(dadosCompletos),
-        criado_por:    usuarioAtual || ''
-      });
-      fetch(BUBBLE_BASE + '/obj/orcamento', {
-        method: 'POST',
-        headers: { 'Authorization': BUBBLE_TOKEN, 'Content-Type': 'application/json' },
-        body: body
-      }).then(function(r){ return r.json(); })
-        .then(function(data){
-          var registroId = data.id || (data.body && data.body.id) || ('tmp_' + Date.now());
-          setHistorico(function(prev){
-            var novo = {
-              _id: registroId,
-              cliente_json: JSON.stringify(cliente),
-              nome_evento: cliente.tipo || '',
-              tipo_pacote: nomePacotes,
-              valor_total: total,
-              data_geracao: new Date().toISOString(),
-              dados_json: JSON.stringify(dadosCompletos),
-              criado_por: usuarioAtual || ''
-            };
-            return [novo, ...prev];
-          });
-        }).catch(function(err){ console.error('[Rondello] Erro ao salvar orçamento no Bubble:', err); });
+      if (_supa) {
+        var savePayload = {
+          nome_evento: cliente.tipo || '',
+          tipo_pacote: nomePacotes,
+          valor_total: total,
+          data_geracao: new Date().toISOString(),
+          dados_json: dadosCompletos,
+          criado_por: usuarioAtual || ''
+        };
+        _supa.from('quotation_history').insert([savePayload]).select('id').single()
+          .then(function(res) {
+            var registroId = (res.data && res.data.id) || ('tmp_' + Date.now());
+            setHistorico(function(prev){
+              var novo = {
+                _id: registroId,
+                nome_evento: cliente.tipo || '',
+                tipo_pacote: nomePacotes,
+                valor_total: total,
+                data_geracao: new Date().toISOString(),
+                dados_json: JSON.stringify(dadosCompletos),
+                criado_por: usuarioAtual || ''
+              };
+              return [novo, ...prev];
+            });
+          }).catch(function(err){ console.error('[Rondello] Erro ao salvar orçamento no Supabase:', err); });
+      }
     }
 
     function loadHistorico() {
+      if (!_supa) { setHistoricoLoading(false); return; }
       setHistoricoLoading(true);
-      fetch(BUBBLE_BASE + '/obj/orcamento?limit=50&sort_field=Created+Date&descending=true', {
-        headers: { Authorization: BUBBLE_TOKEN }
-      }).then(function(r){ return r.json(); })
-        .then(function(data){
-          console.log('[Rondello] Bubble GET orcamento response:', data);
-          var results = (data.response && data.response.results) || [];
-          results.sort(function(a, b) {
-            var da = new Date(a.data_geracao || a['Created Date'] || 0);
-            var db = new Date(b.data_geracao || b['Created Date'] || 0);
-            return db - da;
+      _supa.from('quotation_history')
+        .select('id, nome_evento, tipo_pacote, valor_total, data_geracao, dados_json, criado_por')
+        .order('data_geracao', { ascending: false })
+        .limit(50)
+        .then(function(res) {
+          var results = (res.data || []).map(function(r) {
+            return {
+              _id: r.id,
+              nome_evento: r.nome_evento,
+              tipo_pacote: r.tipo_pacote,
+              valor_total: r.valor_total,
+              data_geracao: r.data_geracao,
+              dados_json: typeof r.dados_json === 'string' ? r.dados_json : JSON.stringify(r.dados_json),
+              criado_por: r.criado_por
+            };
           });
           setHistorico(results);
           setHistoricoLoading(false);
@@ -2802,11 +2809,10 @@
 
     function deleteOrcamento(id) {
       if (!window.confirm('Excluir este orçamento do histórico?')) return;
-      fetch(BUBBLE_BASE + '/obj/orcamento/' + id, {
-        method: 'DELETE',
-        headers: { Authorization: BUBBLE_TOKEN }
-      }).catch(function(){});
       setHistorico(function(prev){ return prev.filter(function(o){ return o._id !== id; }); });
+      if (_supa && !id.startsWith('tmp_')) {
+        _supa.from('quotation_history').delete().eq('id', id).catch(function(){});
+      }
     }
 
     function gerarPDFFromHistorico(item) {

@@ -400,13 +400,17 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     if (validSigners.length === 0) { toast.error('Adicione ao menos um signatário com nome e email'); return; }
 
     setSendingZap(true);
+    const toastId = toast.loading('Gerando PDF do contrato, aguarde...');
     try {
       const base64 = await contractPDFBase64(contractText, event.event_name ?? 'Contrato', companyLogo, companyName, [annex1, annex2].filter(Boolean), event.event_date, event.location_text);
+      toast.dismiss(toastId);
+      const { data: { session } } = await supabase.auth.getSession();
       const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
       const res = await fetch(`${proxyBase}?path=/api/v1/docs/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
           'x-zapsign-token': zapToken,
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
@@ -433,6 +437,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       await supabase.from('events').update({ zapsign_data: zap as any }).eq('id', eventId);
       toast.success('Contrato enviado para assinatura!');
     } catch (e: any) {
+      toast.dismiss(toastId);
       toast.error('Erro ao enviar para ZapSign: ' + (e?.message ?? ''));
     } finally {
       setSendingZap(false);
@@ -443,9 +448,11 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     if (!zapToken || !zapData) return;
     if (!silent) setRefreshingZap(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
       const res = await fetch(`${proxyBase}?path=/api/v1/docs/${zapData.doc_token}/`, {
         headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
           'x-zapsign-token': zapToken,
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
