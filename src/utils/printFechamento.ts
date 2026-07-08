@@ -73,9 +73,9 @@ function buildHtml(
   const paymentsHtml = confirmed.length === 0
     ? `<div style="color:#A29D92;padding:8px 0;font-size:12px;">Nenhum pagamento registrado.</div>`
     : confirmed.map(p => `
-        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #EFECE5;">
-          <span style="color:#6B6B6B;">${fmtDate(p.payment_date)}</span>
-          <span style="color:#2B2B2B;">${fmtBRL(p.value)}</span>
+        <div style="display:flex;justify-content:space-between;padding:11px 2px;border-bottom:1px solid #EFECE5;">
+          <span style="color:#6B6B6B;font-size:12.5px;">${fmtDate(p.payment_date)}</span>
+          <span style="color:#0E2A45;font-size:12.5px;font-weight:600;">${fmtBRL(p.value)}</span>
         </div>`).join('');
 
   const logoHtml = company?.logo_base64
@@ -147,9 +147,9 @@ function buildHtml(
         ${resumoHtml}
       </tbody>
     </table>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;background:#0E2A45;color:#FFFFFF;padding:13px 18px;border-radius:3px;">
-      <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:600;color:#C9D4E0;">Total do evento</span>
-      <span style="font-size:18px;font-weight:700;">${fmtBRL(grand)}</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;border:1px solid #E7E3DB;padding:13px 18px;border-radius:3px;">
+      <span style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;">Total do evento</span>
+      <span style="font-size:16px;font-weight:600;color:#0E2A45;">${fmtBRL(grand)}</span>
     </div>
   </div>
 
