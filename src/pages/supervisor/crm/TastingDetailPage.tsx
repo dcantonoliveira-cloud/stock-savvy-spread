@@ -504,6 +504,7 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
   onAdded: () => void;
 }) {
   const [search,    setSearch]    = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [results,   setResults]   = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [confirmEv, setConfirmEv] = useState<any | null>(null);
@@ -516,13 +517,20 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
     const t = setTimeout(async () => {
       setSearching(true);
       const terms = search.trim().split(/\s+/).filter(Boolean);
-      const { data } = await supabase.from('events')
-        .select('id, event_name, event_date, status, organizer')
+      let q = supabase.from('events')
+        .select('id, event_name, event_date, status, organizer, location_text, guest_count, clients(name)')
         .not('event_name', 'is', null).neq('event_name', '')
-        .in('status', ['lead', 'negotiating', 'tasting_scheduled', 'confirmed'])
-        .or(terms.map(t => `event_name.ilike.%${t}%`).join(','))
+        .or(terms.map(t => `event_name.ilike.%${t}%,organizer.ilike.%${t}%,location_text.ilike.%${t}%`).join(','))
         .or(`event_date.gt.${todayStr},event_date.is.null`)
-        .limit(30);
+        .limit(40);
+
+      if (statusFilter !== 'all') {
+        q = q.eq('status', statusFilter);
+      } else {
+        q = q.in('status', ['lead', 'negotiating', 'tasting_scheduled', 'confirmed']);
+      }
+
+      const { data } = await q;
 
       const OPEN = ['lead', 'negotiating', 'tasting_scheduled'];
       const filtered = (data ?? [])
@@ -537,7 +545,7 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
       setSearching(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, statusFilter]);
 
   const alloc = async (ev: any) => {
     const { data: evDetail } = await supabase.from('events').select('contract_signed_date').eq('id', ev.id).single();
@@ -589,7 +597,25 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
             <div className="flex items-center gap-2 px-3 py-2 border border-border rounded-xl bg-muted/30 mb-3">
               <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
               <input autoFocus className="bg-transparent outline-none flex-1 text-sm"
-                placeholder="Buscar evento..." value={search} onChange={e => setSearch(e.target.value)} />
+                placeholder="Buscar por nome, local ou assessora..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <div className="flex gap-1.5 flex-wrap mb-3">
+              {[
+                { key: 'all', label: 'Todos' },
+                { key: 'lead', label: STATUS_CFG['lead']?.label ?? 'Lead' },
+                { key: 'negotiating', label: STATUS_CFG['negotiating']?.label ?? 'Negociando' },
+                { key: 'tasting_scheduled', label: STATUS_CFG['tasting_scheduled']?.label ?? 'Degustação' },
+                { key: 'confirmed', label: STATUS_CFG['confirmed']?.label ?? 'Confirmado' },
+              ].map(opt => (
+                <button key={opt.key} onClick={() => setStatusFilter(opt.key)}
+                  className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                    statusFilter === opt.key
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted/40 text-muted-foreground border-border hover:border-primary/40'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
             </div>
             {maxCouples !== null && currentCount >= maxCouples && (
               <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs">
@@ -597,19 +623,24 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
                 Limite de {maxCouples} casais atingido. Você ainda pode adicionar mais.
               </div>
             )}
-            <div className="space-y-1 max-h-72 overflow-y-auto">
+            <div className="space-y-1 max-h-64 overflow-y-auto">
               {searching && <p className="text-sm text-muted-foreground text-center py-4">Buscando...</p>}
               {!searching && search && results.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento encontrado.</p>
               )}
               {results.map(ev => (
                 <button key={ev.id} onClick={() => handleClick(ev)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{ev.event_name}</p>
-                    <p className="text-xs text-muted-foreground">{fmtDate(ev.event_date)}</p>
+                  className="w-full flex items-start justify-between px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{ev.event_name}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                      <p className="text-xs text-muted-foreground">{fmtDate(ev.event_date)}</p>
+                      {ev.location_text && <p className="text-xs text-muted-foreground truncate max-w-[140px]">📍 {ev.location_text}</p>}
+                      {ev.organizer && <p className="text-xs text-muted-foreground truncate max-w-[120px]">👤 {ev.organizer}</p>}
+                      {ev.guest_count != null && <p className="text-xs text-muted-foreground">{ev.guest_count} conv.</p>}
+                    </div>
                   </div>
-                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${STATUS_CFG[ev.status]?.cls ?? 'bg-muted border-border text-muted-foreground'}`}>
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 mt-0.5 ${STATUS_CFG[ev.status]?.cls ?? 'bg-muted border-border text-muted-foreground'}`}>
                     {STATUS_CFG[ev.status]?.label ?? ev.status}
                   </span>
                 </button>
