@@ -17,6 +17,7 @@ export default function PortalArquivosPage() {
 
   useEffect(() => {
     if (!event) return;
+    console.log('[arquivos] event.id:', event.id);
     (supabase.from as any)('event_files')
       .select('id, name, url, created_at, type')
       .eq('event_id', event.id)
