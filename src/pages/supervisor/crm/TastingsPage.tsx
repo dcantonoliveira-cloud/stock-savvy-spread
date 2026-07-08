@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, CalendarDays, Copy, Check } from 'lucide-react';
+import { Plus, CalendarDays, Copy, Check, QrCode, X as XIcon } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { getMessageTemplates } from '@/lib/whatsapp';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -70,6 +71,8 @@ export default function TastingsPage() {
   const [visibleCount,  setVisibleCount] = useState(15);
   const [newOpen,       setNewOpen]      = useState(false);
   const [copied,        setCopied]       = useState(false);
+  const [qrOpen,        setQrOpen]       = useState(false);
+  const [qrCopied,      setQrCopied]     = useState(false);
   const [abertoRows,    setAbertoRows]   = useState<AbertoRow[]>([]);
   const [abertoLoading, setAbertoLoading]= useState(false);
   const abertoLoaded = useRef(false);
@@ -235,6 +238,11 @@ export default function TastingsPage() {
             {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
             {copied ? 'Copiado!' : 'Copiar datas disponíveis'}
           </button>
+          <button onClick={() => setQrOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-border bg-white text-sm font-medium text-foreground hover:bg-muted/40 transition-colors">
+            <QrCode className="w-4 h-4" />
+            QR Code cardápio
+          </button>
           <button onClick={() => setNewOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
             <Plus className="w-4 h-4" />
@@ -320,6 +328,57 @@ export default function TastingsPage() {
           onCreated={(s) => { setSessions(prev => [s, ...prev]); setNewOpen(false); navigate(`/tastings/${s.id}`); }}
         />
       )}
+
+      {qrOpen && createPortal(
+        <QrModal onClose={() => setQrOpen(false)} qrCopied={qrCopied} setQrCopied={setQrCopied} />,
+        document.body
+      )}
+    </div>
+  );
+}
+
+// ── QR Modal ──────────────────────────────────────────────────────────────────
+function QrModal({ onClose, qrCopied, setQrCopied }: {
+  onClose: () => void;
+  qrCopied: boolean;
+  setQrCopied: (v: boolean) => void;
+}) {
+  const MENU_URL = `${window.location.origin}/menu`;
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(MENU_URL).then(() => {
+      setQrCopied(true);
+      setTimeout(() => setQrCopied(false), 2500);
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm flex flex-col items-center gap-5" onClick={e => e.stopPropagation()}>
+        <div className="w-full flex items-center justify-between">
+          <p className="text-base font-bold text-foreground">QR Code — Cardápio</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <XIcon className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="p-3 border border-border rounded-2xl bg-white">
+          <QRCodeSVG value={MENU_URL} size={220} bgColor="#ffffff" fgColor="#1E3A8A" level="M" />
+        </div>
+
+        <p className="text-xs text-muted-foreground text-center leading-relaxed">
+          QR code fixo — sempre o mesmo. Imprime e coloca na mesa. A página detecta automaticamente o cardápio do dia.
+        </p>
+
+        <div className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2.5 flex items-center gap-2">
+          <span className="flex-1 text-xs text-muted-foreground font-mono truncate">{MENU_URL}</span>
+          <button onClick={copyLink}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 ${qrCopied ? 'bg-emerald-50 text-emerald-600' : 'bg-white border border-border text-foreground hover:bg-muted/40'}`}>
+            {qrCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            {qrCopied ? 'Copiado!' : 'Copiar'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
