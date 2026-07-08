@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, CalendarDays, Copy, Check, QrCode, X as XIcon } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { Plus, CalendarDays, Copy, Check, QrCode, X as XIcon, Download } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { getMessageTemplates } from '@/lib/whatsapp';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -343,13 +343,24 @@ function QrModal({ onClose, qrCopied, setQrCopied }: {
   qrCopied: boolean;
   setQrCopied: (v: boolean) => void;
 }) {
-  const MENU_URL = `${window.location.origin}/menu`;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const MENU_URL = 'https://rondello-gestao.pages.dev/menu';
 
   const copyLink = () => {
     navigator.clipboard.writeText(MENU_URL).then(() => {
       setQrCopied(true);
       setTimeout(() => setQrCopied(false), 2500);
     });
+  };
+
+  const download = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'qrcode-cardapio-rondello.png';
+    a.click();
   };
 
   return (
@@ -363,19 +374,30 @@ function QrModal({ onClose, qrCopied, setQrCopied }: {
         </div>
 
         <div className="p-3 border border-border rounded-2xl bg-white">
-          <QRCodeSVG value={MENU_URL} size={220} bgColor="#ffffff" fgColor="#1E3A8A" level="M" />
+          <QRCodeCanvas
+            ref={canvasRef}
+            value={MENU_URL}
+            size={220}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            level="M"
+          />
         </div>
 
         <p className="text-xs text-muted-foreground text-center leading-relaxed">
           QR code fixo — sempre o mesmo. Imprime e coloca na mesa. A página detecta automaticamente o cardápio do dia.
         </p>
 
-        <div className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2.5 flex items-center gap-2">
-          <span className="flex-1 text-xs text-muted-foreground font-mono truncate">{MENU_URL}</span>
+        <div className="w-full flex gap-2">
+          <button onClick={download}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-muted/40 transition-colors">
+            <Download className="w-4 h-4" />
+            Baixar PNG
+          </button>
           <button onClick={copyLink}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 ${qrCopied ? 'bg-emerald-50 text-emerald-600' : 'bg-white border border-border text-foreground hover:bg-muted/40'}`}>
-            {qrCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {qrCopied ? 'Copiado!' : 'Copiar'}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${qrCopied ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-border text-foreground hover:bg-muted/40'}`}>
+            {qrCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            {qrCopied ? 'Copiado!' : 'Copiar link'}
           </button>
         </div>
       </div>
