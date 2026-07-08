@@ -288,6 +288,8 @@ export default function CardapioPublicoPage() {
       setNoTasting(true); setLoading(false); return;
     }
 
+    if (data.length === 1) { setTasting(data[0]); setLoading(false); return; }
+
     // Antes das 18h → almoço; a partir das 18h → jantar
     const lunch  = data.find((d: any) => d.type === 'almoco') ?? data[0];
     const dinner = data.find((d: any) => d.type === 'jantar') ?? data[data.length - 1];
