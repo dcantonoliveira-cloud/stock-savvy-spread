@@ -290,7 +290,7 @@ export default function CardapioPublicoPage() {
         // Multiple tastings today: pick by time of day
         // Before 14:00 → first (lunch), 14:00+ → last (dinner)
         const hour = new Date().getHours();
-        const picked = hour < 14 ? data[0] : data[data.length - 1];
+        const picked = hour < 18 ? data[0] : data[data.length - 1];
         setTasting(picked);
         setLoading(false);
       });
