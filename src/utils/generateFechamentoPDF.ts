@@ -247,19 +247,20 @@ export async function generateFechamentoPDF(
 
   y = (doc as any).lastAutoTable.finalY;
 
-  // Barra total (navy)
-  const barH = 10;
-  doc.setFillColor(...NAVY);
-  doc.rect(M, y, CW, barH, 'F');
+  // Card total (mesmo estilo do card "Total Pago")
+  const barH = 11;
+  doc.setDrawColor(...RULE);
+  doc.setLineWidth(0.3);
+  doc.rect(M, y, CW, barH);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(201, 212, 224);
+  doc.setFontSize(6.5);
+  doc.setTextColor(...MIST);
   doc.setCharSpace(0.8);
-  doc.text('TOTAL DO EVENTO', M + 5, y + 6.5);
+  doc.text('TOTAL DO EVENTO', M + 4, y + 4.5);
   doc.setCharSpace(0);
-  doc.setFontSize(11);
-  doc.setTextColor(...WHITE);
-  doc.text(fmtBRL(grand), PW - M - 3, y + 6.5, { align: 'right' });
+  doc.setFontSize(10);
+  doc.setTextColor(...NAVY);
+  doc.text(fmtBRL(grand), PW - M - 4, y + 7.5, { align: 'right' });
 
   y += barH + 10;
 
@@ -278,27 +279,29 @@ export async function generateFechamentoPDF(
   y += 5;
 
   if (confirmed.length > 0) {
-    // Cabeçalho das colunas
+    // Cabeçalho — mesmo estilo do head da tabela resumo
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
     doc.setTextColor(...MIST);
     doc.setCharSpace(0.8);
-    doc.text('DATA', M, y);
-    doc.text('VALOR', PW - M, y, { align: 'right' });
+    doc.text('DATA', M + 2, y);
+    doc.text('VALOR', PW - M - 2, y, { align: 'right' });
     doc.setCharSpace(0);
-    y += 1.5;
+    y += 5;
     hline(doc, M, y, PW - M, 0.2, EFEC);
 
     confirmed.forEach((p) => {
-      y += 5.5;
+      y += 7; // mesmo cellPadding top+bottom da tabela resumo (~3.5+3.5)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(...SMOKE);
-      doc.text(fmtDate(p.payment_date), M, y);
-      doc.setTextColor(...INK);
-      doc.text(fmtBRL(p.value), PW - M, y, { align: 'right' });
-      hline(doc, M, y + 1.5, PW - M, 0.15, EFEC);
+      doc.text(fmtDate(p.payment_date), M + 2, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...NAVY);
+      doc.text(fmtBRL(p.value), PW - M - 2, y, { align: 'right' });
+      hline(doc, M, y + 3, PW - M, 0.2, EFEC);
     });
+    y += 3;
   } else {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
