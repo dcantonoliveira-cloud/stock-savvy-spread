@@ -107,9 +107,9 @@ function buildHtml(
   <div style="border-top:1px solid #E7E3DB;margin-top:18px;"></div>
 
   <!-- Title -->
-  <div style="text-align:center;margin-top:22px;">
+  <div style="text-align:center;margin-top:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">
     <div style="font-size:11px;letter-spacing:.42em;text-transform:uppercase;color:#C2A263;font-weight:600;padding-left:.42em;">Fechamento</div>
-    <h1 style="font-family:Georgia,serif;font-weight:600;font-size:38px;line-height:1.1;color:#0E2A45;margin:8px 0 0;">${clientTitle}</h1>
+    <h1 style="font-family:Georgia,serif;font-weight:600;font-size:38px;line-height:1.1;color:#0E2A45;margin:0;">${clientTitle}</h1>
   </div>
 
   <!-- Stats strip -->
@@ -154,7 +154,7 @@ function buildHtml(
   </div>
 
   <!-- Pagamentos -->
-  <div style="margin-top:28px;">
+  <div style="margin-top:31px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
       <h2 style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#0E2A45;font-weight:600;white-space:nowrap;">Pagamentos efetuados</h2>
       <div style="flex:1;height:1px;background:#EAE6DE;"></div>
