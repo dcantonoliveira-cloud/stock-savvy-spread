@@ -13,7 +13,9 @@ import {
   Download, SlidersHorizontal, CalendarX,
   MapPin, Users, DollarSign, FileText, X,
   Phone, Mail, Edit2, Trash2, ClipboardCheck, Filter,
+  FileCheck2, FileClock, Loader2,
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 // ── Types ──────────────────────────────────────────────────────────
 type EventRow = {
@@ -121,6 +123,12 @@ export default function EventsPage() {
   const [detailEvent, setDetailEvent] = useState<EventRow | null>(null);
   const [editMode, setEditMode] = useState(false);
 
+  // Modal contrato
+  const [contractModal, setContractModal] = useState<EventRow | null>(null);
+  const [zapToken, setZapToken] = useState<string | null>(null);
+  const [contractSaving, setContractSaving] = useState(false);
+  const [zapRefreshing, setZapRefreshing] = useState(false);
+
   // Form
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
@@ -226,6 +234,59 @@ export default function EventsPage() {
       loadEvents(year);
     }
   }, [sortBy]);
+
+  // Carrega token ZapSign uma vez
+  useEffect(() => {
+    (supabase.from('company_integrations' as any).select('api_key').eq('provider', 'zapsign').maybeSingle() as any)
+      .then(({ data }: any) => { if (data?.api_key) setZapToken(data.api_key); });
+  }, []);
+
+  const toggleContractSigned = async (ev: EventRow, signed: boolean) => {
+    setContractSaving(true);
+    const updates: any = { contract_signed: signed };
+    if (signed && !ev.contract_signed_date) updates.contract_signed_date = new Date().toISOString().split('T')[0];
+    await supabase.from('events').update(updates).eq('id', ev.id);
+    const updated = { ...ev, ...updates };
+    setEvents(prev => prev.map(e => e.id === ev.id ? updated : e));
+    setContractModal(updated);
+    setContractSaving(false);
+    toast.success(signed ? 'Contrato marcado como assinado' : 'Contrato desmarcado');
+  };
+
+  const refreshZapStatus = async (ev: EventRow) => {
+    const zap = ev.zapsign_data as any;
+    if (!zapToken || !zap?.doc_token) return;
+    setZapRefreshing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+      const res = await fetch(`${proxyBase}?path=/api/v1/docs/${zap.doc_token}/`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'x-zapsign-token': zapToken,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      if (!res.ok) throw new Error('Erro ZapSign');
+      const data = await res.json();
+      const updatedZap = {
+        ...zap,
+        signers: (data.signers ?? []).map((s: any) => ({
+          token: s.token, name: s.name, email: s.email,
+          status: s.status ?? 'pending', sign_url: s.sign_url,
+        })),
+      };
+      await supabase.from('events').update({ zapsign_data: updatedZap }).eq('id', ev.id);
+      const allSigned = updatedZap.signers.length > 0 && updatedZap.signers.every((s: any) => s.status === 'signed');
+      const updatedEv = { ...ev, zapsign_data: updatedZap, contract_signed: allSigned || ev.contract_signed };
+      if (allSigned && !ev.contract_signed) {
+        await supabase.from('events').update({ contract_signed: true }).eq('id', ev.id);
+      }
+      setEvents(prev => prev.map(e => e.id === ev.id ? updatedEv : e));
+      setContractModal(updatedEv);
+    } catch { toast.error('Erro ao consultar ZapSign'); }
+    setZapRefreshing(false);
+  };
 
   // ── Derived data ─────────────────────────────────────────────────
   const monthsWithEvents = useMemo(() => {
@@ -1003,12 +1064,21 @@ export default function EventsPage() {
                       {(() => {
                         const zap = ev.zapsign_data as any;
                         const allZapSigned = zap?.signers?.length > 0 && zap.signers.every((s: any) => s.status === 'signed');
-                        const manualSigned = ev.contract_signed || !!ev.contract_signed_url;
-                        if (allZapSigned || manualSigned)
-                          return <FileText title="Contrato assinado" className="w-3.5 h-3.5 text-emerald-500 inline" />;
-                        if (zap?.signers?.length > 0)
-                          return <FileText title="Aguardando assinaturas" className="w-3.5 h-3.5 text-amber-400 inline" />;
-                        return <span className="text-muted-foreground/20 text-xs">—</span>;
+                        const signed = ev.contract_signed || allZapSigned || !!ev.contract_signed_url;
+                        const pending = !signed && zap?.signers?.length > 0;
+                        return (
+                          <button
+                            onClick={e => { e.stopPropagation(); setContractModal(ev); }}
+                            title={signed ? 'Contrato assinado — clique para gerenciar' : pending ? 'Aguardando assinaturas — clique para gerenciar' : 'Sem contrato — clique para marcar como assinado'}
+                            className="p-1 rounded hover:bg-muted transition-colors">
+                            {signed
+                              ? <FileCheck2 className="w-3.5 h-3.5 text-emerald-500" />
+                              : pending
+                                ? <FileClock className="w-3.5 h-3.5 text-amber-400" />
+                                : <FileText className="w-3.5 h-3.5 text-muted-foreground/30" />
+                            }
+                          </button>
+                        );
                       })()}
                     </td>
                     {/* AÇÕES */}
@@ -1185,6 +1255,67 @@ export default function EventsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Modal Contrato ── */}
+      {contractModal && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setContractModal(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground">Contrato</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{contractModal.event_name}</p>
+              </div>
+              <button onClick={() => setContractModal(null)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Status ZapSign */}
+            {(contractModal.zapsign_data as any)?.signers?.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/60">Assinaturas ZapSign</p>
+                  <button onClick={() => refreshZapStatus(contractModal)} disabled={zapRefreshing}
+                    className="flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50">
+                    {zapRefreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileClock className="w-3 h-3" />}
+                    Atualizar
+                  </button>
+                </div>
+                {((contractModal.zapsign_data as any).signers as any[]).map((s: any) => (
+                  <div key={s.token} className="flex items-center justify-between text-sm">
+                    <span className="text-foreground">{s.name}</span>
+                    {s.status === 'signed'
+                      ? <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium"><FileCheck2 className="w-3.5 h-3.5" />Assinado</span>
+                      : <span className="flex items-center gap-1 text-xs text-amber-500 font-medium"><FileClock className="w-3.5 h-3.5" />Pendente</span>
+                    }
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Toggle manual */}
+            <div className="flex items-center justify-between pt-2 border-t border-border">
+              <div>
+                <p className="text-sm font-medium text-foreground">Marcar como assinado</p>
+                <p className="text-xs text-muted-foreground">Confirmação manual independente do ZapSign</p>
+              </div>
+              <button
+                onClick={() => toggleContractSigned(contractModal, !contractModal.contract_signed)}
+                disabled={contractSaving}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                  contractModal.contract_signed ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+                }`}>
+                {contractSaving
+                  ? <Loader2 className="w-3 h-3 animate-spin mx-auto text-white" />
+                  : <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${contractModal.contract_signed ? 'translate-x-6' : 'translate-x-1'}`} />
+                }
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
