@@ -285,14 +285,24 @@ export default function CardapioPublicoPage() {
       .order('type', { ascending: true }); // 'almoco' < 'jantar'
 
     if (error || !data || data.length === 0) {
-      setNoTasting(true); setLoading(false); return;
+      // Sem degustação hoje — busca próxima futura
+      const { data: next } = await (supabase as any)
+        .from('tasting_sessions')
+        .select('id, scheduled_date, type, menu_text')
+        .gt('scheduled_date', today)
+        .order('scheduled_date', { ascending: true })
+        .limit(1).single();
+      if (next) setTasting(next); else setNoTasting(true);
+      setLoading(false); return;
     }
 
     if (data.length === 1) { setTasting(data[0]); setLoading(false); return; }
 
     // Antes das 18h → almoço; a partir das 18h → jantar
-    const lunch  = data.find((d: any) => d.type === 'almoco') ?? data[0];
-    const dinner = data.find((d: any) => d.type === 'jantar') ?? data[data.length - 1];
+    // Usa includes() para tolerar acentos, maiúsculas e variações ("Almoço", "almoco", etc.)
+    const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const lunch  = data.find((d: any) => norm(d.type ?? '').includes('almo')) ?? data[0];
+    const dinner = data.find((d: any) => norm(d.type ?? '').includes('jantar')) ?? data[data.length - 1];
     setTasting(hour < 18 ? lunch : dinner);
     setLoading(false);
   })(); }, []);
