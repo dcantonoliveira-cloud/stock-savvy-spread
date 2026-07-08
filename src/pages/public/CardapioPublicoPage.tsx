@@ -116,7 +116,7 @@ function LeadForm({ tastingId, onDone }: { tastingId: string; onDone: (lead: Lea
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Data do evento</label>
             <input value={eventDate} onChange={e => setEventDate(e.target.value)}
               type="date"
-              className={`${inputCls} h-[52px]`} />
+              className={inputCls} />
           </div>
 
           <div>
@@ -274,38 +274,56 @@ export default function CardapioPublicoPage() {
     if (stored) { try { setLead(JSON.parse(stored)); } catch { /* ignore */ } }
   }, []);
 
-  useEffect(() => {
+  useEffect(() => { void (async () => {
     const today = new Date().toISOString().split('T')[0];
-    ;(supabase as any)
+    const hour = new Date().getHours();
+
+    const pickFallback = async () => {
+      // 1. Try next upcoming session
+      const { data: next } = await (supabase as any)
+        .from('tasting_sessions')
+        .select('id, scheduled_date, type, menu_text')
+        .gt('scheduled_date', today)
+        .order('scheduled_date', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (next) { setTasting(next); setLoading(false); return; }
+      // 2. Try most recent past session as fallback
+      const { data: past } = await (supabase as any)
+        .from('tasting_sessions')
+        .select('id, scheduled_date, type, menu_text')
+        .lt('scheduled_date', today)
+        .order('scheduled_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (past) { setTasting(past); setLoading(false); return; }
+      setNoTasting(true);
+      setLoading(false);
+    };
+
+    const { data, error } = await (supabase as any)
       .from('tasting_sessions')
       .select('id, scheduled_date, type, menu_text')
       .eq('scheduled_date', today)
-      .order('created_at', { ascending: true })
-      .then(({ data, error }: any) => {
-        if (error || !data || data.length === 0) {
-          // No tasting today — try next upcoming
-          ;(supabase as any)
-            .from('tasting_sessions')
-            .select('id, scheduled_date, type, menu_text')
-            .gt('scheduled_date', today)
-            .order('scheduled_date', { ascending: true })
-            .limit(1)
-            .single()
-            .then(({ data: next, error: nextErr }: any) => {
-              if (nextErr || !next) setNoTasting(true);
-              else setTasting(next);
-              setLoading(false);
-            });
-          return;
-        }
-        // Multiple tastings today: pick by time of day
-        // Before 14:00 → first (lunch), 14:00+ → last (dinner)
-        const hour = new Date().getHours();
-        const picked = hour < 18 ? data[0] : data[data.length - 1];
-        setTasting(picked);
-        setLoading(false);
-      });
-  }, []);
+      .order('type', { ascending: true }); // 'almoco' < 'jantar' alphabetically
+
+    if (error || !data || data.length === 0) {
+      await pickFallback();
+      return;
+    }
+
+    if (data.length === 1) {
+      setTasting(data[0]);
+      setLoading(false);
+      return;
+    }
+
+    // Multiple today: before 18h → lunch (almoco), 18h+ → dinner (jantar)
+    const lunch  = data.find((d: any) => d.type === 'almoco') ?? data[0];
+    const dinner = data.find((d: any) => d.type === 'jantar') ?? data[data.length - 1];
+    setTasting(hour < 18 ? lunch : dinner);
+    setLoading(false);
+  })(); }, []);
 
   if (loading) {
     return (
