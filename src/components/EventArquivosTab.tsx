@@ -361,7 +361,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     setUploading(true);
     const path = `event-docs/${eventId}/${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from('event-files').upload(path, file, { upsert: true });
-    if (upErr) { toast.error('Erro no upload'); setUploading(false); return; }
+    if (upErr) { toast.error(`Erro no upload: ${upErr.message}`); setUploading(false); return; }
     const { data: { publicUrl } } = supabase.storage.from('event-files').getPublicUrl(path);
     const { data: newFile, error: dbErr } = await supabase.from('event_files' as any)
       .insert({ event_id: eventId, name: file.name, url: publicUrl }).select('id,name,url,created_at').single();

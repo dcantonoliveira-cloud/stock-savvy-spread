@@ -145,7 +145,7 @@ export default function PortalChecklistPage() {
         ))}
       </Block>
 
-      <p className="text-center text-xs text-muted-foreground/60 pb-2">Dúvidas? Fale conosco pelo WhatsApp 😊</p>
+      <p className="text-center text-xs text-muted-foreground/60 pb-2">Dúvidas? Fale conosco pelo WhatsApp</p>
     </div>
   );
 }
