@@ -476,7 +476,7 @@ function WhatsAppTemplatesCard({ savedJson, onSave }: {
   const [saving, setSaving]       = useState(false);
   const [open, setOpen]           = useState(false);
 
-  const KEYS: MessageTemplateKey[] = ['payment', 'file', 'tasting', 'review'];
+  const KEYS: MessageTemplateKey[] = ['payment', 'file', 'tasting', 'review', 'tasting_availability'];
 
   const handleSave = async () => {
     setSaving(true);

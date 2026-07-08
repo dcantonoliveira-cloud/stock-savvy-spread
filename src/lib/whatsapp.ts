@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type ZapiConfig = { instance_id: string; token: string; client_token?: string };
 
-export type MessageTemplateKey = 'payment' | 'file' | 'tasting' | 'review' | 'portal_invite';
+export type MessageTemplateKey = 'payment' | 'file' | 'tasting' | 'review' | 'portal_invite' | 'tasting_availability';
 
 export type MessageTemplates = Record<MessageTemplateKey, string>;
 
@@ -13,6 +13,7 @@ export const DEFAULT_TEMPLATES: MessageTemplates = {
   tasting:       `Olá, {{clientName}}! 🍽️\n\nSua degustação foi agendada para o dia *{{date}}*.\n\nAguardamos vocês com muito carinho para essa experiência especial!\n\n— Rondello Buffet`,
   review:        `Olá, {{clientName}}! ⭐\n\nFoi uma honra realizar o *{{eventName}}*!\n\nGostaríamos muito de saber sua opinião sobre nossos serviços. Sua avaliação é muito importante para nós!\n\nObrigado pela confiança!\n— Rondello Buffet`,
   portal_invite: `Olá, {{clientName}}! 🎉\n\nSeu portal do cliente está pronto! Por lá você acompanha tudo sobre o seu evento *{{eventName}}*: financeiro, arquivos e informações da festa.\n\n*Como acessar:*\n1. Acesse: {{portalUrl}}\n2. Crie sua conta\n3. Use o código: *{{accessCode}}*\n\n— Rondello Buffet`,
+  tasting_availability: `Olá! 😊 Temos as seguintes datas disponíveis para degustação:\n\n{{dates}}\n\nQual data funciona melhor pra vocês? 🍽️\n\n— Rondello Buffet`,
 };
 
 export const TEMPLATE_LABELS: Record<MessageTemplateKey, string> = {
@@ -21,6 +22,7 @@ export const TEMPLATE_LABELS: Record<MessageTemplateKey, string> = {
   tasting:       'Degustação agendada',
   review:        'Pedido de avaliação',
   portal_invite: 'Convite ao portal do cliente',
+  tasting_availability: 'Datas disponíveis para degustação',
 };
 
 export const TEMPLATE_VARS: Record<MessageTemplateKey, string[]> = {
@@ -29,6 +31,7 @@ export const TEMPLATE_VARS: Record<MessageTemplateKey, string[]> = {
   tasting:       ['{{clientName}}', '{{date}}', '{{address}}'],
   review:        ['{{clientName}}', '{{eventName}}'],
   portal_invite: ['{{clientName}}', '{{eventName}}', '{{accessCode}}', '{{portalUrl}}'],
+  tasting_availability: ['{{dates}}'],
 };
 
 // Busca templates salvos no banco (provider = 'whatsapp_messages')

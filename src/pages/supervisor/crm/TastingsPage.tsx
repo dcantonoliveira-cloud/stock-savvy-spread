@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, CalendarDays } from 'lucide-react';
+import { Plus, CalendarDays, Copy, Check } from 'lucide-react';
+import { getMessageTemplates } from '@/lib/whatsapp';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
@@ -68,6 +69,7 @@ export default function TastingsPage() {
   const [loading,       setLoading]      = useState(true);
   const [visibleCount,  setVisibleCount] = useState(15);
   const [newOpen,       setNewOpen]      = useState(false);
+  const [copied,        setCopied]       = useState(false);
   const [abertoRows,    setAbertoRows]   = useState<AbertoRow[]>([]);
   const [abertoLoading, setAbertoLoading]= useState(false);
   const abertoLoaded = useRef(false);
@@ -136,6 +138,41 @@ export default function TastingsPage() {
 
   const now       = new Date().toISOString().split('T')[0];
   const allSorted = [...sessions].sort((a, b) => b.scheduled_date.localeCompare(a.scheduled_date));
+
+  const copyAvailableDates = async () => {
+    const available = allSorted.filter(s => {
+      if (s.scheduled_date < now) return false;
+      const total = statsMap[s.id]?.total ?? 0;
+      const max   = s.max_couples ?? Infinity;
+      return total < max;
+    }).sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+
+    if (available.length === 0) {
+      toast.error('Nenhuma data disponível com vagas');
+      return;
+    }
+
+    const fmtDateLong = (d: string) => {
+      const [y, m, day] = d.split('T')[0].split('-');
+      return `${day}/${m}/${y}`;
+    };
+
+    const lines = available.map(s => {
+      const total  = statsMap[s.id]?.total ?? 0;
+      const max    = s.max_couples ?? 0;
+      const vagas  = max > 0 ? max - total : null;
+      const tipo   = s.type ?? '';
+      return `• ${fmtDateLong(s.scheduled_date)} (${tipo})${vagas !== null ? ` — ${vagas} vaga${vagas !== 1 ? 's' : ''}` : ''}`;
+    }).join('\n');
+
+    const templates = await getMessageTemplates();
+    const text = templates.tasting_availability.replace('{{dates}}', lines);
+
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success('Texto copiado!');
+    setTimeout(() => setCopied(false), 2500);
+  };
   const upcoming  = allSorted.filter(s => s.scheduled_date >= now);
   const past      = allSorted.filter(s => s.scheduled_date < now);
   const visiblePast = past.slice(0, visibleCount);
@@ -192,11 +229,18 @@ export default function TastingsPage() {
           <TabBtn active={tab === 'degustacoes'} onClick={() => setTab('degustacoes')}>Degustações</TabBtn>
           <TabBtn active={tab === 'aberto'}      onClick={() => setTab('aberto')}>Lista em aberto</TabBtn>
         </div>
-        <button onClick={() => setNewOpen(true)}
-          className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
-          <Plus className="w-4 h-4" />
-          Nova degustação
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={copyAvailableDates}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-border bg-white text-sm font-medium text-foreground hover:bg-muted/40 transition-colors">
+            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+            {copied ? 'Copiado!' : 'Copiar datas disponíveis'}
+          </button>
+          <button onClick={() => setNewOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+            <Plus className="w-4 h-4" />
+            Nova degustação
+          </button>
+        </div>
       </div>
 
       {tab === 'degustacoes' && (
