@@ -26,9 +26,10 @@ serve(async (req) => {
 
   try {
     // Busca company_id do Rondello
-    const { data: companies } = await supa.from('companies').select('id').limit(1).single();
-    const companyId = (companies as any)?.id;
-    if (!companyId) throw new Error('Company not found');
+    const { data: companies, error: compErr } = await supa.from('companies').select('id').limit(1);
+    if (compErr) throw new Error('Company query error: ' + compErr.message);
+    const companyId = (companies as any)?.[0]?.id;
+    if (!companyId) throw new Error('Company not found — companies table empty or inaccessible');
 
     // Busca todos os orçamentos do Bubble com paginação
     let allOrcamentos: any[] = [];

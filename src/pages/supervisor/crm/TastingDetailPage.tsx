@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, ExternalLink, Search, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Plus, Trash2, ExternalLink, Search, Loader2, AlertTriangle, MapPin, User, Users } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import RichTextEditor from '@/components/RichTextEditor';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
@@ -516,7 +516,8 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
     if (!search.trim()) { setResults([]); return; }
     const t = setTimeout(async () => {
       setSearching(true);
-      const terms = search.trim().split(/\s+/).filter(Boolean);
+      const terms = search.trim().split(/\s+/).filter(t => t.length >= 2);
+      if (!terms.length) { setResults([]); setSearching(false); return; }
       let q = supabase.from('events')
         .select('id, event_name, event_date, status, organizer, location_text, guest_count, clients(name)')
         .not('event_name', 'is', null).neq('event_name', '')
@@ -635,9 +636,9 @@ function AllocModal({ sessionId, sessionDate, existingEventIds, maxCouples, curr
                     <p className="text-sm font-medium text-foreground truncate">{ev.event_name}</p>
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                       <p className="text-xs text-muted-foreground">{fmtDate(ev.event_date)}</p>
-                      {ev.location_text && <p className="text-xs text-muted-foreground truncate max-w-[140px]">📍 {ev.location_text}</p>}
-                      {ev.organizer && <p className="text-xs text-muted-foreground truncate max-w-[120px]">👤 {ev.organizer}</p>}
-                      {ev.guest_count != null && <p className="text-xs text-muted-foreground">{ev.guest_count} conv.</p>}
+                      {ev.location_text && <p className="text-xs text-muted-foreground truncate max-w-[140px] flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0" />{ev.location_text}</p>}
+                      {ev.organizer && <p className="text-xs text-muted-foreground truncate max-w-[120px] flex items-center gap-1"><User className="w-3 h-3 shrink-0" />{ev.organizer}</p>}
+                      {ev.guest_count != null && <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3 shrink-0" />{ev.guest_count}</p>}
                     </div>
                   </div>
                   <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 mt-0.5 ${STATUS_CFG[ev.status]?.cls ?? 'bg-muted border-border text-muted-foreground'}`}>
