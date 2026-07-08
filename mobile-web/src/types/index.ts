@@ -75,11 +75,22 @@ export interface TastingSession {
   scheduled_date: string;
   type: string | null;
   max_couples: number | null;
+  menu_text?: string | null;
   // from tasting_session_stats view
   total?: number | null;
   fechados?: number | null;
   // linked event count (from tasting_session_events)
   event_ids?: string[];
+}
+
+export interface TastingLead {
+  id?: string;
+  tasting_session_id: string;
+  name: string;
+  whatsapp: string;
+  email: string | null;
+  event_date: string | null;
+  created_at?: string;
 }
 
 export interface EventPayment {

@@ -1,6 +1,6 @@
 // Supabase data client for Rondello Buffet mobile app.
 import { supabase } from '../lib/supabase';
-import type { Event, TastingSession, EventPayment } from '../types';
+import type { Event, TastingSession, EventPayment, TastingLead } from '../types';
 
 const EVENT_SELECT = `
   id, event_name, event_date, status, event_type,
@@ -83,7 +83,7 @@ export async function fetchAllTastings(): Promise<TastingSession[]> {
 
 export async function fetchTasting(id: string): Promise<TastingSession & { linkedEvents: Event[] }> {
   const [sessionRes, evtLinksRes] = await Promise.all([
-    (supabase as any).from('tasting_sessions').select('id, scheduled_date, type, max_couples').eq('id', id).single(),
+    (supabase as any).from('tasting_sessions').select('id, scheduled_date, type, max_couples, menu_text').eq('id', id).single(),
     (supabase as any).from('tasting_session_events').select('event_id').eq('session_id', id),
   ]);
 
@@ -102,6 +102,28 @@ export async function fetchTasting(id: string): Promise<TastingSession & { linke
   }
 
   return { ...session, linkedEvents };
+}
+
+// ── Public menu (no auth) ─────────────────────────────────────────────────────
+
+export async function fetchTastingForMenu(id: string): Promise<{ scheduled_date: string; type: string | null; menu_text: string | null }> {
+  const { data, error } = await (supabase as any)
+    .from('tasting_sessions')
+    .select('scheduled_date, type, menu_text')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function saveTastingLead(lead: TastingLead): Promise<TastingLead> {
+  const { data, error } = await (supabase as any)
+    .from('tasting_leads')
+    .insert(lead)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as TastingLead;
 }
 
 // ── Payments ─────────────────────────────────────────────────────────────────
