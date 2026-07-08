@@ -115,8 +115,8 @@ function LeadForm({ tastingId, onDone }: { tastingId: string; onDone: (lead: Lea
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Data do evento</label>
             <input value={eventDate} onChange={e => setEventDate(e.target.value)}
-              type="date" placeholder="dd/mm/aaaa"
-              className={inputCls} />
+              type="date"
+              className={`${inputCls} h-[52px]`} />
           </div>
 
           <div>
@@ -151,6 +151,8 @@ type MenuTab = 'evento' | 'cardapio';
 function MenuPage({ lead, tasting }: { lead: LeadData; tasting: TastingToday }) {
   const [tab, setTab] = useState<MenuTab>('evento');
   const firstName = lead.name.split('&')[0]?.trim().split(' ')[0] ?? lead.name;
+
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -233,7 +235,16 @@ function MenuPage({ lead, tasting }: { lead: LeadData; tasting: TastingToday }) 
             <div className="bg-white rounded-3xl p-6 shadow-sm">
               <p className="text-[10px] font-black text-[#C9A84C] uppercase tracking-widest mb-4">Cardápio de hoje</p>
               <div
-                className="prose prose-sm max-w-none text-gray-700 leading-relaxed [&_h1]:text-[#1B2A5C] [&_h2]:text-[#1B2A5C] [&_h3]:text-[#1B2A5C] [&_strong]:text-[#1B2A5C]"
+                className="text-sm leading-relaxed text-gray-700
+                  [&_h1]:text-lg [&_h1]:font-bold [&_h1]:text-[#1B2A5C] [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:first:mt-0
+                  [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-[#1B2A5C] [&_h2]:mt-4 [&_h2]:mb-1.5 [&_h2]:first:mt-0
+                  [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-[#1B2A5C] [&_h3]:mt-3 [&_h3]:mb-1
+                  [&_p]:mb-2 [&_p]:leading-relaxed
+                  [&_strong]:font-bold [&_strong]:text-[#1B2A5C]
+                  [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-3 [&_ul]:mt-1
+                  [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-3
+                  [&_li]:mb-0.5
+                  [&_br]:block"
                 dangerouslySetInnerHTML={{ __html: tasting.menu_text }}
               />
             </div>
