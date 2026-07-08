@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// v2
 // ── Paleta (hex → RGB 0-255) ──────────────────────────────────────────────────
 const NAVY   = [14,  42,  69]  as [number,number,number];
 const GOLD   = [194,162, 99]   as [number,number,number];
