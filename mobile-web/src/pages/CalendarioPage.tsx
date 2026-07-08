@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, MapPin, UtensilsCrossed, Users } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, MapPin, Users, UtensilsCrossed } from 'lucide-react';
 import { fetchAllEvents, fetchAllTastings } from '../api/supabase';
 import type { Event, TastingSession } from '../types';
 import { isFechado, eventDisplayName, eventLocationName } from '../lib/eventFilters';
+import { fmtDate } from '../lib/format';
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const MONTHS   = [
@@ -28,19 +29,29 @@ function EventoCard({ item }: { item: Extract<CalItem, { kind: 'fechado' }> }) {
       to={`/eventos/${e.id}`}
       className="flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform"
     >
-      <div className="w-1 self-stretch rounded-full shrink-0 bg-ron-900" />
+      <div className="w-1 self-stretch rounded-full shrink-0 bg-ron-800" />
       <div className="flex-1 min-w-0">
-        <p className="font-bold text-gray-900 text-sm flex-1 truncate">{eventDisplayName(e)}</p>
-        <div className="flex items-center gap-3 mt-1 flex-wrap">
+        <p className="font-bold text-gray-900 text-sm truncate">{eventDisplayName(e)}</p>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+          {e.event_date && (
+            <span className="text-xs text-gray-400 font-medium">{fmtDate(e.event_date)}</span>
+          )}
           {local && (
-            <span className="flex items-center gap-1 text-xs text-gray-400 truncate">
-              <MapPin className="w-3 h-3 shrink-0" />
-              <span className="truncate max-w-[140px]">{local}</span>
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <MapPin className="w-3 h-3 shrink-0 text-gold-400" />
+              <span className="truncate max-w-[120px]">{local}</span>
             </span>
           )}
           {e.guest_count != null && (
             <span className="flex items-center gap-1 text-xs text-gray-400">
-              <Users className="w-3 h-3" />{e.guest_count}
+              <Users className="w-3 h-3 text-gold-400" />
+              {e.guest_count}
+            </span>
+          )}
+          {e.organizer && (
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <Building2 className="w-3 h-3 text-gold-400 shrink-0" />
+              <span className="truncate max-w-[110px]">{e.organizer}</span>
             </span>
           )}
         </div>
@@ -50,19 +61,25 @@ function EventoCard({ item }: { item: Extract<CalItem, { kind: 'fechado' }> }) {
 }
 
 function DegustacaoCard({ item }: { item: Extract<CalItem, { kind: 'degust' }> }) {
+  const t = item.tasting;
+  const typeLabel = t.type ? (t.type.toLowerCase().includes('almo') ? '🍽 Almoço' : t.type.toLowerCase().includes('jant') ? '🌙 Jantar' : t.type) : null;
   return (
     <div className="flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm">
       <div className="w-1 self-stretch rounded-full shrink-0 bg-violet-400" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-bold text-gray-900 text-sm flex-1 truncate">Degustação</p>
+          <p className="font-bold text-gray-900 text-sm flex-1">Degustação</p>
           <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-violet-50 text-violet-700 border border-violet-200 flex items-center gap-1">
             <UtensilsCrossed className="w-2.5 h-2.5" /> Degust.
           </span>
         </div>
-        {item.tasting.max_couples != null && (
-          <p className="text-xs text-gray-400 mt-1">{item.tasting.max_couples} casais</p>
-        )}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+          {typeLabel && <span className="text-xs text-gray-400">{typeLabel}</span>}
+          {t.max_couples != null && <span className="text-xs text-gray-400">{t.max_couples} casais</span>}
+          {(t.event_ids?.length ?? 0) > 0 && (
+            <span className="text-xs text-gray-400">{t.event_ids!.length} evento{t.event_ids!.length !== 1 ? 's' : ''}</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -75,12 +92,12 @@ function ItemCard({ item }: { item: CalItem }) {
 
 export default function CalendarioPage() {
   const today = new Date();
-  const [year, setYear]       = useState(today.getFullYear());
-  const [month, setMonth]     = useState(today.getMonth());
+  const [year, setYear]         = useState(today.getFullYear());
+  const [month, setMonth]       = useState(today.getMonth());
   const [selected, setSelected] = useState<number | null>(today.getDate());
-  const [events, setEvents]       = useState<Event[]>([]);
-  const [tastings, setTastings]   = useState<TastingSession[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [events, setEvents]     = useState<Event[]>([]);
+  const [tastings, setTastings] = useState<TastingSession[]>([]);
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     Promise.all([fetchAllEvents(), fetchAllTastings()])
@@ -169,21 +186,24 @@ export default function CalendarioPage() {
 
         {/* Calendar grid */}
         <div className="bg-white rounded-3xl p-4 shadow-sm">
+          {/* Legend */}
           <div className="flex items-center gap-3 mb-3 px-1">
             <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
-              <span className="w-2 h-2 rounded-full bg-ron-900 inline-block" /> Fechado
+              <span className="w-2 h-2 rounded-full bg-ron-800 inline-block" /> Fechado
             </span>
             <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
               <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" /> Degust.
             </span>
           </div>
 
+          {/* Weekday headers */}
           <div className="grid grid-cols-7 mb-2">
             {WEEKDAYS.map((d, i) => (
               <div key={i} className="text-center text-[11px] font-black text-gray-300 py-1">{d}</div>
             ))}
           </div>
 
+          {/* Day cells */}
           <div className="grid grid-cols-7 gap-y-1">
             {cells.map((day, idx) => {
               if (!day) return <div key={`e-${idx}`} />;
@@ -192,18 +212,18 @@ export default function CalendarioPage() {
               const isToday  = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
               const isSel    = day === selected;
               const dots: string[] = [];
-              if (dayItems.some((i) => i.kind === 'fechado')) dots.push('bg-ron-900');
-              if (dayItems.some((i) => i.kind === 'degust')  && dots.length < 3) dots.push('bg-violet-400');
+              if (dayItems.some((i) => i.kind === 'fechado')) dots.push('bg-ron-800');
+              if (dayItems.some((i) => i.kind === 'degust') && dots.length < 3) dots.push('bg-violet-400');
               return (
                 <button
                   key={key}
                   onClick={() => setSelected(day === selected ? null : day)}
                   className={`flex flex-col items-center py-1.5 rounded-2xl transition-all ${
-                    isSel ? 'bg-ron-900 shadow-lg shadow-ron-900/30' : isToday ? 'bg-gold-50' : ''
+                    isSel ? 'bg-ron-800 shadow-lg shadow-ron-800/30' : isToday ? 'bg-blue-50' : ''
                   }`}
                 >
                   <span className={`text-[13px] font-bold leading-none ${
-                    isSel ? 'text-white' : isToday ? 'text-ron-900' : 'text-gray-800'
+                    isSel ? 'text-white' : isToday ? 'text-ron-800' : 'text-gray-800'
                   }`}>{day}</span>
                   <div className="flex gap-0.5 mt-1 h-1.5">
                     {dots.map((cls, di) => (
@@ -216,7 +236,7 @@ export default function CalendarioPage() {
           </div>
         </div>
 
-        {/* Selected day items */}
+        {/* Selected day */}
         {selected && (
           <div>
             <p className="text-[11px] font-black text-ron-800 uppercase tracking-widest mb-3 capitalize">

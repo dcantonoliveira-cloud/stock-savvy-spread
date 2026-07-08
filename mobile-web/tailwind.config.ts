@@ -5,15 +5,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Rondello Buffet — azul marinho escuro
+        // Rondello Buffet — azul royal vibrante
         ron: {
-          50:  '#EDF0F8',
-          100: '#C8D0EA',
-          200: '#9AAAD4',
-          800: '#253775',
-          900: '#1B2A5C',
-          950: '#0F1830',
-          DEFAULT: '#1B2A5C',
+          50:  '#EEF2FF',
+          100: '#E0E7FF',
+          200: '#C7D2FE',
+          700: '#3730A3',
+          800: '#1D4ED8',   // azul vivo para botões e elementos interativos
+          900: '#1E3A8A',   // azul escuro mas claramente azul (não preto)
+          950: '#172554',   // fundo de hero — escuro sem parecer preto puro
+          DEFAULT: '#1E3A8A',
         },
         // Rondello Buffet — dourado
         gold: {

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, MapPin, Users } from 'lucide-react';
+import { ArrowLeft, Building2, Calendar, CheckCircle2, Clock, MapPin, Users } from 'lucide-react';
 import { fetchEvent, fetchPaymentsForEvent } from '../api/supabase';
 import type { Event, EventPayment } from '../types';
 import { fmtCurrency, fmtDate } from '../lib/format';
-import { eventDisplayName, eventLocationName } from '../lib/eventFilters';
+import { eventDisplayName, eventLocationName, statusLabel, statusBadgeClass } from '../lib/eventFilters';
 
-// ── Field components ─────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (value == null || value === '' || value === 0) return null;
@@ -36,13 +36,13 @@ function FichaTecnica({ e }: { e: Event }) {
       <div>
         <SectionTitle>Evento</SectionTitle>
         <FieldGrid>
-          <Field label="Nome do Evento"    value={e.event_name} />
-          <Field label="Tipo"              value={e.event_type} />
-          <Field label="Local"             value={eventLocationName(e) || undefined} />
-          <Field label="Data"              value={fmtDate(e.event_date ?? undefined)} />
+          <Field label="Nome / Casal"     value={e.event_name} />
+          <Field label="Tipo"             value={e.event_type} />
+          <Field label="Local"            value={eventLocationName(e) || undefined} />
+          <Field label="Data"             value={fmtDate(e.event_date ?? undefined)} />
           <Field label="Horário cerimônia" value={e.ceremony_time} />
-          <Field label="Horas adicionais"  value={e.additional_hours != null ? `${e.additional_hours}h` : null} />
-          <Field label="Valor total"       value={e.total_value != null ? fmtCurrency(e.total_value) : null} />
+          <Field label="Horas adicionais" value={e.additional_hours != null ? `${e.additional_hours}h` : null} />
+          <Field label="Valor total"      value={e.total_value != null ? fmtCurrency(e.total_value) : null} />
         </FieldGrid>
       </div>
 
@@ -64,7 +64,7 @@ function FichaTecnica({ e }: { e: Event }) {
           <Field label="Qtd. profissionais"   value={e.professional_count} />
           <Field label="Tipo alim. prof."     value={e.professional_meal_type} />
           <Field label="Valor alim. prof."    value={e.professional_meal_value != null ? fmtCurrency(e.professional_meal_value) : null} />
-          <Field label="Organizador(a)"       value={e.organizer} />
+          <Field label="Organizador / Assess." value={e.organizer} />
           <Field label="Decorador"            value={e.decorator} />
           <Field label="Confeiteiro(a)"       value={e.pastry_chef} />
           <Field label="Banda / DJ"           value={e.band_dj} />
@@ -175,6 +175,9 @@ function FinanceiroTab({ e }: { e: Event }) {
                     {pg.is_confirmed && (
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     )}
+                    {pg.type && pg.type !== 'payment' && (
+                      <span className="text-xs text-gray-400">{pg.type}</span>
+                    )}
                   </div>
                 </div>
                 <p className="text-sm font-black text-ron-900 shrink-0">
@@ -198,17 +201,19 @@ const TABS = ['Ficha Técnica', 'Financeiro'];
 export default function EventoDetailPage() {
   const { id }    = useParams<{ id: string }>();
   const navigate  = useNavigate();
-  const [evento, setEvento]     = useState<Event | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(false);
+  const [evento, setEvento]       = useState<Event | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) { setError('ID inválido'); setLoading(false); return; }
+    setLoading(true);
+    setError(null);
     fetchEvent(id)
       .then(setEvento)
-      .catch(() => setError(true))
+      .catch((err) => setError(err?.message ?? 'Erro ao carregar evento'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -246,39 +251,49 @@ export default function EventoDetailPage() {
             <div className="h-7 w-48 bg-white/20 rounded-xl animate-pulse" />
             <div className="h-4 w-32 bg-white/10 rounded-xl animate-pulse" />
           </div>
-        ) : (
+        ) : evento ? (
           <>
+            {/* Status badge */}
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black border mb-2 ${statusBadgeClass(evento.status)}`}>
+              {statusLabel(evento.status)}
+            </span>
             <h1 className="text-2xl font-black text-white leading-tight">
-              {evento ? eventDisplayName(evento) : 'Evento'}
+              {eventDisplayName(evento)}
             </h1>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-              {evento?.event_date && (
+              {evento.event_date && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <Calendar className="w-3.5 h-3.5" />
                   {fmtDate(evento.event_date)}
                 </span>
               )}
-              {evento && eventLocationName(evento) && (
+              {eventLocationName(evento) && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <MapPin className="w-3.5 h-3.5" />
                   {eventLocationName(evento)}
                 </span>
               )}
-              {evento?.guest_count != null && (
+              {evento.guest_count != null && (
                 <span className="flex items-center gap-1.5 text-gold-300 text-sm font-medium">
                   <Users className="w-3.5 h-3.5" />
-                  {evento.guest_count} convidados
+                  {evento.guest_count} conv.
                 </span>
               )}
-              {evento?.ceremony_time && (
+              {evento.ceremony_time && (
                 <span className="flex items-center gap-1.5 text-gold-300/70 text-sm font-medium">
                   <Clock className="w-3.5 h-3.5" />
                   {evento.ceremony_time}
                 </span>
               )}
+              {evento.organizer && (
+                <span className="flex items-center gap-1.5 text-gold-300/70 text-sm font-medium">
+                  <Building2 className="w-3.5 h-3.5" />
+                  {evento.organizer}
+                </span>
+              )}
             </div>
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Tab bar */}
@@ -291,7 +306,7 @@ export default function EventoDetailPage() {
               onClick={() => goToTab(i)}
               className={`shrink-0 px-4 py-2 rounded-2xl text-xs font-bold transition-all mr-1 ${
                 activeTab === i
-                  ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30'
+                  ? 'bg-ron-800 text-white shadow-lg shadow-ron-800/30'
                   : 'bg-white text-gray-400 shadow-sm'
               }`}
             >
@@ -310,7 +325,13 @@ export default function EventoDetailPage() {
         ) : error ? (
           <div className="bg-white rounded-3xl p-12 text-center shadow-sm">
             <p className="text-4xl mb-3">⚠️</p>
-            <p className="text-gray-500">Erro ao carregar o evento.</p>
+            <p className="text-gray-500 text-sm">{error}</p>
+            <button
+              onClick={() => navigate(-1)}
+              className="mt-4 px-6 py-2 bg-ron-800 text-white text-sm font-bold rounded-2xl"
+            >
+              Voltar
+            </button>
           </div>
         ) : renderTab()}
       </div>

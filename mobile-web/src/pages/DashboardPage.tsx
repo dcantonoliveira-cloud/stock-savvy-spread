@@ -57,8 +57,8 @@ function KpiCard({
 }) {
   const bg = accent
     ? color === 'gold'   ? 'bg-gold-400 shadow-gold-400/30'
-    : color === 'violet' ? 'bg-violet-700 shadow-violet-700/30'
-    : 'bg-ron-900 shadow-ron-900/30'
+    : color === 'violet' ? 'bg-violet-600 shadow-violet-600/30'
+    : 'bg-ron-800 shadow-ron-800/30'
     : 'bg-white';
 
   return (
@@ -81,9 +81,9 @@ function KpiCard({
 }
 
 export default function DashboardPage() {
-  const [events, setEvents]             = useState<Event[]>([]);
-  const [tastings, setTastings]         = useState<TastingSession[]>([]);
-  const [loading, setLoading]           = useState(true);
+  const [events, setEvents]         = useState<Event[]>([]);
+  const [tastings, setTastings]     = useState<TastingSession[]>([]);
+  const [loading, setLoading]       = useState(true);
   const { canInstall, install, showIOSGuide, setShowIOSGuide } = usePWAInstall();
 
   useEffect(() => {
@@ -96,8 +96,7 @@ export default function DashboardPage() {
   const now       = new Date();
   const thisMonth = now.getMonth();
   const thisYear  = now.getFullYear();
-
-  const fechados = events.filter(isFechado);
+  const fechados  = events.filter(isFechado);
 
   const eventosMes = fechados.filter((e) => {
     if (!e.event_date) return false;
@@ -110,10 +109,9 @@ export default function DashboardPage() {
     return dt.getFullYear() === thisYear && dt.getMonth() === thisMonth;
   }).length;
 
-  const orcamentosAbertos = events.filter((e) => {
-    const EXCLUIDOS = new Set(['confirmed', 'completed', 'cancelled', 'lost']);
-    return !EXCLUIDOS.has(e.status ?? '');
-  }).length;
+  const orcamentosAbertos = events.filter((e) =>
+    e.status === 'lead' || e.status === 'negotiating'
+  ).length;
 
   const upcoming = fechados
     .filter((e) => e.event_date && new Date(e.event_date) >= now)
@@ -125,6 +123,8 @@ export default function DashboardPage() {
   const sectionTitle   = hasUpcoming ? 'Próximos Eventos' : 'Eventos Recentes';
   const mesLabel       = now.toLocaleDateString('pt-BR', { month: 'long' });
 
+  const dayLabel = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
     <div className="pb-36 max-w-lg mx-auto">
 
@@ -133,61 +133,57 @@ export default function DashboardPage() {
       )}
 
       {showIOSGuide && (
-        <div
-          className="fixed inset-0 z-[9998] flex items-end"
-          onClick={() => setShowIOSGuide(false)}
-        >
+        <div className="fixed inset-0 z-[9998] flex items-end" onClick={() => setShowIOSGuide(false)}>
           <div className="absolute inset-0 bg-black/50" />
-          <div
-            className="relative w-full bg-white rounded-t-3xl px-6 pb-10 pt-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="relative w-full bg-white rounded-t-3xl px-6 pb-10 pt-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
             <p className="text-lg font-black text-gray-900 mb-1">Instalar no iPhone</p>
-            <p className="text-sm text-gray-400 mb-6">
-              Adicione o Rondello à tela de início para acesso rápido.
-            </p>
+            <p className="text-sm text-gray-400 mb-6">Adicione o Rondello à tela de início para acesso rápido.</p>
             <div className="space-y-4 mb-6">
-              {[
-                ['1', 'Toque no botão Compartilhar ⬆ na barra do Safari'],
-                ['2', 'Role e toque em "Adicionar à Tela de Início"'],
-                ['3', 'Toque em Adicionar'],
-              ].map(([n, text]) => (
+              {[['1','Toque no botão Compartilhar ⬆ na barra do Safari'],['2','Role e toque em "Adicionar à Tela de Início"'],['3','Toque em Adicionar']].map(([n,text]) => (
                 <div key={n} className="flex items-start gap-4">
                   <div className="w-8 h-8 rounded-xl bg-ron-900 text-white flex items-center justify-center shrink-0 text-sm font-black">{n}</div>
                   <p className="text-sm text-gray-700 pt-1">{text}</p>
                 </div>
               ))}
             </div>
-            <button
-              onClick={() => setShowIOSGuide(false)}
-              className="w-full py-3.5 bg-ron-900 text-white font-bold rounded-2xl"
-            >
-              Entendido
-            </button>
+            <button onClick={() => setShowIOSGuide(false)} className="w-full py-3.5 bg-ron-900 text-white font-bold rounded-2xl">Entendido</button>
           </div>
         </div>
       )}
 
-      {/* Hero */}
-      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-8 overflow-hidden">
-        <div className="absolute -top-10 -right-10 w-56 h-56 bg-white/5 rounded-full" />
-        <div className="absolute top-6 right-8 w-2 h-2 bg-gold-400/50 rounded-full" />
-        <div className="absolute top-11 right-16 w-1 h-1 bg-gold-400/30 rounded-full" />
+      {/* ── Hero redesenhado ─────────────────────────────────────────── */}
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-hero pb-6 overflow-hidden">
+        {/* Ornamentos */}
+        <div className="absolute -top-14 -right-14 w-64 h-64 bg-white/5 rounded-full" />
+        <div className="absolute top-8 right-6 w-2.5 h-2.5 bg-gold-400/40 rounded-full" />
+        <div className="absolute top-14 right-16 w-1.5 h-1.5 bg-gold-400/25 rounded-full" />
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-white/10" />
 
         <div className="relative flex items-start justify-between">
+          {/* Marca */}
           <div>
-            <h1 className="text-4xl font-black text-white tracking-tight leading-none">Rondello</h1>
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-4xl font-black text-white tracking-tight leading-none">Rondello</h1>
+            </div>
+            <p className="text-gold-400/80 text-[11px] font-black uppercase tracking-[0.25em] mt-1">
+              Buffet
+            </p>
+            <p className="text-white/30 text-xs font-medium mt-2 capitalize">{dayLabel}</p>
           </div>
-          {canInstall && (
-            <button
-              onClick={install}
-              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl px-3 py-2 mt-1"
-            >
-              <Download className="w-4 h-4 text-gold-300" />
-              <span className="text-xs font-bold text-white">Instalar</span>
-            </button>
-          )}
+
+          {/* Ações */}
+          <div className="flex flex-col items-end gap-2 mt-1">
+            {canInstall && (
+              <button
+                onClick={install}
+                className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl px-3 py-2"
+              >
+                <Download className="w-4 h-4 text-gold-300" />
+                <span className="text-xs font-bold text-white">Instalar</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -210,7 +206,7 @@ export default function DashboardPage() {
         {!loading && highlightEvent && (
           <Link
             to={`/eventos/${highlightEvent.id}`}
-            className="block rounded-3xl p-5 shadow-xl shadow-ron-900/25 overflow-hidden relative bg-gradient-to-br from-ron-900 to-ron-800"
+            className="block rounded-3xl p-5 shadow-xl shadow-ron-900/20 overflow-hidden relative bg-gradient-to-br from-ron-900 to-ron-800"
           >
             <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/5 rounded-full" />
             <div className="absolute -bottom-10 -left-6 w-28 h-28 bg-black/10 rounded-full" />
@@ -248,7 +244,6 @@ export default function DashboardPage() {
               Ver todos <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
-
           {loading ? (
             <div className="space-y-3">
               <Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" />

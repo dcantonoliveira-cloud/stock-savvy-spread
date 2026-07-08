@@ -6,14 +6,8 @@ import type { Event, TastingSession } from '../types';
 import { fmtDate } from '../lib/format';
 import { eventDisplayName, eventLocationName, statusLabel, statusBadgeClass } from '../lib/eventFilters';
 
-const ALL_FILTERS = [
-  { key: 'abertos',    label: 'Em aberto',  statuses: ['lead', 'negotiating', 'tasting_scheduled'] },
-  { key: 'lead',       label: '1º Contato', statuses: ['lead'] },
-  { key: 'negociando', label: 'Negociando', statuses: ['negotiating'] },
-  { key: 'tasting',    label: 'Degustação', statuses: ['tasting_scheduled'] },
-  { key: 'naofechou',  label: 'Não fechou', statuses: ['lost'] },
-  { key: 'cancelado',  label: 'Cancelado',  statuses: ['cancelled'] },
-];
+// Somente 1º Contato e Negociando com data futura
+const PIPELINE_STATUSES = ['lead', 'negotiating'];
 
 function Skeleton() {
   return <div className="h-20 bg-black/5 rounded-3xl animate-pulse" />;
@@ -24,16 +18,17 @@ export default function OrcamentosPage() {
   const [tastings, setTastings] = useState<TastingSession[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(false);
-  const [filter, setFilter]     = useState('abertos');
   const [search, setSearch]     = useState('');
 
   useEffect(() => {
     Promise.all([fetchAllEvents(), fetchAllTastings()])
       .then(([allEvents, allTastings]) => {
-        const prospects = allEvents.filter((e) => {
-          const EXCLUIDOS = new Set(['confirmed', 'completed']);
-          return !EXCLUIDOS.has(e.status) && e.event_name?.trim();
-        });
+        const now = new Date();
+        const prospects = allEvents.filter((e) =>
+          PIPELINE_STATUSES.includes(e.status) &&
+          e.event_name?.trim() &&
+          (e.event_date ? new Date(e.event_date) >= now : true)
+        );
         setEventos(prospects);
         setTastings(allTastings);
       })
@@ -52,41 +47,44 @@ export default function OrcamentosPage() {
     return map;
   }, [tastings]);
 
-  const activeStatuses = ALL_FILTERS.find((f) => f.key === filter)?.statuses ?? ['lead', 'negotiating'];
-
   const filtered = useMemo(() => {
-    const now = new Date();
     const q = search.trim().toLowerCase();
-
-    let list = eventos.filter((e) => activeStatuses.includes(e.status ?? ''));
-
-    if (!q && filter === 'abertos') {
-      list = list.filter((e) => e.event_date ? new Date(e.event_date) >= now : true);
-    }
-
-    if (q) {
-      list = list.filter((e) => eventDisplayName(e).toLowerCase().includes(q));
-    }
-
-    return list.sort((a, b) => {
-      const da = a.event_date ? new Date(a.event_date).getTime() : 0;
-      const db = b.event_date ? new Date(b.event_date).getTime() : 0;
+    if (!q) return [...eventos].sort((a, b) => {
+      const da = a.event_date ? new Date(a.event_date).getTime() : Infinity;
+      const db = b.event_date ? new Date(b.event_date).getTime() : Infinity;
       return da - db;
     });
-  }, [eventos, filter, search, activeStatuses]);
+    return eventos
+      .filter((e) => eventDisplayName(e).toLowerCase().includes(q))
+      .sort((a, b) => {
+        const da = a.event_date ? new Date(a.event_date).getTime() : Infinity;
+        const db = b.event_date ? new Date(b.event_date).getTime() : Infinity;
+        return da - db;
+      });
+  }, [eventos, search]);
+
+  const leadCount       = eventos.filter((e) => e.status === 'lead').length;
+  const negotiatingCount = eventos.filter((e) => e.status === 'negotiating').length;
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
       {loading && <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />}
 
       {/* Hero */}
-      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pb-8 overflow-hidden min-h-[130px] flex flex-col justify-end">
+      <div className="relative bg-gradient-to-br from-ron-950 via-ron-900 to-ron-800 px-5 pt-safe pb-8 overflow-hidden min-h-[140px] flex flex-col justify-end">
         <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/5 rounded-full" />
         <div className="relative">
           <h1 className="text-4xl font-black text-white tracking-tight leading-none">Orçamentos</h1>
-          <p className="text-white/35 text-xs font-bold mt-1.5 uppercase tracking-[0.15em]">
-            {loading ? '…' : `${filtered.length} em aberto`}
-          </p>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="flex items-center gap-1.5 bg-white/10 rounded-xl px-2.5 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+              <span className="text-white/70 text-[11px] font-bold">{leadCount} 1º Contato</span>
+            </span>
+            <span className="flex items-center gap-1.5 bg-white/10 rounded-xl px-2.5 py-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span className="text-white/70 text-[11px] font-bold">{negotiatingCount} Negociando</span>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -99,21 +97,6 @@ export default function OrcamentosPage() {
           placeholder="Buscar por nome..."
           className="w-full bg-white rounded-2xl px-4 py-3 text-sm text-gray-700 placeholder-gray-400 shadow-sm outline-none focus:ring-2 focus:ring-ron-800/20"
         />
-
-        {/* Filter tabs */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-          {ALL_FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm ${
-                filter === f.key ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30' : 'bg-white text-gray-500'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
 
         {/* List */}
         {loading ? (
@@ -128,7 +111,7 @@ export default function OrcamentosPage() {
             <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
             <p className="font-bold text-gray-700">Nenhum orçamento</p>
             <p className="text-sm text-gray-400 mt-1">
-              {search ? `Nenhum resultado para "${search}"` : 'Nenhum evento com este status'}
+              {search ? `Nenhum resultado para "${search}"` : 'Sem 1º Contato ou Negociando com data futura'}
             </p>
           </div>
         ) : (

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight, MapPin, Users } from 'lucide-react';
+import { ArrowRight, MapPin, Users } from 'lucide-react';
 import { fetchAllEvents } from '../api/supabase';
 import type { Event } from '../types';
 import { isFechado, eventDisplayName, eventLocationName } from '../lib/eventFilters';
+import { fmtDate } from '../lib/format';
 
 const MONTHS      = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
@@ -23,9 +24,9 @@ function EventCard({ event, past }: { event: Event; past?: boolean }) {
       }`}
     >
       <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center shrink-0 ${
-        past ? 'bg-gray-100' : 'bg-gold-50'
+        past ? 'bg-gray-100' : 'bg-blue-50'
       }`}>
-        <span className={`text-[10px] font-bold ${past ? 'text-gray-400' : 'text-gold-400'}`}>{weekday}</span>
+        <span className={`text-[10px] font-bold ${past ? 'text-gray-400' : 'text-ron-800'}`}>{weekday}</span>
         <span className={`text-2xl font-black leading-none ${past ? 'text-gray-500' : 'text-ron-900'}`}>
           {day ?? '—'}
         </span>
@@ -47,6 +48,9 @@ function EventCard({ event, past }: { event: Event; past?: boolean }) {
               {event.guest_count}
             </span>
           )}
+          {!localNome && !event.guest_count && event.event_date && (
+            <span className="text-xs text-gray-400">{fmtDate(event.event_date)}</span>
+          )}
         </div>
       </div>
       <ArrowRight className={`w-4 h-4 shrink-0 ${past ? 'text-gray-200' : 'text-gray-300'}`} />
@@ -60,11 +64,11 @@ function Skeleton() {
 
 export default function EventosPage() {
   const now = new Date();
-  const [year, setYear]     = useState(now.getFullYear());
-  const [month, setMonth]   = useState(now.getMonth());
-  const [events, setEvents] = useState<Event[]>([]);
+  const [year, setYear]       = useState(now.getFullYear());
+  const [month, setMonth]     = useState(now.getMonth());
+  const [events, setEvents]   = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const tabsRef = useRef<HTMLDivElement>(null);
+  const tabsRef               = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchAllEvents()
@@ -72,6 +76,15 @@ export default function EventosPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Scroll active month to center after data loads or month changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const el = tabsRef.current?.querySelector(`[data-month="${month}"]`) as HTMLElement | null;
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [month, loading]);
 
   const countsByMonth = useMemo(() => {
     const counts = Array(12).fill(0);
@@ -98,39 +111,34 @@ export default function EventosPage() {
   const past     = monthEvents.filter((e) => e.event_date && new Date(e.event_date) <  now);
   const yearTotal = events.filter((e) => new Date(e.event_date ?? '').getFullYear() === year).length;
 
-  useEffect(() => {
-    const el = tabsRef.current?.querySelector(`[data-month="${month}"]`) as HTMLElement | null;
-    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }, [month]);
-
   return (
     <div className="pb-36 max-w-lg mx-auto">
       {loading && <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gold-400 animate-pulse" />}
 
-      {/* Header */}
+      {/* Header sticky */}
       <div className="sticky top-0 z-40 bg-[#f2f2f2]/95 backdrop-blur-xl pt-safe">
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <button
-            onClick={() => setYear((y) => y - 1)}
-            className="w-9 h-9 rounded-2xl bg-white shadow-sm flex items-center justify-center"
-          >
-            <ChevronLeft className="w-4 h-4 text-gray-600" />
-          </button>
-          <div className="text-center">
-            <p className="font-black text-gray-900 text-xl leading-none">{year}</p>
-            <p className="text-xs text-gray-400 font-medium mt-0.5">
-              {loading ? '…' : `${yearTotal} eventos`}
-            </p>
+        {/* Hero compacto */}
+        <div className="bg-gradient-to-r from-ron-950 to-ron-900 px-4 pt-4 pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-white tracking-tight leading-none">{year}</h1>
+              <p className="text-white/35 text-[11px] font-bold uppercase tracking-widest mt-0.5">
+                {loading ? '…' : `${yearTotal} eventos`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setYear((y) => y - 1)} className="w-9 h-9 rounded-2xl bg-white/15 flex items-center justify-center">
+                <span className="text-white text-sm font-bold">‹</span>
+              </button>
+              <button onClick={() => setYear((y) => y + 1)} className="w-9 h-9 rounded-2xl bg-white/15 flex items-center justify-center">
+                <span className="text-white text-sm font-bold">›</span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setYear((y) => y + 1)}
-            className="w-9 h-9 rounded-2xl bg-white shadow-sm flex items-center justify-center"
-          >
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-          </button>
         </div>
 
-        <div ref={tabsRef} className="flex gap-2 overflow-x-auto px-4 py-2 scrollbar-none">
+        {/* Month tabs */}
+        <div ref={tabsRef} className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-none">
           {MONTHS.map((m, i) => {
             const active = i === month;
             const count  = countsByMonth[i];
@@ -140,10 +148,10 @@ export default function EventosPage() {
                 data-month={i}
                 onClick={() => setMonth(i)}
                 className={`shrink-0 flex flex-col items-center px-3.5 py-2 rounded-2xl transition-all ${
-                  active ? 'bg-ron-900 shadow-lg shadow-ron-900/30' : 'bg-white shadow-sm'
+                  active ? 'bg-ron-800 shadow-lg shadow-ron-800/30' : 'bg-white shadow-sm'
                 }`}
               >
-                <span className={`text-[11px] font-bold ${active ? 'text-gold-200' : 'text-gray-500'}`}>{m}</span>
+                <span className={`text-[11px] font-bold ${active ? 'text-blue-200' : 'text-gray-500'}`}>{m}</span>
                 <span className={`text-base font-black leading-tight ${active ? 'text-white' : count > 0 ? 'text-ron-800' : 'text-gray-300'}`}>
                   {count > 0 ? count : '·'}
                 </span>

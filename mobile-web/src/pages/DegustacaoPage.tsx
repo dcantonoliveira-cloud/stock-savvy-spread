@@ -5,7 +5,15 @@ import { fetchAllTastings } from '../api/supabase';
 import type { TastingSession } from '../types';
 import { fmtDate } from '../lib/format';
 
-const FILTERS = ['Todas', 'Próximas', 'Realizadas'];
+const FILTERS = ['Próximas', 'Realizadas'];
+
+function typeLabel(type: string | null): string | null {
+  if (!type) return null;
+  const t = type.toLowerCase();
+  if (t.includes('almo')) return '🍽 Almoço';
+  if (t.includes('jant')) return '🌙 Jantar';
+  return type;
+}
 
 function Skeleton() {
   return <div className="h-24 bg-black/5 rounded-3xl animate-pulse" />;
@@ -13,10 +21,10 @@ function Skeleton() {
 
 export default function DegustacaoPage() {
   const navigate = useNavigate();
-  const [items, setItems]   = useState<TastingSession[]>([]);
+  const [items, setItems]     = useState<TastingSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState(false);
-  const [filter, setFilter] = useState('Todas');
+  const [error, setError]     = useState(false);
+  const [filter, setFilter]   = useState('Próximas');
 
   useEffect(() => {
     fetchAllTastings()
@@ -48,6 +56,7 @@ export default function DegustacaoPage() {
   }, [filtered]);
 
   const upcoming = items.filter((d) => new Date(d.scheduled_date) >= now).length;
+  const past     = items.filter((d) => new Date(d.scheduled_date) < now).length;
 
   return (
     <div className="pb-36 max-w-lg mx-auto">
@@ -59,20 +68,20 @@ export default function DegustacaoPage() {
         <div className="relative">
           <h1 className="text-4xl font-black text-white tracking-tight leading-none">Degustações</h1>
           <p className="text-white/35 text-xs font-bold mt-1.5 uppercase tracking-[0.15em]">
-            {loading ? '…' : `${upcoming} próxima${upcoming !== 1 ? 's' : ''} · ${items.length} total`}
+            {loading ? '…' : `${upcoming} próxima${upcoming !== 1 ? 's' : ''} · ${past} realizada${past !== 1 ? 's' : ''}`}
           </p>
         </div>
       </div>
 
       <div className="px-4 space-y-4 pt-4">
-        {/* Filter tabs */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+        {/* Filter tabs — só Próximas e Realizadas */}
+        <div className="flex gap-2">
           {FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm ${
-                filter === f ? 'bg-ron-900 text-white shadow-lg shadow-ron-900/30' : 'bg-white text-gray-500'
+              className={`flex-1 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm ${
+                filter === f ? 'bg-ron-800 text-white shadow-lg shadow-ron-800/30' : 'bg-white text-gray-500'
               }`}
             >
               {f}
@@ -93,19 +102,20 @@ export default function DegustacaoPage() {
             <UtensilsCrossed className="w-10 h-10 text-gray-200 mx-auto mb-3" />
             <p className="font-bold text-gray-700">Nenhuma degustação</p>
             <p className="text-sm text-gray-400 mt-1">
-              {filter === 'Todas' ? 'Ainda não há degustações cadastradas' : `Nenhuma degustação ${filter.toLowerCase()}`}
+              {filter === 'Próximas' ? 'Nenhuma degustação agendada' : 'Nenhuma degustação realizada'}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
             {sorted.map((d) => {
-              const isPast = new Date(d.scheduled_date) < now;
+              const isPast     = new Date(d.scheduled_date) < now;
               const eventCount = d.event_ids?.length ?? 0;
+              const tipo       = typeLabel(d.type);
               return (
                 <button
                   key={d.id}
                   onClick={() => navigate(`/degustacoes/${d.id}`)}
-                  className={`w-full text-left flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform ${isPast ? 'opacity-60' : ''}`}
+                  className={`w-full text-left flex items-start gap-3 bg-white rounded-3xl p-4 shadow-sm active:scale-[0.99] transition-transform ${isPast ? 'opacity-70' : ''}`}
                 >
                   <div className={`w-1 self-stretch rounded-full shrink-0 ${isPast ? 'bg-gray-300' : 'bg-violet-400'}`} />
                   <div className="flex-1 min-w-0">
@@ -122,11 +132,14 @@ export default function DegustacaoPage() {
                         <Calendar className="w-3.5 h-3.5 text-gold-400" />
                         {fmtDate(d.scheduled_date)}
                       </span>
+                      {tipo && (
+                        <span className="text-xs text-gray-500 font-medium">{tipo}</span>
+                      )}
                       {eventCount > 0 && (
                         <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
                           <ClipboardList className="w-3.5 h-3.5 text-gold-400" />
                           {eventCount} evento{eventCount !== 1 ? 's' : ''}
-                          {d.fechados != null && (
+                          {d.fechados != null && d.fechados > 0 && (
                             <span className="text-emerald-500 ml-1">· {d.fechados} fech.</span>
                           )}
                         </span>
