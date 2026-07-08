@@ -128,6 +128,12 @@ function AppRoutes() {
   const { user, role, loading, permissions } = useAuth();
   const isMobile = useIsMobile();
 
+  // Rotas públicas — bypass completo de auth (não espera loading do Supabase)
+  if (window.location.pathname === '/menu') {
+    const CardapioPublicoPage = lazy(() => import('./pages/public/CardapioPublicoPage'));
+    return <Suspense fallback={<PageLoader />}><CardapioPublicoPage /></Suspense>;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
