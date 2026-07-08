@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
   Upload, FileText, Eye, Download,
-  Plus, Loader2, X, ArrowLeft, Search, Layers, Trash2,
+  Plus, Loader2, X, ArrowLeft, Search, Layers, Trash2, Send,
 } from 'lucide-react';
 import BulkPayslipUpload from '@/components/payslips/BulkPayslipUpload';
 import { sha256Hex } from '@/lib/payslipPdf';
@@ -104,6 +104,27 @@ export default function PayslipsAdminPage() {
 
     setPayslips(rows as unknown as Payslip[]);
     setLoading(false);
+  };
+
+  const [resending, setResending] = useState<string | null>(null);
+
+  const resendNotification = async (p: Payslip) => {
+    setResending(p.id);
+    const signUrl = `${window.location.origin}/meus-holerites/${p.id}`;
+    const { data, error } = await supabase.functions.invoke('send-payslip-notification', {
+      body: {
+        payslip_id: p.id,
+        employee_id: p.employee_id,
+        payslip_title: p.title,
+        sign_url: signUrl,
+        channels: ['whatsapp'],
+      },
+    });
+    setResending(null);
+    if (error) { toast.error('Erro ao reenviar'); return; }
+    const r = data?.results ?? {};
+    if (r.whatsapp?.ok) toast.success('Lembrete enviado por WhatsApp');
+    else toast.error(r.whatsapp?.error ?? 'Erro ao enviar WhatsApp');
   };
 
   const deletePayslip = async (p: Payslip) => {
@@ -473,6 +494,12 @@ export default function PayslipsAdminPage() {
                         <button onClick={() => viewSignedPdf(sig.signed_pdf_path ?? null, p.title)}
                           className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors" title="Ver PDF assinado">
                           <Download className="w-4 h-4" />
+                        </button>
+                      )}
+                      {p.status === 'published' && (
+                        <button onClick={() => resendNotification(p)} disabled={resending === p.id}
+                          className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-500 transition-colors disabled:opacity-40" title="Reenviar lembrete de assinatura">
+                          {resending === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                         </button>
                       )}
                       <button onClick={() => deletePayslip(p)}
