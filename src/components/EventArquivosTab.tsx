@@ -484,7 +484,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   };
 
   const AnnexBlock = ({ n, content, show, onRemove }: { n: 1 | 2; content: string; show: boolean; onRemove: () => void }) => {
-    const [collapsed, setCollapsed] = useState(false);
+    const [collapsed, setCollapsed] = useState(true);
     if (!show) return null;
     return (
       <div className="mt-4 border-t border-border pt-4">
@@ -706,7 +706,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                     onChange={html=>{setContractText(html);autoSave('contract_text',html);}}
                     placeholder="" />
                 )}
-                <div className="mt-5 pt-4 border-t border-border">
+                <div className="mt-8 pt-6 border-t border-border">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Anexos contratuais</span>
                     <div className="flex gap-2">
