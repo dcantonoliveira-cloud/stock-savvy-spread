@@ -344,7 +344,7 @@ function QrModal({ onClose, qrCopied, setQrCopied }: {
   setQrCopied: (v: boolean) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const MENU_URL = 'https://rondello-gestao.pages.dev/menu';
+  const MENU_URL = 'https://rondellobuffet-app.com.br/menu';
 
   const copyLink = () => {
     navigator.clipboard.writeText(MENU_URL).then(() => {

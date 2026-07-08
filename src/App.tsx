@@ -141,6 +141,10 @@ function AppRoutes() {
 
   if (!user) {
     // Rotas públicas — acessíveis sem login
+    if (window.location.pathname === '/menu') {
+      const CardapioPublicoPage = lazy(() => import('./pages/public/CardapioPublicoPage'));
+      return <Suspense fallback={<PageLoader />}><CardapioPublicoPage /></Suspense>;
+    }
     if (window.location.pathname.startsWith('/portal/cadastro')) {
       return <Suspense fallback={<PageLoader />}><ClientRegisterPage /></Suspense>;
     }
