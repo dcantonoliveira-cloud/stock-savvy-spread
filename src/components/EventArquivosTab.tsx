@@ -706,7 +706,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                     onChange={html=>{setContractText(html);autoSave('contract_text',html);}}
                     placeholder="" />
                 )}
-                <div className="mt-8 pt-6 border-t border-border">
+                <div className="mt-6 pt-5 border-t border-border">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Anexos contratuais</span>
                     <div className="flex gap-2">
