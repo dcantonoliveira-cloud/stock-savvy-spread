@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, ExternalLink, Search, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Plus, Trash2, ExternalLink, Search, Loader2, AlertTriangle, QrCode, Copy, Check } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { createPortal } from 'react-dom';
 import RichTextEditor from '@/components/RichTextEditor';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
@@ -86,7 +87,8 @@ export default function TastingDetailPage() {
   const [session,      setSession]      = useState<Session | null>(null);
   const [rows,         setRows]         = useState<SessionEvent[]>([]);
   const [loading,      setLoading]      = useState(true);
-  const [tab,          setTab]          = useState<'guests' | 'menu' | 'info'>('guests');
+  const [tab,          setTab]          = useState<'guests' | 'menu' | 'info' | 'qr'>('guests');
+  const [qrCopied,     setQrCopied]     = useState(false);
   const [allocOpen,    setAllocOpen]    = useState(false);
   const [menuText,     setMenuText]     = useState('');
   const [notes,        setNotes]        = useState('');
@@ -256,10 +258,11 @@ export default function TastingDetailPage() {
 
         {/* Tabs */}
         <div className="px-8 flex gap-0">
-          {(['guests', 'menu', 'info'] as const).map(t => (
+          {(['guests', 'menu', 'info', 'qr'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-              {t === 'guests' ? 'Lista de convidados' : t === 'menu' ? 'Cardápio' : 'Informações'}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+              {t === 'qr' && <QrCode className="w-3.5 h-3.5" />}
+              {t === 'guests' ? 'Lista de convidados' : t === 'menu' ? 'Cardápio' : t === 'info' ? 'Informações' : 'QR Code'}
             </button>
           ))}
         </div>
@@ -371,6 +374,39 @@ export default function TastingDetailPage() {
             </div>
           </div>
         )}
+        {tab === 'qr' && (() => {
+          const MOBILE_BASE = import.meta.env.VITE_MOBILE_URL ?? 'https://rondello-gestao.pages.dev';
+          const menuUrl = `${MOBILE_BASE}/menu/${session.id}`;
+          const copyLink = () => {
+            navigator.clipboard.writeText(menuUrl).then(() => {
+              setQrCopied(true);
+              setTimeout(() => setQrCopied(false), 2500);
+            });
+          };
+          return (
+            <div className="max-w-sm space-y-4">
+              <div className="bg-white border border-border rounded-2xl p-6 flex flex-col items-center gap-5">
+                <div className="p-3 border border-border rounded-2xl bg-white">
+                  <QRCodeSVG value={menuUrl} size={200} bgColor="#ffffff" fgColor="#1E3A8A" level="M" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-foreground text-sm">Cardápio desta degustação</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    Coloque na mesa do casal. Eles escaneiam, preenchem os dados uma vez e acessam o cardápio + contagem regressiva.
+                  </p>
+                </div>
+              </div>
+              <div className="bg-white border border-border rounded-2xl px-4 py-3 flex items-center gap-3">
+                <span className="flex-1 text-xs text-muted-foreground font-mono truncate">{menuUrl}</span>
+                <button onClick={copyLink}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${qrCopied ? 'bg-emerald-50 text-emerald-600' : 'bg-muted text-foreground hover:bg-muted/80'}`}>
+                  {qrCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {qrCopied ? 'Copiado!' : 'Copiar link'}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {allocOpen && (
