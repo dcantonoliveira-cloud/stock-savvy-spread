@@ -234,6 +234,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [showZapForm, setShowZapForm]         = useState(false);
   const [sendingZap, setSendingZap]           = useState(false);
   const [refreshingZap, setRefreshingZap]     = useState(false);
+  const [showAllocTasting, setShowAllocTasting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -532,7 +533,14 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
 
       {/* 1. DEGUSTAÇÕES */}
       <div className="bg-white border border-border rounded-2xl p-6">
-        <SectionDivider title="Degustações" />
+        <div className="flex items-center justify-between mb-1">
+          <SectionDivider title="Degustações" />
+          <button onClick={() => setShowAllocTasting(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors shrink-0 ml-3">
+            <Plus className="w-3.5 h-3.5" />
+            Alocar degustação
+          </button>
+        </div>
         {tastings.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">Nenhuma degustação vinculada a este evento</p>
         ) : (
@@ -779,6 +787,127 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       </div>
 
       {waTrigger&&<WhatsAppConfirmModal trigger={waTrigger} onClose={()=>setWaTrigger(null)}/>}
+      {showAllocTasting && (
+        <AllocTastingModal
+          eventId={eventId}
+          eventName={event.event_name ?? 'Evento'}
+          onClose={() => setShowAllocTasting(false)}
+          onAllocated={() => {
+            setShowAllocTasting(false);
+            // recarrega degustações
+            (supabase.from('tasting_session_events' as any)
+              .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
+              .eq('event_id', eventId) as any)
+              .then(({ data }: any) => {
+                setTastings((data ?? []).map((r: any) => ({
+                  id: r.id, session_id: r.session_id,
+                  situation_snapshot: r.situation_snapshot,
+                  paid_amount: r.paid_amount ?? null,
+                  scheduled_date: (r.tasting_sessions as any)?.scheduled_date ?? null,
+                  type: (r.tasting_sessions as any)?.type ?? null,
+                })));
+              });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ── AllocTastingModal ─────────────────────────────────────────────────────────
+import { createPortal } from 'react-dom';
+
+function AllocTastingModal({ eventId, eventName, onClose, onAllocated }: {
+  eventId: string; eventName: string; onClose: () => void; onAllocated: () => void;
+}) {
+  const [sessions, setSessions] = useState<{ id: string; scheduled_date: string | null; type: string | null; max_couples: number | null; current_count: number }[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState<string | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    (async () => {
+      const { data: sessData } = await (supabase.from as any)('tasting_sessions')
+        .select('id, scheduled_date, type, max_couples')
+        .gte('scheduled_date', today)
+        .order('scheduled_date');
+      if (!sessData) { setLoading(false); return; }
+      const sessionIds = sessData.map((s: any) => s.id);
+      const { data: tseRows } = await (supabase.from as any)('tasting_session_events')
+        .select('session_id')
+        .in('session_id', sessionIds);
+      const countMap: Record<string, number> = {};
+      for (const row of (tseRows ?? []) as any[]) {
+        countMap[row.session_id] = (countMap[row.session_id] ?? 0) + 1;
+      }
+      setSessions(sessData.map((s: any) => ({ ...s, current_count: countMap[s.id] ?? 0 })));
+      setLoading(false);
+    })();
+  }, []);
+
+  const alloc = async (session: { id: string }) => {
+    setSaving(session.id);
+    const { error } = await (supabase.from as any)('tasting_session_events')
+      .insert({ session_id: session.id, event_id: eventId, situation_snapshot: 'new' });
+    if (error) { toast.error('Erro ao alocar'); setSaving(null); return; }
+    toast.success('Evento alocado na degustação!');
+    onAllocated();
+  };
+
+  const fmtD = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div>
+            <h3 className="font-semibold text-foreground">Alocar a uma degustação</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{eventName}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-4 max-h-80 overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : sessions.length === 0 ? (
+            <p className="text-center py-8 text-sm text-muted-foreground">Nenhuma degustação agendada para os próximos dias.</p>
+          ) : (
+            <div className="space-y-2">
+              {sessions.map(s => {
+                const full = s.max_couples !== null && s.current_count >= s.max_couples;
+                return (
+                  <button key={s.id} onClick={() => !full && alloc(s)} disabled={full || saving === s.id}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors text-left ${
+                      full ? 'opacity-40 cursor-not-allowed border-border bg-muted/30'
+                           : 'border-border hover:border-violet-300 hover:bg-violet-50'
+                    }`}>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground capitalize">
+                        {s.scheduled_date ? fmtD(s.scheduled_date) : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {s.type ? (s.type === 'almoco' ? 'Almoço' : 'Jantar') : ''}
+                        {s.max_couples !== null ? ` · ${s.current_count}/${s.max_couples} casais` : ` · ${s.current_count} casais`}
+                      </p>
+                    </div>
+                    {saving === s.id
+                      ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      : full
+                        ? <span className="text-xs text-muted-foreground">Lotado</span>
+                        : <Plus className="w-4 h-4 text-violet-500" />
+                    }
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
