@@ -268,13 +268,30 @@ export default function CardapioPublicoPage() {
     ;(supabase as any)
       .from('tasting_sessions')
       .select('id, scheduled_date, type, menu_text')
-      .gte('scheduled_date', today)
-      .order('scheduled_date', { ascending: true })
-      .limit(1)
-      .single()
+      .eq('scheduled_date', today)
+      .order('created_at', { ascending: true })
       .then(({ data, error }: any) => {
-        if (error || !data) setNoTasting(true);
-        else setTasting(data);
+        if (error || !data || data.length === 0) {
+          // No tasting today — try next upcoming
+          ;(supabase as any)
+            .from('tasting_sessions')
+            .select('id, scheduled_date, type, menu_text')
+            .gt('scheduled_date', today)
+            .order('scheduled_date', { ascending: true })
+            .limit(1)
+            .single()
+            .then(({ data: next, error: nextErr }: any) => {
+              if (nextErr || !next) setNoTasting(true);
+              else setTasting(next);
+              setLoading(false);
+            });
+          return;
+        }
+        // Multiple tastings today: pick by time of day
+        // Before 14:00 → first (lunch), 14:00+ → last (dinner)
+        const hour = new Date().getHours();
+        const picked = hour < 14 ? data[0] : data[data.length - 1];
+        setTasting(picked);
         setLoading(false);
       });
   }, []);
