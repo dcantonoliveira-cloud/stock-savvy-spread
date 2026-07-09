@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SupervisorSidebar from './SupervisorSidebar';
 import { supabase } from '@/integrations/supabase/client';
-import { Bell, Search, Receipt, LogOut, ChevronDown, Settings } from 'lucide-react';
+import { Bell, Search, Receipt, LogOut, ChevronDown, Settings, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const PAGE_TITLES: Record<string, string> = {
@@ -42,10 +42,13 @@ const PAGE_TITLES: Record<string, string> = {
   '/cadastros/contratos': 'Contratos',
   '/cadastros/checklists': 'Checklists',
   '/configuracoes': 'Configurações',
+  '/cadastros/notificacoes': 'Grupos de Notificação',
 };
 
 export default function SupervisorLayout({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0);
+  const [urgentAlerts, setUrgentAlerts] = useState(0);
+  const [topUrgent, setTopUrgent] = useState<string | null>(null);
   const [pendingPayslips, setPendingPayslips] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -97,11 +100,43 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  useEffect(() => {
+    const load = async () => {
+      const { data, count } = await (supabase as any)
+        .from('smart_alerts')
+        .select('message', { count: 'exact' })
+        .is('resolved_at', null)
+        .eq('severity', 'urgent')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      setUrgentAlerts(count ?? 0);
+      setTopUrgent(data?.[0]?.message ?? null);
+    };
+    load();
+    const ch = supabase
+      .channel('smart-alerts-layout')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alerts' }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
   return (
     <div className="flex min-h-screen bg-background">
       <SupervisorSidebar />
 
       <div className="flex-1 flex flex-col min-h-screen ml-[180px] xl:ml-[210px]">
+
+        {/* Urgent alert banner */}
+        {urgentAlerts > 0 && topUrgent && (
+          <Link
+            to="/notifications"
+            className="sticky top-0 z-50 flex items-center gap-3 px-4 lg:px-6 xl:px-8 py-2.5 bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
+            <span className="truncate">{urgentAlerts > 1 ? `${urgentAlerts} alertas urgentes — ` : ''}{topUrgent}</span>
+            <span className="ml-auto shrink-0 text-xs opacity-80">Ver alertas →</span>
+          </Link>
+        )}
 
         {/* Top bar */}
         <header className="sticky top-0 z-40 flex items-center justify-between px-4 lg:px-6 xl:px-8 h-14 bg-card border-b border-border">
@@ -123,12 +158,19 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
               className="relative p-2 rounded-lg transition-colors hover:bg-accent"
               title="Notificações"
             >
-              <Bell style={{ width: 18, height: 18 }} className="text-muted-foreground" />
-              {unread > 0 && (
+              <Bell
+                style={{ width: 18, height: 18 }}
+                className={urgentAlerts > 0 ? 'text-red-500 animate-[bell_0.8s_ease-in-out_infinite]' : 'text-muted-foreground'}
+              />
+              {urgentAlerts > 0 ? (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse">
+                  {urgentAlerts > 9 ? '9+' : urgentAlerts}
+                </span>
+              ) : unread > 0 ? (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive rounded-full flex items-center justify-center text-[10px] font-bold text-white">
                   {unread > 9 ? '9+' : unread}
                 </span>
-              )}
+              ) : null}
             </Link>
 
             <div className="relative pl-2 border-l border-border ml-1" ref={menuRef}>

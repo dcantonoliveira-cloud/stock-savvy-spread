@@ -56,6 +56,7 @@ const DecoradoresPage          = lazy(() => import("./pages/supervisor/cadastros
 const ContratosPage            = lazy(() => import("./pages/supervisor/cadastros/ContratosPage"));
 const ChecklistsPage           = lazy(() => import("./pages/supervisor/cadastros/ChecklistsPage"));
 const MensagensPage            = lazy(() => import("./pages/supervisor/cadastros/MensagensPage"));
+const NotificacoesGruposPage   = lazy(() => import("./pages/supervisor/cadastros/NotificacoesGruposPage"));
 const ConfiguracoesPage        = lazy(() => import("./pages/supervisor/ConfiguracoesPage"));
 const MeuPerfilPage            = lazy(() => import("./pages/supervisor/MeuPerfilPage"));
 const EventsPage               = lazy(() => import("./pages/supervisor/crm/EventsPage"));
@@ -214,6 +215,7 @@ function AppRoutes() {
             <Route path="/cadastros/contratos" element={<ContratosPage />} />
             <Route path="/cadastros/checklists" element={<ChecklistsPage />} />
             <Route path="/cadastros/mensagens" element={<MensagensPage />} />
+            <Route path="/cadastros/notificacoes" element={<NotificacoesGruposPage />} />
             <Route path="/configuracoes" element={<ConfiguracoesPage />} />
             <Route path="/meu-perfil" element={<MeuPerfilPage />} />
             <Route path="/tastings" element={<TastingsPage />} />
