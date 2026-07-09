@@ -113,7 +113,7 @@ export default function EventsPage() {
     }
     return today.getMonth();
   });
-  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['confirmed']));
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(ALL_STATUS_KEYS));
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'event_date' | 'contract_signed_date'>('event_date');
 
