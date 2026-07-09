@@ -53,6 +53,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
     var _supa = null;
+    var _companyId = null;
     try {
       var SUPA_URL = 'https://vfrtvnzptaazhzfirflm.supabase.co';
       var SUPA_KEY = 'sb_publishable_7b3DCl-vLsvuYXQ8H9Vdsw_yCvDFyhD';
@@ -62,7 +63,14 @@
       /* Autenticar com token passado via URL param (ex: ?token=...) */
       var _urlToken = new URLSearchParams(window.location.search).get('token');
       if (_supa && _urlToken) {
-        _supa.auth.setSession({ access_token: _urlToken, refresh_token: '' }).catch(function(){});
+        _supa.auth.setSession({ access_token: _urlToken, refresh_token: '' })
+          .then(function() {
+            return _supa.from('companies').select('id').limit(1).single();
+          })
+          .then(function(res) {
+            if (res.data && res.data.id) _companyId = res.data.id;
+          })
+          .catch(function(){});
       }
     } catch(e) { console.warn('Supabase init failed:', e); }
   </script>
@@ -2747,6 +2755,7 @@
       };
       if (_supa) {
         var savePayload = {
+          company_id: _companyId,
           nome_evento: cliente.tipo || '',
           tipo_pacote: nomePacotes,
           valor_total: total,
