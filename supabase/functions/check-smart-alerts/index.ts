@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
       title:       `Holerite não assinado — ${ps.display_name ?? 'Funcionário'}`,
       description: `"${ps.title}" publicado há ${daysWaiting} dia${daysWaiting !== 1 ? 's' : ''} sem assinatura.`,
       entity_type: 'user',
-      entity_id:   ps.employee_id,
+      entity_id:   ps.id,
     })
   }
 
