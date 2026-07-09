@@ -59,7 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </>
         )}
         <button
-          onClick={() => { window.location.href = window.location.href; }}
+          onClick={() => { window.location.reload(); }}
           className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
