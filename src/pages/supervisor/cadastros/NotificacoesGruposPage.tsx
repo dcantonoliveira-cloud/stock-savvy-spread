@@ -28,18 +28,15 @@ export default function NotificacoesGruposPage() {
   const [adding, setAdding]     = useState<GroupType | null>(null);
 
   useEffect(() => {
-    if (myProfile?.company_id) load();
-  }, [myProfile?.company_id]);
+    load();
+  }, []);
 
   async function load() {
-    const companyId = myProfile?.company_id;
-
     const [{ data: grpData }, { data: profData }] = await Promise.all([
       (supabase as any).from('notification_groups').select('id, type, notification_group_members(id, user_id, profiles(display_name, phone))'),
       supabase
         .from('profiles')
         .select('user_id, display_name, phone')
-        .eq('company_id', companyId as any)
         .not('display_name', 'is', null)
         .order('display_name'),
     ]);
