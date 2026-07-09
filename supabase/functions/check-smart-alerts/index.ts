@@ -189,7 +189,11 @@ Deno.serve(async (req) => {
         alert.type === 'payslip_unsigned' ? 'holerites'  : null
 
       if (!groupType) continue
-      const msg = `🚨 *${alert.title}*\n${alert.description}`
+      const emoji =
+        alert.type === 'payment_pending' ? '💸' :
+        alert.type === 'menu_change'      ? '🍽️' :
+        alert.type === 'payslip_unsigned' ? '📄' : '🚨'
+      const msg = `${emoji} *${alert.title}*\n${alert.description}`
       for (const phone of groupMap[groupType] ?? []) {
         await sendWhatsApp(phone, msg, zapiConfig)
       }

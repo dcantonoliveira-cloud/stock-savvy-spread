@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 
 type AlertSeverity = 'urgent' | 'warning';
-type AlertType = 'financeiro' | 'eventos' | 'holerites' | 'exames';
+type AlertType = string;
 
 interface SmartAlert {
   id: string; type: AlertType; severity: AlertSeverity;
@@ -18,11 +18,11 @@ interface SmartAlert {
   resolved_at: string | null; resolved_by_name: string | null; created_at: string;
 }
 
-const TYPE_META: Record<AlertType, { icon: React.ReactNode; label: string }> = {
-  financeiro: { icon: <DollarSign className="w-4 h-4" />,  label: 'Financeiro' },
-  eventos:    { icon: <CalendarDays className="w-4 h-4" />, label: 'Evento' },
-  holerites:  { icon: <FileText className="w-4 h-4" />,     label: 'Holerite' },
-  exames:     { icon: <Stethoscope className="w-4 h-4" />,  label: 'Exame' },
+const TYPE_META: Record<string, { emoji: string; icon: React.ReactNode; label: string }> = {
+  payment_pending:  { emoji: '💸', icon: <DollarSign className="w-4 h-4" />,  label: 'Pagamento' },
+  menu_change:      { emoji: '🍽️', icon: <CalendarDays className="w-4 h-4" />, label: 'Cardápio' },
+  payslip_unsigned: { emoji: '📄', icon: <FileText className="w-4 h-4" />,     label: 'Holerite' },
+  exames:           { emoji: '🩺', icon: <Stethoscope className="w-4 h-4" />,  label: 'Exame' },
 };
 
 const SEV_STYLE = {
@@ -141,14 +141,14 @@ export default function NotificationsPage() {
         <div className="space-y-2">
           {shown.map(a => {
             const sev  = SEV_STYLE[a.severity] ?? SEV_STYLE.warning;
-            const meta = TYPE_META[a.type] ?? { icon: <Bell className="w-4 h-4"/>, label: a.type };
+            const meta = TYPE_META[a.type] ?? { emoji: '🚨', icon: <Bell className="w-4 h-4"/>, label: a.type };
             const canNav = (a.entity_type==='event'||a.entity_type==='employee') && a.entity_id;
             return (
               <div key={a.id} className={`bg-white border border-border border-l-4 ${sev.border} rounded-xl px-4 py-3 flex items-start gap-3 ${a.resolved_at?'opacity-60':''}`}>
                 <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${sev.dot}`}/>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${sev.badge}`}>{meta.icon}{meta.label}</span>
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${sev.badge}`}>{meta.emoji} {meta.label}</span>
                     <span className="text-[11px] text-muted-foreground">{relTime(a.created_at)}</span>
                   </div>
                   <p className="text-sm font-semibold text-foreground mt-1 leading-snug">{a.title}</p>
