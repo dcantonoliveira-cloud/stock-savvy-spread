@@ -1708,8 +1708,13 @@
       return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
     }
     function getCliente(item) {
-      try { return typeof item.cliente_json === 'string' ? JSON.parse(item.cliente_json) : (item.cliente_json || {}); }
-      catch(e) { return {}; }
+      try {
+        if (item.cliente_json) {
+          return typeof item.cliente_json === 'string' ? JSON.parse(item.cliente_json) : (item.cliente_json || {});
+        }
+        var dados = typeof item.dados_json === 'string' ? JSON.parse(item.dados_json) : item.dados_json;
+        return (dados && dados.cliente) ? dados.cliente : {};
+      } catch(e) { return {}; }
     }
     function getNomeCliente(item) { var c = getCliente(item); return c.nome || '—'; }
 
@@ -2440,7 +2445,7 @@
       } catch(e) { return ''; }
     });
 
-    var BUBBLE_BASE = 'https://rondellobuffet-app.com.br/api/1.1';
+    var BUBBLE_BASE = 'https://rondelloemcasa.bubbleapps.io/api/1.1';
     var BUBBLE_TOKEN = 'Bearer b4b3c4138bb1000811d5a3c0ba47a238';
 
     /* ── Supabase sync para masterCardapio ───────────────────────────────── */
