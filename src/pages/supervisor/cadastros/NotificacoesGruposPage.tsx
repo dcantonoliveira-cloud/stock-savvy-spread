@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { DollarSign, CalendarDays, FileText, Stethoscope, X, Plus, Loader2 } from 'lucide-react';
 
@@ -19,6 +20,7 @@ const GROUP_META: Record<GroupType, { label: string; desc: string; icon: React.R
 const ALL_TYPES: GroupType[] = ['financeiro', 'eventos', 'holerites', 'exames'];
 
 export default function NotificacoesGruposPage() {
+  const { profile: myProfile } = useAuth();
   const [groups, setGroups]     = useState<Record<GroupType, Group | null>>({ financeiro: null, eventos: null, holerites: null, exames: null });
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -26,13 +28,28 @@ export default function NotificacoesGruposPage() {
   const [adding, setAdding]     = useState<GroupType | null>(null);
 
   useEffect(() => {
-    load();
-  }, []);
+    if (myProfile?.company_id) load();
+  }, [myProfile?.company_id]);
 
   async function load() {
+    const companyId = myProfile?.company_id;
+
+    // Buscar user_ids com role supervisor ou employee nessa empresa
+    const { data: roleRows } = await supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .in('role', ['supervisor', 'employee'] as any[]);
+
+    const eligibleIds = (roleRows ?? []).map((r: any) => r.user_id);
+
     const [{ data: grpData }, { data: profData }] = await Promise.all([
       (supabase as any).from('notification_groups').select('id, type, notification_group_members(id, user_id, profiles(display_name, phone))'),
-      supabase.from('profiles').select('user_id, display_name, phone').order('display_name'),
+      supabase
+        .from('profiles')
+        .select('user_id, display_name, phone')
+        .eq('company_id', companyId as any)
+        .in('user_id', eligibleIds.length > 0 ? eligibleIds : ['00000000-0000-0000-0000-000000000000'])
+        .order('display_name'),
     ]);
 
     const map: Record<GroupType, Group | null> = { financeiro: null, eventos: null, holerites: null, exames: null };
