@@ -2556,70 +2556,56 @@
 
     function handleSaveModelo(nome) {
       const dados = getSnapshot();
-      const id = 'mdl_' + Date.now();
-      const novo = { id, nome, dados };
+      const novo = { nome, dados };
 
-      /* Atualiza estado e localStorage imediatamente */
-      setModelos(function(prev) {
-        const updated = [...prev, novo];
-        localStorage.setItem('rondello_modelos', JSON.stringify(updated));
-        return updated;
-      });
-
-      /* Salva no Bubble Data API */
-      fetch(BUBBLE_BASE + '/obj/modelo_proposta', {
-        method: 'POST',
-        headers: { 'Authorization': BUBBLE_TOKEN, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelo_id: id, nome: nome, dados_json: JSON.stringify(dados) })
-      }).then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.id) {
-            /* Atualiza o bubble_id no registro local para DELETE funcionar depois */
-            setModelos(function(prev) {
-              const updated = prev.map(function(m) { return m.id === id ? Object.assign({}, m, { bubble_id: data.id }) : m; });
-              localStorage.setItem('rondello_modelos', JSON.stringify(updated));
-              return updated;
-            });
-          }
-        }).catch(function(e) { console.error('[Rondello] Erro ao salvar modelo no Bubble:', e); });
-
-      alert('Modelo "' + nome + '" salvo!');
+      if (_supa && _companyId) {
+        _supa.from('quotation_models')
+          .insert({ company_id: _companyId, nome: nome, dados_json: dados, criado_por: usuarioAtual || '' })
+          .select('id, nome, dados_json, criado_por')
+          .single()
+          .then(function(res) {
+            if (res.data) {
+              const m = { id: res.data.id, nome: res.data.nome, dados: res.data.dados_json };
+              setModelos(function(prev) {
+                const updated = [...prev, m];
+                localStorage.setItem('rondello_modelos', JSON.stringify(updated));
+                return updated;
+              });
+              alert('Modelo "' + nome + '" salvo!');
+            } else {
+              alert('Erro ao salvar modelo: ' + (res.error && res.error.message));
+            }
+          }).catch(function(e) { alert('Erro ao salvar modelo: ' + e.message); });
+      } else {
+        /* fallback localStorage se não tiver Supabase ainda */
+        const id = 'mdl_' + Date.now();
+        setModelos(function(prev) {
+          const updated = [...prev, Object.assign({ id }, novo)];
+          localStorage.setItem('rondello_modelos', JSON.stringify(updated));
+          return updated;
+        });
+        alert('Modelo "' + nome + '" salvo localmente.');
+      }
     }
 
     function handleDeleteModelo(id) {
-      const m = modelos.find(function(m){ return m.id === id; });
-      const updated = modelos.filter(function(m){ return m.id !== id; });
-      localStorage.setItem('rondello_modelos', JSON.stringify(updated));
-      setModelos(updated);
-
-      /* Remove do Bubble pelo bubble_id (se disponível) */
-      const bubbleId = m && m.bubble_id;
-      if (bubbleId) {
-        fetch(BUBBLE_BASE + '/obj/modelo_proposta/' + bubbleId, {
-          method: 'DELETE', headers: { 'Authorization': BUBBLE_TOKEN }
-        }).catch(function(){});
-      } else {
-        /* Fallback: busca pelo modelo_id e deleta */
-        fetch(BUBBLE_BASE + '/obj/modelo_proposta?constraints=' + encodeURIComponent(JSON.stringify([{key:'modelo_id',constraint_type:'equals',value:id}])), {
-          headers: { 'Authorization': BUBBLE_TOKEN }
-        }).then(function(r){ return r.json(); })
-          .then(function(data){
-            var results = (data.response && data.response.results) || [];
-            results.forEach(function(item) {
-              fetch(BUBBLE_BASE + '/obj/modelo_proposta/' + item._id, {
-                method: 'DELETE', headers: { 'Authorization': BUBBLE_TOKEN }
-              }).catch(function(){});
-            });
-          }).catch(function(){});
+      setModelos(function(prev) {
+        const updated = prev.filter(function(m){ return m.id !== id; });
+        localStorage.setItem('rondello_modelos', JSON.stringify(updated));
+        return updated;
+      });
+      if (_supa && id && !id.startsWith('mdl_')) {
+        _supa.from('quotation_models').delete().eq('id', id).catch(function(){});
       }
     }
 
     /* postMessage + URL params + localStorage on mount */
     React.useEffect(() => {
-      /* 1. Load from localStorage first */
+      /* 1. Load from localStorage first (inclui modelos salvos antes da migração) */
+      var localModelos = [];
       try {
-        const saved = JSON.parse(localStorage.getItem('rondello_modelos') || '[]');
-        if (saved.length) setModelos(saved);
+        localModelos = JSON.parse(localStorage.getItem('rondello_modelos') || '[]');
+        if (localModelos.length) setModelos(localModelos);
       } catch(e) {}
 
       function onMessage(e) {
@@ -2647,26 +2633,43 @@
         if (msParam) setModelos(JSON.parse(atob(msParam)));
       } catch(e) {}
 
-      /* Fetch modelos do Bubble — fonte de verdade */
-      fetch(BUBBLE_BASE + '/obj/modelo_proposta?limit=100', {
-        headers: { 'Authorization': BUBBLE_TOKEN }
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var results = (data.response && data.response.results) || [];
-        var ms = results.map(function(item) {
-          try {
-            var dados = typeof item.dados_json === 'string' ? JSON.parse(item.dados_json) : item.dados_json;
-            if (!dados || !item.nome) return null;
-            return { id: item.modelo_id || item._id, bubble_id: item._id, nome: item.nome, dados: dados };
-          } catch(e) { return null; }
-        }).filter(Boolean);
-        /* Usa Bubble como fonte de verdade — substitui localStorage */
-        setModelos(ms);
-        localStorage.setItem('rondello_modelos', JSON.stringify(ms));
-      }).catch(function(){});
+      /* Fetch modelos do Supabase — fonte de verdade */
+      if (_supa) {
+        /* Aguarda o setSession terminar antes de buscar */
+        setTimeout(function() {
+          _supa.from('quotation_models')
+            .select('id, nome, dados_json, criado_por')
+            .order('created_at', { ascending: true })
+            .then(function(res) {
+              var ms = (res.data || []).map(function(r) {
+                return { id: r.id, nome: r.nome, dados: r.dados_json };
+              });
 
-      /* postMessage fallback para compatibilidade */
+              /* Migra modelos do localStorage que ainda não estão no Supabase */
+              var supaIds = new Set(ms.map(function(m){ return m.id; }));
+              var pending = localModelos.filter(function(m){ return m.nome && !supaIds.has(m.id); });
+              if (pending.length && _companyId) {
+                var rows = pending.map(function(m) {
+                  return { company_id: _companyId, nome: m.nome, dados_json: m.dados || m };
+                });
+                _supa.from('quotation_models').insert(rows).select('id, nome, dados_json')
+                  .then(function(ins) {
+                    var migrados = (ins.data || []).map(function(r){ return { id: r.id, nome: r.nome, dados: r.dados_json }; });
+                    var todos = ms.concat(migrados);
+                    setModelos(todos);
+                    localStorage.setItem('rondello_modelos', JSON.stringify(todos));
+                  }).catch(function(){
+                    setModelos(ms);
+                    localStorage.setItem('rondello_modelos', JSON.stringify(ms));
+                  });
+              } else {
+                setModelos(ms);
+                localStorage.setItem('rondello_modelos', JSON.stringify(ms));
+              }
+            }).catch(function(){});
+        }, 800);
+      }
+
       try { window.parent.postMessage({ action:'requestModelos' }, '*'); } catch(e) {}
 
       return () => window.removeEventListener('message', onMessage);
