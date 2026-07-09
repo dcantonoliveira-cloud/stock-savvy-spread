@@ -28,17 +28,29 @@ export default function NotificacoesGruposPage() {
   const [adding, setAdding]     = useState<GroupType | null>(null);
 
   useEffect(() => {
-    load();
-  }, []);
+    // myProfile pode demorar a carregar — aguarda ter company_id
+    if (myProfile !== undefined) load(myProfile?.company_id ?? null);
+  }, [myProfile]);
 
-  async function load() {
+  async function load(companyId: string | null) {
+    // Busca company_id via DB se não veio no perfil
+    let cid = companyId;
+    if (!cid) {
+      const { data: c } = await supabase.from('companies').select('id').limit(1).single();
+      cid = c?.id ?? null;
+    }
+
+    const profQuery = supabase
+      .from('profiles')
+      .select('user_id, display_name, phone')
+      .not('display_name', 'is', null)
+      .order('display_name');
+
+    if (cid) profQuery.eq('company_id', cid as any);
+
     const [{ data: grpData }, { data: profData }] = await Promise.all([
       (supabase as any).from('notification_groups').select('id, type, notification_group_members(id, user_id, profiles(display_name, phone))'),
-      supabase
-        .from('profiles')
-        .select('user_id, display_name, phone')
-        .not('display_name', 'is', null)
-        .order('display_name'),
+      profQuery,
     ]);
 
     const map: Record<GroupType, Group | null> = { financeiro: null, eventos: null, holerites: null, exames: null };
