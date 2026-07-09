@@ -34,21 +34,13 @@ export default function NotificacoesGruposPage() {
   async function load() {
     const companyId = myProfile?.company_id;
 
-    // Buscar user_ids com role supervisor ou employee nessa empresa
-    const { data: roleRows } = await supabase
-      .from('user_roles')
-      .select('user_id, role')
-      .in('role', ['supervisor', 'employee'] as any[]);
-
-    const eligibleIds = (roleRows ?? []).map((r: any) => r.user_id);
-
     const [{ data: grpData }, { data: profData }] = await Promise.all([
       (supabase as any).from('notification_groups').select('id, type, notification_group_members(id, user_id, profiles(display_name, phone))'),
       supabase
         .from('profiles')
         .select('user_id, display_name, phone')
         .eq('company_id', companyId as any)
-        .in('user_id', eligibleIds.length > 0 ? eligibleIds : ['00000000-0000-0000-0000-000000000000'])
+        .not('display_name', 'is', null)
         .order('display_name'),
     ]);
 
