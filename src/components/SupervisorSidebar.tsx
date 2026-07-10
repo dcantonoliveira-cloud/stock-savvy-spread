@@ -74,7 +74,7 @@ const navStructure: NavGroup[] = [
     { path: '/cadastros/contratos',   label: 'Contratos',          icon: ScrollText },
     { path: '/cadastros/decoradores', label: 'Decoradores',        icon: Palette },
     { path: '/cadastros/mensagens',    label: 'Mensagens WhatsApp', icon: MessageCircle },
-    { path: '/cadastros/notificacoes', label: 'Notificações',       icon: Bell },
+    { path: '/cadastros/notificacoes', label: 'Automações',          icon: Bell },
     { path: '/cadastros/produtos',     label: 'Produtos',           icon: ChefHat },
     { path: '/cadastros/saloes',      label: 'Salões & Locais',    icon: MapPin },
     { path: '/cadastros/tipos-festa', label: 'Tipos de Festa',     icon: Sparkles },

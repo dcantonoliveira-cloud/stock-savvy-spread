@@ -104,13 +104,13 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     const load = async () => {
       const { data, count } = await (supabase as any)
         .from('smart_alerts')
-        .select('message', { count: 'exact' })
+        .select('title', { count: 'exact' })
         .is('resolved_at', null)
         .eq('severity', 'urgent')
         .order('created_at', { ascending: false })
         .limit(1);
       setUrgentAlerts(count ?? 0);
-      setTopUrgent(data?.[0]?.message ?? null);
+      setTopUrgent(data?.[0]?.title ?? null);
     };
     load();
     const ch = supabase
