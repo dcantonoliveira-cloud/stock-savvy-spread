@@ -67,6 +67,7 @@ export default function EstatisticasPage() {
   const [loading, setLoading] = useState(true);
   const [tastings, setTastings] = useState<any[]>([]);
   const [tastingRange, setTastingRange] = useState<'3m' | '1a' | 'all'>('1a');
+  const [activeCell, setActiveCell] = useState<{ key: string; month: number } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = useState(1000);
 
@@ -94,7 +95,7 @@ export default function EstatisticasPage() {
           .lte('event_date', `${year}-12-31`),
         supabase
           .from('tasting_session_events' as any)
-          .select('event_id, situation_snapshot, tasting_sessions!session_id(scheduled_date, type)'),
+          .select('event_id, session_id, situation_snapshot, tasting_sessions!session_id(scheduled_date, type)'),
       ]);
       setEvents((evtRes.data ?? []) as EventRow[]);
       setTastings((tastRes.data ?? []) as any[]);
@@ -129,62 +130,76 @@ export default function EstatisticasPage() {
   const totalRev    = completed.reduce((s, e) => s + (e.total_value ?? 0), 0);
   const ticketMedio = totalEvents ? totalRev / totalEvents : 0;
 
-  // Tabela mensal
-  const monthlyTable = useMemo(() => MONTHS.map((_, i) => {
-    // Orçamentos: eventos com event_date neste mês
-    const mo = events.filter(e => e.event_date && monthOf(e.event_date) === i);
-
-    // Contratos fechados: agrupados pelo mês em que o contrato foi assinado,
-    // não pelo mês do evento (para evitar meses futuros aparecerem preenchidos)
-    const fechados = events.filter(e => {
-      if (e.contract_signed_date) {
-        return e.contract_signed_date.startsWith(`${year}`) && monthOf(e.contract_signed_date) === i;
-      }
-      // fallback para eventos sem data de fechamento: usa event_date mas só se já realizados/confirmados
-      // e apenas para meses passados ou atual
-      const currentMonth = new Date().getMonth();
-      const currentYear  = new Date().getFullYear();
-      if (year > currentYear || (year === currentYear && i > currentMonth)) return false;
-      return e.event_date && monthOf(e.event_date) === i &&
-        (e.contract_signed || ['confirmed','completed'].includes(e.status));
-    });
-
-    // Faturamento: pela data do evento (receita prevista por mês de realização)
-    const rev = mo
-      .filter(e => e.contract_signed || ['confirmed','completed'].includes(e.status))
-      .reduce((s, e) => s + (e.total_value ?? 0), 0);
-
-    return {
-      orcamentos: mo.length,
-      contratos: fechados.length,
-      degustacoes: 0,
-      faturamento: rev,
-    };
-  }), [events, year]);
-
-  // Degustações por mês (contagem de tasting_session_events no ano)
-  const tastingsByMonth = useMemo(() => {
-    const counts = Array(12).fill(0);
+  // Mapa de sessões distintas (session_id → {date, type})
+  const sessionMap = useMemo(() => {
+    const map = new Map<string, { date: string; type: string | null }>();
     tastings.forEach((t: any) => {
-      const session = Array.isArray(t.tasting_sessions) ? t.tasting_sessions[0] : t.tasting_sessions;
-      const d = session?.scheduled_date;
-      if (d && d.startsWith(`${year}`)) {
-        counts[monthOf(d)]++;
-      }
+      if (!t.session_id || map.has(t.session_id)) return;
+      const s = Array.isArray(t.tasting_sessions) ? t.tasting_sessions[0] : t.tasting_sessions;
+      if (s?.scheduled_date) map.set(t.session_id, { date: s.scheduled_date, type: s.type });
     });
-    return counts;
-  }, [tastings, year]);
+    return map;
+  }, [tastings]);
 
-  const tableRows = useMemo(() => monthlyTable.map((m, i) => ({
-    ...m,
-    degustacoes: tastingsByMonth[i],
-  })), [monthlyTable, tastingsByMonth]);
+  // Mapa event_id → event_name para lookup no popup
+  const eventNameMap = useMemo(() => new Map(events.map(e => [e.id, e.event_name ?? e.id])), [events]);
+
+  // Tabela mensal com listas detalhadas para popup
+  const tableRows = useMemo(() => {
+    const currentMonth = new Date().getMonth();
+    const currentYear  = new Date().getFullYear();
+
+    return MONTHS.map((_, i) => {
+      // Orçamentos: por event_date
+      const orcList = events.filter(e => e.event_date && monthOf(e.event_date) === i);
+
+      // Contratos fechados: por contract_signed_date (mês real de fechamento)
+      const contratosList = events.filter(e => {
+        if (e.contract_signed_date) {
+          return e.contract_signed_date.startsWith(`${year}`) && monthOf(e.contract_signed_date) === i;
+        }
+        if (year > currentYear || (year === currentYear && i > currentMonth)) return false;
+        return e.event_date && monthOf(e.event_date) === i &&
+          (e.contract_signed || ['confirmed','completed'].includes(e.status));
+      });
+
+      // Degustações: sessões distintas no mês
+      const sessionsList: Array<{ id: string; date: string; type: string | null }> = [];
+      for (const [sid, sd] of sessionMap) {
+        if (sd.date.startsWith(`${year}`) && monthOf(sd.date) === i)
+          sessionsList.push({ id: sid, ...sd });
+      }
+
+      // Eventos em degustação: tasting_session_events do mês
+      const tastingEventsList = tastings.filter((t: any) => {
+        const s = Array.isArray(t.tasting_sessions) ? t.tasting_sessions[0] : t.tasting_sessions;
+        const d = s?.scheduled_date;
+        return d && d.startsWith(`${year}`) && monthOf(d) === i;
+      });
+
+      // Faturamento: soma dos contratos fechados no mês
+      const faturamento = contratosList.reduce((s, e) => s + (e.total_value ?? 0), 0);
+
+      return {
+        orcamentos:   orcList.length,
+        contratos:    contratosList.length,
+        degustacoes:  sessionsList.length,
+        eventos_deg:  tastingEventsList.length,
+        faturamento,
+        _orcList:     orcList,
+        _contratosList: contratosList,
+        _sessionsList: sessionsList,
+        _tastingEventsList: tastingEventsList,
+      };
+    });
+  }, [events, year, sessionMap, tastings]);
 
   const totals = useMemo(() => ({
-    orcamentos: tableRows.reduce((s, r) => s + r.orcamentos, 0),
-    contratos:  tableRows.reduce((s, r) => s + r.contratos, 0),
-    degustacoes:tableRows.reduce((s, r) => s + r.degustacoes, 0),
-    faturamento:tableRows.reduce((s, r) => s + r.faturamento, 0),
+    orcamentos:  tableRows.reduce((s, r) => s + r.orcamentos, 0),
+    contratos:   tableRows.reduce((s, r) => s + r.contratos, 0),
+    degustacoes: tableRows.reduce((s, r) => s + r.degustacoes, 0),
+    eventos_deg: tableRows.reduce((s, r) => s + r.eventos_deg, 0),
+    faturamento: tableRows.reduce((s, r) => s + r.faturamento, 0),
   }), [tableRows]);
 
   // Degustações section
@@ -368,21 +383,31 @@ export default function EstatisticasPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {[
-                    { label: 'Orçamentos cadastrados', key: 'orcamentos' as const, fmt: (v: number) => v || '—' },
-                    { label: 'Contratos fechados',     key: 'contratos'  as const, fmt: (v: number) => v || '—' },
-                    { label: 'Degustações',            key: 'degustacoes'as const, fmt: (v: number) => v || '—' },
-                    { label: 'Faturamento vendido',    key: 'faturamento'as const, fmt: (v: number) => v ? fmtBRL(v) : '—' },
-                  ].map(({ label, key, fmt }) => (
+                  {([
+                    { label: 'Orçamentos cadastrados', key: 'orcamentos',  fmt: (v: number) => v || '—' },
+                    { label: 'Contratos fechados',     key: 'contratos',   fmt: (v: number) => v || '—' },
+                    { label: 'Degustações',            key: 'degustacoes', fmt: (v: number) => v || '—' },
+                    { label: 'Eventos em degustação',  key: 'eventos_deg', fmt: (v: number) => v || '—' },
+                    { label: 'Faturamento vendido',    key: 'faturamento', fmt: (v: number) => v
+                      ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : '—' },
+                  ] as const).map(({ label, key, fmt }) => (
                     <tr key={key} className="hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground sticky left-0 bg-white z-10">{label}</td>
-                      {tableRows.map((row, i) => (
-                        <td key={i} className="px-3 py-3 text-center text-muted-foreground">
-                          {fmt(row[key])}
-                        </td>
-                      ))}
+                      {tableRows.map((row, i) => {
+                        const val = row[key as keyof typeof row] as number;
+                        return (
+                          <td
+                            key={i}
+                            onClick={() => val > 0 ? setActiveCell({ key, month: i }) : undefined}
+                            className={`px-3 py-3 text-center text-muted-foreground transition-colors ${val > 0 ? 'cursor-pointer hover:bg-primary/5 hover:text-primary font-medium' : ''}`}
+                          >
+                            {fmt(val)}
+                          </td>
+                        );
+                      })}
                       <td className="px-4 py-3 text-center font-bold text-foreground sticky right-0 bg-slate-50 border-l border-border">
-                        {fmt(totals[key])}
+                        {fmt(totals[key as keyof typeof totals] as number)}
                       </td>
                     </tr>
                   ))}
@@ -390,6 +415,71 @@ export default function EstatisticasPage() {
               </table>
             </div>
           </div>
+
+          {/* ── Popup célula ── */}
+          {activeCell && (() => {
+            const row = tableRows[activeCell.month];
+            const monthLabel = MONTHS_FULL[activeCell.month];
+            type Item = { label: string; sub?: string };
+            let title = '';
+            let items: Item[] = [];
+
+            if (activeCell.key === 'orcamentos') {
+              title = `Orçamentos — ${monthLabel}`;
+              items = row._orcList.map(e => ({ label: e.event_name ?? '—', sub: e.event_date?.slice(0, 10) }));
+            } else if (activeCell.key === 'contratos') {
+              title = `Contratos fechados — ${monthLabel}`;
+              items = row._contratosList.map(e => ({
+                label: e.event_name ?? '—',
+                sub: e.contract_signed_date
+                  ? `Fechado em ${e.contract_signed_date.slice(0, 10)}`
+                  : e.event_date?.slice(0, 10),
+              }));
+            } else if (activeCell.key === 'degustacoes') {
+              title = `Degustações — ${monthLabel}`;
+              items = row._sessionsList.map(s => ({
+                label: s.type ?? 'Sem tipo',
+                sub: s.date?.slice(0, 10),
+              }));
+            } else if (activeCell.key === 'eventos_deg') {
+              title = `Eventos em degustação — ${monthLabel}`;
+              items = row._tastingEventsList.map((t: any) => ({
+                label: eventNameMap.get(t.event_id) ?? t.event_id,
+                sub: t.situation_snapshot ?? undefined,
+              }));
+            } else if (activeCell.key === 'faturamento') {
+              title = `Faturamento vendido — ${monthLabel}`;
+              items = row._contratosList.map(e => ({
+                label: e.event_name ?? '—',
+                sub: e.total_value != null
+                  ? e.total_value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : '—',
+              }));
+            }
+
+            return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setActiveCell(null)}>
+                <div className="absolute inset-0 bg-black/30" />
+                <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                    <p className="font-semibold text-foreground text-sm">{title}</p>
+                    <button onClick={() => setActiveCell(null)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground">✕</button>
+                  </div>
+                  <div className="divide-y divide-border/50 max-h-80 overflow-y-auto">
+                    {items.length === 0 && (
+                      <p className="px-5 py-8 text-sm text-muted-foreground text-center">Nenhum item.</p>
+                    )}
+                    {items.map((item, idx) => (
+                      <div key={idx} className="px-5 py-3">
+                        <p className="text-sm font-medium text-foreground">{item.label}</p>
+                        {item.sub && <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Seção 4: Degustações ── */}
           <div className="bg-white border border-border rounded-2xl p-6">
