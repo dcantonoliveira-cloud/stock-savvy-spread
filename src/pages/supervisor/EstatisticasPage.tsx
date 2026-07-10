@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { ChevronLeft, ChevronRight, TrendingUp, Users, BarChart3, DollarSign, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, BarChart3, DollarSign, Lock, ExternalLink, CheckCircle2, X } from 'lucide-react';
+import { getStatus } from '@/lib/eventStatus';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -30,6 +32,21 @@ interface EventRow {
   contract_signed_date: string | null;
   product_name: string | null;
   created_at: string;
+}
+
+interface ContratoRow {
+  id: string;
+  event_name: string | null;
+  event_type: string | null;
+  status: string;
+  event_date: string | null;
+  location_text: string | null;
+  guest_count: number | null;
+  price_per_person: number | null;
+  total_value: number | null;
+  paid_value: number | null;
+  is_paid_in_full: boolean | null;
+  contract_signed_date: string | null;
 }
 
 // ── Dot with label for line chart ─────────────────────────────────────────────
@@ -62,10 +79,11 @@ const RONDELLO_DOMAIN = 'rondellobuffet.com.br';
 
 export default function EstatisticasPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [year, setYear] = useState(new Date().getFullYear());
   const [tab, setTab] = useState<'originais' | 'bi'>('originais');
   const [events, setEvents] = useState<EventRow[]>([]);
-  const [contratos, setContratos] = useState<EventRow[]>([]);
+  const [contratos, setContratos] = useState<ContratoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tastings, setTastings] = useState<any[]>([]);
   const [tastingRange, setTastingRange] = useState<'3m' | '1a' | 'all'>('1a');
@@ -99,16 +117,17 @@ export default function EstatisticasPage() {
         // Contratos fechados no ano: filtrado por contract_signed_date (independente do event_date)
         supabase
           .from('events')
-          .select('id, event_name, status, event_date, total_value, contract_signed_date')
+          .select('id, event_name, event_type, status, event_date, location_text, guest_count, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed_date')
           .not('contract_signed_date', 'is', null)
           .gte('contract_signed_date', `${year}-01-01`)
-          .lte('contract_signed_date', `${year}-12-31`),
+          .lte('contract_signed_date', `${year}-12-31`)
+          .order('contract_signed_date'),
         supabase
           .from('tasting_session_events' as any)
           .select('event_id, session_id, situation_snapshot, tasting_sessions!session_id(scheduled_date, type)'),
       ]);
       setEvents((evtRes.data ?? []) as EventRow[]);
-      setContratos((contratosRes.data ?? []) as EventRow[]);
+      setContratos((contratosRes.data ?? []) as ContratoRow[]);
       setTastings((tastRes.data ?? []) as any[]);
       setLoading(false);
     };
@@ -420,70 +439,18 @@ export default function EstatisticasPage() {
           </div>
 
           {/* ── Popup célula ── */}
-          {activeCell && (() => {
-            const row = tableRows[activeCell.month];
-            const monthLabel = MONTHS_FULL[activeCell.month];
-            type Item = { label: string; sub?: string };
-            let title = '';
-            let items: Item[] = [];
-
-            if (activeCell.key === 'orcamentos') {
-              title = `Orçamentos — ${monthLabel}`;
-              items = row._orcList.map(e => ({ label: e.event_name ?? '—', sub: e.event_date?.slice(0, 10) }));
-            } else if (activeCell.key === 'contratos') {
-              title = `Contratos fechados — ${monthLabel}`;
-              items = row._contratosList.map(e => ({
-                label: e.event_name ?? '—',
-                sub: e.contract_signed_date
-                  ? `Fechado em ${e.contract_signed_date.slice(0, 10)}`
-                  : e.event_date?.slice(0, 10),
-              }));
-            } else if (activeCell.key === 'degustacoes') {
-              title = `Degustações — ${monthLabel}`;
-              items = row._sessionsList.map(s => ({
-                label: s.type ?? 'Sem tipo',
-                sub: s.date?.slice(0, 10),
-              }));
-            } else if (activeCell.key === 'eventos_deg') {
-              title = `Eventos em degustação — ${monthLabel}`;
-              items = row._tastingEventsList.map((t: any) => ({
-                label: eventNameMap.get(t.event_id) ?? t.event_id,
-                sub: t.situation_snapshot ?? undefined,
-              }));
-            } else if (activeCell.key === 'faturamento') {
-              title = `Faturamento vendido — ${monthLabel}`;
-              items = row._contratosList
-                .filter(e => e.total_value != null && e.total_value > 0)
-                .sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
-                .map(e => ({
-                  label: e.event_name ?? '—',
-                  sub: (e.total_value!).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                }));
-            }
-
-            return (
-              <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setActiveCell(null)}>
-                <div className="absolute inset-0 bg-black/30" />
-                <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden" style={{ maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
-                  <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                    <p className="font-semibold text-foreground text-sm">{title}</p>
-                    <button onClick={() => setActiveCell(null)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground">✕</button>
-                  </div>
-                  <div className="divide-y divide-border/50">
-                    {items.length === 0 && (
-                      <p className="px-5 py-8 text-sm text-muted-foreground text-center">Nenhum item.</p>
-                    )}
-                    {items.map((item, idx) => (
-                      <div key={idx} className="px-5 py-3">
-                        <p className="text-sm font-medium text-foreground">{item.label}</p>
-                        {item.sub && <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          {activeCell && <CellPopup
+            activeCell={activeCell}
+            tableRows={tableRows}
+            contratos={contratos}
+            eventNameMap={eventNameMap}
+            year={year}
+            onClose={() => setActiveCell(null)}
+            onNavigate={(id) => {
+              setActiveCell(null);
+              navigate(`/events/${id}`, { state: { from: '/estatisticas', fromLabel: 'Estatísticas' } });
+            }}
+          />}
 
           {/* ── Seção 4: Degustações ── */}
           <div className="bg-white border border-border rounded-2xl p-6">
@@ -589,6 +556,168 @@ export default function EstatisticasPage() {
         )
       )}
 
+    </div>
+  );
+}
+
+// ── CellPopup ─────────────────────────────────────────────────────────────────
+function PgtoBadge({ total, paid, full }: { total: number | null; paid: number | null; full: boolean | null }) {
+  const t = total ?? 0;
+  const p = paid ?? 0;
+  const pct = t > 0 ? Math.round((p / t) * 100) : 0;
+  if (full || pct >= 100)
+    return <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600"><CheckCircle2 className="w-3 h-3"/>100%</span>;
+  if (pct === 0)
+    return <span className="text-[11px] font-semibold text-amber-600">0%</span>;
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <span className="text-[11px] font-semibold text-amber-600">{pct}%</span>
+      <div className="w-10 h-1 bg-muted rounded-full overflow-hidden">
+        <div className="h-full bg-amber-400 rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, onNavigate }: {
+  activeCell: { key: string; month: number };
+  tableRows: any[];
+  contratos: ContratoRow[];
+  eventNameMap: Map<string, string>;
+  year: number;
+  onClose: () => void;
+  onNavigate: (id: string) => void;
+}) {
+  const row = tableRows[activeCell.month];
+  const monthLabel = MONTHS_FULL[activeCell.month];
+  const isContratosOrFat = activeCell.key === 'contratos' || activeCell.key === 'faturamento';
+
+  const contratosMes = isContratosOrFat
+    ? contratos.filter(e => e.contract_signed_date != null && (Number(e.contract_signed_date.slice(5,7)) - 1) === activeCell.month)
+    : [];
+
+  const fmtDate = (d: string | null) => d ? `${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}` : '—';
+  const fmtMes  = (d: string | null) => d ? `${d.slice(5,7)}/${d.slice(2,4)}` : '—';
+
+  const titles: Record<string, string> = {
+    orcamentos:  `Orçamentos — ${monthLabel}`,
+    contratos:   `Contratos fechados — ${monthLabel}`,
+    degustacoes: `Degustações — ${monthLabel}`,
+    eventos_deg: `Eventos em degustação — ${monthLabel}`,
+    faturamento: `Faturamento vendido — ${monthLabel}`,
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/30" />
+      <div
+        className="relative bg-white rounded-2xl shadow-xl w-full overflow-hidden flex flex-col"
+        style={{ maxWidth: isContratosOrFat ? '960px' : '420px', maxHeight: '90vh' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
+          <p className="font-semibold text-foreground text-sm">{titles[activeCell.key]}</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {isContratosOrFat && (
+          contratosMes.length === 0
+            ? <p className="px-5 py-10 text-sm text-muted-foreground text-center">Nenhum contrato neste mês.</p>
+            : <div className="overflow-auto">
+                <table className="w-full text-sm whitespace-nowrap">
+                  <thead>
+                    <tr className="bg-muted/30 border-b border-border text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      <th className="text-left px-4 py-2.5">Data Evento</th>
+                      <th className="text-left px-3 py-2.5">Nome</th>
+                      <th className="text-left px-3 py-2.5">Local</th>
+                      <th className="text-center px-3 py-2.5">Tipo</th>
+                      <th className="text-center px-3 py-2.5">Pax</th>
+                      <th className="text-center px-3 py-2.5">R$/Pax</th>
+                      <th className="text-center px-3 py-2.5">Status</th>
+                      <th className="text-center px-3 py-2.5">Fechamento</th>
+                      <th className="text-center px-3 py-2.5">Total</th>
+                      <th className="text-center px-3 py-2.5">Pgto</th>
+                      <th className="px-3 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {contratosMes.map(e => {
+                      const st = getStatus(e.status);
+                      return (
+                        <tr key={e.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-2.5 text-muted-foreground text-xs">{fmtDate(e.event_date)}</td>
+                          <td className="px-3 py-2.5 font-medium text-foreground">{e.event_name ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-muted-foreground text-xs max-w-[130px] truncate">{e.location_text ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">{e.event_type ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-center text-muted-foreground">{e.guest_count ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-center text-muted-foreground text-xs">
+                            {e.price_per_person != null ? `R$ ${e.price_per_person.toLocaleString('pt-BR')}` : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${st.cls}`}>{st.label}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">{fmtMes(e.contract_signed_date)}</td>
+                          <td className="px-3 py-2.5 text-center text-xs font-semibold text-foreground">
+                            {e.total_value != null ? e.total_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <PgtoBadge total={e.total_value} paid={e.paid_value} full={e.is_paid_in_full} />
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <button onClick={() => onNavigate(e.id)} className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors" title="Abrir evento">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {activeCell.key === 'faturamento' && (
+                    <tfoot>
+                      <tr className="border-t-2 border-border bg-muted/30 font-semibold text-xs">
+                        <td colSpan={8} className="px-4 py-2.5 text-foreground">Total</td>
+                        <td className="px-3 py-2.5 text-center text-foreground">
+                          {contratosMes.reduce((s, e) => s + (e.total_value ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+        )}
+
+        {!isContratosOrFat && (() => {
+          type SimpleItem = { label: string; sub?: string; id?: string };
+          let items: SimpleItem[] = [];
+          if (activeCell.key === 'orcamentos')
+            items = row._orcList.map((e: any) => ({ label: e.event_name ?? '—', sub: fmtDate(e.event_date), id: e.id }));
+          else if (activeCell.key === 'degustacoes')
+            items = row._sessionsList.map((s: any) => ({ label: s.type ?? 'Sem tipo', sub: fmtDate(s.date) }));
+          else if (activeCell.key === 'eventos_deg')
+            items = row._tastingEventsList.map((t: any) => ({ label: eventNameMap.get(t.event_id) ?? '—', sub: t.situation_snapshot ?? undefined, id: t.event_id }));
+          return (
+            <div className="divide-y divide-border/50 overflow-y-auto">
+              {items.length === 0 && <p className="px-5 py-10 text-sm text-muted-foreground text-center">Nenhum item.</p>}
+              {items.map((item, idx) => (
+                <div key={idx} className="px-5 py-3 flex items-center justify-between hover:bg-muted/20 transition-colors">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{item.label}</p>
+                    {item.sub && <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>}
+                  </div>
+                  {item.id && (
+                    <button onClick={() => onNavigate(item.id!)} className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </div>
     </div>
   );
 }
