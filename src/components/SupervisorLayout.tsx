@@ -130,7 +130,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
         {urgentAlerts > 0 && topUrgent && (
           <Link
             to="/notifications"
-            className="sticky top-0 z-50 flex items-center gap-3 px-4 lg:px-6 xl:px-8 py-2.5 bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+            className="flex items-center gap-3 px-4 lg:px-6 xl:px-8 py-2.5 bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
           >
             <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
             <span className="truncate">{urgentAlerts > 1 ? `${urgentAlerts} alertas urgentes — ` : ''}{topUrgent}</span>

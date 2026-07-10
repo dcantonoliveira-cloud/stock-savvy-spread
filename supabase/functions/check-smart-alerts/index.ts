@@ -49,9 +49,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
 
   const today    = new Date()
-  const in15     = new Date(today); in15.setDate(today.getDate() + 15)
+  const in7      = new Date(today); in7.setDate(today.getDate() + 7)
   const todayStr = today.toISOString().slice(0, 10)
-  const in15Str  = in15.toISOString().slice(0, 10)
+  const in7Str   = in7.toISOString().slice(0, 10)
 
   const companyId = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89'
 
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     SELECT id, event_name, event_date, contract_value, total_value, paid_value, is_paid_in_full
     FROM events
     WHERE event_date >= '${todayStr}'
-      AND event_date <= '${in15Str}'
+      AND event_date <= '${in7Str}'
       AND status IN ('confirmado','confirmed','ativo')
       AND is_paid_in_full IS NOT TRUE
   `)
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     WHERE eh.field_name IN ('menu_text','menu_mode','product_id','guest_count','price_per_person')
       AND eh.changed_at >= NOW() - INTERVAL '24 hours'
       AND e.event_date >= '${todayStr}'
-      AND e.event_date <= '${in15Str}'
+      AND e.event_date <= '${in7Str}'
     ORDER BY eh.event_id, eh.changed_at DESC
   `)
 
