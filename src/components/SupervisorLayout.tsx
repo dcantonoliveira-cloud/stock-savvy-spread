@@ -127,7 +127,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
       <div className="flex-1 flex flex-col min-h-screen ml-[180px] xl:ml-[210px]">
 
         {/* Urgent alert banner */}
-        {urgentAlerts > 0 && topUrgent && (
+        {urgentAlerts > 0 && topUrgent && pathname !== '/notifications' && (
           <Link
             to="/notifications"
             className="flex items-center gap-3 px-4 lg:px-6 xl:px-8 py-2.5 bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
