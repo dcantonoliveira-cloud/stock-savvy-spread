@@ -108,10 +108,12 @@ Deno.serve(async (req) => {
     SELECT DISTINCT ON (eh.event_id) eh.event_id, eh.field_name, e.event_name, e.event_date
     FROM event_history eh
     JOIN events e ON e.id = eh.event_id
+    LEFT JOIN smart_alerts sa ON sa.type = 'menu_change' AND sa.entity_id = eh.event_id::text
     WHERE eh.field_name IN ('menu_text','menu_mode','product_id','guest_count','price_per_person')
       AND eh.changed_at >= NOW() - INTERVAL '24 hours'
       AND e.event_date >= '${todayStr}'
       AND e.event_date <= '${in7Str}'
+      AND (sa.id IS NULL OR sa.resolved_at IS NULL OR eh.changed_at > sa.resolved_at)
     ORDER BY eh.event_id, eh.changed_at DESC
   `)
 
