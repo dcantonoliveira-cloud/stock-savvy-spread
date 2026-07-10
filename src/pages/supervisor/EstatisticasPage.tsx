@@ -19,6 +19,7 @@ const monthOf = (d: string) => Number(d.slice(5, 7)) - 1;
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface EventRow {
   id: string;
+  event_name: string | null;
   status: string;
   event_date: string | null;
   event_type: string | null;
@@ -90,7 +91,7 @@ export default function EstatisticasPage() {
       const [evtRes, tastRes] = await Promise.all([
         supabase
           .from('events')
-          .select('id, status, event_date, event_type, guest_count, professional_count, total_value, contract_signed, contract_signed_date, product_name, created_at')
+          .select('id, event_name, status, event_date, event_type, guest_count, professional_count, total_value, contract_signed, contract_signed_date, product_name, created_at')
           .gte('event_date', `${year}-01-01`)
           .lte('event_date', `${year}-12-31`),
         supabase
