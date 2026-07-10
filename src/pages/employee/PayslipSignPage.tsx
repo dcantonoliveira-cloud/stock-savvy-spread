@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { CheckCircle2, Download, ArrowLeft, Shield, Loader2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Download, ArrowLeft, Shield, Loader2, AlertCircle, FileText } from 'lucide-react';
 import SignaturePad from '@/components/payslips/SignaturePad';
 import { sha256Hex, generateSignedPdf, AuditData } from '@/lib/payslipPdf';
 import { format } from 'date-fns';
@@ -258,17 +258,51 @@ export default function PayslipSignPage() {
 
       {/* PDF viewer */}
       <div className="bg-white border border-border rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-muted/20 text-xs font-medium text-muted-foreground">
-          Visualizador de documento
+        <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">Documento</span>
+          {pdfUrl && (
+            <a href={pdfUrl} target="_blank" rel="noopener noreferrer"
+              onClick={() => setViewed(true)}
+              className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+              <Download className="w-3.5 h-3.5" />
+              Abrir / Baixar PDF
+            </a>
+          )}
         </div>
         {pdfUrl ? (
-          <iframe
-            src={pdfUrl}
-            className="w-full"
-            style={{ height: '60vh' }}
-            onLoad={() => setViewed(true)}
-            title="Holerite"
-          />
+          <>
+            {/* Desktop: iframe inline viewer */}
+            <iframe
+              src={pdfUrl}
+              className="w-full hidden md:block"
+              style={{ height: '60vh' }}
+              onLoad={() => setViewed(true)}
+              title="Holerite"
+            />
+            {/* Mobile: fallback — iframe não renderiza PDF no Android */}
+            <div className="md:hidden flex flex-col items-center justify-center gap-4 py-10 px-6 text-center">
+              <FileText className="w-12 h-12 text-muted-foreground/30" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Visualizar holerite</p>
+                <p className="text-xs text-muted-foreground mt-1">Toque no botão abaixo para abrir o PDF</p>
+              </div>
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setViewed(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors">
+                <Download className="w-4 h-4" />
+                Abrir PDF
+              </a>
+              {!viewed && (
+                <button onClick={() => setViewed(true)}
+                  className="text-xs text-muted-foreground underline">
+                  Já visualizei o documento
+                </button>
+              )}
+            </div>
+          </>
         ) : (
           <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
