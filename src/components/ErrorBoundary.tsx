@@ -24,10 +24,10 @@ export class ErrorBoundary extends Component<Props, State> {
       const key = '__chunk_reload__';
       const last = parseInt(sessionStorage.getItem(key) ?? '0', 10);
       const now = Date.now();
-      // Permite reload se não houve tentativa nos últimos 10 segundos (evita loop)
       if (now - last > 10_000) {
         sessionStorage.setItem(key, String(now));
-        window.location.reload();
+        // Força busca do HTML novo no servidor (não recarga do cache)
+        window.location.replace('/?_=' + now);
       }
     }
   }
@@ -69,7 +69,7 @@ export class ErrorBoundary extends Component<Props, State> {
               await Promise.all(keys.map(k => caches.delete(k)));
             }
             // Força busca do servidor com cache-busting (evita recarregar do cache do browser)
-            window.location.replace(window.location.pathname + '?_=' + Date.now());
+            window.location.replace('/?_=' + Date.now());
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
         >
