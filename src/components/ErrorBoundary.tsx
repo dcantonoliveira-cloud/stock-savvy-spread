@@ -60,7 +60,6 @@ export class ErrorBoundary extends Component<Props, State> {
         )}
         <button
           onClick={async () => {
-            // Limpa service workers e caches antes de recarregar
             if ('serviceWorker' in navigator) {
               const regs = await navigator.serviceWorker.getRegistrations();
               await Promise.all(regs.map(r => r.unregister()));
@@ -69,7 +68,8 @@ export class ErrorBoundary extends Component<Props, State> {
               const keys = await caches.keys();
               await Promise.all(keys.map(k => caches.delete(k)));
             }
-            window.location.reload();
+            // Força busca do servidor com cache-busting (evita recarregar do cache do browser)
+            window.location.replace(window.location.pathname + '?_=' + Date.now());
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
         >
