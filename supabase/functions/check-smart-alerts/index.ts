@@ -55,8 +55,8 @@ Deno.serve(async (req) => {
 
   const companyId = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89'
 
-  // Alertas existentes não resolvidos (para não duplicar)
-  const existingRows = await sql(`SELECT entity_id, type FROM smart_alerts WHERE resolved_at IS NULL`)
+  // Alertas existentes não resolvidos OU resolvidos nos últimos 3 dias (para não duplicar)
+  const existingRows = await sql(`SELECT entity_id, type FROM smart_alerts WHERE resolved_at IS NULL OR resolved_at >= NOW() - INTERVAL '3 days'`)
   const existingKey  = new Set(existingRows.map((a: any) => `${a.type}::${a.entity_id}`))
 
   const newAlerts: { type: string; severity: string; title: string; description: string; entity_type: string; entity_id: string }[] = []
@@ -92,6 +92,14 @@ Deno.serve(async (req) => {
   }
 
   // ─── 2. Alterações em cardápio/ficha técnica em eventos < 15 dias ───────────
+  const FIELD_LABELS: Record<string, string> = {
+    menu_text:        'Texto do cardápio',
+    menu_mode:        'Modo do cardápio',
+    product_id:       'Produto/Prato',
+    guest_count:      'Número de convidados',
+    price_per_person: 'Preço por pessoa',
+  }
+
   const recentMenuChanges = await sql(`
     SELECT DISTINCT ON (eh.event_id) eh.event_id, eh.field_name, e.event_name, e.event_date
     FROM event_history eh
@@ -107,12 +115,13 @@ Deno.serve(async (req) => {
     const key = `menu_change::${row.event_id}`
     if (existingKey.has(key)) continue
 
-    const daysLeft = Math.round((new Date(row.event_date).getTime() - today.getTime()) / 86400000)
+    const daysLeft  = Math.round((new Date(row.event_date).getTime() - today.getTime()) / 86400000)
+    const fieldLabel = FIELD_LABELS[row.field_name] ?? row.field_name
     newAlerts.push({
       type:        'menu_change',
       severity:    'urgent',
       title:       `Cardápio alterado — ${row.event_name}`,
-      description: `Campo "${row.field_name}" alterado. Evento em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''} (${row.event_date}). Produção pode já ter começado.`,
+      description: `${fieldLabel} alterado. Evento em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''} (${row.event_date}). Produção pode já ter começado.`,
       entity_type: 'event',
       entity_id:   row.event_id,
     })
@@ -161,7 +170,21 @@ Deno.serve(async (req) => {
   }
 
   // ─── WhatsApp via Zapi ──────────────────────────────────────────────────────
-  if (newAlerts.length > 0) {
+  // Para holerites: só envia se notified_at IS NULL ou foi notificado há mais de 3 dias
+  const payslipAlertsToNotify = await sql(`
+    SELECT id, title, description FROM smart_alerts
+    WHERE type = 'payslip_unsigned'
+      AND resolved_at IS NULL
+      AND (notified_at IS NULL OR notified_at < NOW() - INTERVAL '3 days')
+  `)
+
+  // Alertas novos (exceto holerites, que são controlados acima) + holerites elegíveis
+  const alertsToSend = [
+    ...newAlerts.filter(a => a.type !== 'payslip_unsigned'),
+    ...payslipAlertsToNotify.map((r: any) => ({ type: 'payslip_unsigned', title: r.title, description: r.description, _id: r.id })),
+  ]
+
+  if (alertsToSend.length > 0) {
     const zapiRows = await sql(`SELECT api_key, enabled FROM company_integrations WHERE provider = 'zapi' LIMIT 1`)
     let zapiConfig: { instance_id: string; token: string; client_token?: string } | null = null
     if (zapiRows[0]?.enabled && zapiRows[0]?.api_key) {
@@ -182,7 +205,7 @@ Deno.serve(async (req) => {
       groupMap[row.type].push(row.phone)
     }
 
-    for (const alert of newAlerts) {
+    for (const alert of alertsToSend) {
       const groupType =
         alert.type === 'payment_pending' ? 'financeiro' :
         alert.type === 'menu_change'      ? 'eventos'    :
@@ -197,6 +220,16 @@ Deno.serve(async (req) => {
       for (const phone of groupMap[groupType] ?? []) {
         await sendWhatsApp(phone, msg, zapiConfig)
       }
+    }
+
+    // Atualiza notified_at nos holerites que acabaram de ser notificados
+    if (payslipAlertsToNotify.length > 0) {
+      const ids = payslipAlertsToNotify.map((r: any) => `'${r.id}'`).join(',')
+      await sqlInsert(`UPDATE smart_alerts SET notified_at = NOW() WHERE id IN (${ids})`)
+    }
+    // Atualiza notified_at nos alertas novos após inserção
+    if (newAlerts.length > 0) {
+      await sqlInsert(`UPDATE smart_alerts SET notified_at = NOW() WHERE notified_at IS NULL AND resolved_at IS NULL AND type != 'payslip_unsigned'`)
     }
   }
 
