@@ -221,7 +221,7 @@ export default function EventDetailPage() {
   const formRef = useRef<Partial<EventDetail>>({});
   const clientFormRef = useRef<Record<string, string>>({});
   const eventIdRef = useRef<string | undefined>(undefined);
-  const menuFieldChangedRef = useRef(false);
+  const menuAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -362,16 +362,18 @@ export default function EventDetailPage() {
     setSaveStatus('saved');
     toast.success('Salvo com sucesso');
     setTimeout(() => setSaveStatus('idle'), 2000);
-    if (menuFieldChangedRef.current) {
-      menuFieldChangedRef.current = false;
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) return;
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-smart-alerts`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` },
-        }).catch(() => {});
-      });
-    }
+  }, []);
+
+  const triggerMenuAlert = useCallback(() => {
+    if (menuAlertTimerRef.current) clearTimeout(menuAlertTimerRef.current);
+    menuAlertTimerRef.current = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-smart-alerts`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      }).catch(() => {});
+    }, 5 * 60 * 1000);
   }, []);
 
   const MENU_FIELDS = new Set(['menu_text', 'menu_mode', 'product_id', 'guest_count', 'price_per_person']);
@@ -380,10 +382,10 @@ export default function EventDetailPage() {
     const next = { ...formRef.current, [key]: val };
     formRef.current = next;
     setForm(next);
-    if (MENU_FIELDS.has(key as string)) menuFieldChangedRef.current = true;
+    if (MENU_FIELDS.has(key as string)) triggerMenuAlert();
     if (eventTimerRef.current) clearTimeout(eventTimerRef.current);
     eventTimerRef.current = setTimeout(() => persistEvent(formRef.current), 1500);
-  }, [persistEvent]);
+  }, [persistEvent, triggerMenuAlert]);
 
   const s = (key: keyof EventDetail) => String(form[key] ?? '');
 
