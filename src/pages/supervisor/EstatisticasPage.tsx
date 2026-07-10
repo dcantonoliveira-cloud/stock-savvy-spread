@@ -450,12 +450,13 @@ export default function EstatisticasPage() {
               }));
             } else if (activeCell.key === 'faturamento') {
               title = `Faturamento vendido — ${monthLabel}`;
-              items = row._contratosList.map(e => ({
-                label: e.event_name ?? '—',
-                sub: e.total_value != null
-                  ? e.total_value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                  : '—',
-              }));
+              items = row._contratosList
+                .filter(e => e.total_value != null && e.total_value > 0)
+                .sort((a, b) => (b.total_value ?? 0) - (a.total_value ?? 0))
+                .map(e => ({
+                  label: e.event_name ?? '—',
+                  sub: (e.total_value!).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                }));
             }
 
             return (
