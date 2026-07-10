@@ -336,9 +336,9 @@ export default function EventDetailPage() {
   const cancelEvent = async () => {
     if (!id) return;
     if (!confirm('Cancelar este evento? O status será alterado para CANCELADO.')) return;
-    const { error } = await supabase.from('events').update({ status: 'cancelled' }).eq('id', id);
+    const { error } = await supabase.from('events').update({ status: 'cancelled', date_reserved: false }).eq('id', id);
     if (error) { toast.error('Erro ao cancelar'); return; }
-    setEvent(prev => prev ? { ...prev, status: 'cancelled' } : prev);
+    setEvent(prev => prev ? { ...prev, status: 'cancelled', date_reserved: false } : prev);
     toast.success('Evento cancelado');
   };
 
