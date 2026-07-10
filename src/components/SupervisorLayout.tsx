@@ -86,34 +86,16 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     const load = async () => {
-      const { count } = await (supabase as any)
-        .from('smart_alerts')
-        .select('*', { count: 'exact', head: true })
-        .is('resolved_at', null);
-      setUnread(count || 0);
+      const [{ count: totalCount }, { data: urgentData, count: urgentCount }] = await Promise.all([
+        (supabase as any).from('smart_alerts').select('*', { count: 'exact', head: true }).is('resolved_at', null),
+        (supabase as any).from('smart_alerts').select('title', { count: 'exact' }).is('resolved_at', null).eq('severity', 'urgent').order('created_at', { ascending: false }).limit(1),
+      ]);
+      setUnread(totalCount || 0);
+      setUrgentAlerts(urgentCount ?? 0);
+      setTopUrgent(urgentData?.[0]?.title ?? null);
     };
     load();
-    const channel = (supabase as any)
-      .channel('notifications-layout')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alerts' }, load)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  useEffect(() => {
-    const load = async () => {
-      const { data, count } = await (supabase as any)
-        .from('smart_alerts')
-        .select('title', { count: 'exact' })
-        .is('resolved_at', null)
-        .eq('severity', 'urgent')
-        .order('created_at', { ascending: false })
-        .limit(1);
-      setUrgentAlerts(count ?? 0);
-      setTopUrgent(data?.[0]?.title ?? null);
-    };
-    load();
-    const ch = supabase
+    const ch = (supabase as any)
       .channel('smart-alerts-layout')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alerts' }, load)
       .subscribe();
