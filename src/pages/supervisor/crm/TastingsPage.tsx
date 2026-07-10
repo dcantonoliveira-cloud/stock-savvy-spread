@@ -41,7 +41,9 @@ interface AbertoRow {
   event_name: string;
   event_date: string;
   status: string;
-  client_name: string | null;
+  assessor_name: string | null;
+  venue_name: string | null;
+  guest_count: number | null;
   last_tasting_date: string | null;
 }
 
@@ -118,7 +120,7 @@ export default function TastingsPage() {
 
     const { data: evts, error } = await supabase
       .from('events')
-      .select('id, event_name, event_date, status, clients(name)')
+      .select('id, event_name, event_date, status, guest_count, suppliers!organizer_id(name), event_locations!location_id(name)')
       .in('id', eventIds)
       .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
       .order('event_date', { ascending: true });
@@ -130,7 +132,9 @@ export default function TastingsPage() {
       event_name:        e.event_name,
       event_date:        e.event_date,
       status:            e.status,
-      client_name:       e.clients?.name ?? null,
+      assessor_name:     (e.suppliers as any)?.name ?? null,
+      venue_name:        (e.event_locations as any)?.name ?? null,
+      guest_count:       e.guest_count ?? null,
       last_tasting_date: tastingDateMap[e.id] ?? null,
     })));
     setAbertoLoading(false);
@@ -446,8 +450,8 @@ function ListaAbertoTab({ rows, loading, onNavigate }: {
         </div>
       ) : (
         <div className="bg-white border border-border rounded-2xl overflow-hidden">
-          <div className="grid grid-cols-[1fr_180px_160px_120px_120px] gap-3 px-5 py-2.5 bg-muted/30 border-b border-border">
-            {['Evento', 'Cliente', 'Status', 'Data do evento', 'Última degustação'].map(h => (
+          <div className="grid grid-cols-[1fr_160px_160px_90px_120px_120px] gap-3 px-5 py-2.5 bg-muted/30 border-b border-border">
+            {['Evento', 'Assessora', 'Local', 'Conv.', 'Data do evento', 'Última degustação'].map(h => (
               <span key={h} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
             ))}
           </div>
@@ -456,11 +460,15 @@ function ListaAbertoTab({ rows, loading, onNavigate }: {
               const sc = getStatusCfg(row.status);
               return (
                 <div key={row.event_id}
-                  className="grid grid-cols-[1fr_180px_160px_120px_120px] gap-3 px-5 py-3 items-center hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="grid grid-cols-[1fr_160px_160px_90px_120px_120px] gap-3 px-5 py-3 items-center hover:bg-slate-50 transition-colors cursor-pointer"
                   onClick={() => onNavigate(row.event_id)}>
-                  <span className="text-sm font-medium text-foreground truncate">{row.event_name ?? '—'}</span>
-                  <span className="text-sm text-muted-foreground truncate">{row.client_name ?? '—'}</span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-semibold w-fit ${sc.cls}`}>{sc.label}</span>
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-foreground truncate block">{row.event_name ?? '—'}</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-semibold mt-0.5 ${sc.cls}`}>{sc.label}</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground truncate">{row.assessor_name ?? '—'}</span>
+                  <span className="text-sm text-muted-foreground truncate">{row.venue_name ?? '—'}</span>
+                  <span className="text-sm tabular-nums text-foreground">{row.guest_count ?? '—'}</span>
                   <span className="text-sm tabular-nums text-foreground">{fmtDate(row.event_date)}</span>
                   <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(row.last_tasting_date)}</span>
                 </div>
