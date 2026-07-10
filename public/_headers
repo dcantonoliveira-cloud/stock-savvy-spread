@@ -1,0 +1,12 @@
+# index.html nunca deve ser cacheado — garante que o browser sempre busca o HTML mais recente
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+# Assets com hash no nome podem ser cacheados por tempo longo (são imutáveis)
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
