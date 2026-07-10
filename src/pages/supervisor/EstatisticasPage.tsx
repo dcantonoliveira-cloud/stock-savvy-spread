@@ -65,6 +65,7 @@ export default function EstatisticasPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [tab, setTab] = useState<'originais' | 'bi'>('originais');
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [contratos, setContratos] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tastings, setTastings] = useState<any[]>([]);
   const [tastingRange, setTastingRange] = useState<'3m' | '1a' | 'all'>('1a');
@@ -88,17 +89,26 @@ export default function EstatisticasPage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [evtRes, tastRes] = await Promise.all([
+      const [evtRes, contratosRes, tastRes] = await Promise.all([
+        // Eventos do ano: para orçamentos, gráficos e KPIs (por event_date)
         supabase
           .from('events')
           .select('id, event_name, status, event_date, event_type, guest_count, professional_count, total_value, contract_signed, contract_signed_date, product_name, created_at')
           .gte('event_date', `${year}-01-01`)
           .lte('event_date', `${year}-12-31`),
+        // Contratos fechados no ano: filtrado por contract_signed_date (independente do event_date)
+        supabase
+          .from('events')
+          .select('id, event_name, status, event_date, total_value, contract_signed_date')
+          .not('contract_signed_date', 'is', null)
+          .gte('contract_signed_date', `${year}-01-01`)
+          .lte('contract_signed_date', `${year}-12-31`),
         supabase
           .from('tasting_session_events' as any)
           .select('event_id, session_id, situation_snapshot, tasting_sessions!session_id(scheduled_date, type)'),
       ]);
       setEvents((evtRes.data ?? []) as EventRow[]);
+      setContratos((contratosRes.data ?? []) as EventRow[]);
       setTastings((tastRes.data ?? []) as any[]);
       setLoading(false);
     };
@@ -147,22 +157,14 @@ export default function EstatisticasPage() {
 
   // Tabela mensal com listas detalhadas para popup
   const tableRows = useMemo(() => {
-    const currentMonth = new Date().getMonth();
-    const currentYear  = new Date().getFullYear();
-
     return MONTHS.map((_, i) => {
       // Orçamentos: por event_date
       const orcList = events.filter(e => e.event_date && monthOf(e.event_date) === i);
 
-      // Contratos fechados: por contract_signed_date (mês real de fechamento)
-      const contratosList = events.filter(e => {
-        if (e.contract_signed_date) {
-          return e.contract_signed_date.startsWith(`${year}`) && monthOf(e.contract_signed_date) === i;
-        }
-        if (year > currentYear || (year === currentYear && i > currentMonth)) return false;
-        return e.event_date && monthOf(e.event_date) === i &&
-          (e.contract_signed || ['confirmed','completed'].includes(e.status));
-      });
+      // Contratos fechados: query própria filtrada por contract_signed_date no ano
+      const contratosList = contratos.filter(e =>
+        e.contract_signed_date != null && monthOf(e.contract_signed_date) === i
+      );
 
       // Degustações: sessões distintas no mês
       const sessionsList: Array<{ id: string; date: string; type: string | null }> = [];
@@ -193,7 +195,7 @@ export default function EstatisticasPage() {
         _tastingEventsList: tastingEventsList,
       };
     });
-  }, [events, year, sessionMap, tastings]);
+  }, [events, contratos, year, sessionMap, tastings]);
 
   const totals = useMemo(() => ({
     orcamentos:  tableRows.reduce((s, r) => s + r.orcamentos, 0),
