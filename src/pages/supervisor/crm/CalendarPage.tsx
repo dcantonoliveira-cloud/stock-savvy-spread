@@ -82,7 +82,7 @@ export default function CalendarPage() {
       setLoading(true);
       setSelected(null);
       const first = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-      const last  = new Date(year, month + 1, 0).toISOString().slice(0, 10);
+      const last  = `${year}-${String(month + 1).padStart(2, '0')}-${String(daysIn(year, month)).padStart(2, '0')}`;
       const [{ data }, { data: tsData }, { data: apptData }] = await Promise.all([
         supabase
           .from('events')
@@ -137,20 +137,23 @@ export default function CalendarPage() {
   // ── Derived ──────────────────────────────────────────────────────────────────
   const byDay = events.reduce<Record<number, EventRow[]>>((acc, ev) => {
     if (!ev.event_date) return acc;
-    const d = new Date(ev.event_date + 'T12:00:00').getDate();
-    (acc[d] ??= []).push(ev);
+    const [evY, evM, evD] = ev.event_date.split('-').map(Number);
+    if (evY !== year || evM !== month + 1) return acc;
+    (acc[evD] ??= []).push(ev);
     return acc;
   }, {});
 
   const tastingsByDay = tastings.reduce<Record<number, TastingRow[]>>((acc, t) => {
-    const d = new Date(t.scheduled_date + 'T12:00:00').getDate();
-    (acc[d] ??= []).push(t);
+    const [tY, tM, tD] = t.scheduled_date.split('-').map(Number);
+    if (tY !== year || tM !== month + 1) return acc;
+    (acc[tD] ??= []).push(t);
     return acc;
   }, {});
 
   const apptsByDay = appointments.reduce<Record<number, AppointmentRow[]>>((acc, a) => {
-    const d = new Date(a.date + 'T12:00:00').getDate();
-    (acc[d] ??= []).push(a);
+    const [aY, aM, aD] = a.date.split('-').map(Number);
+    if (aY !== year || aM !== month + 1) return acc;
+    (acc[aD] ??= []).push(a);
     return acc;
   }, {});
 
