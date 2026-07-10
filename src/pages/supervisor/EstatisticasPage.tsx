@@ -26,6 +26,7 @@ interface EventRow {
   professional_count: number | null;
   total_value: number | null;
   contract_signed: boolean;
+  contract_signed_date: string | null;
   product_name: string | null;
   created_at: string;
 }
@@ -88,7 +89,7 @@ export default function EstatisticasPage() {
       const [evtRes, tastRes] = await Promise.all([
         supabase
           .from('events')
-          .select('id, status, event_date, event_type, guest_count, professional_count, total_value, contract_signed, product_name, created_at')
+          .select('id, status, event_date, event_type, guest_count, professional_count, total_value, contract_signed, contract_signed_date, product_name, created_at')
           .gte('event_date', `${year}-01-01`)
           .lte('event_date', `${year}-12-31`),
         supabase
@@ -130,16 +131,36 @@ export default function EstatisticasPage() {
 
   // Tabela mensal
   const monthlyTable = useMemo(() => MONTHS.map((_, i) => {
+    // Orçamentos: eventos com event_date neste mês
     const mo = events.filter(e => e.event_date && monthOf(e.event_date) === i);
-    const fechados = mo.filter(e => e.contract_signed || ['confirmed','completed'].includes(e.status));
-    const rev = fechados.reduce((s, e) => s + (e.total_value ?? 0), 0);
+
+    // Contratos fechados: agrupados pelo mês em que o contrato foi assinado,
+    // não pelo mês do evento (para evitar meses futuros aparecerem preenchidos)
+    const fechados = events.filter(e => {
+      if (e.contract_signed_date) {
+        return e.contract_signed_date.startsWith(`${year}`) && monthOf(e.contract_signed_date) === i;
+      }
+      // fallback para eventos sem data de fechamento: usa event_date mas só se já realizados/confirmados
+      // e apenas para meses passados ou atual
+      const currentMonth = new Date().getMonth();
+      const currentYear  = new Date().getFullYear();
+      if (year > currentYear || (year === currentYear && i > currentMonth)) return false;
+      return e.event_date && monthOf(e.event_date) === i &&
+        (e.contract_signed || ['confirmed','completed'].includes(e.status));
+    });
+
+    // Faturamento: pela data do evento (receita prevista por mês de realização)
+    const rev = mo
+      .filter(e => e.contract_signed || ['confirmed','completed'].includes(e.status))
+      .reduce((s, e) => s + (e.total_value ?? 0), 0);
+
     return {
       orcamentos: mo.length,
       contratos: fechados.length,
-      degustacoes: 0, // preenchido abaixo
+      degustacoes: 0,
       faturamento: rev,
     };
-  }), [events]);
+  }), [events, year]);
 
   // Degustações por mês (contagem de tasting_session_events no ano)
   const tastingsByMonth = useMemo(() => {
