@@ -626,20 +626,19 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
           contratosMes.length === 0
             ? <p className="px-5 py-10 text-sm text-muted-foreground text-center">Nenhum contrato neste mês.</p>
             : <div className="overflow-auto">
-                <table className="w-full text-sm whitespace-nowrap">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/30 border-b border-border text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      <th className="text-left px-4 py-2.5">Data Evento</th>
+                      <th className="text-left px-3 py-2.5 w-[90px]">Data Evento</th>
                       <th className="text-left px-3 py-2.5">Nome</th>
-                      <th className="text-left px-3 py-2.5">Local</th>
-                      <th className="text-center px-3 py-2.5">Tipo</th>
-                      <th className="text-center px-3 py-2.5">Pax</th>
-                      <th className="text-center px-3 py-2.5">R$/Pax</th>
-                      <th className="text-center px-3 py-2.5">Status</th>
-                      <th className="text-center px-3 py-2.5">Fechamento</th>
-                      <th className="text-center px-3 py-2.5">Total</th>
-                      <th className="text-center px-3 py-2.5">Pgto</th>
-                      <th className="px-3 py-2.5" />
+                      <th className="text-center px-2 py-2.5 w-[90px]">Tipo</th>
+                      <th className="text-center px-2 py-2.5 w-[50px]">Pax</th>
+                      <th className="text-center px-2 py-2.5 w-[60px]">R$/Pax</th>
+                      <th className="text-center px-2 py-2.5 w-[90px]">Status</th>
+                      <th className="text-center px-2 py-2.5 w-[70px]">Fechamento</th>
+                      <th className="text-center px-2 py-2.5 w-[100px]">Total</th>
+                      <th className="text-center px-2 py-2.5 w-[60px]">Pgto</th>
+                      <th className="px-2 py-2.5 w-[36px]" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
@@ -647,25 +646,24 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
                       const st = getStatus(e.status);
                       return (
                         <tr key={e.id} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-4 py-2.5 text-muted-foreground text-xs">{fmtDate(e.event_date)}</td>
+                          <td className="px-3 py-2.5 text-muted-foreground text-xs">{fmtDate(e.event_date)}</td>
                           <td className="px-3 py-2.5 font-medium text-foreground">{e.event_name ?? '—'}</td>
-                          <td className="px-3 py-2.5 text-muted-foreground text-xs max-w-[130px] truncate">{e.location_text ?? '—'}</td>
-                          <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">{e.event_type ?? '—'}</td>
-                          <td className="px-3 py-2.5 text-center text-muted-foreground">{e.guest_count ?? '—'}</td>
-                          <td className="px-3 py-2.5 text-center text-muted-foreground text-xs">
-                            {e.price_per_person != null ? `R$ ${e.price_per_person.toLocaleString('pt-BR')}` : '—'}
+                          <td className="px-2 py-2.5 text-center text-xs text-muted-foreground">{e.event_type ?? '—'}</td>
+                          <td className="px-2 py-2.5 text-center text-muted-foreground">{e.guest_count ?? '—'}</td>
+                          <td className="px-2 py-2.5 text-center text-muted-foreground text-xs">
+                            {e.price_per_person != null ? e.price_per_person.toLocaleString('pt-BR') : '—'}
                           </td>
-                          <td className="px-3 py-2.5 text-center">
+                          <td className="px-2 py-2.5 text-center">
                             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${st.cls}`}>{st.label}</span>
                           </td>
-                          <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">{fmtMes(e.contract_signed_date)}</td>
-                          <td className="px-3 py-2.5 text-center text-xs font-semibold text-foreground">
+                          <td className="px-2 py-2.5 text-center text-xs text-muted-foreground">{fmtMes(e.contract_signed_date)}</td>
+                          <td className="px-2 py-2.5 text-center text-xs font-semibold text-foreground">
                             {e.total_value != null ? e.total_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}
                           </td>
-                          <td className="px-3 py-2.5 text-center">
+                          <td className="px-2 py-2.5 text-center">
                             <PgtoBadge total={e.total_value} paid={e.paid_value} full={e.is_paid_in_full} />
                           </td>
-                          <td className="px-3 py-2.5 text-center">
+                          <td className="px-2 py-2.5 text-center">
                             <button onClick={() => onNavigate(e.id)} className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors" title="Abrir evento">
                               <ExternalLink className="w-3.5 h-3.5" />
                             </button>
@@ -677,7 +675,7 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
                   {activeCell.key === 'faturamento' && (
                     <tfoot>
                       <tr className="border-t-2 border-border bg-muted/30 font-semibold text-xs">
-                        <td colSpan={8} className="px-4 py-2.5 text-foreground">Total</td>
+                        <td colSpan={7} className="px-3 py-2.5 text-foreground">Total</td>
                         <td className="px-3 py-2.5 text-center text-foreground">
                           {contratosMes.reduce((s, e) => s + (e.total_value ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </td>
