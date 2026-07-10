@@ -93,7 +93,7 @@ export default function EstatisticasPage() {
           .lte('event_date', `${year}-12-31`),
         supabase
           .from('tasting_session_events' as any)
-          .select('event_id, status, tasting_sessions(scheduled_date, type)'),
+          .select('event_id, situation_snapshot, tasting_sessions!session_id(scheduled_date, type)'),
       ]);
       setEvents((evtRes.data ?? []) as EventRow[]);
       setTastings((tastRes.data ?? []) as any[]);
@@ -145,7 +145,8 @@ export default function EstatisticasPage() {
   const tastingsByMonth = useMemo(() => {
     const counts = Array(12).fill(0);
     tastings.forEach((t: any) => {
-      const d = (t.tasting_sessions as any)?.scheduled_date;
+      const session = Array.isArray(t.tasting_sessions) ? t.tasting_sessions[0] : t.tasting_sessions;
+      const d = session?.scheduled_date;
       if (d && d.startsWith(`${year}`)) {
         counts[monthOf(d)]++;
       }
@@ -167,27 +168,41 @@ export default function EstatisticasPage() {
 
   // Degustações section
   const now = new Date();
+  const getTastingDate = (t: any) => {
+    const session = Array.isArray(t.tasting_sessions) ? t.tasting_sessions[0] : t.tasting_sessions;
+    return session?.scheduled_date ?? null;
+  };
+
   const tastingFiltered = useMemo(() => {
     if (tastingRange === '3m') {
       const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 3);
       return tastings.filter((t: any) => {
-        const d = (t.tasting_sessions as any)?.scheduled_date;
+        const d = getTastingDate(t);
         return d && new Date(d) >= cutoff;
       });
     }
     if (tastingRange === '1a') {
       const cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 1);
       return tastings.filter((t: any) => {
-        const d = (t.tasting_sessions as any)?.scheduled_date;
+        const d = getTastingDate(t);
         return d && new Date(d) >= cutoff;
       });
     }
     return tastings;
   }, [tastings, tastingRange]);
 
+  const eventStatusMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    events.forEach(e => { map[e.id] = e.status; });
+    return map;
+  }, [events]);
+
   const tastingQtd   = tastingFiltered.length;
   const newClients   = new Set(tastingFiltered.map((t: any) => t.event_id)).size;
-  const closedFromT  = tastingFiltered.filter((t: any) => t.status === 'confirmed' || t.status === 'completed').length;
+  const closedFromT  = tastingFiltered.filter((t: any) => {
+    const st = eventStatusMap[t.event_id];
+    return st === 'confirmed' || st === 'completed';
+  }).length;
   const openFromT    = newClients - closedFromT;
   const conversionRate = newClients ? ((closedFromT / newClients) * 100).toFixed(0) : '0';
   const avgPerContract = closedFromT ? (newClients / closedFromT).toFixed(2) : '—';
