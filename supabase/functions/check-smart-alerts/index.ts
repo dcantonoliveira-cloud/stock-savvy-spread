@@ -169,6 +169,12 @@ Deno.serve(async (req) => {
         '${esc(alert.entity_type)}',
         '${esc(alert.entity_id)}'
       )
+      ON CONFLICT (type, entity_id, title) DO UPDATE
+        SET resolved_at = NULL,
+            resolved_by_name = NULL,
+            notified_at = NULL,
+            description = EXCLUDED.description,
+            created_at = NOW()
     `)
     if (ok) inserted++
   }
