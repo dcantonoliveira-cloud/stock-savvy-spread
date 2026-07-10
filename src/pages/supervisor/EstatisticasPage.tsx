@@ -462,12 +462,12 @@ export default function EstatisticasPage() {
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setActiveCell(null)}>
                 <div className="absolute inset-0 bg-black/30" />
-                <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden" style={{ maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
                   <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                     <p className="font-semibold text-foreground text-sm">{title}</p>
                     <button onClick={() => setActiveCell(null)} className="p-1 rounded-lg hover:bg-muted text-muted-foreground">✕</button>
                   </div>
-                  <div className="divide-y divide-border/50 max-h-80 overflow-y-auto">
+                  <div className="divide-y divide-border/50">
                     {items.length === 0 && (
                       <p className="px-5 py-8 text-sm text-muted-foreground text-center">Nenhum item.</p>
                     )}
