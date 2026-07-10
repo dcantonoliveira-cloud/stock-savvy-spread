@@ -86,16 +86,16 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     const load = async () => {
-      const { count } = await supabase
-        .from('app_notifications')
+      const { count } = await (supabase as any)
+        .from('smart_alerts')
         .select('*', { count: 'exact', head: true })
-        .eq('read', false as any);
+        .is('resolved_at', null);
       setUnread(count || 0);
     };
     load();
-    const channel = supabase
+    const channel = (supabase as any)
       .channel('notifications-layout')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_notifications' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alerts' }, load)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);

@@ -55,8 +55,12 @@ Deno.serve(async (req) => {
 
   const companyId = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89'
 
-  // Alertas existentes não resolvidos OU resolvidos nos últimos 3 dias (para não duplicar)
-  const existingRows = await sql(`SELECT entity_id, type FROM smart_alerts WHERE resolved_at IS NULL OR resolved_at >= NOW() - INTERVAL '3 days'`)
+  // Alertas existentes não resolvidos OU resolvidos nos últimos 3 dias (exceto menu_change, que pode reabrir a cada nova alteração)
+  const existingRows = await sql(`
+    SELECT entity_id, type FROM smart_alerts
+    WHERE resolved_at IS NULL
+       OR (type != 'menu_change' AND resolved_at >= NOW() - INTERVAL '3 days')
+  `)
   const existingKey  = new Set(existingRows.map((a: any) => `${a.type}::${a.entity_id}`))
 
   const newAlerts: { type: string; severity: string; title: string; description: string; entity_type: string; entity_id: string }[] = []
