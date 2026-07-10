@@ -158,7 +158,7 @@ export default function EstatisticasPage() {
   const totalGuests = completed.reduce((s, e) => s + (e.guest_count ?? 0), 0);
   const totalStaff  = completed.reduce((s, e) => s + (e.professional_count ?? 0), 0);
   const totalRev    = completed.reduce((s, e) => s + (e.total_value ?? 0), 0);
-  const ticketMedio = totalEvents ? totalRev / totalEvents : 0;
+  const ticketMedio = totalGuests ? totalRev / totalGuests : 0;
 
   // Mapa de sessões distintas (session_id → {date, type})
   const sessionMap = useMemo(() => {
@@ -593,7 +593,11 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
   const isContratosOrFat = activeCell.key === 'contratos' || activeCell.key === 'faturamento';
 
   const contratosMes = isContratosOrFat
-    ? contratos.filter(e => e.contract_signed_date != null && (Number(e.contract_signed_date.slice(5,7)) - 1) === activeCell.month)
+    ? contratos.filter(e =>
+        e.contract_signed_date != null &&
+        (Number(e.contract_signed_date.slice(5,7)) - 1) === activeCell.month &&
+        e.status !== 'cancelled' && e.status !== 'lost'
+      )
     : [];
 
   const fmtDate = (d: string | null) => d ? `${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}` : '—';
