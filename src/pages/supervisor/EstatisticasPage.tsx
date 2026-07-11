@@ -192,8 +192,9 @@ export default function EstatisticasPage() {
           sessionsList.push({ id: sid, ...sd });
       }
 
-      // Eventos em degustação: tasting_session_events do mês
+      // Eventos em degustação: apenas novos (situation_snapshot = 'new') do mês
       const tastingEventsList = tastings.filter((t: any) => {
+        if (t.situation_snapshot !== 'new') return false;
         const s = Array.isArray(t.tasting_sessions) ? t.tasting_sessions[0] : t.tasting_sessions;
         const d = s?.scheduled_date;
         return d && d.startsWith(`${year}`) && monthOf(d) === i;
@@ -282,7 +283,7 @@ export default function EstatisticasPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 overflow-x-hidden">
 
       {/* Header */}
       <div className="flex items-center justify-between">
