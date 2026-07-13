@@ -77,7 +77,7 @@ export async function generateFechamentoPDF(
   const profN    = event.professional_count ?? 0;
   const profV    = event.professional_meal_value ?? 0;
   const contV    = event.contract_value ?? 0;
-  const paying   = guests - children;
+  const paying   = guests;
 
   const base  = isPpx
     ? paying * ppx + children * ppx * 0.5 + profN * profV
