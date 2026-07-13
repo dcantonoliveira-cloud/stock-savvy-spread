@@ -200,6 +200,55 @@ function SignerStatusBadge({ status }: { status: string }) {
   return <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600"><Clock className="w-3 h-3" />Pendente</span>;
 }
 
+// ── AnnexBlock (fora do componente pai para evitar remount ao digitar) ─────────
+interface AnnexBlockProps {
+  n: 1 | 2;
+  content: string;
+  show: boolean;
+  collapsed: boolean;
+  setCollapsed: (v: boolean | ((p: boolean) => boolean)) => void;
+  annexModels: AnnexModel[];
+  onAnnex: (n: 1 | 2, html: string) => void;
+  onSaveModel: (content: string) => void;
+  onRemove: () => void;
+}
+
+function AnnexBlock({ n, content, show, collapsed, setCollapsed, annexModels, onAnnex, onSaveModel, onRemove }: AnnexBlockProps) {
+  if (!show) return null;
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={() => setCollapsed(v => !v)}
+          className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
+        >
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+          Anexo {n}
+        </button>
+        <div className="flex items-center gap-2">
+          {!collapsed && annexModels.length > 0 && (
+            <select className="text-xs border border-border rounded-lg px-2 py-1.5 bg-background" defaultValue=""
+              onChange={e => { const m = annexModels.find(x => x.id === e.target.value); if (m) onAnnex(n, m.content ?? ''); e.currentTarget.value = ''; }}>
+              <option value="" disabled>Usar modelo...</option>
+              {annexModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          )}
+          {!collapsed && content && (
+            <button onClick={() => onSaveModel(content)}
+              className="text-xs border border-border rounded-lg px-2 py-1.5 hover:bg-muted transition-colors text-muted-foreground whitespace-nowrap">
+              Salvar como modelo
+            </button>
+          )}
+          <button onClick={onRemove} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+      {!collapsed && <RichTextEditor content={content} onChange={html => onAnnex(n, html)} placeholder="Conteúdo do anexo..." />}
+    </div>
+  );
+}
+
 // ── componente ─────────────────────────────────────────────────────────────────
 export default function EventArquivosTab({ eventId, event, clientPhone }: Props) {
   const navigate = useNavigate();
@@ -516,42 +565,17 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     toast.success(`Link de ${firstName} copiado!`);
   };
 
-  const AnnexBlock = ({ n, content, show, onRemove }: { n: 1 | 2; content: string; show: boolean; onRemove: () => void }) => {
-    const collapsed = n === 1 ? annex1Collapsed : annex2Collapsed;
-    const setCollapsed = n === 1 ? setAnnex1Collapsed : setAnnex2Collapsed;
-    if (!show) return null;
-    return (
-      <div className="mt-4 border-t border-border pt-4">
-        <div className="flex items-center justify-between mb-2">
-          <button
-            onClick={() => setCollapsed(v => !v)}
-            className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
-          >
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
-            Anexo {n}
-          </button>
-          <div className="flex items-center gap-2">
-            {!collapsed && annexModels.length > 0 && (
-              <select className="text-xs border border-border rounded-lg px-2 py-1.5 bg-background" defaultValue=""
-                onChange={e => { const m=annexModels.find(x=>x.id===e.target.value); if(m) handleAnnex(n,m.content??''); e.currentTarget.value=''; }}>
-                <option value="" disabled>Usar modelo...</option>
-                {annexModels.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-            )}
-            {!collapsed && content && (
-              <button onClick={() => saveAnnexAsModel(content)}
-                className="text-xs border border-border rounded-lg px-2 py-1.5 hover:bg-muted transition-colors text-muted-foreground whitespace-nowrap">
-                Salvar como modelo
-              </button>
-            )}
-            <button onClick={onRemove} className="p-1 text-muted-foreground hover:text-destructive transition-colors">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-        {!collapsed && <RichTextEditor content={content} onChange={html => handleAnnex(n, html)} placeholder="Conteúdo do anexo..." />}
-      </div>
-    );
+  const annexBlockProps1 = {
+    n: 1 as const, content: annex1, show: showAnnex1,
+    collapsed: annex1Collapsed, setCollapsed: setAnnex1Collapsed,
+    annexModels, onAnnex: handleAnnex, onSaveModel: saveAnnexAsModel,
+    onRemove: () => { setShowAnnex1(false); handleAnnex(1, ''); },
+  };
+  const annexBlockProps2 = {
+    n: 2 as const, content: annex2, show: showAnnex2,
+    collapsed: annex2Collapsed, setCollapsed: setAnnex2Collapsed,
+    annexModels, onAnnex: handleAnnex, onSaveModel: saveAnnexAsModel,
+    onRemove: () => { setShowAnnex2(false); handleAnnex(2, ''); },
   };
 
   return (
@@ -755,8 +779,8 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                       {showAnnex1&&!showAnnex2&&<button onClick={()=>setShowAnnex2(true)} className="flex items-center gap-1 px-2.5 py-1 text-xs border border-border rounded-lg hover:bg-muted transition-colors"><Plus className="w-3 h-3"/>2º anexo</button>}
                     </div>
                   </div>
-                  <AnnexBlock n={1} content={annex1} show={showAnnex1} onRemove={()=>{setShowAnnex1(false);handleAnnex(1,'');}} />
-                  <AnnexBlock n={2} content={annex2} show={showAnnex2} onRemove={()=>{setShowAnnex2(false);handleAnnex(2,'');}} />
+                  <AnnexBlock {...annexBlockProps1} />
+                  <AnnexBlock {...annexBlockProps2} />
                   {!showAnnex1&&<p className="text-xs text-muted-foreground mt-1">Nenhum anexo adicionado</p>}
                 </div>
               </>
