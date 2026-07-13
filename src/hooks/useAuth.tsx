@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         access_cadastros:      p.access_cadastros   ?? false,
         access_estatisticas:   p.access_estatisticas ?? false,
         access_administracao:  p.access_administracao ?? false,
-        access_producao:       p.access_producao      ?? false,
+        access_producao:       (p as any).access_producao ?? false,
         is_admin:              p.is_admin             ?? false,
       });
     } else {
