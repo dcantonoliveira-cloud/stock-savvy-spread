@@ -327,7 +327,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     }, 1200);
   };
 
-  const generateContract = () => {
+  const generateContract = async () => {
     if (!contractTemplate) { toast.error('Nenhum modelo configurado. Vá em Cadastros → Contratos.'); return; }
     const missing = REQUIRED_FIELDS.filter(f => !f.getValue(event));
     if (missing.length > 0) {
@@ -337,8 +337,12 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     const generated = replaceTags(contractTemplate, event, witness1Name, witness1Cpf);
     setContractText(generated); setContractGenerated(true);
     setAnnex1(''); setAnnex2(''); setShowAnnex1(false); setShowAnnex2(false);
-    supabase.from('events').update({ contract_text: generated, annex_1_text: null, annex_2_text: null }).eq('id', eventId);
-    toast.success('Contrato gerado com sucesso');
+    const { error } = await supabase.from('events').update({ contract_text: generated, annex_1_text: null, annex_2_text: null }).eq('id', eventId);
+    if (error) {
+      toast.error('Erro ao salvar contrato: ' + error.message);
+    } else {
+      toast.success('Contrato gerado com sucesso');
+    }
   };
 
   const handleAnnex = (n: 1 | 2, html: string) => {
