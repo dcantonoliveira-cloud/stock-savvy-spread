@@ -31,7 +31,7 @@ interface EventData {
   clients: { name: string | null; cpf: string | null; rg: string | null; address: string | null; email: string | null } | null;
 }
 interface ZapSigner { token: string; name: string; email: string; status: string; sign_url: string }
-interface ZapData { doc_token: string; open_id: number; signers: ZapSigner[]; sent_at: string }
+interface ZapData { doc_token: string; open_id: number; signers: ZapSigner[]; sent_at: string; signed_file?: string | null }
 interface Props { eventId: string; event: EventData; clientPhone?: string | null }
 
 // ── tag replacement ────────────────────────────────────────────────────────────
@@ -522,6 +522,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           token: s.token, name: s.name, email: s.email,
           status: s.status ?? 'pending', sign_url: s.sign_url,
         })),
+        signed_file: data.signed_file ?? zapData.signed_file ?? null,
       };
       // Detectar assinantes que acabaram de assinar
       const prevSigners = zapData.signers ?? [];
@@ -529,8 +530,11 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         s.status === 'signed' &&
         prevSigners.find(p => p.token === s.token)?.status !== 'signed'
       );
+      const allSigned = updated.signers.length > 0 && updated.signers.every(s => s.status === 'signed');
       setZapData(updated);
-      await supabase.from('events').update({ zapsign_data: updated as any }).eq('id', eventId);
+      const dbUpdates: any = { zapsign_data: updated };
+      if (allSigned) dbUpdates.contract_signed = true;
+      await supabase.from('events').update(dbUpdates).eq('id', eventId);
       // Inserir alert para cada novo assinante
       for (const signer of newlySigned) {
         const eventName = event.event_name ?? 'Evento';
@@ -757,9 +761,17 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                     </div>
                   ))}
                   {zapData.signers.every(s=>s.status==='signed') && (
-                    <p className="text-xs font-semibold text-emerald-600 text-center pt-1 flex items-center justify-center gap-1">
-                      <Check className="w-3.5 h-3.5" />Todos assinaram!
-                    </p>
+                    <div className="flex items-center justify-center gap-3 pt-1">
+                      <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" />Todos assinaram!
+                      </p>
+                      {zapData.signed_file && (
+                        <a href={zapData.signed_file} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                          <Download className="w-3.5 h-3.5" />Ver contrato assinado
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
