@@ -244,7 +244,7 @@ function AnnexBlock({ n, content, show, collapsed, setCollapsed, annexModels, on
           </button>
         </div>
       </div>
-      {!collapsed && <RichTextEditor content={content} onChange={html => onAnnex(n, html)} placeholder="Conteúdo do anexo..." />}
+      {!collapsed && <RichTextEditor content={content} onChange={html => onAnnex(n, html)} onBlur={html => onAnnex(n, html)} placeholder="Conteúdo do anexo..." />}
     </div>
   );
 }
@@ -375,7 +375,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     clearTimeout(timers.current[field]);
     timers.current[field] = setTimeout(async () => {
       await supabase.from('events').update({ [field]: value || null }).eq('id', eventId);
-    }, 1200);
+    }, 600);
   };
 
   const generateContract = async () => {

@@ -24,6 +24,7 @@ const COLORS = [
 interface Props {
   content: string;
   onChange: (html: string) => void;
+  onBlur?: (html: string) => void;
   placeholder?: string;
 }
 
@@ -46,7 +47,7 @@ function ToolbarBtn({
   );
 }
 
-export default function RichTextEditor({ content, onChange, placeholder = 'Escreva aqui...' }: Props) {
+export default function RichTextEditor({ content, onChange, onBlur, placeholder = 'Escreva aqui...' }: Props) {
   const [showColors, setShowColors] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [showLink, setShowLink] = useState(false);
@@ -65,6 +66,7 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Escre
     ],
     content,
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onBlur: ({ editor }) => onBlur?.(editor.getHTML()),
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] px-4 py-3 text-sm text-foreground',
