@@ -88,6 +88,7 @@ const EmployeeEventsPage      = lazy(() => import("./pages/employee/EmployeeEven
 const EmployeeMateriaisPage   = lazy(() => import("./pages/employee/EmployeeMateriaisPage"));
 const MyPayslipsPage          = lazy(() => import("./pages/employee/MyPayslipsPage"));
 const PayslipSignPage         = lazy(() => import("./pages/employee/PayslipSignPage"));
+const ProducaoPage            = lazy(() => import("./pages/employee/ProducaoPage"));
 const PayslipsAdminPage       = lazy(() => import("./pages/supervisor/payslips/PayslipsAdminPage"));
 
 // ─── Public pages (lazy) ───
@@ -285,6 +286,7 @@ function AppRoutes() {
           <Route path="/inventario" element={permissions.access_stock ? <EmployeeInventoryPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/eventos" element={permissions.access_stock ? <EmployeeEventsPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/materiais" element={permissions.access_materials ? <EmployeeMateriaisPage /> : <Navigate to="/" replace />} />
+          <Route path="/producao" element={<ProducaoPage />} />
           <Route path="/meus-holerites" element={<MyPayslipsPage />} />
           <Route path="/meus-holerites/:id" element={<PayslipSignPage />} />
           <Route path="*" element={<Navigate to={permissions.access_stock ? "/" : "/materiais"} replace />} />

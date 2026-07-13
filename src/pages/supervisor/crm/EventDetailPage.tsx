@@ -993,10 +993,15 @@ export default function EventDetailPage() {
 
 const FIELD_LABELS: Record<string, string> = {
   event_name: 'Nome do Evento', event_type: 'Tipo', event_date: 'Data',
-  location_id: 'Local', product_id: 'Produto', guest_count: 'Convidados',
-  price_per_person: 'Preço/Pax', organizer_id: 'Assessora', decorator_id: 'Decoradora',
-  notes: 'Observações', menu_text: 'Cardápio (texto)', menu_mode: 'Modo Cardápio',
-  status: 'Status', ceremony_time: 'Horário Cerimônia',
+  location_id: 'Local', location_text: 'Local (texto)', product_id: 'Produto', product_name: 'Produto',
+  guest_count: 'Convidados', price_per_person: 'Preço/Pax', total_value: 'Valor total',
+  contract_value: 'Valor do contrato', contract_signed: 'Contrato assinado',
+  organizer_id: 'Assessora', organizer: 'Assessora', decorator_id: 'Decoradora', decorator: 'Decoradora',
+  pastry_chef: 'Confeiteiro', band_dj: 'Banda/DJ', bartender: 'Barman', photo_video: 'Foto/Vídeo',
+  professional_count: 'Quantidade de profissionais', professional_meal_value: 'Refeição profissional',
+  pricing_mode: 'Modo de precificação', notes: 'Observações',
+  menu_text: 'Cardápio (texto)', menu_mode: 'Modo Cardápio',
+  status: 'Status', ceremony_time: 'Horário Cerimônia', duration_hours: 'Duração (horas)',
 };
 
 function EventHistorySection({ eventId }: { eventId: string }) {
