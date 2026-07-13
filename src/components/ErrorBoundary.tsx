@@ -68,8 +68,9 @@ export class ErrorBoundary extends Component<Props, State> {
               const keys = await caches.keys();
               await Promise.all(keys.map(k => caches.delete(k)));
             }
-            // Força busca do servidor com cache-busting (evita recarregar do cache do browser)
-            window.location.replace('/?_=' + Date.now());
+            sessionStorage.clear();
+            // Hard reload — bypassa cache do browser completamente
+            window.location.href = window.location.origin + '/?nocache=' + Date.now();
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
         >
