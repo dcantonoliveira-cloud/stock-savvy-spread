@@ -474,6 +474,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           name: `Contrato - ${event.event_name ?? 'Evento'}`,
           base64_pdf: base64,
           sandbox: false,
+          webhook_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-webhook`,
           signers: validSigners.map(s => ({ name: s.name, email: s.email, send_automatic_email: true })),
         }),
       });
@@ -552,7 +553,14 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   };
   const refreshZapStatus = () => fetchZapStatus(false);
 
-  // Auto-refresh signature status every 30s while there are pending signers
+  // Busca status imediato ao carregar se há documento pendente
+  useEffect(() => {
+    if (zapData && zapData.signers.some(s => s.status !== 'signed')) {
+      fetchZapStatus(true);
+    }
+  }, [zapData?.doc_token]);
+
+  // Auto-refresh a cada 30s enquanto há signatários pendentes
   useEffect(() => {
     if (!zapData || zapData.signers.every(s => s.status === 'signed')) return;
     const interval = setInterval(() => fetchZapStatus(true), 30000);
