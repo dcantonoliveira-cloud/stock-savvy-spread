@@ -109,7 +109,7 @@ export default function ContractFormPage() {
     setSaving(true);
 
     if (clientId) {
-      await (supabase.from as any)('clients').update({
+      const { error: clientErr } = await (supabase.from as any)('clients').update({
         name:     form.name     || undefined,
         cpf:      form.cpf      || undefined,
         rg:       form.rg       || undefined,
@@ -119,9 +119,14 @@ export default function ContractFormPage() {
         email:    form.email    || undefined,
         source:   form.source   || undefined,
       }).eq('id', clientId);
+      if (clientErr) {
+        setSaving(false);
+        alert('Erro ao salvar dados. Por favor, tente novamente.');
+        return;
+      }
     }
 
-    await (supabase.from as any)('events').update({
+    const { error: eventErr } = await (supabase.from as any)('events').update({
       witness_name:            form.witness_name    || null,
       witness_cpf:             form.witness_cpf     || null,
       witness_email:           form.witness_email   || null,
@@ -129,6 +134,11 @@ export default function ContractFormPage() {
       witness_2_email:         form.witness_2_email || null,
       contract_form_submitted: true,
     }).eq('id', eventId);
+    if (eventErr) {
+      setSaving(false);
+      alert('Erro ao enviar formulário. Por favor, tente novamente.');
+      return;
+    }
 
     setSaving(false);
     setState('done');
