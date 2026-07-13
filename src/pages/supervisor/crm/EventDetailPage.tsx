@@ -700,7 +700,39 @@ export default function EventDetailPage() {
                 />
 
                 <F label="Horário de início" value={s('ceremony_time')} onChange={v => setF('ceremony_time', v)} placeholder="15:30 hs" />
-                <F label="Duração (horas)" value={s('duration_hours')} onChange={v => setF('duration_hours', v)} type="number" suffix="h" />
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-1.5">Duração</p>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="number" min={0} max={24}
+                        className="w-full px-3 py-2 pr-7 rounded-xl border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                        value={form.duration_hours != null ? Math.floor(form.duration_hours) : ''}
+                        onChange={e => {
+                          const h = parseInt(e.target.value) || 0;
+                          const m = form.duration_hours != null ? Math.round((form.duration_hours % 1) * 60) : 0;
+                          setF('duration_hours', String(h + m / 60));
+                        }}
+                        placeholder="0"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">h</span>
+                    </div>
+                    <div className="relative flex-1">
+                      <input
+                        type="number" min={0} max={59} step={5}
+                        className="w-full px-3 py-2 pr-10 rounded-xl border border-border text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                        value={form.duration_hours != null ? Math.round((form.duration_hours % 1) * 60) : ''}
+                        onChange={e => {
+                          const m = parseInt(e.target.value) || 0;
+                          const h = form.duration_hours != null ? Math.floor(form.duration_hours) : 0;
+                          setF('duration_hours', String(h + m / 60));
+                        }}
+                        placeholder="0"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">min</span>
+                    </div>
+                  </div>
+                </div>
                 <F label="Convidados" value={s('guest_count')} onChange={v => setF('guest_count', v)} type="number" />
 
                 {/* Preço: muda conforme o modo */}
