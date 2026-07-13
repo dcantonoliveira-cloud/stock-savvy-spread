@@ -127,10 +127,18 @@ export default function SupervisorProducaoPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const filtered = orders.filter(o =>
-    (filter === 'all' || o.status === filter) &&
-    (search === '' || o.title.toLowerCase().includes(search.toLowerCase()) || (o.event_name ?? '').toLowerCase().includes(search.toLowerCase()))
-  );
+  const STATUS_ORDER: Record<Status, number> = { pending: 0, in_progress: 1, done: 2 };
+
+  const filtered = orders
+    .filter(o =>
+      (filter === 'all' || o.status === filter) &&
+      (search === '' || o.title.toLowerCase().includes(search.toLowerCase()) || (o.event_name ?? '').toLowerCase().includes(search.toLowerCase()))
+    )
+    .sort((a, b) => {
+      const sd = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+      if (sd !== 0) return sd;
+      return a.delivery_date.localeCompare(b.delivery_date);
+    });
 
   const pending    = filtered.filter(o => o.status === 'pending').length;
   const inProgress = filtered.filter(o => o.status === 'in_progress').length;
