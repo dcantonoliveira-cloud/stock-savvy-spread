@@ -41,6 +41,8 @@ const navStructure: NavGroup[] = [
     { path: '/financeiro/relatorios',     label: 'Relatórios',       icon: BookMarked },
   ]},
 
+  { path: '/supervisor/producao', label: 'Produção', icon: ChefHat, permKey: 'access_estoque' },
+
   { label: 'Operações', icon: UtensilsCrossed, permKey: 'access_estoque', items: [
     { path: '/event-menus',    label: 'Cardápios',       icon: UtensilsCrossed },
     { path: '/sheets',         label: 'Fichas Técnicas', icon: FileText },

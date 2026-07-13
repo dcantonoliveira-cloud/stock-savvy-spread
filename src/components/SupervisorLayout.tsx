@@ -44,6 +44,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/configuracoes': 'Configurações',
   '/cadastros/notificacoes': 'Grupos de Notificação',
   '/estatisticas': 'Estatísticas',
+  '/supervisor/producao': 'Produção',
 };
 
 export default function SupervisorLayout({ children }: { children: ReactNode }) {

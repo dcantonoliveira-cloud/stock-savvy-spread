@@ -31,6 +31,7 @@ const UsersPage                = lazy(() => import("./pages/supervisor/UsersPage
 const NotificationsPage        = lazy(() => import("./pages/supervisor/NotificationsPage"));
 const AIAnalysisPage           = lazy(() => import("./pages/supervisor/AIAnalysisPage"));
 const EstatisticasPage         = lazy(() => import("./pages/supervisor/EstatisticasPage"));
+const SupervisorProducaoPage   = lazy(() => import("./pages/supervisor/ProducaoPage"));
 const EmployeeDetailPage       = lazy(() => import("./pages/supervisor/EmployeeDetailPage"));
 const CategoriesPage           = lazy(() => import("./pages/supervisor/CategoriesPage"));
 const TagsPage                 = lazy(() => import("./pages/supervisor/TagsPage"));
@@ -255,6 +256,7 @@ function AppRoutes() {
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/analysis" element={<AIAnalysisPage />} />
             <Route path="/estatisticas" element={<EstatisticasPage />} />
+            <Route path="/supervisor/producao" element={<SupervisorProducaoPage />} />
             <Route path="/holerites" element={<PayslipsAdminPage />} />
             <Route path="/meus-holerites" element={<MyPayslipsPage />} />
             <Route path="/meus-holerites/:id" element={<PayslipSignPage />} />

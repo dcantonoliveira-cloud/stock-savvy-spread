@@ -108,25 +108,15 @@ export default function ContractFormPage() {
     if (!eventId) return;
     setSaving(true);
 
-    if (clientId) {
-      const { error: clientErr } = await (supabase.from as any)('clients').update({
-        name:     form.name     || undefined,
-        cpf:      form.cpf      || undefined,
-        rg:       form.rg       || undefined,
-        address:  form.address  || undefined,
-        zip_code: form.zip_code || undefined,
-        phone:    form.phone    || undefined,
-        email:    form.email    || undefined,
-        source:   form.source   || undefined,
-      }).eq('id', clientId);
-      if (clientErr) {
-        setSaving(false);
-        alert('Erro ao salvar dados. Por favor, tente novamente.');
-        return;
-      }
-    }
-
     const { error: eventErr } = await (supabase.from as any)('events').update({
+      contratante_name:        form.name        || null,
+      contratante_cpf:         form.cpf         || null,
+      contratante_rg:          form.rg          || null,
+      contratante_address:     form.address     || null,
+      contratante_zip_code:    form.zip_code    || null,
+      contratante_phone:       form.phone       || null,
+      contratante_email:       form.email       || null,
+      contratante_source:      form.source      || null,
       witness_name:            form.witness_name    || null,
       witness_cpf:             form.witness_cpf     || null,
       witness_email:           form.witness_email   || null,
@@ -136,7 +126,7 @@ export default function ContractFormPage() {
     }).eq('id', eventId);
     if (eventErr) {
       setSaving(false);
-      alert('Erro ao enviar formulário. Por favor, tente novamente.');
+      alert('Erro ao enviar seus dados. Por favor, tente novamente ou entre em contato com o buffet.');
       return;
     }
 
