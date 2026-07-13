@@ -45,9 +45,10 @@ function requiredPermFor(pathname: string): keyof Permissions | null {
  * Meus Holerites, Comparativo) são sempre liberadas.
  */
 export default function SupervisorRouteGuard({ children }: { children: ReactNode }) {
-  const { permissions, role } = useAuth();
+  const { permissions, role, loading } = useAuth();
   const { pathname } = useLocation();
 
+  if (loading) return null;
   if (permissions.is_admin || role === 'supervisor') return <>{children}</>;
 
   const perm = requiredPermFor(pathname);
