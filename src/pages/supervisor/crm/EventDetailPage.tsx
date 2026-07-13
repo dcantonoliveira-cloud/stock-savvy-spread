@@ -430,11 +430,23 @@ export default function EventDetailPage() {
     const next = { ...clientFormRef.current, [key]: val };
     clientFormRef.current = next;
     setClientForm(next);
-    const clientId = event?.clients?.id;
-    if (!clientId) return;
     if (clientTimerRef.current) clearTimeout(clientTimerRef.current);
-    clientTimerRef.current = setTimeout(() => persistClient(clientFormRef.current, clientId), 1500);
-  }, [event?.clients?.id, persistClient]);
+    clientTimerRef.current = setTimeout(async () => {
+      let clientId = event?.clients?.id;
+      if (!clientId) {
+        // Criar cliente e vincular ao evento
+        const { data: newClient } = await supabase.from('clients' as any).insert({
+          company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89',
+          name: clientFormRef.current.name || null,
+        }).select('id').single();
+        if (!newClient) return;
+        clientId = (newClient as any).id;
+        await supabase.from('events').update({ client_id: clientId }).eq('id', id!);
+        setEvent(prev => prev ? { ...prev, clients: { id: clientId!, name: clientFormRef.current.name || null, phone: null, email: null, cpf: null, rg: null, address: null, zip_code: null, source: null } } : prev);
+      }
+      persistClient(clientFormRef.current, clientId);
+    }, 1500);
+  }, [event?.clients?.id, persistClient, id]);
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -766,44 +778,40 @@ export default function EventDetailPage() {
             {/* Dados do contratante */}
             <div className="bg-white border border-border rounded-2xl p-6">
               <SectionTitle>Dados do Contratante</SectionTitle>
-              {event.clients ? (
-                <div className="grid grid-cols-3 gap-x-6 gap-y-4">
-                  <div className="col-span-2">
-                    <label className={labelCls}>Nome do Contratante</label>
-                    <input className={inputCls} value={clientForm.name ?? ''} onChange={e => setC('name', e.target.value)} placeholder="Nome completo" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Telefone com DDD</label>
-                    <input className={inputCls} value={clientForm.phone ?? ''} onChange={e => setC('phone', e.target.value)} placeholder="(11) 99999-9999" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>CPF/CNPJ</label>
-                    <input className={inputCls} value={clientForm.cpf ?? ''} onChange={e => setC('cpf', e.target.value)} placeholder="000.000.000-00" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>RG</label>
-                    <input className={inputCls} value={clientForm.rg ?? ''} onChange={e => setC('rg', e.target.value)} placeholder="00.000.000-0" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>E-mail</label>
-                    <input className={inputCls} value={clientForm.email ?? ''} onChange={e => setC('email', e.target.value)} placeholder="email@exemplo.com" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className={labelCls}>Endereço Completo</label>
-                    <input className={inputCls} value={clientForm.address ?? ''} onChange={e => setC('address', e.target.value)} placeholder="Rua, número, complemento, bairro, cidade" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>CEP</label>
-                    <input className={inputCls} value={clientForm.zip_code ?? ''} onChange={e => setC('zip_code', e.target.value)} placeholder="00000-000" />
-                  </div>
-                  <div>
-                    <label className={labelCls}>De onde nos conheceu</label>
-                    <input className={inputCls} value={clientForm.source ?? ''} onChange={e => setC('source', e.target.value)} placeholder="Instagram, indicação..." />
-                  </div>
+              <div className="grid grid-cols-3 gap-x-6 gap-y-4">
+                <div className="col-span-2">
+                  <label className={labelCls}>Nome do Contratante</label>
+                  <input className={inputCls} value={clientForm.name ?? ''} onChange={e => setC('name', e.target.value)} placeholder="Nome completo" />
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Nenhum cliente vinculado a este evento.</p>
-              )}
+                <div>
+                  <label className={labelCls}>Telefone com DDD</label>
+                  <input className={inputCls} value={clientForm.phone ?? ''} onChange={e => setC('phone', e.target.value)} placeholder="(11) 99999-9999" />
+                </div>
+                <div>
+                  <label className={labelCls}>CPF/CNPJ</label>
+                  <input className={inputCls} value={clientForm.cpf ?? ''} onChange={e => setC('cpf', e.target.value)} placeholder="000.000.000-00" />
+                </div>
+                <div>
+                  <label className={labelCls}>RG</label>
+                  <input className={inputCls} value={clientForm.rg ?? ''} onChange={e => setC('rg', e.target.value)} placeholder="00.000.000-0" />
+                </div>
+                <div>
+                  <label className={labelCls}>E-mail</label>
+                  <input className={inputCls} value={clientForm.email ?? ''} onChange={e => setC('email', e.target.value)} placeholder="email@exemplo.com" />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Endereço Completo</label>
+                  <input className={inputCls} value={clientForm.address ?? ''} onChange={e => setC('address', e.target.value)} placeholder="Rua, número, complemento, bairro, cidade" />
+                </div>
+                <div>
+                  <label className={labelCls}>CEP</label>
+                  <input className={inputCls} value={clientForm.zip_code ?? ''} onChange={e => setC('zip_code', e.target.value)} placeholder="00000-000" />
+                </div>
+                <div>
+                  <label className={labelCls}>De onde nos conheceu</label>
+                  <input className={inputCls} value={clientForm.source ?? ''} onChange={e => setC('source', e.target.value)} placeholder="Instagram, indicação..." />
+                </div>
+              </div>
             </div>
 
             {/* Testemunha */}
