@@ -467,8 +467,27 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           status: s.status ?? 'pending', sign_url: s.sign_url,
         })),
       };
+      // Detectar assinantes que acabaram de assinar
+      const prevSigners = zapData.signers ?? [];
+      const newlySigned = updated.signers.filter(s =>
+        s.status === 'signed' &&
+        prevSigners.find(p => p.token === s.token)?.status !== 'signed'
+      );
       setZapData(updated);
       await supabase.from('events').update({ zapsign_data: updated as any }).eq('id', eventId);
+      // Inserir alert para cada novo assinante
+      for (const signer of newlySigned) {
+        const eventName = event.event_name ?? 'Evento';
+        await (supabase as any).from('smart_alerts').insert({
+          company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89',
+          type: 'zapsign_signed',
+          severity: 'warning',
+          title: `${signer.name} assinou o contrato`,
+          description: eventName,
+          entity_type: 'event',
+          entity_id: eventId,
+        });
+      }
       if (!silent) toast.success('Status atualizado');
     } catch {
       if (!silent) toast.error('Erro ao atualizar status');

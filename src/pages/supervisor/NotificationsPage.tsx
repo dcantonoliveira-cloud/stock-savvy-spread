@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Bell, CheckCheck, AlertTriangle, Clock, DollarSign,
   CalendarDays, FileText, Stethoscope, CheckCircle2, Loader2,
-  ExternalLink, Send, ListChecks,
+  ExternalLink, Send, ListChecks, ClipboardCheck, PenLine,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +23,8 @@ const TYPE_META: Record<string, { emoji: string; icon: React.ReactNode; label: s
   menu_change:      { emoji: '🍽️', icon: <CalendarDays className="w-3.5 h-3.5" />, label: 'Cardápio' },
   payslip_unsigned: { emoji: '📄', icon: <FileText className="w-3.5 h-3.5" />,     label: 'Holerite' },
   exames:           { emoji: '🩺', icon: <Stethoscope className="w-3.5 h-3.5" />,  label: 'Exame' },
+  contract_form:    { emoji: '📋', icon: <ClipboardCheck className="w-3.5 h-3.5" />, label: 'Formulário' },
+  zapsign_signed:   { emoji: '✍️', icon: <PenLine className="w-3.5 h-3.5" />,        label: 'Assinatura' },
 };
 
 const SEV_STYLE = {
