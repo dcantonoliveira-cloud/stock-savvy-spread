@@ -265,8 +265,8 @@ export default function CalendarPage() {
                     </span>
 
                     <div className="flex flex-col gap-0.5 overflow-hidden flex-1 mt-0.5">
-                      {/* Events */}
-                      {evs.slice(0, 2).map(ev => {
+                      {/* Events — up to 3 slots total */}
+                      {evs.slice(0, 3).map(ev => {
                         const st = STATUS[ev.status ?? ''];
                         return (
                           <div key={ev.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md ${st?.bg ?? 'bg-muted'} min-w-0`}>
@@ -278,7 +278,7 @@ export default function CalendarPage() {
                         );
                       })}
                       {/* Tastings */}
-                      {tsgs.slice(0, evs.length >= 2 ? 1 : 2).map(t => (
+                      {tsgs.slice(0, Math.max(0, 3 - evs.length)).map(t => (
                         <div key={t.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-50 min-w-0">
                           <UtensilsCrossed className="w-2.5 h-2.5 shrink-0 text-violet-500" />
                           <span className="text-[10px] font-medium truncate leading-tight text-violet-700">
