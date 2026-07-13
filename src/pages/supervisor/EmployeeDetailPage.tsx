@@ -16,7 +16,7 @@ interface EmpPermissions {
   access_stock: boolean; access_materials: boolean;
   access_comercial: boolean; access_financeiro: boolean;
   access_estoque: boolean; access_cadastros: boolean;
-  access_estatisticas: boolean; access_administracao: boolean;
+  access_estatisticas: boolean; access_administracao: boolean; access_producao: boolean;
   is_admin: boolean;
 }
 
@@ -25,7 +25,7 @@ const DEFAULT_PERMS: EmpPermissions = {
   access_stock: false, access_materials: false,
   access_comercial: false, access_financeiro: false,
   access_estoque: false, access_cadastros: false,
-  access_estatisticas: false, access_administracao: false,
+  access_estatisticas: false, access_administracao: false, access_producao: false,
   is_admin: false,
 };
 
@@ -53,6 +53,10 @@ const PERM_GROUPS = [
   {
     label: 'Estatísticas', key: 'access_estatisticas' as keyof EmpPermissions,
     desc: 'Relatórios de desempenho e Dashboard BI',
+  },
+  {
+    label: 'Produção', key: 'access_producao' as keyof EmpPermissions,
+    desc: 'Pedidos de produção da cozinha',
   },
   {
     label: 'Administração', key: 'access_administracao' as keyof EmpPermissions,
@@ -169,6 +173,7 @@ export default function EmployeeDetailPage() {
         access_cadastros: d.access_cadastros ?? false,
         access_estatisticas: d.access_estatisticas ?? false,
         access_administracao: d.access_administracao ?? false,
+        access_producao: d.access_producao ?? false,
         is_admin: d.is_admin ?? false,
       });
     }

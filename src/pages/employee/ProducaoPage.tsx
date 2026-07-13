@@ -10,6 +10,7 @@ interface Order {
   id: string;
   title: string;
   description: string | null;
+  delivery_address: string | null;
   event_id: string | null;
   event_name?: string | null;
   delivery_date: string;
@@ -76,7 +77,8 @@ export default function ProducaoPage() {
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground text-sm leading-tight">{order.title}</p>
-            {order.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{order.description}</p>}
+            {order.description && <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{order.description}</p>}
+            {order.delivery_address && <p className="text-xs text-blue-600 mt-0.5 font-medium">📍 {order.delivery_address}</p>}
           </div>
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${cfg.badge}`}>{cfg.label}</span>
         </div>

@@ -11,6 +11,7 @@ interface Order {
   id: string;
   title: string;
   description: string | null;
+  delivery_address: string | null;
   event_id: string | null;
   event_name?: string | null;
   delivery_date: string;
@@ -33,7 +34,7 @@ const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', cu
 
 const inputCls = 'w-full px-3 py-2.5 rounded-xl border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors';
 const labelCls = 'block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5';
-const BLANK = { title: '', description: '', event_id: '', delivery_date: '', delivery_time: '', extra_value: '' };
+const BLANK = { title: '', description: '', delivery_address: '', event_id: '', delivery_date: '', delivery_time: '', extra_value: '' };
 
 export default function SupervisorProducaoPage() {
   const [orders, setOrders]       = useState<Order[]>([]);
@@ -94,8 +95,9 @@ export default function SupervisorProducaoPage() {
     const { error } = await (supabase.from as any)('production_orders').insert({
       company_id:    COMPANY_ID,
       title:         form.title,
-      description:   form.description || null,
-      event_id:      form.event_id || null,
+      description:      form.description || null,
+      delivery_address: form.delivery_address || null,
+      event_id:         form.event_id || null,
       delivery_date: form.delivery_date,
       delivery_time: form.delivery_time || null,
       extra_value:   form.extra_value ? parseFloat(form.extra_value.replace(',', '.')) : null,
@@ -197,7 +199,8 @@ export default function SupervisorProducaoPage() {
                   <tr key={o.id} className="hover:bg-muted/20 transition-colors">
                     <td className="px-5 py-3">
                       <p className="font-medium text-foreground">{o.title}</p>
-                      {o.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{o.description}</p>}
+                      {o.description && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{o.description}</p>}
+                      {o.delivery_address && <p className="text-xs text-blue-600 mt-0.5">📍 {o.delivery_address}</p>}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       {o.event_name ? (
@@ -258,9 +261,16 @@ export default function SupervisorProducaoPage() {
 
               <div>
                 <label className={labelCls}>Descrição</label>
-                <textarea className={inputCls + ' resize-none'} rows={2} value={form.description}
+                <textarea className={inputCls + ' resize-none'} rows={3} value={form.description}
                   onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                   placeholder="Quantidade, sabor, detalhes..." />
+              </div>
+
+              <div>
+                <label className={labelCls}>Endereço de entrega</label>
+                <input className={inputCls} value={form.delivery_address}
+                  onChange={e => setForm(p => ({ ...p, delivery_address: e.target.value }))}
+                  placeholder="Rua, número, bairro..." />
               </div>
 
               <div ref={searchRef} className="relative">

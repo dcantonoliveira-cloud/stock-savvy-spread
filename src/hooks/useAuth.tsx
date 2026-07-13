@@ -18,6 +18,7 @@ export interface Permissions {
   access_cadastros: boolean;
   access_estatisticas: boolean;
   access_administracao: boolean;
+  access_producao: boolean;
   // admin flag — can manage other users' permissions
   is_admin: boolean;
 }
@@ -34,6 +35,7 @@ const SUPERVISOR_DEFAULTS: Permissions = {
   access_cadastros: true,
   access_estatisticas: true,
   access_administracao: true,
+  access_producao: true,
   is_admin: true,
 };
 
@@ -48,6 +50,7 @@ const EMPLOYEE_DEFAULTS: Permissions = {
   access_cadastros: false,
   access_estatisticas: false,
   access_administracao: false,
+  access_producao: false,
   is_admin: false,
 };
 
@@ -108,7 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         access_cadastros:      p.access_cadastros   ?? false,
         access_estatisticas:   p.access_estatisticas ?? false,
         access_administracao:  p.access_administracao ?? false,
-        is_admin:              p.is_admin           ?? false,
+        access_producao:       p.access_producao      ?? false,
+        is_admin:              p.is_admin             ?? false,
       });
     } else {
       // No row → full access for supervisors, defaults for employees

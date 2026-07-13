@@ -22,7 +22,7 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
       { to: '/eventos', label: 'Eventos', icon: CalendarDays },
     ] : []),
     ...(permissions.access_materials ? [{ to: '/materiais', label: 'Materiais', icon: Warehouse }] : []),
-    { to: '/producao', label: 'Produção', icon: UtensilsCrossed },
+    ...(permissions.access_producao ? [{ to: '/producao', label: 'Produção', icon: UtensilsCrossed }] : []),
     { to: '/meus-holerites', label: 'Holerites', icon: FileText },
   ];
 
