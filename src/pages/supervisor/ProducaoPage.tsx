@@ -58,7 +58,14 @@ export default function SupervisorProducaoPage() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const sub = (supabase as any)
+      .channel('production_supervisor')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_orders' }, load)
+      .subscribe();
+    return () => sub.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (eventSearch.length < 2) { setEventOptions([]); return; }
