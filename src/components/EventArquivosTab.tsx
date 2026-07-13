@@ -214,6 +214,8 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [annex2, setAnnex2]                   = useState('');
   const [showAnnex1, setShowAnnex1]           = useState(false);
   const [showAnnex2, setShowAnnex2]           = useState(false);
+  const [annex1Collapsed, setAnnex1Collapsed] = useState(true);
+  const [annex2Collapsed, setAnnex2Collapsed] = useState(true);
   const [annexModels, setAnnexModels]         = useState<AnnexModel[]>([]);
   const [witness1Name, setWitness1Name]       = useState('');
   const [witness1Cpf, setWitness1Cpf]         = useState('');
@@ -515,7 +517,8 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   };
 
   const AnnexBlock = ({ n, content, show, onRemove }: { n: 1 | 2; content: string; show: boolean; onRemove: () => void }) => {
-    const [collapsed, setCollapsed] = useState(true);
+    const collapsed = n === 1 ? annex1Collapsed : annex2Collapsed;
+    const setCollapsed = n === 1 ? setAnnex1Collapsed : setAnnex2Collapsed;
     if (!show) return null;
     return (
       <div className="mt-4 border-t border-border pt-4">
