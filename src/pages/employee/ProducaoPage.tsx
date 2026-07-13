@@ -65,9 +65,13 @@ export default function ProducaoPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const filtered = orders.filter(o => activeFilter === 'all' || o.status === activeFilter);
+  const filtered = orders
+    .filter(o => activeFilter === 'all' || o.status === activeFilter)
+    .sort((a, b) => a.delivery_date.localeCompare(b.delivery_date) || (a.delivery_time ?? '').localeCompare(b.delivery_time ?? ''));
+
   const overdue  = filtered.filter(o => o.delivery_date < today && o.status !== 'done');
-  const upcoming = filtered.filter(o => o.delivery_date >= today || o.status === 'done');
+  const todayOrders = filtered.filter(o => o.delivery_date === today);
+  const future   = filtered.filter(o => o.delivery_date > today);
 
   const OrderCard = ({ order }: { order: Order }) => {
     const cfg = STATUS_CFG[order.status];
@@ -141,17 +145,23 @@ export default function ProducaoPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground text-sm">Nenhum pedido.</div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {overdue.length > 0 && (
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-red-500 mb-2">Atrasados</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-red-500 mb-2">⚠ Atrasados</p>
               <div className="space-y-3">{overdue.map(o => <OrderCard key={o.id} order={o} />)}</div>
             </div>
           )}
-          {upcoming.length > 0 && (
+          {todayOrders.length > 0 && (
             <div>
-              {overdue.length > 0 && <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Próximos</p>}
-              <div className="space-y-3">{upcoming.map(o => <OrderCard key={o.id} order={o} />)}</div>
+              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Hoje</p>
+              <div className="space-y-3">{todayOrders.map(o => <OrderCard key={o.id} order={o} />)}</div>
+            </div>
+          )}
+          {future.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Próximos</p>
+              <div className="space-y-3">{future.map(o => <OrderCard key={o.id} order={o} />)}</div>
             </div>
           )}
         </div>
