@@ -106,7 +106,7 @@ export default function CalendarPage() {
           .order('date'),
       ]);
       const visible = (data ?? []).filter((e: any) =>
-        e.status !== 'cancelled' &&
+        e.status !== 'cancelled' && e.status !== 'lost' &&
         (e.status === 'confirmed' || e.status === 'completed' || e.date_reserved === true)
       );
       // Resolve location_id → location_text para eventos sem location_text
