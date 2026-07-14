@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, CalendarDays, Copy, Check, QrCode, X as XIcon, Download } from 'lucide-react';
+import { Plus, CalendarDays, Copy, Check, QrCode, X as XIcon, Download, Lock, ChevronDown, ChevronUp, StickyNote, ExternalLink } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getMessageTemplates } from '@/lib/whatsapp';
 import { createPortal } from 'react-dom';
@@ -45,6 +45,8 @@ interface AbertoRow {
   venue_name: string | null;
   guest_count: number | null;
   last_tasting_date: string | null;
+  date_reserved: boolean | null;
+  notes: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -117,7 +119,7 @@ export default function TastingsPage() {
 
     const { data: evts, error } = await supabase
       .from('events')
-      .select('id, event_name, event_date, status, guest_count, organizer, location_text')
+      .select('id, event_name, event_date, status, guest_count, organizer, location_text, date_reserved, notes')
       .in('id', eventIds)
       .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
       .order('event_date', { ascending: true });
@@ -133,6 +135,8 @@ export default function TastingsPage() {
       venue_name:        e.location_text ?? null,
       guest_count:       e.guest_count ?? null,
       last_tasting_date: tastingDateMap[e.id] ?? null,
+      date_reserved:     e.date_reserved ?? null,
+      notes:             e.notes ?? null,
     })));
     setAbertoLoading(false);
   };
@@ -428,12 +432,66 @@ function Cell({ v, bold, muted, danger }: { v: number | string | null | undefine
   );
 }
 
+// ─── Status options for the aberto list ───────────────────────────────────────
+const ABERTO_STATUS_OPTIONS = [
+  { key: 'lead',              label: '1º Contato' },
+  { key: 'negotiating',       label: 'Negociando' },
+  { key: 'tasting_scheduled', label: 'Degustação' },
+  { key: 'confirmed',         label: 'Confirmado' },
+  { key: 'lost',              label: 'Não fechou' },
+  { key: 'cancelled',         label: 'Cancelado' },
+];
+
 // ─── Lista em aberto tab ──────────────────────────────────────────────────────
-function ListaAbertoTab({ rows, loading, onNavigate }: {
+function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
   rows: AbertoRow[];
   loading: boolean;
   onNavigate: (id: string) => void;
 }) {
+  const [rows, setRows] = useState<AbertoRow[]>(initialRows);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [statusOpen, setStatusOpen] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  useEffect(() => { setRows(initialRows); }, [initialRows]);
+
+  const toggleExpand = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const changeStatus = async (row: AbertoRow, newStatus: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setStatusOpen(null);
+    if (newStatus === row.status) return;
+
+    if (newStatus === 'confirmed') {
+      onNavigate(row.event_id);
+      return;
+    }
+
+    setSaving(row.event_id);
+    const updates: any = { status: newStatus };
+    if (newStatus === 'lost' || newStatus === 'cancelled') {
+      updates.date_reserved = false;
+    }
+
+    const { error } = await supabase.from('events').update(updates).eq('id', row.event_id);
+    if (error) { toast.error('Erro ao alterar status'); setSaving(null); return; }
+
+    setRows(prev => prev.map(r =>
+      r.event_id === row.event_id
+        ? { ...r, status: newStatus, date_reserved: updates.date_reserved ?? r.date_reserved }
+        : r
+    ));
+    setSaving(null);
+
+    // Remove da lista se perdeu o status "em aberto"
+    if (['confirmed', 'lost', 'cancelled'].includes(newStatus)) {
+      setTimeout(() => setRows(prev => prev.filter(r => r.event_id !== row.event_id)), 800);
+    }
+  };
+
   if (loading) return <div className="bg-white border border-border rounded-2xl py-16 text-center text-muted-foreground text-sm">Carregando...</div>;
 
   return (
@@ -447,27 +505,103 @@ function ListaAbertoTab({ rows, loading, onNavigate }: {
         </div>
       ) : (
         <div className="bg-white border border-border rounded-2xl overflow-hidden">
-          <div className="grid grid-cols-[1fr_160px_160px_90px_120px_120px] gap-3 px-5 py-2.5 bg-muted/30 border-b border-border">
-            {['Evento', 'Assessora', 'Local', 'Conv.', 'Data do evento', 'Última degustação'].map(h => (
-              <span key={h} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
+          <div className="grid grid-cols-[1fr_140px_150px_60px_110px_110px_32px] gap-3 px-5 py-2.5 bg-muted/30 border-b border-border">
+            {['Evento', 'Status', 'Local', 'Conv.', 'Data do evento', 'Últ. degustação', ''].map((h, i) => (
+              <span key={i} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
             ))}
           </div>
           <div className="divide-y divide-border/50">
             {rows.map(row => {
               const sc = getStatusCfg(row.status);
+              const isExpanded = expanded[row.event_id];
+              const isSaving = saving === row.event_id;
+              const hasNotes = row.notes && row.notes.replace(/<[^>]+>/g, '').trim().length > 0;
+              const isStatusOpen = statusOpen === row.event_id;
+
               return (
-                <div key={row.event_id}
-                  className="grid grid-cols-[1fr_160px_160px_90px_120px_120px] gap-3 px-5 py-3 items-center hover:bg-slate-50 transition-colors cursor-pointer"
-                  onClick={() => onNavigate(row.event_id)}>
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-foreground truncate block">{row.event_name ?? '—'}</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-semibold mt-0.5 ${sc.cls}`}>{sc.label}</span>
+                <div key={row.event_id} className={`transition-colors ${isSaving ? 'opacity-50' : ''}`}>
+                  {/* Main row */}
+                  <div
+                    className="grid grid-cols-[1fr_140px_150px_60px_110px_110px_32px] gap-3 px-5 py-3 items-center hover:bg-slate-50 cursor-pointer"
+                    onClick={() => onNavigate(row.event_id)}>
+
+                    {/* Evento + assessora */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-sm font-medium text-foreground truncate">{row.event_name ?? '—'}</span>
+                        {hasNotes && <StickyNote className="w-3 h-3 text-amber-400 shrink-0" />}
+                      </div>
+                      <span className="text-xs text-muted-foreground/70 truncate block">{row.assessor_name ?? '—'}</span>
+                    </div>
+
+                    {/* Status dropdown */}
+                    <div className="relative" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={e => { e.stopPropagation(); setStatusOpen(isStatusOpen ? null : row.event_id); }}
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold w-full justify-between ${sc.cls}`}>
+                        <span>{sc.label}</span>
+                        <ChevronDown className="w-2.5 h-2.5 shrink-0" />
+                      </button>
+                      {isStatusOpen && (
+                        <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-border rounded-xl shadow-lg py-1 w-36">
+                          {ABERTO_STATUS_OPTIONS.map(opt => {
+                            const cfg = getStatusCfg(opt.key);
+                            return (
+                              <button key={opt.key}
+                                onClick={e => changeStatus(row, opt.key, e)}
+                                className={`w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-muted/50 transition-colors flex items-center gap-2 ${opt.key === row.status ? 'opacity-40 pointer-events-none' : ''}`}>
+                                <span className={`w-2 h-2 rounded-full border ${cfg.cls}`} />
+                                {opt.label}
+                                {opt.key === 'confirmed' && <ExternalLink className="w-2.5 h-2.5 ml-auto text-muted-foreground" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Local */}
+                    <span className="text-sm text-muted-foreground truncate">{row.venue_name ?? '—'}</span>
+
+                    {/* Convidados */}
+                    <span className="text-sm tabular-nums text-foreground">{row.guest_count ?? '—'}</span>
+
+                    {/* Data do evento + ícone reserva */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm tabular-nums text-foreground">{fmtDate(row.event_date)}</span>
+                      {row.date_reserved && (
+                        <Lock className="w-3 h-3 text-emerald-500 shrink-0" title="Data reservada" />
+                      )}
+                    </div>
+
+                    {/* Última degustação */}
+                    <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(row.last_tasting_date)}</span>
+
+                    {/* Expand notes */}
+                    <button
+                      onClick={e => toggleExpand(row.event_id, e)}
+                      className="flex items-center justify-center w-6 h-6 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                  <span className="text-sm text-muted-foreground truncate">{row.assessor_name ?? '—'}</span>
-                  <span className="text-sm text-muted-foreground truncate">{row.venue_name ?? '—'}</span>
-                  <span className="text-sm tabular-nums text-foreground">{row.guest_count ?? '—'}</span>
-                  <span className="text-sm tabular-nums text-foreground">{fmtDate(row.event_date)}</span>
-                  <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(row.last_tasting_date)}</span>
+
+                  {/* Expanded notes */}
+                  {isExpanded && (
+                    <div className="px-5 pb-3 bg-amber-50/40 border-t border-amber-100">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-600/70 mt-2 mb-1.5">Observações</p>
+                      {hasNotes
+                        ? <div className="text-sm text-foreground prose prose-sm max-w-none [&_p]:my-0.5"
+                            dangerouslySetInnerHTML={{ __html: row.notes! }} />
+                        : <p className="text-sm text-muted-foreground italic">Nenhuma observação registrada.</p>
+                      }
+                      <button
+                        onClick={e => { e.stopPropagation(); onNavigate(row.event_id); }}
+                        className="mt-2 flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                        <ExternalLink className="w-3 h-3" />
+                        Abrir evento completo
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
