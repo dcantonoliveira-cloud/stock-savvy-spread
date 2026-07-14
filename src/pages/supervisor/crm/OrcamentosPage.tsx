@@ -52,6 +52,7 @@ export default function OrcamentosPage() {
   const [showGerador, setShowGerador] = useState(false);
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [iframeToken, setIframeToken] = useState<string | null>(null);
+  const [iframeUser,  setIframeUser]  = useState<string>('');
   const [sortAsc, setSortAsc] = useState(true);
 
   const handleSort = (col: string) => {
@@ -84,8 +85,13 @@ export default function OrcamentosPage() {
     supabase.from('companies').select('features').limit(1).single().then(({ data }) => {
       if ((data as any)?.features?.gerador_orcamentos) setShowGerador(true);
     });
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       setIframeToken(data.session?.access_token ?? null);
+      const uid = data.session?.user?.id;
+      if (uid) {
+        const { data: profile } = await (supabase as any).from('profiles').select('display_name').eq('user_id', uid).single();
+        setIframeUser(profile?.display_name ?? '');
+      }
     });
   }, []);
 
@@ -175,7 +181,7 @@ export default function OrcamentosPage() {
       {/* ── Gerador (iframe) ── */}
       {activeTab === 'gerador' && (
         <iframe
-          src={iframeToken ? `/orcamento.html?token=${iframeToken}` : '/orcamento.html'}
+          src={iframeToken ? `/orcamento.html?token=${iframeToken}&usuario=${encodeURIComponent(iframeUser)}` : '/orcamento.html'}
           className="w-full rounded-2xl border border-border"
           style={{ height: 'calc(100vh - 160px)' }}
           title="Gerador de Orçamentos"
