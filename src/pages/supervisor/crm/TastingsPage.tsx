@@ -103,20 +103,24 @@ export default function TastingsPage() {
       .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
       .order('event_date', { ascending: true });
 
-    if (error) { console.error('[aberto]', error); setAbertoLoading(false); return; }
+    if (error) { console.error('[aberto] evts error', error); setAbertoLoading(false); return; }
+    console.log('[aberto] evts', evts?.length, evts?.map((e:any)=>e.status));
     if (!evts || evts.length === 0) { setAbertoRows([]); setAbertoLoading(false); return; }
 
     // 2. Busca quais desses eventos têm degustação com data < hoje
     const allIds = evts.map((e: any) => e.id);
-    const { data: tse } = await supabase
+    const { data: tse, error: tseErr } = await supabase
       .from('tasting_session_events' as any)
       .select('event_id, tasting_sessions(scheduled_date)')
       .in('event_id', allIds);
+
+    console.log('[aberto] tse', tse?.length, tseErr, JSON.stringify(tse?.slice(0,3)));
 
     // Monta mapa event_id → última data de degustação passada
     const tastingDateMap: Record<string, string> = {};
     for (const row of (tse ?? []) as any[]) {
       const d = row.tasting_sessions?.scheduled_date;
+      console.log('[aberto] row', row.event_id, d, 'today', today, 'pass?', d && d < today);
       if (!d || d >= today) continue;
       if (!tastingDateMap[row.event_id] || d > tastingDateMap[row.event_id])
         tastingDateMap[row.event_id] = d;
