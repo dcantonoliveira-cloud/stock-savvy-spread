@@ -505,8 +505,8 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
         </div>
       ) : (
         <div className="bg-white border border-border rounded-2xl overflow-hidden">
-          <div className="grid grid-cols-[1fr_140px_150px_60px_110px_110px_32px] gap-3 px-5 py-2.5 bg-muted/30 border-b border-border">
-            {['Evento', 'Status', 'Local', 'Conv.', 'Data do evento', 'Últ. degustação', ''].map((h, i) => (
+          <div className="grid grid-cols-[280px_110px_1fr_55px_100px_100px_28px] gap-3 px-5 py-2 bg-muted/30 border-b border-border">
+            {['Evento', 'Status', 'Local', 'Conv.', 'Data evento', 'Últ. degust.', ''].map((h, i) => (
               <span key={i} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
             ))}
           </div>
@@ -522,7 +522,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                 <div key={row.event_id} className={`transition-colors ${isSaving ? 'opacity-50' : ''}`}>
                   {/* Main row */}
                   <div
-                    className="grid grid-cols-[1fr_140px_150px_60px_110px_110px_32px] gap-3 px-5 py-3 items-center hover:bg-slate-50 cursor-pointer"
+                    className="grid grid-cols-[280px_110px_1fr_55px_100px_100px_28px] gap-3 px-5 py-2.5 items-center hover:bg-slate-50 cursor-pointer"
                     onClick={() => onNavigate(row.event_id)}>
 
                     {/* Evento + assessora */}
@@ -538,7 +538,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                     <div className="relative" onClick={e => e.stopPropagation()}>
                       <button
                         onClick={e => { e.stopPropagation(); setStatusOpen(isStatusOpen ? null : row.event_id); }}
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold w-full justify-between ${sc.cls}`}>
+                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-semibold w-fit max-w-full ${sc.cls}`}>
                         <span>{sc.label}</span>
                         <ChevronDown className="w-2.5 h-2.5 shrink-0" />
                       </button>
