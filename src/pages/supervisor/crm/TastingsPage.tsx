@@ -77,7 +77,6 @@ export default function TastingsPage() {
   const [qrCopied,      setQrCopied]     = useState(false);
   const [abertoRows,    setAbertoRows]   = useState<AbertoRow[]>([]);
   const [abertoLoading, setAbertoLoading]= useState(false);
-  const abertoLoaded = useRef(false);
 
   const load = async () => {
     setLoading(true);
@@ -93,9 +92,7 @@ export default function TastingsPage() {
   };
 
   const loadAberto = async () => {
-    if (abertoLoaded.current) return;
     setAbertoLoading(true);
-    abertoLoaded.current = true;
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -118,11 +115,12 @@ export default function TastingsPage() {
     const eventIds = Object.keys(tastingDateMap);
     if (eventIds.length === 0) { setAbertoRows([]); setAbertoLoading(false); return; }
 
+    // Inclui todos os status não-finalizados (exclui apenas confirmed, completed, cancelled, lost)
     const { data: evts, error } = await supabase
       .from('events')
       .select('id, event_name, event_date, status, guest_count, suppliers!organizer_id(name), event_locations!location_id(name)')
       .in('id', eventIds)
-      .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
+      .not('status', 'in', '("confirmed","completed","cancelled","lost")')
       .order('event_date', { ascending: true });
 
     if (error) console.error('[aberto]', error);
