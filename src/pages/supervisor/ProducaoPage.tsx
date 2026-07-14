@@ -131,7 +131,7 @@ export default function SupervisorProducaoPage() {
 
   const filtered = orders
     .filter(o =>
-      (filter === 'all' || o.status === filter) &&
+      (filter === 'all' ? o.status !== 'done' : o.status === filter) &&
       (search === '' || o.title.toLowerCase().includes(search.toLowerCase()) || (o.event_name ?? '').toLowerCase().includes(search.toLowerCase()))
     )
     .sort((a, b) => {
