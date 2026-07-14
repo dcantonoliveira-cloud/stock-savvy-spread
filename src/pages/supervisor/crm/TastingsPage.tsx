@@ -96,47 +96,44 @@ export default function TastingsPage() {
 
     const today = new Date().toISOString().split('T')[0];
 
-    // 1. Busca eventos nos status "em aberto" (lead, negociando, degustação agendada)
-    const { data: evts, error } = await supabase
-      .from('events')
-      .select('id, event_name, event_date, status, guest_count, organizer, location_text')
-      .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
-      .order('event_date', { ascending: true });
-
-    if (error) { console.error('[aberto] evts error', error); setAbertoLoading(false); return; }
-    if (!evts || evts.length === 0) { setAbertoRows([]); setAbertoLoading(false); return; }
-
-    // 2. Busca quais desses eventos têm degustação com data < hoje
-    const allIds = evts.map((e: any) => e.id);
     const { data: tse } = await supabase
       .from('tasting_session_events' as any)
-      .select('event_id, tasting_sessions(scheduled_date)')
-      .in('event_id', allIds);
+      .select('event_id, tasting_sessions!inner(scheduled_date)')
+      .lt('tasting_sessions.scheduled_date', today);
 
-    // Monta mapa event_id → última data de degustação passada
+    if (!tse || tse.length === 0) { setAbertoRows([]); setAbertoLoading(false); return; }
+
     const tastingDateMap: Record<string, string> = {};
-    for (const row of (tse ?? []) as any[]) {
-      const d = row.tasting_sessions?.scheduled_date;
-      if (!d || d >= today) continue;
+    for (const row of tse as any[]) {
+      if (!row.event_id) continue;
+      const d = (row.tasting_sessions as any)?.scheduled_date;
+      if (!d) continue;
       if (!tastingDateMap[row.event_id] || d > tastingDateMap[row.event_id])
         tastingDateMap[row.event_id] = d;
     }
 
-    // 3. Filtra apenas eventos que tiveram degustação passada
-    const rows = evts
-      .filter((e: any) => tastingDateMap[e.id])
-      .map((e: any) => ({
-        event_id:          e.id,
-        event_name:        e.event_name,
-        event_date:        e.event_date,
-        status:            e.status,
-        assessor_name:     e.organizer ?? null,
-        venue_name:        e.location_text ?? null,
-        guest_count:       e.guest_count ?? null,
-        last_tasting_date: tastingDateMap[e.id],
-      }));
+    const eventIds = Object.keys(tastingDateMap);
+    if (eventIds.length === 0) { setAbertoRows([]); setAbertoLoading(false); return; }
 
-    setAbertoRows(rows);
+    const { data: evts, error } = await supabase
+      .from('events')
+      .select('id, event_name, event_date, status, guest_count, organizer, location_text')
+      .in('id', eventIds)
+      .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
+      .order('event_date', { ascending: true });
+
+    if (error) { console.error('[aberto]', error); setAbertoLoading(false); return; }
+
+    setAbertoRows((evts ?? []).map((e: any) => ({
+      event_id:          e.id,
+      event_name:        e.event_name,
+      event_date:        e.event_date,
+      status:            e.status,
+      assessor_name:     e.organizer ?? null,
+      venue_name:        e.location_text ?? null,
+      guest_count:       e.guest_count ?? null,
+      last_tasting_date: tastingDateMap[e.id] ?? null,
+    })));
     setAbertoLoading(false);
   };
 
