@@ -99,7 +99,7 @@ export default function TastingsPage() {
     // 1. Busca eventos nos status "em aberto" (lead, negociando, degustação agendada)
     const { data: evts, error } = await supabase
       .from('events')
-      .select('id, event_name, event_date, status, guest_count, suppliers!organizer_id(name), event_locations!location_id(name)')
+      .select('id, event_name, event_date, status, guest_count, organizer, location_text')
       .in('status', ['lead', 'negotiating', 'tasting_scheduled'])
       .order('event_date', { ascending: true });
 
@@ -134,8 +134,8 @@ export default function TastingsPage() {
         event_name:        e.event_name,
         event_date:        e.event_date,
         status:            e.status,
-        assessor_name:     (e.suppliers as any)?.name ?? null,
-        venue_name:        (e.event_locations as any)?.name ?? null,
+        assessor_name:     e.organizer ?? null,
+        venue_name:        e.location_text ?? null,
         guest_count:       e.guest_count ?? null,
         last_tasting_date: tastingDateMap[e.id],
       }));
