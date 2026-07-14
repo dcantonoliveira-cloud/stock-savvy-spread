@@ -115,12 +115,10 @@ export default function TastingsPage() {
     const eventIds = Object.keys(tastingDateMap);
     if (eventIds.length === 0) { setAbertoRows([]); setAbertoLoading(false); return; }
 
-    // Inclui todos os status não-finalizados (exclui apenas confirmed, completed, cancelled, lost)
     const { data: evts, error } = await supabase
       .from('events')
       .select('id, event_name, event_date, status, guest_count, suppliers!organizer_id(name), event_locations!location_id(name)')
       .in('id', eventIds)
-      .not('status', 'in', '("confirmed","completed","cancelled","lost")')
       .order('event_date', { ascending: true });
 
     if (error) console.error('[aberto]', error);
