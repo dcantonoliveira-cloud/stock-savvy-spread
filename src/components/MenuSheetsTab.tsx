@@ -18,10 +18,17 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
   const [pickerOpen, setPickerOpen]   = useState(false);
   const [aiLoading, setAiLoading]     = useState(false);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
-  const [aiResult, setAiResult]       = useState<AIResult | null>(null);
-  const [aiReport, setAiReport]       = useState<AIReport | null>(null);
-  // uncertain selections: menu_item → chosen sheet id or '' (skip)
-  const [uncertainSel, setUncertainSel] = useState<Record<string, string>>({});
+  const aiKey = `ai_result_${eventId}`;
+  const readSession = () => { try { const v = sessionStorage.getItem(aiKey); return v ? JSON.parse(v) : null; } catch { return null; } };
+  const [aiResult, setAiResultRaw]    = useState<AIResult | null>(() => readSession()?.result ?? null);
+  const [aiReport, setAiReportRaw]    = useState<AIReport | null>(() => readSession()?.report ?? null);
+  const [uncertainSel, setUncertainSelRaw] = useState<Record<string, string>>(() => readSession()?.sel ?? {});
+
+  const setAiResult = (v: AIResult | null) => { setAiResultRaw(v); const s = readSession() ?? {}; if (v) sessionStorage.setItem(aiKey, JSON.stringify({ ...s, result: v })); };
+  const setAiReport = (v: AIReport | null) => { setAiReportRaw(v); const s = readSession() ?? {}; if (v) sessionStorage.setItem(aiKey, JSON.stringify({ ...s, report: v })); else { const n = readSession() ?? {}; delete n.report; sessionStorage.setItem(aiKey, JSON.stringify(n)); } };
+  const setUncertainSel = (v: Record<string, string> | ((p: Record<string, string>) => Record<string, string>)) => {
+    setUncertainSelRaw(prev => { const next = typeof v === 'function' ? v(prev) : v; const s = readSession() ?? {}; sessionStorage.setItem(aiKey, JSON.stringify({ ...s, sel: next })); return next; });
+  };
   // modal state
   const [modalOpen, setModalOpen]     = useState(false);
   const [modalSheetId, setModalSheetId] = useState<string | null>(null);
