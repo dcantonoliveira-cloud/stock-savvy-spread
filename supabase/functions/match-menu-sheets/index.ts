@@ -13,8 +13,7 @@ serve(async (req) => {
     const expectedKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!apikey || (expectedKey && apikey !== expectedKey)) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -25,32 +24,30 @@ serve(async (req) => {
 
     if (!menu_text?.trim()) {
       return new Response(JSON.stringify({ error: "Cardápio em texto não preenchido" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY não configurada");
 
-    const sheetsText = sheets
-      .map(s => `ID: ${s.id} | Nome: ${s.name}${s.category ? ` | Categoria: ${s.category}` : ""}`)
-      .join("\n");
+    // Compact format: use index numbers instead of UUIDs to save tokens
+    const indexedSheets = sheets.map((s, i) => `${i}:${s.name}`).join("\n");
 
-    const prompt = `Você é um assistente que identifica quais fichas técnicas de buffet correspondem aos itens de um cardápio em texto livre.
+    // Truncate menu text to ~2000 chars to stay within token limits
+    const menuTruncated = menu_text.slice(0, 2000);
 
-FICHAS TÉCNICAS DISPONÍVEIS:
-${sheetsText}
+    const prompt = `Você recebe uma lista numerada de fichas técnicas de buffet e um cardápio em texto livre.
+Retorne os NÚMEROS (índices) das fichas que aparecem no cardápio, por similaridade de nome.
+Não invente — só inclua fichas que realmente aparecem.
 
-CARDÁPIO EM TEXTO:
-${menu_text}
+FICHAS (índice:nome):
+${indexedSheets}
 
-Analise o cardápio e retorne APENAS os IDs das fichas técnicas que correspondem a itens presentes no cardápio.
-Faça correspondência por similaridade de nome (ignore maiúsculas/minúsculas, acentos e pequenas variações).
-Não invente correspondências — só inclua IDs de fichas que realmente aparecem no cardápio.
+CARDÁPIO:
+${menuTruncated}
 
-Responda SOMENTE com um JSON no formato:
-{"matched_ids": ["id1", "id2", ...]}`;
+Responda APENAS com JSON: {"matched_indexes":[0,1,2,...]}`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -61,36 +58,35 @@ Responda SOMENTE com um JSON no formato:
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        max_tokens: 256,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
     const rawText = await response.text();
+    if (!response.ok) throw new Error(`Anthropic ${response.status}: ${rawText.slice(0, 300)}`);
 
-    if (!response.ok) {
-      throw new Error(`Anthropic ${response.status}: ${rawText.slice(0, 300)}`);
-    }
-
-    let result: any;
-    try { result = JSON.parse(rawText); } catch { throw new Error(`JSON inválido da API: ${rawText.slice(0, 200)}`); }
-
+    const result = JSON.parse(rawText);
     const aiText = result.content?.[0]?.text ?? "";
-    if (!aiText) throw new Error(`Sem texto na resposta. Raw: ${rawText.slice(0, 200)}`);
 
     const jsonMatch = aiText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error(`IA não retornou JSON. Texto: ${aiText.slice(0, 200)}`);
 
     const parsed = JSON.parse(jsonMatch[0]);
+    const indexes: number[] = parsed.matched_indexes ?? [];
 
-    return new Response(JSON.stringify(parsed), {
+    // Map indexes back to real IDs
+    const matched_ids = indexes
+      .filter(i => i >= 0 && i < sheets.length)
+      .map(i => sheets[i].id);
+
+    return new Response(JSON.stringify({ matched_ids }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message ?? "Erro interno" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
