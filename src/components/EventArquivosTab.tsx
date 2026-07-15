@@ -751,11 +751,17 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                       <div className="flex items-center gap-3">
                         <SignerStatusBadge status={s.status} />
                         {s.sign_url && (
-                          <button onClick={()=>copySignerLink(s)} title="Copiar link de assinatura"
-                            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors border border-border rounded-lg px-2 py-1 hover:border-primary/30">
-                            <Copy className="w-3 h-3" />
-                            {s.name.split(' ')[0]} - link
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button onClick={()=>copySignerLink(s)} title="Copiar link de assinatura"
+                              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors border border-border rounded-lg px-2 py-1 hover:border-primary/30">
+                              <Copy className="w-3 h-3" />
+                              {s.name.split(' ')[0]} - link
+                            </button>
+                            <a href={s.sign_url} target="_blank" rel="noopener noreferrer" title="Abrir link de assinatura"
+                              className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-primary transition-colors border border-border rounded-lg hover:border-primary/30">
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
                         )}
                       </div>
                     </div>
