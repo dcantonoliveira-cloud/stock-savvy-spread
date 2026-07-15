@@ -168,17 +168,43 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
     }
   };
 
-  const confirmUncertain = async () => {
-    const toAdd: string[] = [];
+  const saveMapping = async (menuItem: string, sheetId: string, sheetName: string) => {
+    const key = menuItem.toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    await supabase.from('menu_ai_mappings' as any).upsert(
+      { menu_text: key, sheet_id: sheetId, sheet_name: sheetName, updated_at: new Date().toISOString() },
+      { onConflict: 'menu_text,sheet_id', ignoreDuplicates: false }
+    ).then(() => supabase.rpc('increment_mapping_count' as any, { p_menu_text: key, p_sheet_id: sheetId }).catch(() => {}));
+  };
+
+  const confirmOneUncertain = async (menuItem: string) => {
+    const sheetId = uncertainSel[menuItem] ?? '';
     const addedIds = new Set(menuSheets.map(m => m.sheet_id));
-    Object.entries(uncertainSel).forEach(([, sheetId]) => {
-      if (sheetId && !addedIds.has(sheetId)) toAdd.push(sheetId);
-    });
+    if (sheetId && !addedIds.has(sheetId)) {
+      await supabase.from('event_menu_sheets' as any).insert({ event_id: eventId, sheet_id: sheetId, sort_order: menuSheets.length, notes: '' });
+      await loadAll();
+      const sheet = allSheets.find(s => s.id === sheetId);
+      if (sheet) saveMapping(menuItem, sheetId, sheet.name);
+      toast.success('Ficha adicionada!');
+    }
+    setAiResult(p => p ? { ...p, uncertain: p.uncertain.filter(u => u.menu_item !== menuItem) } : p);
+  };
+
+  const dismissUncertain = (menuItem: string) => {
+    setAiResult(p => p ? { ...p, uncertain: p.uncertain.filter(u => u.menu_item !== menuItem) } : p);
+  };
+
+  const confirmAllUncertain = async () => {
+    const addedIds = new Set(menuSheets.map(m => m.sheet_id));
+    const toAdd = Object.entries(uncertainSel).filter(([, id]) => id && !addedIds.has(id));
     if (toAdd.length === 0) { setAiResult(p => p ? { ...p, uncertain: [] } : p); return; }
-    await Promise.all(toAdd.map((sheetId, i) =>
+    await Promise.all(toAdd.map(([, sheetId], i) =>
       supabase.from('event_menu_sheets' as any).insert({ event_id: eventId, sheet_id: sheetId, sort_order: menuSheets.length + i, notes: '' })
     ));
     await loadAll();
+    toAdd.forEach(([menuItem, sheetId]) => {
+      const sheet = allSheets.find(s => s.id === sheetId);
+      if (sheet) saveMapping(menuItem, sheetId, sheet.name);
+    });
     setAiResult(p => p ? { ...p, uncertain: [] } : p);
     toast.success(`${toAdd.length} ficha${toAdd.length > 1 ? 's' : ''} adicionada${toAdd.length > 1 ? 's' : ''}!`);
   };
@@ -319,18 +345,28 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
                     allSheets={allSheets}
                     onChange={id => setUncertainSel(p => ({ ...p, [u.menu_item]: id }))}
                   />
+                  <button onClick={() => confirmOneUncertain(u.menu_item)}
+                    disabled={!uncertainSel[u.menu_item] && !u.suggestions[0]?.id}
+                    className="text-xs px-2.5 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors whitespace-nowrap font-medium">
+                    ✓ Confirmar
+                  </button>
                   <button onClick={() => { openCreate(u.menu_item); }}
                     className="text-xs px-2.5 py-1.5 rounded-lg border border-border bg-white hover:bg-muted text-muted-foreground transition-colors whitespace-nowrap">
                     + Criar nova
+                  </button>
+                  <button onClick={() => dismissUncertain(u.menu_item)} title="Ignorar"
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors">
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
             ))}
           </div>
-          <div className="px-4 py-3 border-t border-amber-200 flex justify-end">
-            <button onClick={confirmUncertain}
+          <div className="px-4 py-3 border-t border-amber-200 flex items-center justify-between">
+            <span className="text-xs text-amber-700/60">{aiResult.uncertain.length} item{aiResult.uncertain.length > 1 ? 's' : ''} restante{aiResult.uncertain.length > 1 ? 's' : ''}</span>
+            <button onClick={confirmAllUncertain}
               className="text-sm font-medium px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors">
-              Confirmar seleções
+              Confirmar todos
             </button>
           </div>
         </div>
