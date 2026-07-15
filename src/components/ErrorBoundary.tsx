@@ -60,7 +60,6 @@ export class ErrorBoundary extends Component<Props, State> {
               }
             } catch (_) {}
             sessionStorage.clear();
-            localStorage.clear();
             // Cache-bust the HTML so browser fetches fresh chunk URLs from Cloudflare
             window.location.href = window.location.origin + '/?_=' + Date.now();
           }}

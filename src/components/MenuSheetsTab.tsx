@@ -313,12 +313,12 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
                 <span className="text-sm font-medium text-foreground min-w-[140px]">{u.menu_item}</span>
                 <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <div className="flex items-center gap-2 flex-wrap flex-1">
-                  <select value={uncertainSel[u.menu_item] ?? ''}
-                    onChange={e => setUncertainSel(p => ({ ...p, [u.menu_item]: e.target.value }))}
-                    className="text-xs border border-border rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 flex-1 min-w-[160px]">
-                    {u.suggestions.map(s => <option key={s.id} value={s.id}>{s.name}{s.category ? ` (${s.category})` : ''}</option>)}
-                    <option value="">— Não adicionar —</option>
-                  </select>
+                  <UncertainCombobox
+                    value={uncertainSel[u.menu_item] ?? u.suggestions[0]?.id ?? ''}
+                    suggestions={u.suggestions}
+                    allSheets={allSheets}
+                    onChange={id => setUncertainSel(p => ({ ...p, [u.menu_item]: id }))}
+                  />
                   <button onClick={() => { openCreate(u.menu_item); }}
                     className="text-xs px-2.5 py-1.5 rounded-lg border border-border bg-white hover:bg-muted text-muted-foreground transition-colors whitespace-nowrap">
                     + Criar nova
@@ -487,6 +487,70 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
         mode={modalMode}
         initialName={modalInitialName}
       />
+    </div>
+  );
+}
+
+// ── Uncertain combobox — suggestions + full search ────────────────────────────
+function UncertainCombobox({ value, suggestions, allSheets, onChange }: {
+  value: string; suggestions: Sheet[]; allSheets: Sheet[]; onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const selected = allSheets.find(s => s.id === value);
+  const suggestionIds = new Set(suggestions.map(s => s.id));
+
+  const results = q.trim()
+    ? allSheets.filter(s => s.name.toLowerCase().includes(q.toLowerCase())).slice(0, 10)
+    : [...suggestions, ...allSheets.filter(s => !suggestionIds.has(s.id)).slice(0, 6)];
+
+  return (
+    <div className="relative flex-1 min-w-[200px]" ref={ref}>
+      <button onClick={() => { setOpen(v => !v); setQ(''); }}
+        className="w-full text-left text-xs px-2.5 py-1.5 border border-border rounded-lg bg-white flex items-center justify-between gap-2 hover:border-primary/40 transition-colors">
+        <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
+          {selected ? `${selected.name}${selected.category ? ` (${selected.category})` : ''}` : '— Não adicionar —'}
+        </span>
+        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 w-full min-w-[260px] bg-white border border-border rounded-xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-border">
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)}
+              placeholder="Buscar ficha..."
+              className="w-full h-7 px-2.5 text-xs border border-border rounded-lg focus:outline-none focus:border-primary" />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {!q && <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 bg-muted/20">Sugestões da IA</div>}
+            {results.map((s, i) => (
+              <div key={s.id}>
+                {!q && i === suggestions.length && suggestions.length > 0 && (
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 bg-muted/20 border-t border-border">Outras fichas</div>
+                )}
+                <button onClick={() => { onChange(s.id); setOpen(false); }}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center gap-2 ${value === s.id ? 'bg-primary/10 text-primary' : 'hover:bg-primary/5'}`}>
+                  {value === s.id && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                  <span className="font-medium">{s.name}</span>
+                  {s.category && <span className="text-muted-foreground">({s.category})</span>}
+                  {!q && suggestionIds.has(s.id) && <span className="ml-auto text-[10px] text-violet-500 font-medium">IA</span>}
+                </button>
+              </div>
+            ))}
+            <button onClick={() => { onChange(''); setOpen(false); }}
+              className={`w-full text-left px-3 py-2 text-xs border-t border-border transition-colors ${!value ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}>
+              — Não adicionar —
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
