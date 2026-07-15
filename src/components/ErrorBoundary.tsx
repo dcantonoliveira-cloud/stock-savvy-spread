@@ -19,17 +19,6 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
-    if (error.message?.includes('Failed to fetch dynamically imported module') ||
-        error.message?.includes('Importing a module script failed')) {
-      const key = '__chunk_reload__';
-      const last = parseInt(sessionStorage.getItem(key) ?? '0', 10);
-      const now = Date.now();
-      if (now - last > 10_000) {
-        sessionStorage.setItem(key, String(now));
-        // Força busca do HTML novo no servidor (não recarga do cache)
-        window.location.replace('/?_=' + now);
-      }
-    }
   }
 
   render() {
@@ -72,8 +61,8 @@ export class ErrorBoundary extends Component<Props, State> {
             } catch (_) {}
             sessionStorage.clear();
             localStorage.clear();
-            // Replace para não acumular histórico; sem query param extra
-            window.location.replace(window.location.origin + '/');
+            // Cache-bust the HTML so browser fetches fresh chunk URLs from Cloudflare
+            window.location.href = window.location.origin + '/?_=' + Date.now();
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
         >
