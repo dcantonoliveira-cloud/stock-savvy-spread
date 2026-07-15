@@ -98,8 +98,10 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
         }
       );
 
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? 'Erro na IA');
+      const text = await res.text();
+      let json: any = {};
+      try { json = JSON.parse(text); } catch { throw new Error(`Resposta inválida (${res.status}): ${text.slice(0, 200)}`); }
+      if (!res.ok) throw new Error(`[${res.status}] ${json.error ?? text.slice(0, 200)}`);
 
       const matchedIds: string[] = json.matched_ids ?? [];
       if (matchedIds.length === 0) {
