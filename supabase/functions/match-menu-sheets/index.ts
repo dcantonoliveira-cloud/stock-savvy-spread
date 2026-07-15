@@ -44,10 +44,11 @@ ${indexedSheets}
 CARDÁPIO:
 ${menuTruncated}
 
-Classifique cada prato do cardápio:
-- matched: correspondência clara
-- uncertain: possível correspondência (seja GENEROSO, 40%+ de chance já é uncertain) — até 3 sugestões
-- unmatched: sem correspondência
+REGRAS IMPORTANTES:
+1. O cardápio tem seções em MAIÚSCULAS (ex: ILHA GOURMET, MINI PRATOS, COQUETEL VOLANTE, JANTAR). Use o nome da seção para desambiguar: um prato em "ILHA GOURMET" deve corresponder à ficha com "MESA" ou "ILHA" no nome; um prato em "MINI PRATOS" ou "COQUETEL VOLANTE" deve corresponder à ficha com "mini prato" ou "coquetel" no nome.
+2. matched: correspondência clara (incluindo quando a seção resolve a ambiguidade)
+3. uncertain: possível correspondência com dúvida — liste até 3 fichas como sugestões. Seja GENEROSO: 40%+ de chance já é uncertain.
+4. unmatched: sem nenhuma ficha similar
 
 JSON:
 {"matched":[{"index":0,"menu_item":"..."}],"uncertain":[{"menu_item":"...","suggestions":[0,2]}],"unmatched":["..."]}`;
