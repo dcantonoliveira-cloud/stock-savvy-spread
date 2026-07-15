@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,16 +9,15 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "Sessão inválida" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Verify request has a valid API key (anon key sent by frontend)
+    const apikey = req.headers.get("apikey");
+    const expectedKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!apikey || (expectedKey && apikey !== expectedKey)) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { menu_text, sheets } = await req.json() as {
       menu_text: string;
@@ -27,13 +25,18 @@ serve(async (req) => {
     };
 
     if (!menu_text?.trim()) {
-      return new Response(JSON.stringify({ error: "Cardápio em texto não preenchido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Cardápio em texto não preenchido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY não configurada");
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY não configurada");
 
-    const sheetsText = sheets.map(s => `ID: ${s.id} | Nome: ${s.name}${s.category ? ` | Categoria: ${s.category}` : ""}`).join("\n");
+    const sheetsText = sheets
+      .map(s => `ID: ${s.id} | Nome: ${s.name}${s.category ? ` | Categoria: ${s.category}` : ""}`)
+      .join("\n");
 
     const prompt = `Você é um assistente que identifica quais fichas técnicas de buffet correspondem aos itens de um cardápio em texto livre.
 
@@ -54,7 +57,7 @@ Responda SOMENTE com um JSON no formato:
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
+        "x-api-key": anthropicKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
@@ -72,7 +75,6 @@ Responda SOMENTE com um JSON no formato:
     const result = await response.json();
     const text = result.content?.[0]?.text ?? "";
 
-    // Extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Resposta inválida da IA");
 
