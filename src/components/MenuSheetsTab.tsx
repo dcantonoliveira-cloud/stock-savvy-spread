@@ -1,16 +1,17 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Plus, Trash2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Sheet { id: string; name: string; category: string | null }
 interface MenuSheet { id: string; sheet_id: string; notes: string; sort_order: number; sheet: Sheet }
 
-export default function MenuSheetsTab({ eventId }: { eventId: string }) {
+export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: string; menuText?: string }) {
   const [allSheets, setAllSheets] = useState<Sheet[]>([]);
   const [menuSheets, setMenuSheets] = useState<MenuSheet[]>([]);
   const [search, setSearch] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   const loadAll = async () => {
@@ -68,6 +69,74 @@ export default function MenuSheetsTab({ eventId }: { eventId: string }) {
     ));
   };
 
+  const suggestWithAI = async () => {
+    const stripped = menuText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!stripped) {
+      toast.error('Preencha o cardápio em "Texto livre" primeiro');
+      return;
+    }
+    if (allSheets.length === 0) {
+      toast.error('Nenhuma ficha técnica cadastrada no sistema');
+      return;
+    }
+
+    setAiLoading(true);
+    const toastId = toast.loading('IA analisando o cardápio...');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/match-menu-sheets`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ menu_text: stripped, sheets: allSheets }),
+        }
+      );
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Erro na IA');
+
+      const matchedIds: string[] = json.matched_ids ?? [];
+      if (matchedIds.length === 0) {
+        toast.dismiss(toastId);
+        toast.info('A IA não encontrou correspondências com as fichas cadastradas');
+        return;
+      }
+
+      // Add matched sheets that aren't already added
+      const addedIds = new Set(menuSheets.map(m => m.sheet_id));
+      const toAdd = allSheets.filter(s => matchedIds.includes(s.id) && !addedIds.has(s.id));
+
+      if (toAdd.length === 0) {
+        toast.dismiss(toastId);
+        toast.info('Todas as fichas encontradas já estão adicionadas');
+        return;
+      }
+
+      await Promise.all(toAdd.map((sheet, i) =>
+        supabase.from('event_menu_sheets' as any).insert({
+          event_id: eventId,
+          sheet_id: sheet.id,
+          sort_order: menuSheets.length + i,
+          notes: '',
+        })
+      ));
+
+      await loadAll();
+      toast.dismiss(toastId);
+      toast.success(`IA adicionou ${toAdd.length} ficha${toAdd.length > 1 ? 's' : ''} automaticamente`);
+    } catch (err: any) {
+      toast.dismiss(toastId);
+      toast.error(err.message ?? 'Erro ao consultar IA');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // Group available sheets by category (excluding already added)
   const addedIds = new Set(menuSheets.map(m => m.sheet_id));
   const filtered = allSheets.filter(s =>
@@ -81,64 +150,80 @@ export default function MenuSheetsTab({ eventId }: { eventId: string }) {
     return acc;
   }, {});
 
+  const hasMenuText = menuText.replace(/<[^>]*>/g, '').trim().length > 0;
+
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           {menuSheets.length === 0 ? 'Nenhuma receita adicionada.' : `${menuSheets.length} receita${menuSheets.length > 1 ? 's' : ''} no cardápio`}
         </p>
-        <div className="relative" ref={pickerRef}>
-          <button
-            onClick={() => setPickerOpen(v => !v)}
-            className="flex items-center gap-1.5 h-9 px-4 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Adicionar receita
-          </button>
+        <div className="flex items-center gap-2">
+          {/* AI button — only shown when menu_text exists */}
+          {hasMenuText && (
+            <button
+              onClick={suggestWithAI}
+              disabled={aiLoading}
+              className="flex items-center gap-1.5 h-9 px-4 text-sm font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              {aiLoading ? 'Analisando...' : 'Sugerir com IA'}
+            </button>
+          )}
 
-          {pickerOpen && (
-            <div className="absolute right-0 top-full mt-1 z-50 w-80 bg-white border border-border rounded-xl shadow-xl overflow-hidden">
-              <div className="p-2 border-b border-border">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <input
-                    autoFocus
-                    type="text"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Buscar receita..."
-                    className="w-full h-8 pl-8 pr-3 text-sm border border-border rounded-lg focus:outline-none focus:border-primary"
-                  />
+          <div className="relative" ref={pickerRef}>
+            <button
+              onClick={() => setPickerOpen(v => !v)}
+              className="flex items-center gap-1.5 h-9 px-4 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar receita
+            </button>
+
+            {pickerOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-80 bg-white border border-border rounded-xl shadow-xl overflow-hidden">
+                <div className="p-2 border-b border-border">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                    <input
+                      autoFocus
+                      type="text"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Buscar receita..."
+                      className="w-full h-8 pl-8 pr-3 text-sm border border-border rounded-lg focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  {Object.keys(grouped).length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      {search ? 'Nenhuma receita encontrada.' : 'Todas as receitas já foram adicionadas.'}
+                    </p>
+                  ) : (
+                    Object.entries(grouped).map(([cat, sheets]) => (
+                      <div key={cat}>
+                        <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 bg-muted/30 sticky top-0">
+                          {cat}
+                        </div>
+                        {sheets.map(sheet => (
+                          <button
+                            key={sheet.id}
+                            onClick={() => addSheet(sheet)}
+                            className="w-full text-left px-3 py-2.5 text-sm hover:bg-primary/5 transition-colors flex items-center gap-2"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            {sheet.name}
+                          </button>
+                        ))}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-              <div className="max-h-72 overflow-y-auto">
-                {Object.keys(grouped).length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">
-                    {search ? 'Nenhuma receita encontrada.' : 'Todas as receitas já foram adicionadas.'}
-                  </p>
-                ) : (
-                  Object.entries(grouped).map(([cat, sheets]) => (
-                    <div key={cat}>
-                      <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 bg-muted/30 sticky top-0">
-                        {cat}
-                      </div>
-                      {sheets.map(sheet => (
-                        <button
-                          key={sheet.id}
-                          onClick={() => addSheet(sheet)}
-                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-primary/5 transition-colors flex items-center gap-2"
-                        >
-                          <Plus className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                          {sheet.name}
-                        </button>
-                      ))}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -146,7 +231,14 @@ export default function MenuSheetsTab({ eventId }: { eventId: string }) {
       {menuSheets.length === 0 ? (
         <div className="border-2 border-dashed border-border rounded-xl py-14 flex flex-col items-center gap-3 text-center">
           <BookOpenIcon />
-          <p className="text-sm text-muted-foreground">Clique em <strong>Adicionar receita</strong> para montar o cardápio</p>
+          {hasMenuText ? (
+            <p className="text-sm text-muted-foreground">
+              Clique em <strong className="text-violet-600">Sugerir com IA</strong> para preencher automaticamente<br />
+              ou <strong>Adicionar receita</strong> para selecionar manualmente
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Clique em <strong>Adicionar receita</strong> para montar o cardápio</p>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

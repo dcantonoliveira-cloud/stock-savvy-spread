@@ -918,7 +918,7 @@ export default function EventDetailPage() {
                 placeholder="Descreva o cardápio do evento..."
               />
             ) : (
-              id && <MenuSheetsTab eventId={id} />
+              id && <MenuSheetsTab eventId={id} menuText={form.menu_text ?? ''} />
             )}
           </div>
         )}
