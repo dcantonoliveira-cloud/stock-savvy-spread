@@ -31,31 +31,25 @@ serve(async (req) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY não configurada");
 
-    const indexedSheets = sheets.map((s, i) => `${i}:${s.name}`).join("\n");
-    const menuTruncated = menu_text.slice(0, 2500);
+    // Truncate aggressively to stay under 10k tokens/min
+    const indexedSheets = sheets.map((s, i) => `${i}:${s.name.slice(0, 40)}`).join("\n");
+    const menuTruncated = menu_text.slice(0, 1200);
 
-    const prompt = `Você é um assistente de buffet. Cruze os itens do cardápio com as fichas técnicas disponíveis.
+    const prompt = `Cruze itens do cardápio com fichas técnicas. Responda SÓ JSON.
 
-FICHAS TÉCNICAS (índice:nome):
+FICHAS (índice:nome):
 ${indexedSheets}
 
-CARDÁPIO EM TEXTO:
+CARDÁPIO:
 ${menuTruncated}
 
-Classifique cada item do cardápio em uma de 3 categorias:
-- "matched": correspondência clara e direta (mesmo prato ou nome muito similar)
-- "uncertain": correspondência possível mas com dúvida (nome parcial, variação ou ambiguidade) — liste até 3 fichas como sugestões
-- "unmatched": item do cardápio sem nenhuma ficha similar
+Classifique cada prato do cardápio:
+- matched: correspondência clara
+- uncertain: possível correspondência (seja GENEROSO, 40%+ de chance já é uncertain) — até 3 sugestões
+- unmatched: sem correspondência
 
-Seja GENEROSO com "uncertain": prefira sugerir fichas a descartar. Um item com 40% de chance de corresponder já é "uncertain", não "unmatched".
-Extraia todos os pratos/itens do cardápio em texto, ignorando títulos de seção como "ILHA", "Welcome Drink", etc.
-
-Responda SOMENTE com JSON válido:
-{
-  "matched": [{"index": 0, "menu_item": "nome do item no cardápio"}],
-  "uncertain": [{"menu_item": "nome do item", "suggestions": [0, 2, 5]}],
-  "unmatched": ["item sem correspondência", "outro item"]
-}`;
+JSON:
+{"matched":[{"index":0,"menu_item":"..."}],"uncertain":[{"menu_item":"...","suggestions":[0,2]}],"unmatched":["..."]}`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -66,7 +60,7 @@ Responda SOMENTE com JSON válido:
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        max_tokens: 800,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -82,7 +76,6 @@ Responda SOMENTE com JSON válido:
 
     const parsed = JSON.parse(jsonMatch[0]);
 
-    // Map indexes back to real IDs
     const matched_ids: string[] = (parsed.matched ?? [])
       .map((m: any) => m.index)
       .filter((i: number) => i >= 0 && i < sheets.length)
