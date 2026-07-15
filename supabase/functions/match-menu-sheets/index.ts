@@ -31,9 +31,10 @@ serve(async (req) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY não configurada");
 
-    // Truncate aggressively to stay under 10k tokens/min
-    const indexedSheets = sheets.map((s, i) => `${i}:${s.name.slice(0, 40)}`).join("\n");
-    const menuTruncated = menu_text.slice(0, 1200);
+    // Limit sheets to 60 to keep input tokens low; truncate menu text
+    const sheetsLimited = sheets.slice(0, 60);
+    const indexedSheets = sheetsLimited.map((s, i) => `${i}:${s.name.slice(0, 35)}`).join("\n");
+    const menuTruncated = menu_text.slice(0, 1000);
 
     const prompt = `Cruze itens do cardápio com fichas técnicas. Responda SÓ JSON.
 
@@ -60,7 +61,7 @@ JSON:
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 800,
+        max_tokens: 1500,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -78,14 +79,14 @@ JSON:
 
     const matched_ids: string[] = (parsed.matched ?? [])
       .map((m: any) => m.index)
-      .filter((i: number) => i >= 0 && i < sheets.length)
-      .map((i: number) => sheets[i].id);
+      .filter((i: number) => i >= 0 && i < sheetsLimited.length)
+      .map((i: number) => sheetsLimited[i].id);
 
     const uncertain = (parsed.uncertain ?? []).map((u: any) => ({
       menu_item: u.menu_item,
       suggestions: (u.suggestions ?? [])
-        .filter((i: number) => i >= 0 && i < sheets.length)
-        .map((i: number) => ({ id: sheets[i].id, name: sheets[i].name, category: sheets[i].category })),
+        .filter((i: number) => i >= 0 && i < sheetsLimited.length)
+        .map((i: number) => ({ id: sheetsLimited[i].id, name: sheetsLimited[i].name, category: sheetsLimited[i].category })),
     }));
 
     const unmatched: string[] = parsed.unmatched ?? [];
