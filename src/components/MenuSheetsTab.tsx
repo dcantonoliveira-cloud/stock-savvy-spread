@@ -9,6 +9,7 @@ interface MenuSheet { id: string; sheet_id: string; notes: string; sort_order: n
 
 interface UncertainItem { menu_item: string; suggestions: { id: string; name: string; category: string | null }[] }
 interface AIResult { matched_ids: string[]; uncertain: UncertainItem[]; unmatched: string[] }
+interface AIReport { matched: number; uncertain: number; unmatched: string[] }
 
 export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: string; menuText?: string }) {
   const [allSheets, setAllSheets]     = useState<Sheet[]>([]);
@@ -18,6 +19,7 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
   const [aiLoading, setAiLoading]     = useState(false);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const [aiResult, setAiResult]       = useState<AIResult | null>(null);
+  const [aiReport, setAiReport]       = useState<AIReport | null>(null);
   // uncertain selections: menu_item → chosen sheet id or '' (skip)
   const [uncertainSel, setUncertainSel] = useState<Record<string, string>>({});
   // modal state
@@ -108,6 +110,7 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
     if (allSheets.length === 0) { toast.error('Nenhuma ficha técnica cadastrada no sistema'); return; }
     setAiLoading(true);
     setAiResult(null);
+    setAiReport(null);
     const toastId = toast.loading('IA analisando o cardápio...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -143,14 +146,13 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
       }
 
       setAiResult(result);
+      setAiReport({ matched: toAdd.length, uncertain: result.uncertain.length, unmatched: result.unmatched });
       // Init uncertain selections
       const sel: Record<string, string> = {};
       result.uncertain.forEach(u => { sel[u.menu_item] = u.suggestions[0]?.id ?? ''; });
       setUncertainSel(sel);
 
       toast.dismiss(toastId);
-      const total = toAdd.length + result.uncertain.length + result.unmatched.length;
-      toast.success(`IA: ${toAdd.length} adicionados · ${result.uncertain.length} com dúvida · ${result.unmatched.length} não encontrados`);
     } catch (err: any) {
       toast.dismiss(toastId);
       toast.error(err.message ?? 'Erro ao consultar IA');
@@ -249,6 +251,47 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
           </div>
         </div>
       </div>
+
+      {/* ── AI: Mini relatório ── */}
+      {aiReport && (
+        <div className="border border-border rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 bg-muted/30 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
+              <span className="text-sm font-semibold text-foreground">Resultado da IA</span>
+            </div>
+            <button onClick={() => setAiReport(null)} className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-border">
+            <div className="px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-green-600">{aiReport.matched}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Adicionados</p>
+            </div>
+            <div className="px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-amber-500">{aiReport.uncertain}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Com dúvida</p>
+            </div>
+            <div className="px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-red-500">{aiReport.unmatched.length}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Não encontrados</p>
+            </div>
+          </div>
+          {aiReport.unmatched.length > 0 && (
+            <div className="border-t border-border px-4 py-3">
+              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Itens não encontrados no sistema:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {aiReport.unmatched.map(item => (
+                  <span key={item} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded-full">
+                    <AlertCircle className="w-3 h-3 shrink-0" />{item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── AI: Uncertain panel ── */}
       {aiResult && aiResult.uncertain.length > 0 && (
