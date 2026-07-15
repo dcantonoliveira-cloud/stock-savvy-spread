@@ -9,7 +9,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Verify request has a valid API key (anon key sent by frontend)
     const apikey = req.headers.get("apikey");
     const expectedKey = Deno.env.get("SUPABASE_ANON_KEY");
     if (!apikey || (expectedKey && apikey !== expectedKey)) {
@@ -67,16 +66,20 @@ Responda SOMENTE com um JSON no formato:
       }),
     });
 
+    const rawText = await response.text();
+
     if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Anthropic API error: ${err}`);
+      throw new Error(`Anthropic ${response.status}: ${rawText.slice(0, 300)}`);
     }
 
-    const result = await response.json();
-    const text = result.content?.[0]?.text ?? "";
+    let result: any;
+    try { result = JSON.parse(rawText); } catch { throw new Error(`JSON inválido da API: ${rawText.slice(0, 200)}`); }
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Resposta inválida da IA");
+    const aiText = result.content?.[0]?.text ?? "";
+    if (!aiText) throw new Error(`Sem texto na resposta. Raw: ${rawText.slice(0, 200)}`);
+
+    const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error(`IA não retornou JSON. Texto: ${aiText.slice(0, 200)}`);
 
     const parsed = JSON.parse(jsonMatch[0]);
 
