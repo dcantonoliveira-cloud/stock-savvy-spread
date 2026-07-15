@@ -45,10 +45,11 @@ CARDÁPIO:
 ${menuTruncated}
 
 REGRAS IMPORTANTES:
-1. O cardápio tem seções em MAIÚSCULAS (ex: ILHA GOURMET, MINI PRATOS, COQUETEL VOLANTE, JANTAR). Use o nome da seção para desambiguar: um prato em "ILHA GOURMET" deve corresponder à ficha com "MESA" ou "ILHA" no nome; um prato em "MINI PRATOS" ou "COQUETEL VOLANTE" deve corresponder à ficha com "mini prato" ou "coquetel" no nome.
-2. matched: correspondência clara (incluindo quando a seção resolve a ambiguidade)
-3. uncertain: possível correspondência com dúvida — liste até 3 fichas como sugestões. Seja GENEROSO: 40%+ de chance já é uncertain.
-4. unmatched: sem nenhuma ficha similar
+1. Compare ignorando maiúsculas/minúsculas, acentos e letras duplicadas (ex: "chips" = "CHIPPS", "mandioquinha" = "mandioquinha", "ceviche" = "CEVICHE"). Foque no significado, não na grafia exata.
+2. O cardápio tem seções em MAIÚSCULAS (ex: ILHA GOURMET, MINI PRATOS, COQUETEL VOLANTE, JANTAR). Use o nome da seção para desambiguar: prato em "ILHA GOURMET" prefere ficha com "MESA" ou "ILHA"; prato em "MINI PRATOS" prefere ficha com "mini prato".
+3. matched: correspondência clara pelo nome ou quando a seção resolve a ambiguidade.
+4. uncertain: possível correspondência com alguma dúvida — liste até 3 fichas. Seja GENEROSO: 40%+ de chance já é uncertain.
+5. unmatched: sem nenhuma ficha similar mesmo com tolerância a grafia.
 
 JSON:
 {"matched":[{"index":0,"menu_item":"..."}],"uncertain":[{"menu_item":"...","suggestions":[0,2]}],"unmatched":["..."]}`;
