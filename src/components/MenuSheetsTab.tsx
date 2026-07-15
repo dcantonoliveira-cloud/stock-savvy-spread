@@ -86,7 +86,7 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/match-menu-sheets`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clever-action`,
         {
           method: 'POST',
           headers: {
