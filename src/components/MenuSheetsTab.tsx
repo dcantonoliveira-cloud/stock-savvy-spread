@@ -19,16 +19,21 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
   const [aiLoading, setAiLoading]     = useState(false);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const aiKey = `ai_result_${eventId}`;
-  const readSession = () => { try { const v = sessionStorage.getItem(aiKey); return v ? JSON.parse(v) : null; } catch { return null; } };
-  const [aiResult, setAiResultRaw]    = useState<AIResult | null>(() => readSession()?.result ?? null);
-  const [aiReport, setAiReportRaw]    = useState<AIReport | null>(() => readSession()?.report ?? null);
-  const [uncertainSel, setUncertainSelRaw] = useState<Record<string, string>>(() => readSession()?.sel ?? {});
-
-  const setAiResult = (v: AIResult | null) => { setAiResultRaw(v); const s = readSession() ?? {}; if (v) sessionStorage.setItem(aiKey, JSON.stringify({ ...s, result: v })); };
-  const setAiReport = (v: AIReport | null) => { setAiReportRaw(v); const s = readSession() ?? {}; if (v) sessionStorage.setItem(aiKey, JSON.stringify({ ...s, report: v })); else { const n = readSession() ?? {}; delete n.report; sessionStorage.setItem(aiKey, JSON.stringify(n)); } };
-  const setUncertainSel = (v: Record<string, string> | ((p: Record<string, string>) => Record<string, string>)) => {
-    setUncertainSelRaw(prev => { const next = typeof v === 'function' ? v(prev) : v; const s = readSession() ?? {}; sessionStorage.setItem(aiKey, JSON.stringify({ ...s, sel: next })); return next; });
+  const readSession = (): { result?: AIResult; report?: AIReport; sel?: Record<string, string> } => {
+    try { const v = sessionStorage.getItem(aiKey); return v ? JSON.parse(v) : {}; } catch { return {}; }
   };
+  const [aiResult, setAiResult]       = useState<AIResult | null>(() => readSession().result ?? null);
+  const [aiReport, setAiReport]       = useState<AIReport | null>(() => readSession().report ?? null);
+  const [uncertainSel, setUncertainSel] = useState<Record<string, string>>(() => readSession().sel ?? {});
+
+  // Persist all AI state to sessionStorage whenever any of it changes
+  useEffect(() => {
+    const s = readSession();
+    if (aiResult) s.result = aiResult; else delete s.result;
+    if (aiReport) s.report = aiReport; else delete s.report;
+    s.sel = uncertainSel;
+    sessionStorage.setItem(aiKey, JSON.stringify(s));
+  }, [aiResult, aiReport, uncertainSel]);
   // modal state
   const [modalOpen, setModalOpen]     = useState(false);
   const [modalSheetId, setModalSheetId] = useState<string | null>(null);
@@ -116,8 +121,6 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
     if (!stripped) { toast.error('Preencha o cardápio em "Texto livre" primeiro'); return; }
     if (allSheets.length === 0) { toast.error('Nenhuma ficha técnica cadastrada no sistema'); return; }
     setAiLoading(true);
-    setAiResult(null);
-    setAiReport(null);
     const toastId = toast.loading('IA analisando o cardápio...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -140,7 +143,7 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
 
       const result: AIResult = json;
 
-      // Auto-add matched sheets
+      // Auto-add matched sheets that aren't already in the event
       const addedIds = new Set(menuSheets.map(m => m.sheet_id));
       const toAdd = allSheets.filter(s => result.matched_ids.includes(s.id) && !addedIds.has(s.id));
       if (toAdd.length) {
@@ -152,12 +155,32 @@ export default function MenuSheetsTab({ eventId, menuText = '' }: { eventId: str
         await loadAll();
       }
 
-      setAiResult(result);
-      setAiReport({ matched: toAdd.length, uncertain: result.uncertain.length, unmatched: result.unmatched });
-      // Init uncertain selections
-      const sel: Record<string, string> = {};
-      result.uncertain.forEach(u => { sel[u.menu_item] = u.suggestions[0]?.id ?? ''; });
-      setUncertainSel(sel);
+      // Merge with existing pending uncertain/unmatched (keep items not yet resolved)
+      const prevResult = aiResult;
+      const prevUncertainItems = new Set(prevResult?.uncertain.map(u => u.menu_item) ?? []);
+      const prevUnmatched = new Set(prevResult?.unmatched ?? []);
+
+      // New uncertain: from AI + keep previous ones not yet resolved
+      const newUncertain = [
+        ...result.uncertain.filter(u => !prevUncertainItems.has(u.menu_item)),
+        ...(prevResult?.uncertain ?? []),
+      ];
+      // New unmatched: from AI + keep previous ones not yet resolved
+      const newUnmatched = [
+        ...result.unmatched.filter(u => !prevUnmatched.has(u)),
+        ...(prevResult?.unmatched ?? []),
+      ];
+
+      const merged: AIResult = { matched_ids: result.matched_ids, uncertain: newUncertain, unmatched: newUnmatched };
+      setAiResult(merged);
+      setAiReport({ matched: toAdd.length, uncertain: newUncertain.length, unmatched: newUnmatched });
+
+      // Init selections for new uncertain items only
+      setUncertainSel(prev => {
+        const sel = { ...prev };
+        result.uncertain.forEach(u => { if (!sel[u.menu_item]) sel[u.menu_item] = u.suggestions[0]?.id ?? ''; });
+        return sel;
+      });
 
       toast.dismiss(toastId);
     } catch (err: any) {
