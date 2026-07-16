@@ -114,24 +114,26 @@ export default function BIDashboard() {
   const load = async () => {
     setLoading(true);
 
-    const [evRes, clRes] = await Promise.all([
+    const [evRes, clRes, locRes] = await Promise.all([
       supabase
         .from('events' as any)
-        .select('id, event_name, status, event_date, event_type, location_text, location_id, location:event_locations!location_id(name), guest_count, total_value, contract_signed_date, created_at, client_id')
+        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, total_value, contract_signed_date, created_at, client_id')
         .order('event_date', { ascending: false }),
-      supabase
-        .from('clients' as any)
-        .select('id, name, zip_code, source'),
+      supabase.from('clients' as any).select('id, name, zip_code, source'),
+      supabase.from('event_locations' as any).select('id, name'),
     ]);
 
     console.log('[BI] events:', evRes.data?.length, 'error:', evRes.error?.message);
-    console.log('[BI] clients:', clRes.data?.length, 'error:', clRes.error?.message);
 
     const clientById: Record<string, ClientBI> = {};
     (clRes.data ?? []).forEach((c: any) => { clientById[c.id] = { name: c.name, zip_code: c.zip_code, source: c.source }; });
 
+    const locById: Record<string, string> = {};
+    (locRes.data ?? []).forEach((l: any) => { locById[l.id] = l.name; });
+
     const events = (evRes.data ?? []).map((e: any) => ({
       ...e,
+      location: e.location_id ? { name: locById[e.location_id] ?? null } : null,
       clients: e.client_id ? (clientById[e.client_id] ?? null) : null,
     }));
 
