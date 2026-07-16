@@ -113,11 +113,26 @@ export default function BIDashboard() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('events' as any)
-      .select('id, event_name, status, event_date, event_type, location_text, location_id, location:location_id(name), guest_count, total_value, contract_signed_date, created_at, client_id, clients(name, zip_code, source)')
-      .order('event_date', { ascending: false });
-    setAll((data ?? []) as EventBI[]);
+
+    const [evRes, clRes] = await Promise.all([
+      supabase
+        .from('events' as any)
+        .select('id, event_name, status, event_date, event_type, location_text, location_id, location:location_id(name), guest_count, total_value, contract_signed_date, created_at, client_id')
+        .order('event_date', { ascending: false }),
+      supabase
+        .from('clients' as any)
+        .select('id, name, zip_code, source'),
+    ]);
+
+    const clientById: Record<string, ClientBI> = {};
+    (clRes.data ?? []).forEach((c: any) => { clientById[c.id] = { name: c.name, zip_code: c.zip_code, source: c.source }; });
+
+    const events = (evRes.data ?? []).map((e: any) => ({
+      ...e,
+      clients: e.client_id ? (clientById[e.client_id] ?? null) : null,
+    }));
+
+    setAll(events as EventBI[]);
     setLoading(false);
   };
 
