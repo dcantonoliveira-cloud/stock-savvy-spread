@@ -143,9 +143,11 @@ interface EventBI {
   created_at: string;
   client_id: string | null;
   clients: ClientBI | null;
+  organizer: string | null;
+  organizer_id: string | null;
 }
 
-type TabKey = 'geral' | 'fechados' | 'aberto' | 'nfechou' | 'clientes' | 'kpis';
+type TabKey = 'geral' | 'fechados' | 'aberto' | 'nfechou' | 'clientes' | 'parceiros' | 'kpis';
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
 const Tip = ({ active, payload, label, formatter }: any) => {
@@ -199,7 +201,7 @@ export default function BIDashboard() {
     const [evRes, clRes, locRes] = await Promise.all([
       supabase
         .from('events' as any)
-        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, contract_signed_date, created_at, client_id')
+        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, contract_signed_date, created_at, client_id, organizer, organizer_id')
         .order('event_date', { ascending: false }),
       supabase.from('clients' as any).select('id, name, zip_code, source'),
       supabase.from('event_locations' as any).select('id, name'),
@@ -260,8 +262,9 @@ export default function BIDashboard() {
     { key: 'fechados', label: 'Fechados' },
     { key: 'aberto',   label: 'Em Aberto' },
     { key: 'nfechou',  label: 'Não Fechou' },
-    { key: 'clientes', label: 'Clientes' },
-    { key: 'kpis',     label: 'KPIs' },
+    { key: 'clientes',  label: 'Clientes' },
+    { key: 'parceiros', label: 'Assessoras & Locais' },
+    { key: 'kpis',      label: 'KPIs' },
   ];
 
   return (
@@ -312,8 +315,9 @@ export default function BIDashboard() {
       {tab === 'fechados' && <TabFechados ev={ev} fc={fc} locName={locName} />}
       {tab === 'aberto'   && <TabAberto  ab={ab} ev={ev} fc={fc} ticketMedio={ticketMedio} />}
       {tab === 'nfechou'  && <TabNFechou nf={nf} ev={ev} />}
-      {tab === 'clientes' && <TabClientes ev={ev} fc={fc} ab={ab} all={all} />}
-      {tab === 'kpis'     && <TabKpis    ev={ev} fc={fc} ab={ab} nf={nf} all={all} ticketMedio={ticketMedio} />}
+      {tab === 'clientes'  && <TabClientes  ev={ev} fc={fc} ab={ab} all={all} />}
+      {tab === 'parceiros' && <TabParceiros fc={fc} ab={ab} all={all} locName={locName} ticketMedio={ticketMedio} />}
+      {tab === 'kpis'      && <TabKpis     ev={ev} fc={fc} ab={ab} nf={nf} all={all} ticketMedio={ticketMedio} />}
     </div>
   );
 }
@@ -1134,6 +1138,319 @@ function TabClientes({ ev, fc, ab, all }: { ev: EventBI[]; fc: EventBI[]; ab: Ev
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TAB: ASSESSORAS & LOCAIS
+// ══════════════════════════════════════════════════════════════════════════════
+interface ParceiraStat {
+  name: string;
+  fc: number;       // fechados
+  leads: number;    // em aberto
+  total: number;    // fc + leads
+  receita: number;
+  ticketMedio: number;
+  txConv: number;   // fc / total
+  paxMedio: number;
+  receitaFutura: number; // leads × ticketMedio global
+  anos: number[];   // anos distintos em que teve fecho
+  meses: { m: number; q: number }[]; // sazonalidade
+}
+
+function buildStats(
+  fc: EventBI[], ab: EventBI[], getKey: (e: EventBI) => string | null, ticketMedioGlobal: number
+): ParceiraStat[] {
+  const map: Record<string, { fc: EventBI[]; ab: EventBI[] }> = {};
+  const add = (e: EventBI, type: 'fc' | 'ab') => {
+    const k = getKey(e)?.trim() || null;
+    if (!k) return;
+    if (!map[k]) map[k] = { fc: [], ab: [] };
+    map[k][type].push(e);
+  };
+  fc.forEach(e => add(e, 'fc'));
+  ab.forEach(e => add(e, 'ab'));
+
+  return Object.entries(map).map(([name, { fc: fcs, ab: abs }]) => {
+    const receita = sum(fcs.map(e => e.total_value ?? 0));
+    const total = fcs.length + abs.length;
+    const paxList = fcs.filter(e => e.guest_count).map(e => e.guest_count!);
+    const anos = [...new Set(fcs.filter(e => e.event_date).map(e => yearOf(e.event_date!)))].sort();
+
+    // sazonalidade: quantos fechados por mês
+    const mMap: Record<number, number> = {};
+    fcs.filter(e => e.event_date).forEach(e => {
+      const m = monthOf(e.event_date!);
+      mMap[m] = (mMap[m] ?? 0) + 1;
+    });
+    const meses = Object.entries(mMap).map(([m, q]) => ({ m: Number(m), q })).sort((a, b) => a.m - b.m);
+
+    return {
+      name,
+      fc: fcs.length,
+      leads: abs.length,
+      total,
+      receita,
+      ticketMedio: fcs.length ? receita / fcs.length : 0,
+      txConv: total ? fcs.length / total * 100 : 0,
+      paxMedio: paxList.length ? Math.round(avg(paxList)) : 0,
+      receitaFutura: abs.length * ticketMedioGlobal,
+      anos,
+      meses,
+    };
+  }).sort((a, b) => b.receita - a.receita);
+}
+
+function BadgeConv({ pct: p }: { pct: number }) {
+  const color = p >= 60 ? 'bg-emerald-100 text-emerald-700' : p >= 35 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700';
+  return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${color}`}>{p.toFixed(0)}%</span>;
+}
+
+function MiniSazon({ meses }: { meses: { m: number; q: number }[] }) {
+  const max = Math.max(...meses.map(x => x.q), 1);
+  return (
+    <div className="flex gap-0.5 items-end h-5">
+      {MONTHS.map((_, i) => {
+        const q = meses.find(x => x.m === i)?.q ?? 0;
+        const h = Math.round((q / max) * 20);
+        return (
+          <div key={i} title={`${MONTHS[i]}: ${q}`}
+            className={`w-1.5 rounded-sm ${q > 0 ? 'bg-primary' : 'bg-muted'}`}
+            style={{ height: `${Math.max(h, q > 0 ? 3 : 2)}px` }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function TabelaParceiros({ stats, ticketMedioGlobal, label }: {
+  stats: ParceiraStat[]; ticketMedioGlobal: number; label: string;
+}) {
+  const [sort, setSort] = useState<keyof ParceiraStat>('receita');
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc');
+  const [search, setSearch] = useState('');
+
+  const sorted = [...stats]
+    .filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const va = a[sort] as number; const vb = b[sort] as number;
+      return dir === 'desc' ? vb - va : va - vb;
+    });
+
+  const toggle = (k: keyof ParceiraStat) => {
+    if (sort === k) setDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSort(k); setDir('desc'); }
+  };
+  const Th = ({ k, children }: { k: keyof ParceiraStat; children: React.ReactNode }) => (
+    <th onClick={() => toggle(k)}
+      className="text-right px-3 py-2.5 cursor-pointer hover:text-foreground select-none whitespace-nowrap">
+      {children}{sort === k ? (dir === 'desc' ? ' ↓' : ' ↑') : ''}
+    </th>
+  );
+
+  const totalReceita = sum(sorted.map(s => s.receita));
+
+  return (
+    <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="p-4 border-b border-border flex items-center justify-between gap-4">
+        <SH>{label}</SH>
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Filtrar..."
+          className="text-xs border border-border rounded-md px-2.5 py-1.5 w-48 outline-none focus:ring-1 focus:ring-primary/30"
+        />
+      </div>
+      {sorted.length === 0
+        ? <p className="text-xs text-muted-foreground p-4">Nenhum dado encontrado.</p>
+        : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-muted/30 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                  <th className="text-left px-4 py-2.5 sticky left-0 bg-muted/30">Nome</th>
+                  <Th k="fc">Fechados</Th>
+                  <Th k="leads">Leads</Th>
+                  <Th k="txConv">Conv%</Th>
+                  <Th k="receita">Receita</Th>
+                  <Th k="ticketMedio">Ticket Médio</Th>
+                  <Th k="receitaFutura">Pipeline</Th>
+                  <Th k="paxMedio">Pax Médio</Th>
+                  <th className="text-right px-3 py-2.5">% Receita</th>
+                  <th className="text-left px-3 py-2.5 whitespace-nowrap">Sazon.</th>
+                  <th className="text-left px-3 py-2.5">Anos ativos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {sorted.map(s => (
+                  <tr key={s.name} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-2.5 font-medium text-foreground max-w-[180px] truncate sticky left-0 bg-white">{s.name}</td>
+                    <td className="px-3 py-2.5 text-right text-muted-foreground">{s.fc}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      {s.leads > 0
+                        ? <span className="bg-blue-50 text-blue-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">{s.leads}</span>
+                        : <span className="text-muted-foreground">0</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-right"><BadgeConv pct={s.txConv} /></td>
+                    <td className="px-3 py-2.5 text-right font-medium text-foreground">{fmFull(s.receita)}</td>
+                    <td className="px-3 py-2.5 text-right text-muted-foreground">{fmBRL(s.ticketMedio)}</td>
+                    <td className="px-3 py-2.5 text-right text-blue-600 font-medium">{s.leads > 0 ? fmBRL(s.receitaFutura) : '—'}</td>
+                    <td className="px-3 py-2.5 text-right text-muted-foreground">{s.paxMedio > 0 ? `${s.paxMedio} pax` : '—'}</td>
+                    <td className="px-3 py-2.5 text-right text-muted-foreground">{pct(s.receita, totalReceita)}</td>
+                    <td className="px-3 py-2.5"><MiniSazon meses={s.meses} /></td>
+                    <td className="px-3 py-2.5 text-muted-foreground">{s.anos.join(', ') || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-muted/20 font-semibold border-t-2 border-border">
+                  <td className="px-4 py-2.5 text-foreground">Total</td>
+                  <td className="px-3 py-2.5 text-right">{sum(sorted.map(s => s.fc))}</td>
+                  <td className="px-3 py-2.5 text-right">{sum(sorted.map(s => s.leads))}</td>
+                  <td className="px-3 py-2.5 text-right">
+                    <BadgeConv pct={
+                      sum(sorted.map(s => s.total)) > 0
+                        ? sum(sorted.map(s => s.fc)) / sum(sorted.map(s => s.total)) * 100
+                        : 0
+                    } />
+                  </td>
+                  <td className="px-3 py-2.5 text-right">{fmFull(totalReceita)}</td>
+                  <td className="px-3 py-2.5 text-right">{fmBRL(sorted.length ? totalReceita / sum(sorted.map(s => s.fc)) : 0)}</td>
+                  <td className="px-3 py-2.5 text-right text-blue-600">{fmBRL(sum(sorted.map(s => s.receitaFutura)))}</td>
+                  <td colSpan={4} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
+  fc: EventBI[]; ab: EventBI[]; all: EventBI[];
+  locName: (e: EventBI) => string | null; ticketMedio: number;
+}) {
+  const assessorasStats = buildStats(fc, ab, e => e.organizer, ticketMedio);
+  const locaisStats     = buildStats(fc, ab, e => locName(e),  ticketMedio);
+
+  const semAssessora = fc.filter(e => !e.organizer?.trim()).length;
+  const semLocal     = fc.filter(e => !locName(e)).length;
+  const totalFc = fc.length;
+
+  // Top 5 assessoras por receita — para gráfico
+  const top5Ass = assessorasStats.slice(0, 5);
+  const assChartData = top5Ass.map(s => ({
+    name: s.name.length > 14 ? s.name.slice(0, 12) + '…' : s.name,
+    Fechados: s.fc,
+    Leads: s.leads,
+    Receita: Math.round(s.receita / 1000),
+  }));
+
+  const top5Loc = locaisStats.slice(0, 5);
+  const locChartData = top5Loc.map(s => ({
+    name: s.name.length > 16 ? s.name.slice(0, 14) + '…' : s.name,
+    Fechados: s.fc,
+    Leads: s.leads,
+    Receita: Math.round(s.receita / 1000),
+  }));
+
+  return (
+    <div className="space-y-8">
+
+      {/* ── ASSESSORAS ─────────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <h3 className="text-base font-semibold text-foreground">Assessoras</h3>
+          {semAssessora > 0 && (
+            <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+              {semAssessora} eventos fechados sem assessora cadastrada
+            </span>
+          )}
+        </div>
+
+        {/* KPIs assessoras */}
+        <div className="grid grid-cols-4 gap-3">
+          <KCard label="Assessoras ativas"    value={`${assessorasStats.length}`}                         sub="com pelo menos 1 evento" />
+          <KCard label="Com leads em aberto"  value={`${assessorasStats.filter(s => s.leads > 0).length}`} sub="assessoras com pipeline" color="text-blue-600" />
+          <KCard label="Melhor conv%"
+            value={assessorasStats.length ? `${Math.max(...assessorasStats.map(s => s.txConv)).toFixed(0)}%` : '—'}
+            sub={assessorasStats.sort((a,b)=>b.txConv-a.txConv)[0]?.name ?? ''} color="text-emerald-600" />
+          <KCard label="Maior pipeline"
+            value={assessorasStats.filter(s=>s.leads>0).length ? fmBRL(Math.max(...assessorasStats.filter(s=>s.leads>0).map(s=>s.receitaFutura))) : '—'}
+            sub="assessora com mais leads × ticket médio" color="text-blue-600" />
+        </div>
+
+        {/* Mini gráfico top 5 */}
+        {assChartData.length > 0 && (
+          <div className="bg-white border border-border rounded-xl p-5">
+            <SH>Top 5 assessoras — fechados vs leads vs receita (R$K)</SH>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={assChartData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
+                <YAxis yAxisId="q" orientation="left"  tick={{ fontSize: 10, fill: '#888' }} allowDecimals={false} />
+                <YAxis yAxisId="v" orientation="right" tick={{ fontSize: 10, fill: '#888' }} />
+                <Tooltip content={<Tip />} />
+                <Legend />
+                <Bar yAxisId="q" dataKey="Fechados" fill="#3D5C38" radius={[3,3,0,0]} />
+                <Bar yAxisId="q" dataKey="Leads"    fill="#2E4A7A" radius={[3,3,0,0]} />
+                <Line yAxisId="v" type="monotone" dataKey="Receita" name="Receita R$K" stroke="#B8922A" strokeWidth={2} dot={{ r: 4 }} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        <TabelaParceiros stats={assessorasStats} ticketMedioGlobal={ticketMedio} label="Ranking de assessoras" />
+      </div>
+
+      {/* ── LOCAIS ─────────────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <h3 className="text-base font-semibold text-foreground">Locais de Festa</h3>
+          {semLocal > 0 && (
+            <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+              {semLocal} eventos fechados sem local cadastrado
+            </span>
+          )}
+        </div>
+
+        {/* KPIs locais */}
+        <div className="grid grid-cols-4 gap-3">
+          <KCard label="Locais distintos"      value={`${locaisStats.length}`}                              sub="com pelo menos 1 evento" />
+          <KCard label="Com leads em aberto"   value={`${locaisStats.filter(s => s.leads > 0).length}`}     sub="locais com pipeline"     color="text-blue-600" />
+          <KCard label="Local mais lucrativo"
+            value={locaisStats[0] ? fmBRL(locaisStats[0].ticketMedio) : '—'}
+            sub={`ticket médio · ${locaisStats[0]?.name ?? ''}`} color="text-amber-600" />
+          <KCard label="Maior pax médio"
+            value={locaisStats.filter(s=>s.paxMedio>0).length ? `${Math.max(...locaisStats.filter(s=>s.paxMedio>0).map(s=>s.paxMedio))} pax` : '—'}
+            sub={locaisStats.sort((a,b)=>b.paxMedio-a.paxMedio)[0]?.name ?? ''} />
+        </div>
+
+        {/* Mini gráfico top 5 locais */}
+        {locChartData.length > 0 && (
+          <div className="bg-white border border-border rounded-xl p-5">
+            <SH>Top 5 locais — fechados vs leads vs receita (R$K)</SH>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={locChartData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
+                <YAxis yAxisId="q" orientation="left"  tick={{ fontSize: 10, fill: '#888' }} allowDecimals={false} />
+                <YAxis yAxisId="v" orientation="right" tick={{ fontSize: 10, fill: '#888' }} />
+                <Tooltip content={<Tip />} />
+                <Legend />
+                <Bar yAxisId="q" dataKey="Fechados" fill="#7A2C1E" radius={[3,3,0,0]} />
+                <Bar yAxisId="q" dataKey="Leads"    fill="#8C7B6A" radius={[3,3,0,0]} />
+                <Line yAxisId="v" type="monotone" dataKey="Receita" name="Receita R$K" stroke="#B8922A" strokeWidth={2} dot={{ r: 4 }} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        <TabelaParceiros stats={locaisStats} ticketMedioGlobal={ticketMedio} label="Ranking de locais" />
+      </div>
     </div>
   );
 }
