@@ -312,7 +312,7 @@ export default function OrcamentosPage() {
                 <Td className="text-muted-foreground tabular-nums">{diasEmAberto(row.created_at)}</Td>
                 <Td className="tabular-nums">
                   {row.tasting_date
-                    ? <span className="text-violet-700 font-medium">{fmtDate(row.tasting_date)}</span>
+                    ? <span className={`font-medium ${row.tasting_date < TODAY ? 'text-red-600' : 'text-violet-700'}`}>{fmtDate(row.tasting_date)}</span>
                     : <span className="text-muted-foreground/40">—</span>}
                 </Td>
                 <Td onClick={e => e.stopPropagation()}>
