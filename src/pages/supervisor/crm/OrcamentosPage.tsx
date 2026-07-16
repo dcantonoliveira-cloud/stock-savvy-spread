@@ -15,6 +15,7 @@ interface Orcamento {
   status: string;
   date_reserved: boolean | null;
   clients: { name: string | null } | null;
+  tasting_date?: string | null;
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────────
@@ -62,20 +63,37 @@ export default function OrcamentosPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('events')
-      .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, clients(name)')
-      .in('status', [...PIPELINE_STATUSES, 'cancelled'])
-      .not('event_name', 'is', null)
-      .neq('event_name', '')
-      .order('created_at', { ascending: false });
-    if (error) console.error('[OrcamentosPage]', error);
-    const sorted = (data ?? []).sort((a: any, b: any) => {
-      if (!a.event_date && !b.event_date) return 0;
-      if (!a.event_date) return 1;
-      if (!b.event_date) return -1;
-      return b.event_date.localeCompare(a.event_date);
-    });
+    const [evRes, tseRes] = await Promise.all([
+      supabase
+        .from('events')
+        .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, clients(name)')
+        .in('status', [...PIPELINE_STATUSES, 'cancelled'])
+        .not('event_name', 'is', null)
+        .neq('event_name', '')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('tasting_session_events' as any)
+        .select('event_id, tasting_sessions!inner(scheduled_date)'),
+    ]);
+    if (evRes.error) console.error('[OrcamentosPage]', evRes.error);
+
+    // earliest tasting per event
+    const tastingMap: Record<string, string> = {};
+    for (const row of (tseRes.data ?? []) as any[]) {
+      const d = row.tasting_sessions?.scheduled_date;
+      if (!d || !row.event_id) continue;
+      if (!tastingMap[row.event_id] || d < tastingMap[row.event_id])
+        tastingMap[row.event_id] = d;
+    }
+
+    const sorted = (evRes.data ?? [])
+      .map((e: any) => ({ ...e, tasting_date: tastingMap[e.id] ?? null }))
+      .sort((a: any, b: any) => {
+        if (!a.event_date && !b.event_date) return 0;
+        if (!a.event_date) return 1;
+        if (!b.event_date) return -1;
+        return b.event_date.localeCompare(a.event_date);
+      });
     setRows(sorted as any);
     setLoading(false);
   };
@@ -141,6 +159,7 @@ export default function OrcamentosPage() {
           va = a.created_at ? Math.floor((Date.now() - new Date(a.created_at).getTime()) / 86_400_000) : -1;
           vb = b.created_at ? Math.floor((Date.now() - new Date(b.created_at).getTime()) / 86_400_000) : -1;
         }
+        if (sortCol === 'tasting_date') { va = a.tasting_date ?? ''; vb = b.tasting_date ?? ''; }
         if (sortCol === 'status')      { va = a.status; vb = b.status; }
         if (va < vb) return sortAsc ? -1 : 1;
         if (va > vb) return sortAsc ? 1 : -1;
@@ -258,16 +277,17 @@ export default function OrcamentosPage() {
               <Th col="location"    sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Local</Th>
               <Th col="organizer"   sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Assessoria</Th>
               <Th col="event_date"  sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Data do evento</Th>
-              <Th col="em_aberto"   sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Em aberto</Th>
-              <Th col="status"      sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Status</Th>
+              <Th col="em_aberto"    sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Em aberto</Th>
+              <Th col="tasting_date" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>1ª Degustação</Th>
+              <Th col="status"       sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Status</Th>
               <Th></Th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="py-16 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+              <tr><td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">Carregando...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="py-16 text-center text-muted-foreground text-sm">Nenhum orçamento encontrado.</td></tr>
+              <tr><td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">Nenhum orçamento encontrado.</td></tr>
             ) : filtered.map((row, i) => (
               <tr
                 key={row.id}
@@ -290,6 +310,11 @@ export default function OrcamentosPage() {
                   </div>
                 </Td>
                 <Td className="text-muted-foreground tabular-nums">{diasEmAberto(row.created_at)}</Td>
+                <Td className="tabular-nums">
+                  {row.tasting_date
+                    ? <span className="text-violet-700 font-medium">{fmtDate(row.tasting_date)}</span>
+                    : <span className="text-muted-foreground/40">—</span>}
+                </Td>
                 <Td onClick={e => e.stopPropagation()}>
                   <StatusDropdown status={row.status} onChange={s => updateStatus(row.id, s)} />
                 </Td>
