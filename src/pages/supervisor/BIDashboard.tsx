@@ -124,6 +124,9 @@ export default function BIDashboard() {
         .select('id, name, zip_code, source'),
     ]);
 
+    console.log('[BI] events:', evRes.data?.length, 'error:', evRes.error?.message);
+    console.log('[BI] clients:', clRes.data?.length, 'error:', clRes.error?.message);
+
     const clientById: Record<string, ClientBI> = {};
     (clRes.data ?? []).forEach((c: any) => { clientById[c.id] = { name: c.name, zip_code: c.zip_code, source: c.source }; });
 
