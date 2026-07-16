@@ -5,6 +5,66 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ── Text utils ─────────────────────────────────────────────────────────────────
+const norm = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+   .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+const stopwords = new Set(["com", "sem", "por", "para", "das", "dos", "aos", "uma", "uns", "num", "nao", "que", "nao", "ao", "de", "da", "do", "e", "a", "o"]);
+const tokens = (s: string) => norm(s).split(" ").filter(w => w.length >= 3 && !stopwords.has(w));
+
+// Levenshtein distance
+function lev(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const dp: number[] = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0]; dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i-1] === b[j-1] ? prev : 1 + Math.min(prev, dp[j], dp[j-1]);
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+}
+
+// Word-level fuzzy similarity: two words match if lev distance ≤ 1 per 4 chars
+const wordMatch = (a: string, b: string) => {
+  if (a === b) return true;
+  const maxDist = Math.floor(Math.max(a.length, b.length) / 4);
+  return lev(a, b) <= Math.min(maxDist, 2);
+};
+
+// Token Jaccard with fuzzy word matching
+function similarity(menuItem: string, sheetName: string): number {
+  const ta = tokens(menuItem);
+  const tb = tokens(sheetName);
+  if (ta.length === 0 || tb.length === 0) return 0;
+  let matched = 0;
+  for (const wa of ta) {
+    if (tb.some(wb => wordMatch(wa, wb))) matched++;
+  }
+  const union = ta.length + tb.length - matched;
+  return matched / union;
+}
+
+// Extract menu items from text (ignore section headers in ALL CAPS)
+function extractMenuItems(text: string): string[] {
+  const lines = text.split(/[\n;]/).map(l => l.replace(/^[·•\-\*]\s*/, "").trim()).filter(Boolean);
+  const items: string[] = [];
+  for (const line of lines) {
+    // Skip short lines, pure caps section headers, and lines with just numbers
+    if (line.length < 4) continue;
+    if (/^\d+$/.test(line)) continue;
+    const upper = line.replace(/[^a-zA-Z]/g, '');
+    if (upper.length > 3 && upper === upper.toUpperCase() && !line.includes(' ') === false && line.split(' ').length <= 3 && line.length < 30) continue;
+    items.push(line);
+  }
+  return [...new Set(items)];
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -31,95 +91,110 @@ serve(async (req) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY não configurada");
 
-    // Normalize text: lowercase, remove accents, keep only alphanumeric + spaces
-    const norm = (s: string) =>
-      s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-       .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    const menuItems = extractMenuItems(menu_text.slice(0, 3000));
 
-    // Extract significant words (3+ chars), ignore common stopwords
-    const stopwords = new Set(["com", "sem", "por", "para", "das", "dos", "aos", "the", "and", "com", "uma", "uns"]);
-    const keywords = (s: string) => norm(s).split(" ").filter(w => w.length >= 3 && !stopwords.has(w));
+    // ── Stage 1: Local fuzzy matching ─────────────────────────────────────────
+    const matched_ids: string[] = [];
+    const toAI: { menu_item: string; candidates: { id: string; name: string; category: string | null; score: number }[] }[] = [];
 
-    const menuTruncated = menu_text.slice(0, 2000);
-    const menuKeywords = new Set(keywords(menuTruncated));
+    for (const item of menuItems) {
+      const scored = sheets
+        .map(s => ({ ...s, score: similarity(item, s.name) }))
+        .sort((a, b) => b.score - a.score);
 
-    // Score each sheet by keyword overlap with the full menu text
-    const scored = sheets.map(s => {
-      const sheetKws = keywords(s.name);
-      const score = sheetKws.reduce((acc, w) => {
-        if (menuKeywords.has(w)) return acc + 2;
-        // partial match: menu keyword starts with or contains sheet word
-        for (const mk of menuKeywords) {
-          if (mk.includes(w) || w.includes(mk)) return acc + 1;
+      const best = scored[0];
+
+      if (best.score >= 0.55) {
+        // High confidence → auto match
+        if (!matched_ids.includes(best.id)) matched_ids.push(best.id);
+      } else {
+        // Send to AI with top candidates
+        const candidates = scored.filter(s => s.score >= 0.1).slice(0, 8);
+        toAI.push({ menu_item: item, candidates });
+      }
+    }
+
+    // ── Stage 2: AI for ambiguous items ───────────────────────────────────────
+    const uncertain: { menu_item: string; suggestions: { id: string; name: string; category: string | null }[] }[] = [];
+    const unmatched: string[] = [];
+
+    if (toAI.length > 0) {
+      // Build compact prompt: only send candidates relevant to each item
+      const aiItems = toAI.map((x, i) => {
+        const cands = x.candidates.map((c, j) => `  ${j}:${c.name}`).join("\n");
+        return `[${i}] "${x.menu_item}"\nCandidatos:\n${cands}`;
+      }).join("\n\n");
+
+      const prompt = `Você é um especialista em buffet. Para cada item do cardápio, identifique a melhor ficha técnica entre os candidatos listados.
+
+Compare ignorando maiúsculas, acentos e pequenas variações de grafia (ex: "chips" = "CHIPPS", "kafta" = "kafta de cordeiro"). Foque no significado: "mini kafta com tahine e iogurte" corresponde a "Kafta cordeiro molho de tahine com iogurte".
+
+${aiItems}
+
+Para cada item [i], responda com:
+- "matched": índice do candidato se for correspondência clara ou muito provável (>60% de certeza)
+- "uncertain": lista de índices dos melhores candidatos (até 3) se houver dúvida
+- "unmatched": se nenhum candidato fizer sentido
+
+JSON (array com um objeto por item, na mesma ordem):
+[{"i":0,"matched":2},{"i":1,"uncertain":[0,1]},{"i":2,"unmatched":true}]`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1024,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+
+      const rawText = await response.text();
+      if (!response.ok) throw new Error(`Anthropic ${response.status}: ${rawText.slice(0, 300)}`);
+
+      const result = JSON.parse(rawText);
+      const aiText = result.content?.[0]?.text ?? "";
+      const jsonMatch = aiText.match(/\[[\s\S]*\]/);
+
+      if (jsonMatch) {
+        const parsed: { i: number; matched?: number; uncertain?: number[]; unmatched?: boolean }[] = JSON.parse(jsonMatch[0]);
+
+        for (const r of parsed) {
+          const item = toAI[r.i];
+          if (!item) continue;
+
+          if (r.matched !== undefined && item.candidates[r.matched]) {
+            const sheet = item.candidates[r.matched];
+            if (!matched_ids.includes(sheet.id)) matched_ids.push(sheet.id);
+          } else if (r.uncertain && r.uncertain.length > 0) {
+            const suggestions = r.uncertain
+              .map((j: number) => item.candidates[j])
+              .filter(Boolean)
+              .map(c => ({ id: c.id, name: c.name, category: c.category }));
+            if (suggestions.length > 0) uncertain.push({ menu_item: item.menu_item, suggestions });
+            else unmatched.push(item.menu_item);
+          } else {
+            unmatched.push(item.menu_item);
+          }
         }
-        return acc;
-      }, 0);
-      return { ...s, score };
-    }).sort((a, b) => b.score - a.score);
-
-    // Always include sheets with score > 0 (up to 80), pad with up to 20 others
-    const relevant = scored.filter(s => s.score > 0).slice(0, 80);
-    const padding  = scored.filter(s => s.score === 0).slice(0, Math.max(0, 20 - relevant.length));
-    const sheetsLimited = [...relevant, ...padding];
-
-    const indexedSheets = sheetsLimited.map((s, i) => `${i}:${s.name}`).join("\n");
-
-    const prompt = `Cruze itens do cardápio com fichas técnicas. Responda SÓ JSON.
-
-FICHAS (índice:nome):
-${indexedSheets}
-
-CARDÁPIO:
-${menuTruncated}
-
-REGRAS IMPORTANTES:
-1. Compare ignorando maiúsculas/minúsculas, acentos e letras duplicadas (ex: "chips" = "CHIPPS", "mandioquinha" = "mandioquinha", "ceviche" = "CEVICHE"). Foque no significado, não na grafia exata.
-2. O cardápio tem seções em MAIÚSCULAS (ex: ILHA GOURMET, MINI PRATOS, COQUETEL VOLANTE, JANTAR). Use o nome da seção para desambiguar: prato em "ILHA GOURMET" prefere ficha com "MESA" ou "ILHA"; prato em "MINI PRATOS" prefere ficha com "mini prato".
-3. matched: correspondência clara pelo nome ou quando a seção resolve a ambiguidade.
-4. uncertain: possível correspondência com alguma dúvida — liste até 3 fichas. Seja GENEROSO: 40%+ de chance já é uncertain.
-5. unmatched: sem nenhuma ficha similar mesmo com tolerância a grafia.
-
-JSON:
-{"matched":[{"index":0,"menu_item":"..."}],"uncertain":[{"menu_item":"...","suggestions":[0,2]}],"unmatched":["..."]}`;
-
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1500,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const rawText = await response.text();
-    if (!response.ok) throw new Error(`Anthropic ${response.status}: ${rawText.slice(0, 300)}`);
-
-    const result = JSON.parse(rawText);
-    const aiText = result.content?.[0]?.text ?? "";
-
-    const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error(`IA não retornou JSON. Texto: ${aiText.slice(0, 200)}`);
-
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    const matched_ids: string[] = (parsed.matched ?? [])
-      .map((m: any) => m.index)
-      .filter((i: number) => i >= 0 && i < sheetsLimited.length)
-      .map((i: number) => sheetsLimited[i].id);
-
-    const uncertain = (parsed.uncertain ?? []).map((u: any) => ({
-      menu_item: u.menu_item,
-      suggestions: (u.suggestions ?? [])
-        .filter((i: number) => i >= 0 && i < sheetsLimited.length)
-        .map((i: number) => ({ id: sheetsLimited[i].id, name: sheetsLimited[i].name, category: sheetsLimited[i].category })),
-    }));
-
-    const unmatched: string[] = parsed.unmatched ?? [];
+      } else {
+        // If AI failed to parse, add everything to uncertain with top candidates
+        for (const item of toAI) {
+          if (item.candidates.length > 0) {
+            uncertain.push({
+              menu_item: item.menu_item,
+              suggestions: item.candidates.slice(0, 3).map(c => ({ id: c.id, name: c.name, category: c.category })),
+            });
+          } else {
+            unmatched.push(item.menu_item);
+          }
+        }
+      }
+    }
 
     return new Response(JSON.stringify({ matched_ids, uncertain, unmatched }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
