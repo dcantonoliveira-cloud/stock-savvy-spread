@@ -227,7 +227,10 @@ export default function BIDashboard() {
 
   useEffect(() => { load(); }, []);
 
-  const locName = (e: EventBI) => e.location_text || (e.location as any)?.name || null;
+  const normName = (s: string | null | undefined) =>
+    s?.trim().replace(/\s+/g, ' ')
+      .split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') || null;
+  const locName = (e: EventBI) => normName(e.location_text || (e.location as any)?.name);
 
   const anos  = useMemo(() => [...new Set(all.filter(e => e.event_date).map(e => yearOf(e.event_date!)))].sort(), [all]);
   const tipos = useMemo(() => [...new Set(all.map(e => e.event_type).filter(Boolean))].sort(), [all]);
@@ -1159,6 +1162,10 @@ interface ParceiraStat {
   meses: { m: number; q: number }[]; // sazonalidade
 }
 
+const normStr = (s: string | null | undefined) =>
+  s?.trim().replace(/\s+/g, ' ')
+    .split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') || null;
+
 function buildStats(
   fc: EventBI[], ab: EventBI[], getKey: (e: EventBI) => string | null, ticketMedioGlobal: number
 ): ParceiraStat[] {
@@ -1333,8 +1340,8 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
   fc: EventBI[]; ab: EventBI[]; all: EventBI[];
   locName: (e: EventBI) => string | null; ticketMedio: number;
 }) {
-  const assessorasStats = buildStats(fc, ab, e => e.organizer, ticketMedio);
-  const locaisStats     = buildStats(fc, ab, e => locName(e),  ticketMedio);
+  const assessorasStats = buildStats(fc, ab, e => normStr(e.organizer), ticketMedio);
+  const locaisStats     = buildStats(fc, ab, e => locName(e),           ticketMedio);
 
   const semAssessora = fc.filter(e => !e.organizer?.trim()).length;
   const semLocal     = fc.filter(e => !locName(e)).length;
