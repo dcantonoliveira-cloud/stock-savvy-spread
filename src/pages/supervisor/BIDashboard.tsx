@@ -117,7 +117,7 @@ export default function BIDashboard() {
     const [evRes, clRes] = await Promise.all([
       supabase
         .from('events' as any)
-        .select('id, event_name, status, event_date, event_type, location_text, location_id, location:location_id(name), guest_count, total_value, contract_signed_date, created_at, client_id')
+        .select('id, event_name, status, event_date, event_type, location_text, location_id, location:event_locations!location_id(name), guest_count, total_value, contract_signed_date, created_at, client_id')
         .order('event_date', { ascending: false }),
       supabase
         .from('clients' as any)
