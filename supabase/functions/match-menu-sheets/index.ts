@@ -31,10 +31,38 @@ serve(async (req) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY não configurada");
 
-    // Limit sheets to 60 to keep input tokens low; truncate menu text
-    const sheetsLimited = sheets.slice(0, 60);
-    const indexedSheets = sheetsLimited.map((s, i) => `${i}:${s.name.slice(0, 35)}`).join("\n");
-    const menuTruncated = menu_text.slice(0, 1000);
+    // Normalize text: lowercase, remove accents, keep only alphanumeric + spaces
+    const norm = (s: string) =>
+      s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+       .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+    // Extract significant words (3+ chars), ignore common stopwords
+    const stopwords = new Set(["com", "sem", "por", "para", "das", "dos", "aos", "the", "and", "com", "uma", "uns"]);
+    const keywords = (s: string) => norm(s).split(" ").filter(w => w.length >= 3 && !stopwords.has(w));
+
+    const menuTruncated = menu_text.slice(0, 2000);
+    const menuKeywords = new Set(keywords(menuTruncated));
+
+    // Score each sheet by keyword overlap with the full menu text
+    const scored = sheets.map(s => {
+      const sheetKws = keywords(s.name);
+      const score = sheetKws.reduce((acc, w) => {
+        if (menuKeywords.has(w)) return acc + 2;
+        // partial match: menu keyword starts with or contains sheet word
+        for (const mk of menuKeywords) {
+          if (mk.includes(w) || w.includes(mk)) return acc + 1;
+        }
+        return acc;
+      }, 0);
+      return { ...s, score };
+    }).sort((a, b) => b.score - a.score);
+
+    // Always include sheets with score > 0 (up to 80), pad with up to 20 others
+    const relevant = scored.filter(s => s.score > 0).slice(0, 80);
+    const padding  = scored.filter(s => s.score === 0).slice(0, Math.max(0, 20 - relevant.length));
+    const sheetsLimited = [...relevant, ...padding];
+
+    const indexedSheets = sheetsLimited.map((s, i) => `${i}:${s.name}`).join("\n");
 
     const prompt = `Cruze itens do cardápio com fichas técnicas. Responda SÓ JSON.
 
