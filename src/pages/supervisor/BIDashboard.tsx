@@ -29,6 +29,86 @@ const pct = (n: number, d: number) => d ? `${(n / d * 100).toFixed(1)}%` : '—'
 const fmtNum = (v: number) => v.toLocaleString('pt-BR');
 const fmtDate = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 
+// CEP range → city lookup (BR, SP interior focus for Sorocaba region)
+function cepToCity(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const d = raw.replace(/\D/g, '');
+  if (d.length < 5) return null;
+  const n = parseInt(d.slice(0, 8).padEnd(8, '0'), 10);
+
+  // São Paulo capital
+  if (n >= 1000000 && n <= 9999999) return 'São Paulo/SP';
+  // SP interior - Sorocaba region
+  if (n >= 18000000 && n <= 18109999) return 'Sorocaba/SP';
+  if (n >= 18110000 && n <= 18139999) return 'Mairinque/SP';
+  if (n >= 18140000 && n <= 18159999) return 'São Roque/SP';
+  if (n >= 18160000 && n <= 18169999) return 'Ibiúna/SP';
+  if (n >= 18170000 && n <= 18179999) return 'Piedade/SP';
+  if (n >= 18180000 && n <= 18199999) return 'Itu/SP';
+  if (n >= 18200000 && n <= 18229999) return 'Tatuí/SP';
+  if (n >= 18230000 && n <= 18279999) return 'Itapetininga/SP';
+  if (n >= 18280000 && n <= 18299999) return 'Angatuba/SP';
+  if (n >= 18300000 && n <= 18309999) return 'Botucatu/SP';
+  if (n >= 18310000 && n <= 18389999) return 'Botucatu/SP';
+  if (n >= 18390000 && n <= 18409999) return 'Avaré/SP';
+  if (n >= 18410000 && n <= 18419999) return 'Avaré/SP';
+  if (n >= 18530000 && n <= 18549999) return 'Ourinhos/SP';
+  if (n >= 18550000 && n <= 18569999) return 'Ourinhos/SP';
+  if (n >= 18600000 && n <= 18619999) return 'Assis/SP';
+  if (n >= 18700000 && n <= 18729999) return 'Piraju/SP';
+  if (n >= 18800000 && n <= 18829999) return 'Itapeva/SP';
+  if (n >= 18900000 && n <= 18919999) return 'Registro/SP';
+  // Campinas region
+  if (n >= 13000000 && n <= 13099999) return 'Campinas/SP';
+  if (n >= 13100000 && n <= 13139999) return 'Campinas/SP';
+  if (n >= 13140000 && n <= 13159999) return 'Paulínia/SP';
+  if (n >= 13160000 && n <= 13179999) return 'Americana/SP';
+  if (n >= 13300000 && n <= 13329999) return 'Itu/SP';
+  if (n >= 13330000 && n <= 13349999) return 'Salto/SP';
+  if (n >= 13350000 && n <= 13369999) return 'Indaiatuba/SP';
+  if (n >= 13400000 && n <= 13429999) return 'Piracicaba/SP';
+  if (n >= 13480000 && n <= 13499999) return 'Limeira/SP';
+  if (n >= 13500000 && n <= 13539999) return 'Rio Claro/SP';
+  if (n >= 13570000 && n <= 13589999) return 'São Carlos/SP';
+  // ABC paulista
+  if (n >= 9000000  && n <= 9999999)  return 'ABC Paulista/SP';
+  // Other SP cities
+  if (n >= 12200000 && n <= 12299999) return 'São José dos Campos/SP';
+  if (n >= 12300000 && n <= 12389999) return 'Jacareí/SP';
+  if (n >= 14800000 && n <= 14829999) return 'Araraquara/SP';
+  if (n >= 15000000 && n <= 15099999) return 'São José do Rio Preto/SP';
+  if (n >= 16000000 && n <= 16099999) return 'Araçatuba/SP';
+  if (n >= 17000000 && n <= 17099999) return 'Bauru/SP';
+  if (n >= 19000000 && n <= 19099999) return 'Presidente Prudente/SP';
+  // Other states - fallback to state prefix
+  const state = parseInt(d.slice(0, 2), 10);
+  if (state <= 9)  return 'São Paulo/SP';
+  if (state <= 19) return 'São Paulo/SP';
+  if (state >= 20 && state <= 28) return 'Rio de Janeiro/RJ';
+  if (state >= 29 && state <= 29) return 'Espírito Santo/ES';
+  if (state >= 30 && state <= 39) return 'Minas Gerais/MG';
+  if (state >= 40 && state <= 48) return 'Bahia/BA';
+  if (state >= 49 && state <= 49) return 'Sergipe/SE';
+  if (state >= 50 && state <= 56) return 'Pernambuco/PE';
+  if (state >= 57 && state <= 57) return 'Alagoas/AL';
+  if (state >= 58 && state <= 58) return 'Paraíba/PB';
+  if (state >= 59 && state <= 59) return 'Rio Grande do Norte/RN';
+  if (state >= 60 && state <= 63) return 'Ceará/CE';
+  if (state >= 64 && state <= 64) return 'Piauí/PI';
+  if (state >= 65 && state <= 65) return 'Maranhão/MA';
+  if (state >= 66 && state <= 68) return 'Pará/PA';
+  if (state >= 69 && state <= 69) return 'Amazonas/AM';
+  if (state >= 70 && state <= 73) return 'Distrito Federal/DF';
+  if (state >= 74 && state <= 76) return 'Goiás/GO';
+  if (state >= 77 && state <= 77) return 'Tocantins/TO';
+  if (state >= 78 && state <= 78) return 'Mato Grosso/MT';
+  if (state >= 79 && state <= 79) return 'Mato Grosso do Sul/MS';
+  if (state >= 80 && state <= 87) return 'Paraná/PR';
+  if (state >= 88 && state <= 89) return 'Santa Catarina/SC';
+  if (state >= 90 && state <= 99) return 'Rio Grande do Sul/RS';
+  return `CEP ${d.slice(0, 5)}xxx`;
+}
+
 const isFechado = (s: string) => s === 'confirmed' || s === 'completed';
 const isAberto  = (s: string) => s === 'lead' || s === 'negotiating' || s === 'tasting_scheduled';
 const isNFechou = (s: string) => s === 'lost' || s === 'cancelled';
@@ -858,15 +938,16 @@ function TabClientes({ ev, fc, ab, all }: { ev: EventBI[]; fc: EventBI[]; ab: Ev
     name: name.length > 18 ? name.slice(0, 16) + '…' : name, q, v: Math.round(v / 1000),
   }));
 
-  // Por região (CEP — 5 primeiros dígitos)
-  const porCep: Record<string, { q: number; v: number }> = {};
+  // Por cidade (via CEP)
+  const porCidade: Record<string, { q: number; v: number }> = {};
   fc.forEach(e => {
-    const cep = e.clients?.zip_code?.replace(/\D/g, '').slice(0, 5) || null;
-    if (!cep) return;
-    if (!porCep[cep]) porCep[cep] = { q: 0, v: 0 };
-    porCep[cep].q++; porCep[cep].v += e.total_value ?? 0;
+    const cidade = cepToCity(e.clients?.zip_code);
+    if (!cidade) return;
+    if (!porCidade[cidade]) porCidade[cidade] = { q: 0, v: 0 };
+    porCidade[cidade].q++; porCidade[cidade].v += e.total_value ?? 0;
   });
-  const cepArr = Object.entries(porCep).sort((a, b) => b[1].q - a[1].q).slice(0, 15);
+  const cidadeArr = Object.entries(porCidade).sort((a, b) => b[1].q - a[1].q);
+  const totalComCidade = cidadeArr.reduce((s, [, v]) => s + v.v, 0);
   const semCep = fc.filter(e => !e.clients?.zip_code).length;
 
   // Recorrência ao longo do tempo
@@ -929,17 +1010,17 @@ function TabClientes({ ev, fc, ab, all }: { ev: EventBI[]; fc: EventBI[]; ab: Ev
         </div>
       </div>
 
-      {/* Por região (CEP) */}
-      {cepArr.length > 0 && (
+      {/* Por cidade */}
+      {cidadeArr.length > 0 && (
         <div className="bg-white border border-border rounded-xl overflow-hidden">
           <div className="p-4 border-b border-border">
-            <SH>Por região (CEP)</SH>
+            <SH>Por cidade</SH>
             {semCep > 0 && <p className="text-[10px] text-amber-600 -mt-2">{semCep} contratos sem CEP cadastrado não aparecem aqui</p>}
           </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/30 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                <th className="text-left px-4 py-2.5">CEP (prefixo)</th>
+                <th className="text-left px-4 py-2.5">Cidade</th>
                 <th className="text-right px-4 py-2.5">Contratos</th>
                 <th className="text-right px-4 py-2.5">Receita</th>
                 <th className="text-right px-4 py-2.5">Ticket Médio</th>
@@ -947,13 +1028,13 @@ function TabClientes({ ev, fc, ab, all }: { ev: EventBI[]; fc: EventBI[]; ab: Ev
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {cepArr.map(([cep, { q, v }]) => (
-                <tr key={cep} className="hover:bg-muted/20">
-                  <td className="px-4 py-2.5 font-mono text-sm text-foreground">{cep}xxx</td>
+              {cidadeArr.map(([cidade, { q, v }]) => (
+                <tr key={cidade} className="hover:bg-muted/20">
+                  <td className="px-4 py-2.5 font-medium text-foreground">{cidade}</td>
                   <td className="px-4 py-2.5 text-right text-muted-foreground">{q}</td>
                   <td className="px-4 py-2.5 text-right text-muted-foreground">{fmFull(v)}</td>
                   <td className="px-4 py-2.5 text-right text-muted-foreground">{fmBRL(q ? v / q : 0)}</td>
-                  <td className="px-4 py-2.5 text-right text-muted-foreground">{pct(q, fc.length)}</td>
+                  <td className="px-4 py-2.5 text-right text-muted-foreground">{pct(v, totalComCidade)}</td>
                 </tr>
               ))}
             </tbody>
