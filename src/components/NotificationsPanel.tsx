@@ -123,19 +123,19 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
                     <span className={`w-5 h-5 rounded-full ${cfg.bg} ${cfg.color} flex items-center justify-center shrink-0`}>
                       {cfg.icon}
                     </span>
-                    <p className={`text-xs leading-snug truncate ${!n.read ? 'font-semibold text-foreground' : 'text-foreground'}`}>
+                    <p className={`text-sm leading-snug truncate ${!n.read ? 'font-semibold text-foreground' : 'text-foreground'}`}>
                       {n.title}
                     </p>
                   </div>
                   {n.message && (
-                    <p className="text-[11px] text-muted-foreground truncate">{n.message}</p>
+                    <p className="text-xs text-muted-foreground truncate">{n.message}</p>
                   )}
                   {n.actor_name && (
-                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">{n.actor_name}</p>
+                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">{n.actor_name}</p>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{relTime(n.created_at)}</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{relTime(n.created_at)}</span>
                   {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
                 </div>
               </div>
