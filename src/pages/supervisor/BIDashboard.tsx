@@ -136,6 +136,8 @@ interface EventBI {
   location_id: string | null;
   location: { name: string } | null;
   guest_count: number | null;
+  duration_hours: number | null;
+  additional_hours: number | null;
   total_value: number | null;
   contract_signed_date: string | null;
   created_at: string;
@@ -197,7 +199,7 @@ export default function BIDashboard() {
     const [evRes, clRes, locRes] = await Promise.all([
       supabase
         .from('events' as any)
-        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, total_value, contract_signed_date, created_at, client_id')
+        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, contract_signed_date, created_at, client_id')
         .order('event_date', { ascending: false }),
       supabase.from('clients' as any).select('id, name, zip_code, source'),
       supabase.from('event_locations' as any).select('id, name'),
@@ -518,6 +520,30 @@ function TabFechados({ ev, fc, locName }: { ev: EventBI[]; fc: EventBI[]; locNam
     name: name.length > 14 ? name.slice(0, 12) + '…' : name, ticket: q ? Math.round(v / q / 1000) : 0,
   }));
 
+  // Faixas de convidados
+  const paxBins = [0, 50, 100, 150, 200, 250, 300, 400, 500, Infinity];
+  const paxLabels = ['<50', '50-99', '100-149', '150-199', '200-249', '250-299', '300-399', '400-499', '500+'];
+  const paxData = paxLabels.map((name, i) => ({
+    name,
+    qtd: fc.filter(e => {
+      const g = e.guest_count ?? 0;
+      return g >= paxBins[i] && g < paxBins[i + 1];
+    }).length,
+  })).filter(d => d.qtd > 0);
+
+  // Faixas de duração (horas)
+  const durBins = [0, 3, 4, 5, 6, 7, 8, 10, Infinity];
+  const durLabels = ['<3h', '3h', '4h', '5h', '6h', '7h', '8h', '>8h'];
+  const durData = durLabels.map((name, i) => ({
+    name,
+    qtd: fc.filter(e => {
+      const h = (e.duration_hours ?? 0) + (e.additional_hours ?? 0);
+      if (h === 0) return false;
+      return h >= durBins[i] && h < durBins[i + 1];
+    }).length,
+  })).filter(d => d.qtd > 0);
+  const semDuracao = fc.filter(e => !e.duration_hours).length;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-4 gap-3">
@@ -620,6 +646,46 @@ function TabFechados({ ev, fc, locName }: { ev: EventBI[]; fc: EventBI[]; locNam
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      {/* Convidados + Duração */}
+      <div className="grid grid-cols-2 gap-6">
+        <div className="bg-white border border-border rounded-xl p-5">
+          <SH>Festas por faixa de convidados</SH>
+          {paxData.length === 0
+            ? <p className="text-xs text-muted-foreground">Sem dados de convidados</p>
+            : <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={paxData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#888' }} allowDecimals={false} />
+                  <Tooltip content={<Tip />} />
+                  <Bar dataKey="qtd" name="Festas" radius={[3, 3, 0, 0]}>
+                    {paxData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+          }
+        </div>
+
+        <div className="bg-white border border-border rounded-xl p-5">
+          <SH>Festas por duração</SH>
+          {semDuracao > 0 && <p className="text-[10px] text-amber-600 -mt-2 mb-2">{semDuracao} sem duração cadastrada</p>}
+          {durData.length === 0
+            ? <p className="text-xs text-muted-foreground">Sem dados de duração</p>
+            : <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={durData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#888' }} allowDecimals={false} />
+                  <Tooltip content={<Tip />} />
+                  <Bar dataKey="qtd" name="Festas" radius={[3, 3, 0, 0]}>
+                    {durData.map((_, i) => <Cell key={i} fill={COLORS[(i + 4) % COLORS.length]} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+          }
         </div>
       </div>
 
