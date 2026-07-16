@@ -45,6 +45,8 @@ interface EventBI {
   event_date: string | null;
   event_type: string | null;
   location_text: string | null;
+  location_id: string | null;
+  location: { name: string } | null;
   guest_count: number | null;
   total_value: number | null;
   contract_signed_date: string | null;
@@ -97,7 +99,7 @@ export default function BIDashboard() {
     setLoading(true);
     const { data } = await supabase
       .from('events' as any)
-      .select('id, event_name, status, event_date, event_type, location_text, guest_count, total_value, contract_signed_date, created_at')
+      .select('id, event_name, status, event_date, event_type, location_text, location_id, location:location_id(name), guest_count, total_value, contract_signed_date, created_at')
       .order('event_date', { ascending: false });
     setAll((data ?? []) as EventBI[]);
     setLoading(false);
@@ -105,10 +107,13 @@ export default function BIDashboard() {
 
   useEffect(() => { load(); }, []);
 
+  // Resolve location name: prefer location_text, fallback to joined location.name
+  const locName = (e: Event) => e.location_text || (e.location as any)?.name || null;
+
   // ── Filter options ─────────────────────────────────────────────────────────
   const anos  = useMemo(() => [...new Set(all.filter(e => e.event_date).map(e => yearOf(e.event_date!)))].sort(), [all]);
   const tipos  = useMemo(() => [...new Set(all.map(e => e.event_type).filter(Boolean))].sort(), [all]);
-  const locais = useMemo(() => [...new Set(all.map(e => e.location_text).filter(Boolean))].sort(), [all]);
+  const locais = useMemo(() => [...new Set(all.map(e => locName(e)).filter(Boolean))].sort(), [all]);
 
   // ── Filtered dataset ───────────────────────────────────────────────────────
   const ev = useMemo(() => {
@@ -117,7 +122,7 @@ export default function BIDashboard() {
       if (filterYear && e.event_date && yearOf(e.event_date) !== Number(filterYear)) return false;
       if (filterMonth && e.event_date && monthOf(e.event_date) !== Number(filterMonth) - 1) return false;
       if (filterType && e.event_type !== filterType) return false;
-      if (filterLocal && e.location_text !== filterLocal) return false;
+      if (filterLocal && locName(e) !== filterLocal) return false;
       if (filterRange > 0 && ((e.total_value ?? 0) < range.mn || (e.total_value ?? 0) >= range.mx)) return false;
       return true;
     });
@@ -343,7 +348,7 @@ function TabFechados({ ev, fc }: { ev: EventBI[]; fc: EventBI[] }) {
 
   // Por local
   const porLocal: Record<string, { q: number; v: number }> = {};
-  fc.forEach(e => { const l = e.location_text || 'N/D'; if (!porLocal[l]) porLocal[l] = { q: 0, v: 0 }; porLocal[l].q++; porLocal[l].v += e.total_value ?? 0; });
+  fc.forEach(e => { const l = locName(e) || 'N/D'; if (!porLocal[l]) porLocal[l] = { q: 0, v: 0 }; porLocal[l].q++; porLocal[l].v += e.total_value ?? 0; });
   const localArr = Object.entries(porLocal).sort((a, b) => b[1].q - a[1].q).slice(0, 10);
 
   // Histograma tickets
