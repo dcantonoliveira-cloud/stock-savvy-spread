@@ -1,9 +1,5 @@
-# index.html nunca deve ser cacheado — garante que o browser sempre busca o HTML mais recente
-/
-  Cache-Control: no-cache, no-store, must-revalidate
-  Pragma: no-cache
-
-/index.html
+# Qualquer rota HTML nunca deve ser cacheada — garante chunks sempre frescos
+/*
   Cache-Control: no-cache, no-store, must-revalidate
   Pragma: no-cache
 
