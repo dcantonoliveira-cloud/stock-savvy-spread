@@ -569,11 +569,11 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                     <span className="text-sm tabular-nums text-foreground">{row.guest_count ?? '—'}</span>
 
                     {/* Data do evento + reservado + calendário */}
-                    <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
-                      <span className="text-sm tabular-nums text-foreground">{fmtDate(row.event_date)}</span>
+                    <div className="flex items-center gap-1.5 flex-nowrap min-w-0 overflow-hidden">
+                      <span className="text-sm tabular-nums text-foreground shrink-0">{fmtDate(row.event_date)}</span>
                       {row.date_reserved && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-600 border border-violet-200 leading-none">
-                          Reservado
+                        <span className="inline-flex shrink-0 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-600 border border-violet-200 leading-none">
+                          Res.
                         </span>
                       )}
                       {row.event_date && (
@@ -583,7 +583,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                             const [y, m] = row.event_date!.split('-');
                             navigate(`/calendar?year=${y}&month=${m}`, { state: { backTo: '/degustacoes', backLabel: 'Degustações', backTab: 'aberto' } });
                           }}
-                          className="p-0.5 rounded hover:bg-primary/10 text-muted-foreground/40 hover:text-primary transition-colors"
+                          className="shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground/40 hover:text-primary transition-colors"
                           title="Ver no calendário"
                         >
                           <Calendar className="w-3.5 h-3.5" />
