@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, CalendarDays, Copy, Check, QrCode, X as XIcon, Download, Lock, ChevronDown, ChevronUp, StickyNote, ExternalLink } from 'lucide-react';
+import { Plus, CalendarDays, Copy, Check, QrCode, X as XIcon, Download, ChevronDown, ChevronUp, StickyNote, ExternalLink, Calendar } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getMessageTemplates } from '@/lib/whatsapp';
 import { createPortal } from 'react-dom';
@@ -530,8 +530,10 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span className="text-sm font-medium text-foreground truncate">{row.event_name ?? '—'}</span>
                         {hasNotes && <StickyNote className="w-3 h-3 text-amber-400 shrink-0" />}
+                        {row.assessor_name && (
+                          <span className="text-xs text-muted-foreground/60 truncate shrink-0">· {row.assessor_name}</span>
+                        )}
                       </div>
-                      <span className="text-xs text-muted-foreground/70 truncate block">{row.assessor_name ?? '—'}</span>
                     </div>
 
                     {/* Status dropdown */}
@@ -566,11 +568,26 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                     {/* Convidados */}
                     <span className="text-sm tabular-nums text-foreground">{row.guest_count ?? '—'}</span>
 
-                    {/* Data do evento + ícone reserva */}
-                    <div className="flex items-center gap-1">
+                    {/* Data do evento + reservado + calendário */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-sm tabular-nums text-foreground">{fmtDate(row.event_date)}</span>
                       {row.date_reserved && (
-                        <Lock className="w-3 h-3 text-emerald-500 shrink-0" title="Data reservada" />
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-600 border border-violet-200 leading-none">
+                          Reservado
+                        </span>
+                      )}
+                      {row.event_date && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            const [y, m] = row.event_date!.split('-');
+                            navigate(`/calendario?year=${y}&month=${m}`, { state: { backTo: '/degustacoes', backLabel: 'Degustações', backTab: 'aberto' } });
+                          }}
+                          className="p-0.5 rounded hover:bg-primary/10 text-muted-foreground/40 hover:text-primary transition-colors"
+                          title="Ver no calendário"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                        </button>
                       )}
                     </div>
 

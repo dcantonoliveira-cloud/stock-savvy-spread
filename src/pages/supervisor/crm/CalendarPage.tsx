@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ChevronLeft, ChevronRight, Users, CalendarCheck,
@@ -64,9 +64,15 @@ const daysIn   = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 // ── Component ───────────────────────────────────────────────────────────────────
 export default function CalendarPage() {
   const navigate   = useNavigate();
+  const location   = useLocation();
+  const [searchParams] = useSearchParams();
+  const backTo     = (location.state as any)?.backTo as string | undefined;
+  const backLabel  = (location.state as any)?.backLabel as string | undefined;
   const today      = new Date();
-  const [year, setYear]         = useState(today.getFullYear());
-  const [month, setMonth]       = useState(today.getMonth());
+  const initYear  = parseInt(searchParams.get('year') ?? '') || today.getFullYear();
+  const initMonth = (parseInt(searchParams.get('month') ?? '') || today.getMonth() + 1) - 1;
+  const [year, setYear]         = useState(initYear);
+  const [month, setMonth]       = useState(initMonth);
   const [events,       setEvents]       = useState<EventRow[]>([]);
   const [tastings,     setTastings]     = useState<TastingRow[]>([]);
   const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
@@ -178,6 +184,15 @@ export default function CalendarPage() {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
+          {backTo && (
+            <button
+              onClick={() => navigate(backTo, { state: location.state })}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl border border-border bg-white hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              {backLabel ?? 'Voltar'}
+            </button>
+          )}
           {/* Nav */}
           <div className="flex items-center gap-1 bg-white border border-border rounded-xl p-0.5">
             <button onClick={prev} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
