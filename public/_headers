@@ -1,8 +1,9 @@
-# Qualquer rota HTML nunca deve ser cacheada — garante chunks sempre frescos
 /*
   Cache-Control: no-cache, no-store, must-revalidate
   Pragma: no-cache
+  Surrogate-Control: no-store
+  CDN-Cache-Control: no-store
+  Cloudflare-CDN-Cache-Control: no-store
 
-# Assets com hash no nome podem ser cacheados por tempo longo (são imutáveis)
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

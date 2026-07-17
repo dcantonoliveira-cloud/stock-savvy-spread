@@ -59,8 +59,11 @@ export class ErrorBoundary extends Component<Props, State> {
               }
             } catch (_) {}
             sessionStorage.clear();
-            // Cache-bust the HTML so browser fetches fresh chunk URLs from Cloudflare
-            window.location.href = window.location.origin + '/?_=' + Date.now();
+            localStorage.removeItem('__chunk_v');
+            // Force browser to fetch fresh HTML — bypass all caches
+            const url = new URL(window.location.href);
+            url.searchParams.set('_', Date.now().toString());
+            window.location.replace(url.toString());
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
         >
