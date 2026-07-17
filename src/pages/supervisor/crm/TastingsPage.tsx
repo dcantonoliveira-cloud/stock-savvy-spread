@@ -569,7 +569,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                     <span className="text-sm tabular-nums text-foreground">{row.guest_count ?? '—'}</span>
 
                     {/* Data do evento + reservado + calendário */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
                       <span className="text-sm tabular-nums text-foreground">{fmtDate(row.event_date)}</span>
                       {row.date_reserved && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-600 border border-violet-200 leading-none">
