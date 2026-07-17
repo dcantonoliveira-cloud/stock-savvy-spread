@@ -26,27 +26,26 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center p-8">
-        {this.isChunkError() ? (
-          <>
+        <>
+          {this.isChunkError() ? (
             <RefreshCw className="w-10 h-10 text-primary" />
-            <div>
-              <h2 className="text-lg font-semibold text-foreground mb-1">Nova versão disponível</h2>
-              <p className="text-sm text-muted-foreground max-w-md">
-                O sistema foi atualizado. Clique abaixo para carregar a versão mais recente.
-              </p>
-            </div>
-          </>
-        ) : (
-          <>
+          ) : (
             <AlertTriangle className="w-12 h-12 text-destructive" />
-            <div>
-              <h2 className="text-lg font-semibold text-foreground mb-1">Algo deu errado nesta página</h2>
-              <p className="text-sm text-muted-foreground max-w-md">
-                {this.state.error.message || 'Erro inesperado'}
-              </p>
-            </div>
-          </>
-        )}
+          )}
+          <div>
+            <h2 className="text-lg font-semibold text-foreground mb-1">
+              {this.isChunkError() ? 'Nova versão disponível' : 'Algo deu errado nesta página'}
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              {this.isChunkError()
+                ? 'O sistema foi atualizado. Clique abaixo para carregar a versão mais recente.'
+                : (this.state.error.message || 'Erro inesperado')}
+            </p>
+            <p className="text-xs text-muted-foreground/50 mt-2 max-w-md font-mono break-all">
+              {this.state.error.message}
+            </p>
+          </div>
+        </>
         <button
           onClick={async () => {
             try {
