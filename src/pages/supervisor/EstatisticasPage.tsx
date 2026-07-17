@@ -637,17 +637,34 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
                       );
                     })}
                   </tbody>
-                  {activeCell.key === 'faturamento' && (
-                    <tfoot>
-                      <tr className="border-t-2 border-border bg-muted/30 font-semibold text-xs">
-                        <td colSpan={7} className="px-3 py-2.5 text-foreground">Total</td>
-                        <td className="px-3 py-2.5 text-center text-foreground">
-                          {contratosMes.reduce((s, e) => s + (e.total_value ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td colSpan={2} />
-                      </tr>
-                    </tfoot>
-                  )}
+                  {(activeCell.key === 'faturamento' || activeCell.key === 'contratos') && (() => {
+                    const totalVal  = contratosMes.reduce((s, e) => s + (e.total_value ?? 0), 0);
+                    const totalPax  = contratosMes.reduce((s, e) => s + (e.guest_count ?? 0), 0);
+                    const count     = contratosMes.filter(e => e.total_value != null).length;
+                    const ticketMed = count > 0 ? totalVal / count : 0;
+                    const ticketPax = totalPax > 0 ? totalVal / totalPax : 0;
+                    const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                    return (
+                      <tfoot>
+                        <tr className="border-t-2 border-border bg-muted/30 font-semibold text-xs">
+                          <td colSpan={3} className="px-3 py-2.5 text-foreground">
+                            {contratosMes.length} contratos
+                          </td>
+                          <td className="px-2 py-2.5 text-center text-foreground">{totalPax.toLocaleString('pt-BR')}</td>
+                          <td className="px-2 py-2.5 text-center text-foreground text-[10px]">{ticketPax > 0 ? fmt(ticketPax) : '—'}</td>
+                          <td colSpan={2} />
+                          <td className="px-2 py-2.5 text-center text-foreground">{fmt(totalVal)}</td>
+                          <td colSpan={2} />
+                        </tr>
+                        <tr className="bg-muted/10 text-[10px] text-muted-foreground">
+                          <td colSpan={3} className="px-3 py-1.5">Ticket médio por contrato</td>
+                          <td colSpan={4} />
+                          <td className="px-2 py-1.5 text-center font-semibold text-foreground">{ticketMed > 0 ? fmt(ticketMed) : '—'}</td>
+                          <td colSpan={2} />
+                        </tr>
+                      </tfoot>
+                    );
+                  })()}
                 </table>
               </div>
         )}
