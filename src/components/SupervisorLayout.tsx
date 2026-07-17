@@ -69,6 +69,18 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
   }, []);
 
   useEffect(() => {
+    const check = () => {
+      const hasOverlay = !!document.querySelector(
+        '.fixed.inset-0[class*="z-"]'
+      );
+      document.body.style.overflow = hasOverlay ? 'hidden' : '';
+    };
+    const obs = new MutationObserver(check);
+    obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    return () => { obs.disconnect(); document.body.style.overflow = ''; };
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     const load = async () => {
       const { count } = await supabase
