@@ -164,7 +164,9 @@ export default function EstatisticasPage() {
 
       // Contratos fechados: query própria filtrada por contract_signed_date no ano
       const contratosList = contratos.filter(e =>
-        e.contract_signed_date != null && monthOf(e.contract_signed_date) === i
+        e.contract_signed_date != null &&
+        monthOf(e.contract_signed_date) === i &&
+        e.status !== 'cancelled' && e.status !== 'lost' && e.status !== 'not_closed'
       );
 
       // Degustações: sessões distintas no mês
