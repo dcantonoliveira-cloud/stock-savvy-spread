@@ -505,7 +505,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
         </div>
       ) : (
         <div className="bg-white border border-border rounded-2xl overflow-hidden">
-          <div className="grid grid-cols-[2fr_100px_1fr_50px_90px_90px_24px] gap-3 px-5 py-2 bg-muted/30 border-b border-border">
+          <div className="grid grid-cols-[2fr_100px_1fr_50px_160px_90px_24px] gap-3 px-5 py-2 bg-muted/30 border-b border-border">
             {['Evento', 'Status', 'Local', 'Conv.', 'Data evento', 'Últ. degust.', ''].map((h, i) => (
               <span key={i} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">{h}</span>
             ))}
@@ -522,7 +522,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                 <div key={row.event_id} className={`transition-colors ${isSaving ? 'opacity-50' : ''}`}>
                   {/* Main row */}
                   <div
-                    className="grid grid-cols-[2fr_100px_1fr_50px_90px_90px_24px] gap-3 px-5 py-2.5 items-center hover:bg-slate-50 cursor-pointer"
+                    className="grid grid-cols-[2fr_100px_1fr_50px_160px_90px_24px] gap-3 px-5 py-2.5 items-center hover:bg-slate-50 cursor-pointer"
                     onClick={() => onNavigate(row.event_id)}>
 
                     {/* Evento + assessora */}
