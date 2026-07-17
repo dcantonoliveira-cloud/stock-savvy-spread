@@ -65,7 +65,15 @@ function AssessoraModal({
         .or(`organizer_id.eq.${assessora.id},organizer.eq.${assessora.name}`)
         .order('event_date', { ascending: false });
       if (error) toast.error('Erro ao carregar eventos: ' + error.message);
-      setEventos((data ?? []) as EventoRow[]);
+      const raw = (data ?? []) as EventoRow[];
+      const confirmed = new Set(['confirmed', 'completed']);
+      raw.sort((a, b) => {
+        const aConf = confirmed.has(a.status ?? '');
+        const bConf = confirmed.has(b.status ?? '');
+        if (aConf !== bConf) return aConf ? -1 : 1;
+        return (b.event_date ?? '').localeCompare(a.event_date ?? '');
+      });
+      setEventos(raw);
       setLoadingEvt(false);
     };
     load();
