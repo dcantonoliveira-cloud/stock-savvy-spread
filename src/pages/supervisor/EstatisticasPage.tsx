@@ -554,11 +554,7 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
   const isContratosOrFat = activeCell.key === 'contratos' || activeCell.key === 'faturamento';
 
   const contratosMes = isContratosOrFat
-    ? contratos.filter(e =>
-        e.contract_signed_date != null &&
-        (Number(e.contract_signed_date.slice(5,7)) - 1) === activeCell.month &&
-        e.status !== 'cancelled' && e.status !== 'lost'
-      )
+    ? (row._contratosList as ContratoRow[])
     : [];
 
   const fmtDate = (d: string | null) => d ? `${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}` : '—';
