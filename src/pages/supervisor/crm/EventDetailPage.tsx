@@ -318,6 +318,10 @@ export default function EventDetailPage() {
 
   const changeStatus = async (newStatus: string) => {
     if (!id) return;
+    if (['confirmed', 'completed'].includes(newStatus) && !event?.event_date) {
+      toast.error('Defina a data do evento antes de confirmar.');
+      return;
+    }
     const updates: Record<string, any> = { status: newStatus };
     if (newStatus === 'confirmed') {
       updates.contract_signed = true;
