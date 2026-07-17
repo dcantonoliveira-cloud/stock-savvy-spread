@@ -643,23 +643,28 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
                     const count     = contratosMes.filter(e => e.total_value != null).length;
                     const ticketMed = count > 0 ? totalVal / count : 0;
                     const ticketPax = totalPax > 0 ? totalVal / totalPax : 0;
-                    const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                    const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     return (
                       <tfoot>
                         <tr className="border-t-2 border-border bg-muted/30 font-semibold text-xs">
-                          <td colSpan={3} className="px-3 py-2.5 text-foreground">
-                            {contratosMes.length} contratos
-                          </td>
+                          <td colSpan={3} className="px-3 py-2.5 text-foreground">{contratosMes.length} contratos</td>
                           <td className="px-2 py-2.5 text-center text-foreground">{totalPax.toLocaleString('pt-BR')}</td>
-                          <td className="px-2 py-2.5 text-center text-foreground text-[10px]">{ticketPax > 0 ? fmt(ticketPax) : '—'}</td>
-                          <td colSpan={2} />
+                          <td colSpan={3} />
                           <td className="px-2 py-2.5 text-center text-foreground">{fmt(totalVal)}</td>
                           <td colSpan={2} />
                         </tr>
-                        <tr className="bg-muted/10 text-[10px] text-muted-foreground">
-                          <td colSpan={3} className="px-3 py-1.5">Ticket médio por contrato</td>
-                          <td colSpan={4} />
-                          <td className="px-2 py-1.5 text-center font-semibold text-foreground">{ticketMed > 0 ? fmt(ticketMed) : '—'}</td>
+                        <tr className="bg-muted/10 text-[10px] text-muted-foreground border-t border-border/40">
+                          <td colSpan={3} className="px-3 py-1.5 text-muted-foreground">Tickets médios</td>
+                          <td colSpan={1} />
+                          <td className="px-2 py-1.5 text-center">
+                            <span className="text-[9px] block text-muted-foreground/60">por pax</span>
+                            <span className="font-semibold text-foreground">{ticketPax > 0 ? fmt(ticketPax) : '—'}</span>
+                          </td>
+                          <td colSpan={2} />
+                          <td className="px-2 py-1.5 text-center">
+                            <span className="text-[9px] block text-muted-foreground/60">por contrato</span>
+                            <span className="font-semibold text-foreground">{ticketMed > 0 ? fmt(ticketMed) : '—'}</span>
+                          </td>
                           <td colSpan={2} />
                         </tr>
                       </tfoot>
