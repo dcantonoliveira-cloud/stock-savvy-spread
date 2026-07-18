@@ -53,34 +53,32 @@ serve(async (req) => {
 
       await supabase.from('events').update({ zapsign_data: updatedZap }).eq('id', eventId);
 
-      // Notification
-      await supabase.from('smart_alerts').insert({
+      await supabase.from('app_notifications').insert({
         company_id: COMPANY_ID,
-        type: 'zapsign_signed',
-        severity: 'warning',
+        type: 'zapsign_assinatura',
         title: `${signer.name} assinou o contrato`,
-        description: eventName,
-        entity_type: 'event',
-        entity_id: eventId,
+        message: eventName,
+        actor_name: signer.name,
+        data: { link: `/events/${eventId}` },
+        read: false,
       });
     }
 
     if (eventType === 'doc_signed') {
-      // Mark all signers as signed
       const updatedSigners = (zapData.signers ?? []).map((s: any) => ({ ...s, status: 'signed' }));
       await supabase.from('events').update({
         zapsign_data: { ...zapData, signers: updatedSigners },
         contract_signed: true,
       }).eq('id', eventId);
 
-      await supabase.from('smart_alerts').insert({
+      await supabase.from('app_notifications').insert({
         company_id: COMPANY_ID,
-        type: 'zapsign_signed',
-        severity: 'info',
+        type: 'zapsign_assinatura',
         title: 'Contrato totalmente assinado',
-        description: eventName,
-        entity_type: 'event',
-        entity_id: eventId,
+        message: eventName,
+        actor_name: null,
+        data: { link: `/events/${eventId}` },
+        read: false,
       });
     }
 

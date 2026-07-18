@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Bell, FileText, CalendarDays, DollarSign, CheckCircle2, UtensilsCrossed, ChevronRight } from 'lucide-react';
+import { Bell, FileText, CalendarDays, DollarSign, CheckCircle2, UtensilsCrossed, ChevronRight, PenLine } from 'lucide-react';
 
 interface Notif {
   id: string;
@@ -19,7 +19,8 @@ const TYPE_CFG: Record<string, { icon: React.ReactNode; color: string; bg: strin
   nova_degustacao:   { icon: <CalendarDays className="w-3.5 h-3.5" />,    color: 'text-purple-600',  bg: 'bg-purple-100' },
   novo_pagamento:    { icon: <DollarSign className="w-3.5 h-3.5" />,      color: 'text-emerald-600', bg: 'bg-emerald-100' },
   evento_fechado:    { icon: <CheckCircle2 className="w-3.5 h-3.5" />,    color: 'text-green-600',   bg: 'bg-green-100' },
-  cardapio_alterado: { icon: <UtensilsCrossed className="w-3.5 h-3.5" />, color: 'text-orange-600',  bg: 'bg-orange-100' },
+  cardapio_alterado:  { icon: <UtensilsCrossed className="w-3.5 h-3.5" />, color: 'text-orange-600',  bg: 'bg-orange-100' },
+  zapsign_assinatura: { icon: <PenLine className="w-3.5 h-3.5" />,         color: 'text-violet-600',  bg: 'bg-violet-100' },
 };
 const DEFAULT_CFG = { icon: <Bell className="w-3.5 h-3.5" />, color: 'text-muted-foreground', bg: 'bg-muted' };
 
