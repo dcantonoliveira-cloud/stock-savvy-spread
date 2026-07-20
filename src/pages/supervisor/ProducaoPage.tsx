@@ -120,7 +120,8 @@ export default function SupervisorProducaoPage() {
 
   const deleteOrder = async (id: string) => {
     if (!confirm('Excluir este pedido?')) return;
-    await (supabase.from as any)('production_orders').delete().eq('id', id);
+    const { error } = await (supabase.from as any)('production_orders').delete().eq('id', id);
+    if (error) { toast.error('Erro ao excluir pedido'); return; }
     setOrders(prev => prev.filter(o => o.id !== id));
     toast.success('Pedido excluído');
   };
@@ -131,7 +132,7 @@ export default function SupervisorProducaoPage() {
 
   const filtered = orders
     .filter(o =>
-      (filter === 'all' ? o.status !== 'done' : o.status === filter) &&
+      (filter === 'all' || o.status === filter) &&
       (search === '' || o.title.toLowerCase().includes(search.toLowerCase()) || (o.event_name ?? '').toLowerCase().includes(search.toLowerCase()))
     )
     .sort((a, b) => {
@@ -143,8 +144,9 @@ export default function SupervisorProducaoPage() {
     });
 
   const overdue     = filtered.filter(o => o.delivery_date < today && o.status !== 'done');
-  const todayOrders = filtered.filter(o => o.delivery_date === today);
-  const future      = filtered.filter(o => o.delivery_date > today);
+  const todayOrders = filtered.filter(o => o.delivery_date === today && o.status !== 'done');
+  const future      = filtered.filter(o => o.delivery_date > today && o.status !== 'done');
+  const done        = filtered.filter(o => o.status === 'done');
 
   const pending    = filtered.filter(o => o.status === 'pending').length;
   const inProgress = filtered.filter(o => o.status === 'in_progress').length;
@@ -260,6 +262,7 @@ export default function SupervisorProducaoPage() {
                     {overdue.length > 0 && <><SectionHeader label="⚠ Atrasados" color="text-red-500" />{overdue.map(Row)}</>}
                     {todayOrders.length > 0 && <><SectionHeader label="Hoje" color="text-primary" />{todayOrders.map(Row)}</>}
                     {future.length > 0 && <><SectionHeader label="Próximos" color="text-muted-foreground" />{future.map(Row)}</>}
+                    {done.length > 0 && <><SectionHeader label="✓ Realizados" color="text-emerald-600" />{done.map(Row)}</>}
                   </>
                 );
               })()}
