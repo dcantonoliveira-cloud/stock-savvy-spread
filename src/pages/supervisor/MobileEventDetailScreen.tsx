@@ -2,10 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ArrowLeft, Phone, MapPin, Users, Clock, Calendar, Building2, Utensils,
-  FileText, ExternalLink, Download, Loader2,
+  FileText, ExternalLink, Download, Loader2, CheckCircle2, AlertCircle,
 } from 'lucide-react';
-import EventChecklistTab from '@/components/EventChecklistTab';
-import EventFinanceiroTab from '@/components/EventFinanceiroTab';
 import EventCronogramaTab from '@/components/EventCronogramaTab';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -87,17 +85,15 @@ interface EventDetail {
   contract_signed_url: string | null;
 }
 
-type MobileTab = 'ficha' | 'cliente' | 'cardapio' | 'checklist' | 'cronograma' | 'financeiro' | 'arquivos' | 'outros';
+type MobileTab = 'ficha' | 'cliente' | 'cardapio' | 'cronograma' | 'financeiro' | 'arquivos';
 
 const TABS: { id: MobileTab; label: string }[] = [
   { id: 'ficha',      label: 'Ficha' },
   { id: 'cliente',    label: 'Cliente' },
   { id: 'cardapio',   label: 'Cardápio' },
-  { id: 'checklist',  label: 'Checklist' },
   { id: 'cronograma', label: 'Cronograma' },
   { id: 'financeiro', label: 'Financeiro' },
   { id: 'arquivos',   label: 'Arquivos' },
-  { id: 'outros',     label: 'Outros' },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -272,7 +268,10 @@ function FichaTab({ ev, eventId }: { ev: EventDetail; eventId: string }) {
         <div>
           <SectionTitle>Observações</SectionTitle>
           <Box>
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{ev.notes}</p>
+            <div
+              className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none"
+              dangerouslySetInnerHTML={{ __html: ev.notes }}
+            />
           </Box>
         </div>
       )}
@@ -686,6 +685,192 @@ function OutrosTab({ ev, eventId }: { ev: EventDetail; eventId: string }) {
   );
 }
 
+// ─── Financeiro Tab ───────────────────────────────────────────────────────────
+
+interface Payment { id: string; payment_date: string | null; value: number; type: string; is_confirmed: boolean; notes: string | null; }
+interface Additional { id: string; description: string; value: number; }
+
+const PAYMENT_TYPE_LABEL: Record<string, string> = {
+  payment: 'Pagamento', tasting: 'Degustação', deposit: 'Entrada', other: 'Outro',
+};
+const PAYMENT_TYPE_CLS: Record<string, string> = {
+  payment: 'bg-emerald-100 text-emerald-700',
+  tasting: 'bg-purple-100 text-purple-700',
+  deposit: 'bg-blue-100 text-blue-700',
+  other:   'bg-gray-100 text-gray-600',
+};
+
+function FinanceiroTab({ ev, eventId }: { ev: EventDetail; eventId: string }) {
+  const [payments, setPayments]     = useState<Payment[]>([]);
+  const [additionals, setAdditionals] = useState<Additional[]>([]);
+  const [loading, setLoading]       = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      (supabase.from as any)('event_payments')
+        .select('id,payment_date,value,type,is_confirmed,notes')
+        .eq('event_id', eventId)
+        .order('payment_date', { ascending: true }),
+      (supabase.from as any)('event_additional_values')
+        .select('id,description,value')
+        .eq('event_id', eventId)
+        .order('sort_order'),
+    ]).then(([payRes, addRes]) => {
+      setPayments(payRes.data ?? []);
+      setAdditionals(addRes.data ?? []);
+      setLoading(false);
+    });
+  }, [eventId]);
+
+  const pricingMode = ev.pricing_mode ?? 'per_person';
+  const baseValue = pricingMode === 'fixed'
+    ? (ev.contract_value ?? 0)
+    : ((ev.guest_count ?? 0) * (ev.price_per_person ?? 0))
+      + ((ev.children_50_pct ?? 0) * (ev.price_per_person ?? 0) * 0.5)
+      + ((ev.professional_count ?? 0) * (ev.professional_meal_value ?? 0));
+
+  const addTotal   = additionals.reduce((s, a) => s + Number(a.value), 0);
+  const totalValue = baseValue + addTotal;
+  const confirmed  = payments.filter(p => p.is_confirmed);
+  const scheduled  = payments.filter(p => !p.is_confirmed);
+  const paidTotal  = confirmed.reduce((s, p) => s + Number(p.value), 0);
+  const balance    = totalValue - paidTotal;
+  const pctPaid    = totalValue > 0 ? Math.min((paidTotal / totalValue) * 100, 100) : 0;
+
+  const fmtDate = (d: string | null) => {
+    if (!d) return '—';
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
+  };
+
+  if (loading) return (
+    <div className="space-y-3">
+      {[1,2,3].map(i => <div key={i} className="h-16 bg-black/5 rounded-3xl animate-pulse" />)}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+
+      {/* Resumo */}
+      <div>
+        <SectionTitle>Resumo</SectionTitle>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-3xl p-4 shadow-sm">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Valor total</p>
+            <p className="text-lg font-black text-gray-900">{fmtMoney(totalValue)}</p>
+          </div>
+          <div className="bg-white rounded-3xl p-4 shadow-sm">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Valor pago</p>
+            <p className="text-lg font-black text-emerald-600">{fmtMoney(paidTotal)}</p>
+          </div>
+          <div className={`rounded-3xl p-4 shadow-sm ${balance > 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
+            <p className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${balance > 0 ? 'text-red-400' : 'text-emerald-500'}`}>Saldo</p>
+            <p className={`text-lg font-black ${balance > 0 ? 'text-red-600' : 'text-emerald-700'}`}>{fmtMoney(balance)}</p>
+          </div>
+          <div className="bg-white rounded-3xl p-4 shadow-sm flex flex-col justify-between">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">% Pago</p>
+            <p className="text-lg font-black text-gray-900">{pctPaid.toFixed(0)}%</p>
+            <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pctPaid}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modo de cobrança */}
+      <Box>
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Modo de cobrança</p>
+        <div className="flex items-center justify-between">
+          <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${pricingMode === 'per_person' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+            {pricingMode === 'per_person' ? 'Por convidado' : 'Valor fixo'}
+          </span>
+          <span className="text-sm font-semibold text-gray-700">
+            {pricingMode === 'per_person'
+              ? `${ev.guest_count ?? 0} conv × ${fmtMoney(ev.price_per_person)}`
+              : fmtMoney(ev.contract_value)}
+          </span>
+        </div>
+        {pricingMode === 'per_person' && (ev.children_50_pct ?? 0) > 0 && (
+          <p className="text-xs text-gray-400 mt-1">+ {ev.children_50_pct} crianças 50%</p>
+        )}
+        {pricingMode === 'per_person' && (ev.professional_count ?? 0) > 0 && (
+          <p className="text-xs text-gray-400">+ {ev.professional_count} profissionais</p>
+        )}
+      </Box>
+
+      {/* Adicionais */}
+      {additionals.length > 0 && (
+        <div>
+          <SectionTitle>Valores adicionais</SectionTitle>
+          <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
+            {additionals.map((a, idx) => (
+              <div key={a.id} className={`flex items-center justify-between px-5 py-3.5 ${idx < additionals.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <p className="text-sm text-gray-700 font-medium">{a.description}</p>
+                <p className="text-sm font-bold text-gray-900">{fmtMoney(a.value)}</p>
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-100">
+              <p className="text-[11px] font-black text-gray-400 uppercase tracking-wider">Total adicionais</p>
+              <p className="text-sm font-black text-gray-900">{fmtMoney(addTotal)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pagamentos confirmados */}
+      <div>
+        <SectionTitle>Recebimentos confirmados</SectionTitle>
+        {confirmed.length === 0 ? (
+          <Box>
+            <div className="flex items-center gap-3 py-2">
+              <AlertCircle className="w-4 h-4 text-gray-300" />
+              <p className="text-sm text-gray-400">Nenhum pagamento recebido</p>
+            </div>
+          </Box>
+        ) : (
+          <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
+            {confirmed.map((p, idx) => (
+              <div key={p.id} className={`flex items-center gap-3 px-5 py-3.5 ${idx < confirmed.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${PAYMENT_TYPE_CLS[p.type] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {PAYMENT_TYPE_LABEL[p.type] ?? p.type}
+                    </span>
+                    <span className="text-[11px] text-gray-400">{fmtDate(p.payment_date)}</span>
+                  </div>
+                  {p.notes && <p className="text-[11px] text-gray-400 mt-0.5 truncate">{p.notes}</p>}
+                </div>
+                <p className="text-sm font-bold text-emerald-600 shrink-0">{fmtMoney(p.value)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Agendados */}
+      {scheduled.length > 0 && (
+        <div>
+          <SectionTitle>Agendados</SectionTitle>
+          <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
+            {scheduled.map((p, idx) => (
+              <div key={p.id} className={`flex items-center gap-3 px-5 py-3.5 ${idx < scheduled.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className="w-4 h-4 rounded-full border-2 border-amber-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[11px] text-gray-400">{fmtDate(p.payment_date)}</span>
+                  {p.notes && <p className="text-[11px] text-gray-400 mt-0.5 truncate">{p.notes}</p>}
+                </div>
+                <p className="text-sm font-bold text-amber-600 shrink-0">{fmtMoney(p.value)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function MobileEventDetailScreen({ eventId, onBack }: { eventId: string; onBack: () => void }) {
@@ -724,7 +909,7 @@ export default function MobileEventDetailScreen({ eventId, onBack }: { eventId: 
 
   const isConfirmed = event ? ['confirmed', 'completed'].includes(event.status) : false;
   const visibleTabs = TABS.filter(t => {
-    if (!isConfirmed && ['cardapio','checklist','cronograma','financeiro'].includes(t.id)) return false;
+    if (!isConfirmed && ['cardapio','cronograma','financeiro'].includes(t.id)) return false;
     return true;
   });
 
@@ -746,66 +931,74 @@ export default function MobileEventDetailScreen({ eventId, onBack }: { eventId: 
       )}
 
       {/* ── Hero ── */}
-      <div className="bg-gradient-to-br from-[#172554] via-[#1E3A8A] to-[#1E3A8A] px-5 pt-hero pb-6 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#0e1f4a] via-[#152d6b] to-[#152d6b] px-5 pb-5 relative overflow-hidden" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
         <div className="absolute -top-8 -right-8 w-36 h-36 bg-white/5 rounded-full" />
         <div className="absolute top-8 right-6 w-2.5 h-2.5 bg-[#C4973A]/40 rounded-full" />
         <div className="absolute top-14 right-16 w-1.5 h-1.5 bg-[#C4973A]/25 rounded-full" />
 
-        <button
-          onClick={onBack}
-          className="w-9 h-9 rounded-2xl bg-white/15 flex items-center justify-center mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 text-white" />
-        </button>
-
         {loading ? (
           <div className="space-y-2">
             <div className="h-4 w-24 bg-white/20 rounded-xl animate-pulse" />
-            <div className="h-7 w-52 bg-white/20 rounded-xl animate-pulse" />
-            <div className="h-4 w-36 bg-white/10 rounded-xl animate-pulse" />
+            <div className="h-6 w-52 bg-white/20 rounded-xl animate-pulse" />
+            <div className="h-3 w-36 bg-white/10 rounded-xl animate-pulse" />
           </div>
         ) : event ? (
           <>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black border mb-2 ${STATUS_CLS[event.status] ?? 'bg-white/10 text-white border-white/20'}`}>
-              {STATUS_LABEL[event.status] ?? event.status}
-            </span>
-            <h1 className="text-2xl font-black text-white leading-tight">
+            <div className="flex items-center gap-3 mb-2">
+              <button
+                onClick={onBack}
+                className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4 text-white" />
+              </button>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black border ${STATUS_CLS[event.status] ?? 'bg-white/10 text-white border-white/20'}`}>
+                {STATUS_LABEL[event.status] ?? event.status}
+              </span>
+            </div>
+            <h1 className="text-xl font-black text-white leading-tight ml-1">
               {event.event_name ?? 'Sem nome'}
             </h1>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 ml-1">
               {event.event_date && (
-                <span className="flex items-center gap-1.5 text-[#D4AB52] text-sm font-medium">
-                  <Calendar className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1.5 text-[#D4AB52] text-xs font-medium">
+                  <Calendar className="w-3 h-3" />
                   {day} {mon}
                 </span>
               )}
               {event.location_text && (
-                <span className="flex items-center gap-1.5 text-[#D4AB52] text-sm font-medium">
-                  <MapPin className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1.5 text-[#D4AB52] text-xs font-medium">
+                  <MapPin className="w-3 h-3" />
                   {event.location_text}
                 </span>
               )}
               {event.guest_count != null && (
-                <span className="flex items-center gap-1.5 text-[#D4AB52] text-sm font-medium">
-                  <Users className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1.5 text-[#D4AB52] text-xs font-medium">
+                  <Users className="w-3 h-3" />
                   {event.guest_count} conv.
                 </span>
               )}
               {event.ceremony_time && (
-                <span className="flex items-center gap-1.5 text-[#D4AB52]/70 text-sm font-medium">
-                  <Clock className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1.5 text-[#D4AB52]/70 text-xs font-medium">
+                  <Clock className="w-3 h-3" />
                   {event.ceremony_time}
                 </span>
               )}
               {event.organizer && (
-                <span className="flex items-center gap-1.5 text-[#D4AB52]/70 text-sm font-medium">
-                  <Building2 className="w-3.5 h-3.5" />
+                <span className="flex items-center gap-1.5 text-[#D4AB52]/70 text-xs font-medium">
+                  <Building2 className="w-3 h-3" />
                   {event.organizer}
                 </span>
               )}
             </div>
           </>
-        ) : null}
+        ) : (
+          <button
+            onClick={onBack}
+            className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center"
+          >
+            <ArrowLeft className="w-4 h-4 text-white" />
+          </button>
+        )}
       </div>
 
       {/* ── Tab bar ── */}
@@ -850,7 +1043,6 @@ export default function MobileEventDetailScreen({ eventId, onBack }: { eventId: 
             {tab === 'ficha'      && <FichaTab ev={event} eventId={eventId} />}
             {tab === 'cliente'    && <ClienteTab ev={event} />}
             {tab === 'cardapio'   && <CardapioTab ev={event} eventId={eventId} />}
-            {tab === 'checklist'  && <EventChecklistTab eventId={eventId} />}
             {tab === 'cronograma' && (
               <EventCronogramaTab
                 eventId={eventId}
@@ -860,26 +1052,8 @@ export default function MobileEventDetailScreen({ eventId, onBack }: { eventId: 
                 onChangeText={() => {}}
               />
             )}
-            {tab === 'financeiro' && (
-              <EventFinanceiroTab
-                eventId={eventId}
-                event={{
-                  guest_count:             event.guest_count,
-                  children_50_pct:         event.children_50_pct,
-                  price_per_person:        event.price_per_person,
-                  professional_count:      event.professional_count,
-                  professional_meal_value: event.professional_meal_value,
-                  pricing_mode:            event.pricing_mode,
-                  contract_value:          event.contract_value,
-                }}
-                onUpdateEvent={() => {}}
-                clientPhone={event.clients?.phone}
-                clientName={event.clients?.name}
-                eventName={event.event_name}
-              />
-            )}
-            {tab === 'arquivos' && <ArquivosTab ev={event} eventId={eventId} />}
-            {tab === 'outros'   && <OutrosTab ev={event} eventId={eventId} />}
+            {tab === 'financeiro' && <FinanceiroTab ev={event} eventId={eventId} />}
+            {tab === 'arquivos'   && <ArquivosTab ev={event} eventId={eventId} />}
           </>
         )}
       </div>
