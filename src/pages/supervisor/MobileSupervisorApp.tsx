@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  Home, List, FileText, CalendarDays, Utensils, BarChart2,
+  Home, List, FileText, CalendarDays, Utensils,
   ChevronRight, ChevronLeft, LogOut, ArrowRight,
   MapPin, Users, Search, X, QrCode,
 } from 'lucide-react';
@@ -42,11 +42,11 @@ type LinkedEvent = {
   guest_count: number | null;
 };
 
-type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings' | 'stats';
+type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
-const RON_950 = '#172554';
-const RON_900 = '#1E3A8A';
+const RON_950 = '#0e1f4a';
+const RON_900 = '#152d6b';
 const RON_800 = '#1D4ED8';
 const GOLD_400 = '#C4973A';
 const GOLD_300 = '#D4AB52';
@@ -139,7 +139,6 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
     { id: 'quotes',   label: 'Orçam.',   Icon: FileText },
     { id: 'agenda',   label: 'Agenda',   Icon: CalendarDays },
     { id: 'tastings', label: 'Degust.',  Icon: Utensils },
-    { id: 'stats',    label: 'Stats',    Icon: BarChart2 },
   ];
 
   return (
@@ -167,13 +166,17 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 function Hero({ title, sub, actions }: { title: string; sub?: string; actions?: React.ReactNode }) {
   return (
-    <div className="relative overflow-hidden px-5 pt-hero pb-8"
-         style={{ background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 60%, ${RON_900} 100%)` }}>
-      <div className="absolute top-12 right-6 w-28 h-28 rounded-full opacity-[0.06]"
-           style={{ background: `radial-gradient(circle, white, transparent)` }} />
-      {actions && <div className="absolute top-safe right-4 pt-3">{actions}</div>}
-      <h1 className="text-4xl font-bold text-white tracking-tight">{title}</h1>
-      {sub && <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">{sub}</p>}
+    <div style={{
+      background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 100%)`,
+      paddingTop: 'env(safe-area-inset-top, 0px)',
+    }}>
+      <div className="relative overflow-hidden px-5 pt-8 pb-6">
+        <div className="absolute top-4 right-6 w-24 h-24 rounded-full opacity-[0.06]"
+             style={{ background: 'radial-gradient(circle, white, transparent)' }} />
+        {actions && <div className="absolute top-2 right-4">{actions}</div>}
+        <h1 className="text-3xl font-bold text-white tracking-tight">{title}</h1>
+        {sub && <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">{sub}</p>}
+      </div>
     </div>
   );
 }
@@ -200,19 +203,23 @@ function HomeScreen({ events, sessions, loading, setTab, onSelect }: {
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none pb-32">
       {/* Hero */}
-      <div className="relative overflow-hidden px-5 pt-12 pb-8"
-           style={{ background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 60%, ${RON_900} 100%)` }}>
-        <div className="absolute top-8 right-6 w-28 h-28 rounded-full opacity-[0.06]"
-             style={{ background: 'radial-gradient(circle, white, transparent)' }} />
-        <button onClick={signOut}
-          className="absolute top-4 right-4 p-2 text-white/30 hover:text-white/60 transition-colors">
-          <LogOut className="w-4 h-4" />
-        </button>
-        <h1 className="text-4xl font-bold text-white tracking-tight">Rondello</h1>
-        <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mt-0.5">Buffet</p>
+      <div style={{
+        background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 100%)`,
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+      }}>
+        <div className="relative overflow-hidden px-5 pt-8 pb-6">
+          <div className="absolute top-4 right-6 w-24 h-24 rounded-full opacity-[0.06]"
+               style={{ background: 'radial-gradient(circle, white, transparent)' }} />
+          <button onClick={signOut}
+            className="absolute top-3 right-4 p-2 text-white/30 hover:text-white/60 transition-colors">
+            <LogOut className="w-4 h-4" />
+          </button>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Rondello</h1>
+          <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mt-0.5">Buffet</p>
+        </div>
       </div>
 
-      <div className="px-4 -mt-5 space-y-4">
+      <div className="px-4 pt-4 space-y-4">
         {/* KPI cards */}
         <div className="grid grid-cols-3 gap-3">
           <button onClick={() => setTab('events')}
@@ -474,7 +481,7 @@ function QuotesScreen({ events, loading, onSelect }: {
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
       <Hero title="Orçamentos" sub={`${pipeline.length} em negociação`} />
-      <div className="px-4 -mt-4 pt-4 space-y-4">
+      <div className="px-4 pt-4 space-y-4">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -610,7 +617,7 @@ function AgendaScreen({ events, sessions, loading, onSelect }: {
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
       <Hero title={MONTH_FULL[month]} sub={`${Object.values(dayEvents).flat().length + Object.values(dayTastings).flat().length} items · ${year}`} />
-      <div className="px-4 -mt-4 pt-4 space-y-4">
+      <div className="px-4 pt-4 space-y-4">
         {/* Calendar */}
         <div className="bg-white rounded-3xl shadow-sm p-4">
           {/* Nav */}
@@ -741,7 +748,7 @@ function TastingsScreen({ sessions, loading, onTasting }: {
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
       <Hero title="Degustações" sub={`${upcoming.length} próximas · ${sessions.length} total`} />
-      <div className="px-4 -mt-4 pt-4 space-y-4">
+      <div className="px-4 pt-4 space-y-4">
         {/* Filter tabs */}
         <div className="flex gap-2 bg-white rounded-3xl shadow-sm p-1">
           {([['upcoming', 'Próximas'], ['past', 'Realizadas']] as [TastingFilter, string][]).map(([id, label]) => (
@@ -808,9 +815,12 @@ function TastingDetailScreen({ session, onBack, onSelect }: {
   return (
     <div className="min-h-screen bg-[#f2f2f2] flex flex-col">
       {/* Hero */}
-      <div className="relative overflow-hidden px-5 pt-12 pb-8"
-           style={{ background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 60%, ${RON_900} 100%)` }}>
-        <div className="absolute top-8 right-6 w-28 h-28 rounded-full opacity-[0.06]"
+      <div style={{
+        background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 100%)`,
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+      }}>
+      <div className="relative overflow-hidden px-5 pt-8 pb-6">
+        <div className="absolute top-4 right-6 w-24 h-24 rounded-full opacity-[0.06]"
              style={{ background: 'radial-gradient(circle, white, transparent)' }} />
         <button onClick={onBack} className="flex items-center gap-2 text-white/60 mb-4 hover:text-white transition-colors">
           <ChevronLeft className="w-5 h-5" />
@@ -823,9 +833,10 @@ function TastingDetailScreen({ session, onBack, onSelect }: {
           </p>
         )}
       </div>
+      </div>
 
       {/* Tabs */}
-      <div className="px-4 -mt-4 pt-4">
+      <div className="px-4 pt-4">
         <div className="flex gap-2 bg-white rounded-3xl shadow-sm p-1 mb-4">
           {([['eventos', 'Eventos'], ['qrcode', 'QR Code']] as [TastingDetailTab, string][]).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)}
@@ -918,7 +929,7 @@ function StatsScreen({ events, loading }: { events: Event[]; loading: boolean })
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
       <Hero title="Estatísticas" sub="Visão geral do negócio" />
-      <div className="px-4 -mt-4 pt-4 space-y-4">
+      <div className="px-4 pt-4 space-y-4">
         {/* KPI row */}
         <div className="grid grid-cols-2 gap-3">
           {[
@@ -1070,7 +1081,6 @@ export default function MobileSupervisorApp() {
           {tab === 'quotes'   && <QuotesScreen   events={events} loading={loading} onSelect={setSelectedEventId} />}
           {tab === 'agenda'   && <AgendaScreen   events={events} sessions={sessions} loading={loading} onSelect={setSelectedEventId} />}
           {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} onTasting={setSelectedTastingId} />}
-          {tab === 'stats'    && <StatsScreen    events={events} loading={loading} />}
           <BottomNav tab={tab} setTab={setTab} />
         </>
       )}
