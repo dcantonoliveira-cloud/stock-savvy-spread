@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
-import { Plus, X, ChevronsUpDown, Check, PackagePlus } from 'lucide-react';
+import { Plus, X, ChevronsUpDown, Check, PackagePlus, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib/units';
@@ -114,6 +114,71 @@ function QuickCreateItemDialog({ open, onClose, onCreated }: { open: boolean; on
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Image Uploader ────────────────────────────────────────────────────────────
+function ImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `sheets/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from('item-images').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('item-images').getPublicUrl(path);
+      onChange(publicUrl);
+    } catch {
+      toast.error('Erro ao fazer upload da imagem');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <label className="text-sm text-muted-foreground mb-1 block">Foto do Prato</label>
+      <div
+        className="relative border-2 border-dashed border-border rounded-xl overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+        style={{ height: value ? 160 : 80 }}
+        onClick={() => !uploading && inputRef.current?.click()}
+      >
+        {value ? (
+          <>
+            <img src={value} alt="preview" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+              <span className="text-white text-xs font-medium flex items-center gap-1.5">
+                <Upload className="w-3.5 h-3.5" /> Trocar foto
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onChange(''); }}
+              className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-full gap-2 text-muted-foreground">
+            {uploading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /><span className="text-xs">Enviando...</span></>
+              : <><Upload className="w-4 h-4" /><span className="text-xs">Clique para adicionar foto</span></>
+            }
+          </div>
+        )}
+        {uploading && value && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <Loader2 className="w-5 h-5 animate-spin text-white" />
+          </div>
+        )}
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+    </div>
   );
 }
 
@@ -305,10 +370,8 @@ export default function SheetFormModal({ open, onClose, onSaved, sheetId, initia
                 <Input value={description} onChange={e => setDesc(e.target.value)} placeholder="Breve descrição do prato" />
               </div>
 
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Foto do Prato (URL)</label>
-                <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://..." />
-              </div>
+              <ImageUploader value={imageUrl} onChange={setImageUrl} />
+
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

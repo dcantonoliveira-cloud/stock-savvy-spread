@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ArrowLeft, Pencil, Check, X, Plus, Loader2,
-  ChefHat, Clock, Users, ChevronsUpDown, PackagePlus, CalendarDays, SquarePen
+  ChefHat, Clock, Users, ChevronsUpDown, PackagePlus, CalendarDays, SquarePen, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,73 @@ import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib
 import { fmtNum, fmtCur } from '@/lib/format';
 
 const YIELD_UNITS = ['kg', 'g', 'L', 'ml', 'un', 'cx', 'pct', 'mç', 'vd', 'fatias', 'lt', 'fco', 'lata', 'garr', 'cumb', 'bj', 'pote', 'rolo', 'pés', 'forma'];
+
+function SheetImageSection({ imageUrl, editing, onChange }: { imageUrl: string | null; editing: boolean; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `sheets/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from('item-images').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('item-images').getPublicUrl(path);
+      onChange(publicUrl);
+    } catch {
+      toast.error('Erro ao fazer upload da imagem');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!editing) {
+    return imageUrl
+      ? <img src={imageUrl} alt="" className="w-full max-h-48 object-cover" />
+      : null;
+  }
+
+  return (
+    <div
+      className="relative cursor-pointer group"
+      style={{ height: imageUrl ? 160 : 80 }}
+      onClick={() => !uploading && inputRef.current?.click()}
+    >
+      {imageUrl ? (
+        <>
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <span className="text-white text-xs font-medium flex items-center gap-1.5">
+              <Upload className="w-3.5 h-3.5" /> Trocar foto
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onChange(''); }}
+            className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </>
+      ) : (
+        <div className="flex items-center justify-center h-full gap-2 text-muted-foreground border-b border-dashed border-border bg-muted/20">
+          {uploading
+            ? <><Loader2 className="w-4 h-4 animate-spin" /><span className="text-xs">Enviando...</span></>
+            : <><Upload className="w-4 h-4" /><span className="text-xs">Adicionar foto do prato</span></>
+          }
+        </div>
+      )}
+      {uploading && imageUrl && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-white" />
+        </div>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+    </div>
+  );
+}
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
 type TagItem = { id: string; name: string; color: string };
@@ -343,8 +410,12 @@ export default function SheetDetailPage() {
 
       {/* Header */}
       <div className="bg-white rounded-xl border border-border mb-6 shadow-sm overflow-hidden">
-        {sheet.image_url && !editing && (
-          <img src={sheet.image_url} alt={sheet.name} className="w-full max-h-48 object-cover rounded-xl" />
+        {(sheet.image_url || editing) && (
+          <SheetImageSection
+            imageUrl={editing ? editImageUrl : sheet.image_url}
+            editing={editing}
+            onChange={setEditImageUrl}
+          />
         )}
         <div className="p-6">
           <div className="flex items-start justify-between gap-4">
@@ -377,12 +448,6 @@ export default function SheetDetailPage() {
                 <Badge className="bg-primary/10 text-primary border-primary/20">Custo: {fmtCur(totalCost)}</Badge>
               </div>
               {sheet.description && <p className="text-sm text-muted-foreground mt-2">{sheet.description}</p>}
-              {editing && (
-                <div className="mt-3">
-                  <label className="text-xs text-muted-foreground mb-1 block">URL da Foto</label>
-                  <Input value={editImageUrl} onChange={e => setEditImageUrl(e.target.value)} placeholder="https://exemplo.com/foto.jpg" className="h-8 text-sm" />
-                </div>
-              )}
             </div>
             <div className="flex gap-2 flex-shrink-0">
               {!editing
