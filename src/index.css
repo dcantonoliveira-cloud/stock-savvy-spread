@@ -176,3 +176,10 @@
   }
   ::-webkit-scrollbar-thumb:hover { background: hsl(220 20% 70%); }
 }
+
+/* Mobile supervisor app utilities */
+.pt-hero  { padding-top: calc(env(safe-area-inset-top, 0px) + 4.5rem); }
+.pb-safe  { padding-bottom: env(safe-area-inset-bottom, 16px); }
+.pt-safe  { padding-top: env(safe-area-inset-top, 0px); }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
