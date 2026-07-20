@@ -52,7 +52,7 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
     const { data: roles } = await supabase
       .from('user_roles')
       .select('user_id')
-      .eq('role', 'employee');
+      .in('role', ['employee', 'supervisor']);
     const employeeIds = (roles ?? []).map((r: any) => r.user_id);
     if (employeeIds.length === 0) { setEmployees([]); return; }
     const { data } = await supabase
