@@ -118,7 +118,21 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
         const fileBytes = await job.file.arrayBuffer();
         const hash = await sha256Hex(fileBytes);
 
-        // Upsert payslip
+        // Verificar se já existe um holerite deste tipo para este funcionário/mês
+        const { data: existing } = await supabase
+          .from('payslips' as any)
+          .select('id, status, current_version')
+          .eq('company_id', companyId)
+          .eq('employee_id', job.employee.id)
+          .eq('reference_month', refMonth)
+          .eq('title', title)
+          .maybeSingle();
+
+        if ((existing as any)?.status === 'signed') {
+          throw new Error('Holerite já foi assinado — não pode ser substituído');
+        }
+
+        // Upsert payslip (conflict key inclui title para não conflitar com outros tipos no mesmo mês)
         const { data: ps, error: psErr } = await supabase
           .from('payslips' as any)
           .upsert({
@@ -130,7 +144,7 @@ export default function BulkPayslipUpload({ onClose, onDone }: Props) {
             current_version: 1,
             created_by: userId,
             published_at: new Date().toISOString(),
-          }, { onConflict: 'company_id,employee_id,reference_month', ignoreDuplicates: false })
+          }, { onConflict: 'company_id,employee_id,reference_month,title', ignoreDuplicates: false })
           .select('id, current_version, status')
           .single();
         if (psErr) throw psErr;
