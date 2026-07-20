@@ -1119,9 +1119,19 @@ export default function SupervisorSheetsPage() {
             <button
               onClick={async () => {
                 try {
-                  const res = await fetch(lightboxUrl);
-                  const blob = await res.blob();
-                  await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  await new Promise<void>((resolve, reject) => {
+                    img.onload = () => resolve();
+                    img.onerror = reject;
+                    img.src = lightboxUrl + '?t=' + Date.now();
+                  });
+                  const canvas = document.createElement('canvas');
+                  canvas.width = img.naturalWidth;
+                  canvas.height = img.naturalHeight;
+                  canvas.getContext('2d')!.drawImage(img, 0, 0);
+                  const blob = await new Promise<Blob>((res, rej) => canvas.toBlob(b => b ? res(b) : rej(), 'image/png'));
+                  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
                   toast.success('Foto copiada!');
                 } catch {
                   toast.error('Não foi possível copiar a imagem');
