@@ -349,11 +349,24 @@ function EventsScreen({ events, loading, onSelect }: {
     return monthCounts[m] ? m : months[0] ?? '';
   });
 
+  const monthScrollRef = useRef<HTMLDivElement>(null);
+  const monthBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
   useEffect(() => {
     const m = (new Date().getMonth() + 1).toString().padStart(2, '0');
     setMonth(monthCounts[m] ? m : Object.keys(monthCounts).sort()[0] ?? '');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
+
+  useEffect(() => {
+    const container = monthScrollRef.current;
+    const btn = monthBtnRefs.current[month];
+    if (!container || !btn) return;
+    const containerW = container.offsetWidth;
+    const btnLeft = btn.offsetLeft;
+    const btnW = btn.offsetWidth;
+    container.scrollTo({ left: btnLeft - containerW / 2 + btnW / 2, behavior: 'smooth' });
+  }, [month]);
 
   const filtered = yearEvents
     .filter(e => e.event_date?.slice(5, 7) === month)
@@ -366,7 +379,7 @@ function EventsScreen({ events, loading, onSelect }: {
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
       <Hero title={year} sub={`${yearEvents.length} eventos confirmados`} />
-      <div className="px-4 -mt-4 space-y-4 pt-4">
+      <div className="px-4 pt-4 space-y-4">
         {/* Year nav */}
         <div className="flex items-center justify-between bg-white rounded-3xl shadow-sm px-4 py-3">
           <button onClick={() => setYear(y => String(Number(y) - 1))}
@@ -382,17 +395,19 @@ function EventsScreen({ events, loading, onSelect }: {
 
         {/* Month pills with count dots */}
         {months.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 -mx-4 px-4">
+          <div ref={monthScrollRef} className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-4 px-4">
             {months.map(m => {
               const active = month === m;
               return (
-                <button key={m} onClick={() => setMonth(m)}
-                  className="flex-shrink-0 flex flex-col items-center px-3.5 py-2.5 rounded-2xl text-sm font-bold transition-all shadow-sm"
+                <button key={m}
+                  ref={el => { monthBtnRefs.current[m] = el; }}
+                  onClick={() => setMonth(m)}
+                  className="flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-2xl font-bold transition-all shadow-sm"
                   style={active
-                    ? { background: RON_950, color: 'white' }
-                    : { background: 'white', color: '#9ca3af' }}>
+                    ? { background: RON_950, color: 'white', minWidth: '64px' }
+                    : { background: 'white', color: '#9ca3af', minWidth: '64px' }}>
                   <span className="text-[10px] uppercase tracking-wide">{MONTH_SHORT[Number(m) - 1]}</span>
-                  <span className="text-lg leading-tight">{monthCounts[m]}</span>
+                  <span className="text-xl leading-tight">{monthCounts[m]}</span>
                   {active && (
                     <span className="w-1 h-1 rounded-full bg-white/60 mt-0.5" />
                   )}
