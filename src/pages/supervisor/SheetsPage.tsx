@@ -1091,28 +1091,26 @@ export default function SupervisorSheetsPage() {
       {/* Lightbox */}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80"
           onClick={() => setLightboxUrl(null)}
         >
-          <img
-            src={lightboxUrl}
-            alt=""
-            className="max-w-full max-h-[80vh] rounded-xl shadow-2xl object-contain"
-            onClick={e => e.stopPropagation()}
-          />
-          {/* Fechar */}
           <button
             onClick={() => setLightboxUrl(null)}
             className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
-          {/* Ações */}
-          <div className="absolute bottom-6 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-w-[90vw] max-h-[80vh] rounded-xl shadow-2xl object-contain"
+            onClick={e => e.stopPropagation()}
+          />
+          <div className="flex items-center gap-2 mt-4" onClick={e => e.stopPropagation()}>
             <a
               href={lightboxUrl}
               download
-              className="flex items-center gap-1.5 px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-lg transition-colors backdrop-blur-sm"
+              className="flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-lg transition-colors backdrop-blur-sm"
             >
               <Download className="w-3.5 h-3.5" /> Download
             </a>
@@ -1127,7 +1125,7 @@ export default function SupervisorSheetsPage() {
                   toast.error('Não foi possível copiar a imagem');
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-lg transition-colors backdrop-blur-sm"
+              className="flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-lg transition-colors backdrop-blur-sm"
             >
               <Copy className="w-3.5 h-3.5" /> Copiar
             </button>
