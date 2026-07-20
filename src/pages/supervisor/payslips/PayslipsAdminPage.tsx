@@ -436,7 +436,9 @@ export default function PayslipsAdminPage() {
             <tr className="border-b border-border bg-muted/30 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
               <th className="text-left px-5 py-3">Funcionário</th>
               <th className="text-left px-4 py-3">Competência</th>
+              <th className="text-left px-4 py-3">Tipo</th>
               <th className="text-left px-4 py-3">Status</th>
+              <th className="text-left px-4 py-3">Data envio</th>
               <th className="text-left px-4 py-3">Data assinatura</th>
               <th className="text-right px-5 py-3">Ações</th>
             </tr>
@@ -445,7 +447,7 @@ export default function PayslipsAdminPage() {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {[30, 25, 15, 20, 10].map((w, j) => (
+                  {[30, 15, 12, 12, 15, 15, 10].map((w, j) => (
                     <td key={j} className="px-5 py-3">
                       <div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${w}%` }} />
                     </td>
@@ -454,7 +456,7 @@ export default function PayslipsAdminPage() {
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-muted-foreground text-sm">
+                <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground text-sm">
                   <FileText className="w-8 h-8 mx-auto mb-2 opacity-20" />
                   Nenhum holerite encontrado.
                 </td>
@@ -462,6 +464,8 @@ export default function PayslipsAdminPage() {
             ) : filtered.map(p => {
               const sig = p.electronic_signatures?.[0];
               const status = STATUS_MAP[p.status as keyof typeof STATUS_MAP] ?? { label: p.status, cls: 'bg-muted text-muted-foreground' };
+              const TIPO_LABELS = ['Pagamento','Adiantamento','Férias','13º Salário','Rescisão','Outros'];
+              const tipoFromTitle = TIPO_LABELS.find(t => p.title.startsWith(t)) ?? 'Pagamento';
               return (
                 <tr key={p.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-5 py-3">
@@ -474,10 +478,18 @@ export default function PayslipsAdminPage() {
                       return `${MONTHS[parseInt(mo) - 1]}/${y}`;
                     })()}
                   </td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
+                    {tipoFromTitle}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${status.cls}`}>
                       {status.label}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
+                    {p.published_at
+                      ? format(new Date(p.published_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                      : <span className="opacity-40">—</span>}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">
                     {sig
