@@ -509,7 +509,7 @@ async function ensureRootFolder(token: string, cachedId: string | null): Promise
       if (!d.trashed) return cachedId
     }
   }
-  return await createFolder(token, 'Backups - Stock Savvy', 'root')
+  return await createFolder(token, 'Backups - Rondello Buffet', 'root')
 }
 
 async function createFolder(token: string, name: string, parentId: string): Promise<string> {
@@ -556,9 +556,7 @@ async function cleanOldBackups(token: string, parentId: string, keepId: string):
 }
 
 // ─── E-mail (Resend) ─────────────────────────────────────────────────────────
-// TODO: trocar para um domínio próprio do Stock Savvy quando disponível.
-// Por ora usa o domínio já verificado no Resend (rondellobuffet.com.br).
-const FROM_ADDRESS = 'Stock Savvy <backup@rondellobuffet.com.br>'
+const FROM_ADDRESS = 'Rondello Buffet - Gestão <backup@rondellobuffet.com.br>'
 
 function reportHtml(s: {
   okCount: number; total: number; totalRows: number; report: { table: string; rows: number; ok: boolean }[]; stamp: string
@@ -575,7 +573,7 @@ function reportHtml(s: {
   return `<!DOCTYPE html><html lang="pt-BR"><body style="margin:0;background:#f8fafc;font-family:-apple-system,Segoe UI,sans-serif;">
     <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
       <div style="background:#0f766e;padding:28px 40px;">
-        <p style="margin:0;color:#ccfbf1;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Stock Savvy · Backup automático</p>
+        <p style="margin:0;color:#ccfbf1;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Rondello Buffet - Gestão · Backup automático</p>
         <h1 style="margin:6px 0 0;color:#fff;font-size:20px;font-weight:700;">Backup concluído ${failed.length ? '(com avisos)' : ''}</h1>
       </div>
       <div style="padding:28px 40px;">
@@ -594,7 +592,7 @@ function reportHtml(s: {
         ${failed.length ? `<p style="margin:16px 0 0;color:#b45309;font-size:12px;">⚠️ Tabelas com aviso: ${failed.map(f => f.table).join(', ')}</p>` : ''}
       </div>
       <div style="padding:16px 40px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-        <p style="margin:0;color:#94a3b8;font-size:11px;">© Stock Savvy</p>
+        <p style="margin:0;color:#94a3b8;font-size:11px;">© Rondello Buffet</p>
       </div>
     </div></body></html>`
 }
