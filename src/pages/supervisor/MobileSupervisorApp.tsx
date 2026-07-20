@@ -4,7 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   Home, List, FileText, CalendarDays, Utensils,
   ChevronRight, ChevronLeft, LogOut, ArrowRight,
-  MapPin, Users, Search, X,
+  MapPin, Users, Search, X, Phone, Mail, DollarSign,
+  Clock, Tag, CheckCircle2, Circle, AlertCircle,
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
@@ -151,8 +152,8 @@ function DarkDateBadge({ date }: { date: string }) {
 }
 
 // ─── Home Screen ─────────────────────────────────────────────────────────────
-function HomeScreen({ events, sessions, loading, setTab }: {
-  events: Event[]; sessions: SessionExtra[]; loading: boolean; setTab: (t: Tab) => void;
+function HomeScreen({ events, sessions, loading, setTab, onSelect }: {
+  events: Event[]; sessions: SessionExtra[]; loading: boolean; setTab: (t: Tab) => void; onSelect: (id: string) => void;
 }) {
   const { signOut } = useAuth();
   const now = new Date();
@@ -209,7 +210,7 @@ function HomeScreen({ events, sessions, loading, setTab }: {
 
         {/* Next event */}
         {nextEvent && (
-          <div className="rounded-2xl p-5 relative overflow-hidden"
+          <button onClick={() => onSelect(nextEvent.id)} className="rounded-2xl p-5 relative overflow-hidden w-full text-left active:opacity-80"
                style={{ background: 'hsl(222 35% 18%)' }}>
             <div className="absolute inset-0 opacity-5"
                  style={{ background: 'radial-gradient(circle at 80% 50%, hsl(222 60% 60%), transparent 60%)' }} />
@@ -238,7 +239,7 @@ function HomeScreen({ events, sessions, loading, setTab }: {
                 </div>
               </div>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Upcoming list */}
@@ -258,7 +259,7 @@ function HomeScreen({ events, sessions, loading, setTab }: {
           ) : (
             <div className="space-y-3">
               {upcoming.slice(0, 6).map(ev => (
-                <div key={ev.id} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-4">
+                <button key={ev.id} onClick={() => onSelect(ev.id)} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-4 w-full text-left active:opacity-80">
                   {ev.event_date && <DarkDateBadge date={ev.event_date} />}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-foreground truncate">{ev.event_name ?? 'Sem nome'}</p>
@@ -267,7 +268,7 @@ function HomeScreen({ events, sessions, loading, setTab }: {
                     )}
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -278,7 +279,7 @@ function HomeScreen({ events, sessions, loading, setTab }: {
 }
 
 // ─── Events Screen ────────────────────────────────────────────────────────────
-function EventsScreen({ events, loading }: { events: Event[]; loading: boolean }) {
+function EventsScreen({ events, loading, onSelect }: { events: Event[]; loading: boolean; onSelect: (id: string) => void }) {
   const confirmed = events.filter(e => CONFIRMED.includes(e.status));
 
   // Year navigation
@@ -363,7 +364,7 @@ function EventsScreen({ events, loading }: { events: Event[]; loading: boolean }
                   </p>
                 </div>
                 <div className="space-y-3">
-                  {upcoming.map(ev => <EventCard key={ev.id} ev={ev} />)}
+                  {upcoming.map(ev => <EventCard key={ev.id} ev={ev} onSelect={onSelect} />)}
                 </div>
               </div>
             )}
@@ -371,7 +372,7 @@ function EventsScreen({ events, loading }: { events: Event[]; loading: boolean }
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Realizados</p>
                 <div className="space-y-3 opacity-50">
-                  {past.reverse().map(ev => <EventCard key={ev.id} ev={ev} />)}
+                  {past.reverse().map(ev => <EventCard key={ev.id} ev={ev} onSelect={onSelect} />)}
                 </div>
               </div>
             )}
@@ -385,9 +386,9 @@ function EventsScreen({ events, loading }: { events: Event[]; loading: boolean }
   );
 }
 
-function EventCard({ ev }: { ev: Event }) {
+function EventCard({ ev, onSelect }: { ev: Event; onSelect: (id: string) => void }) {
   return (
-    <div className="bg-white rounded-2xl border border-border p-4 flex items-center gap-4">
+    <button onClick={() => onSelect(ev.id)} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-4 w-full text-left active:opacity-80">
       {ev.event_date && <DateBadge date={ev.event_date} />}
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground truncate">{ev.event_name ?? 'Sem nome'}</p>
@@ -405,7 +406,7 @@ function EventCard({ ev }: { ev: Event }) {
         </div>
       </div>
       <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-    </div>
+    </button>
   );
 }
 
@@ -419,7 +420,7 @@ const QUOTE_FILTERS = [
   { key: 'lost',             label: 'Cancelado' },
 ];
 
-function QuotesScreen({ events, loading }: { events: Event[]; loading: boolean }) {
+function QuotesScreen({ events, loading, onSelect }: { events: Event[]; loading: boolean; onSelect: (id: string) => void }) {
   const quotes = events.filter(e => ALL_OPEN.includes(e.status));
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -474,7 +475,7 @@ function QuotesScreen({ events, loading }: { events: Event[]; loading: boolean }
         ) : (
           <div className="space-y-3">
             {filtered.map(ev => (
-              <div key={ev.id} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-3">
+              <button key={ev.id} onClick={() => onSelect(ev.id)} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-3 w-full text-left active:opacity-80">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-semibold text-foreground flex-1 truncate">{ev.event_name ?? 'Sem nome'}</p>
@@ -496,7 +497,7 @@ function QuotesScreen({ events, loading }: { events: Event[]; loading: boolean }
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -506,7 +507,7 @@ function QuotesScreen({ events, loading }: { events: Event[]; loading: boolean }
 }
 
 // ─── Agenda Screen ────────────────────────────────────────────────────────────
-function AgendaScreen({ events, sessions, loading }: { events: Event[]; sessions: SessionExtra[]; loading: boolean }) {
+function AgendaScreen({ events, sessions, loading, onSelect }: { events: Event[]; sessions: SessionExtra[]; loading: boolean; onSelect: (id: string) => void }) {
   const now = new Date();
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth()); // 0-indexed
@@ -637,7 +638,7 @@ function AgendaScreen({ events, sessions, loading }: { events: Event[]; sessions
             ) : (
               <div className="space-y-3">
                 {selAll.map(ev => (
-                  <div key={ev.id} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-3">
+                  <button key={ev.id} onClick={() => onSelect(ev.id)} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-3 w-full text-left active:opacity-80">
                     <div className="w-3 h-3 rounded-full flex-shrink-0"
                          style={{ background: CONFIRMED.includes(ev.status) ? 'hsl(222 35% 18%)' : 'hsl(38 75% 52%)' }} />
                     <div className="flex-1 min-w-0">
@@ -649,7 +650,7 @@ function AgendaScreen({ events, sessions, loading }: { events: Event[]; sessions
                     <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_CLS[ev.status] ?? ''}`}>
                       {STATUS_LABEL[ev.status] ?? ev.status}
                     </span>
-                  </div>
+                  </button>
                 ))}
                 {selTastings.map(s => (
                   <div key={s.id} className="bg-white rounded-2xl border border-purple-200 p-4 flex items-center gap-3">
@@ -750,12 +751,335 @@ function TastingsScreen({ sessions, loading }: { sessions: SessionExtra[]; loadi
   );
 }
 
+
+// ─── Mobile Event Detail Screen ───────────────────────────────────────────────
+type FullEvent = {
+  id: string;
+  event_name: string | null;
+  event_date: string | null;
+  guest_count: number | null;
+  status: string;
+  location_text: string | null;
+  ceremony_time: string | null;
+  duration: number | null;
+  event_type: string | null;
+  price_per_pax: number | null;
+  contract_value: number | null;
+  pricing_mode: string | null;
+  children_count: number | null;
+  children_discount: number | null;
+  non_paying_guests: number | null;
+  additional_hours: number | null;
+  additional_hour_value: number | null;
+  observations: string | null;
+  client_id: string | null;
+  clients: {
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+    cpf: string | null;
+    address: string | null;
+  } | null;
+};
+
+type Payment = {
+  payment_date: string | null;
+  value: number;
+  notes: string | null;
+  is_confirmed: boolean;
+};
+
+function fmtMoney(v: number | null | undefined) {
+  if (v == null) return '—';
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function fmtPhone(p: string | null) {
+  if (!p) return null;
+  return p.replace(/\D/g, '').replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+}
+
+function MobileEventDetailScreen({ eventId, onBack }: { eventId: string; onBack: () => void }) {
+  const [event, setEvent]     = useState<FullEvent | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      supabase.from('events')
+        .select('id,event_name,event_date,guest_count,status,location_text,ceremony_time,duration,event_type,price_per_pax,contract_value,pricing_mode,children_count,children_discount,non_paying_guests,additional_hours,additional_hour_value,observations,client_id,clients(name,phone,email,cpf,address)')
+        .eq('id', eventId).single(),
+      (supabase.from as any)('event_payments')
+        .select('payment_date,value,notes,is_confirmed')
+        .eq('event_id', eventId).order('payment_date'),
+    ]).then(([evRes, payRes]) => {
+      if (evRes.data) setEvent(evRes.data as any);
+      if (payRes.data) setPayments(payRes.data as Payment[]);
+      setLoading(false);
+    });
+  }, [eventId]);
+
+  if (loading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+
+  if (!event) return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
+      <p className="text-muted-foreground">Evento não encontrado</p>
+      <button onClick={onBack} className="text-primary font-semibold">Voltar</button>
+    </div>
+  );
+
+  const isConfirmed = CONFIRMED.includes(event.status);
+  const payingGuests = (event.guest_count ?? 0) - (event.non_paying_guests ?? 0) - (event.children_count ?? 0);
+  const baseValue = event.pricing_mode === 'per_pax'
+    ? (event.price_per_pax ?? 0) * Math.max(payingGuests, 0) + (event.price_per_pax ?? 0) * (event.children_count ?? 0) * (1 - (event.children_discount ?? 0) / 100)
+    : (event.contract_value ?? 0);
+  const addHoursValue = (event.additional_hours ?? 0) * (event.additional_hour_value ?? 0);
+  const totalValue = baseValue + addHoursValue;
+  const confirmedTotal = payments.filter(p => p.is_confirmed).reduce((s, p) => s + p.value, 0);
+  const pendingTotal   = payments.filter(p => !p.is_confirmed).reduce((s, p) => s + p.value, 0);
+  const remaining      = totalValue - confirmedTotal - pendingTotal;
+
+  const whatsappUrl = event.clients?.phone
+    ? `https://wa.me/55${event.clients.phone.replace(/\D/g, '')}`
+    : null;
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <div className="sticky top-0 z-10"
+           style={{ background: 'linear-gradient(135deg, hsl(222 45% 13%) 0%, hsl(222 35% 22%) 100%)' }}>
+        <div className="flex items-center gap-3 px-4 pt-12 pb-4">
+          <button onClick={onBack}
+            className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 active:bg-white/20">
+            <ChevronLeft className="w-5 h-5 text-white" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-white/40 uppercase tracking-widest">
+              {isConfirmed ? 'Evento' : 'Orçamento'}
+            </p>
+            <h1 className="text-lg font-bold text-white leading-tight truncate">
+              {event.event_name ?? 'Sem nome'}
+            </h1>
+          </div>
+          <span className={`flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${STATUS_CLS[event.status] ?? 'bg-muted text-muted-foreground'}`}>
+            {STATUS_LABEL[event.status] ?? event.status}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto pb-8 px-4 space-y-4 mt-4">
+
+        {/* Info card */}
+        <div className="bg-white rounded-2xl border border-border p-4 space-y-3">
+          {event.event_date && (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-muted/50 flex items-center justify-center flex-shrink-0">
+                <CalendarDays className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Data</p>
+                <p className="text-sm font-semibold text-foreground">{fmtFull(event.event_date)}</p>
+              </div>
+            </div>
+          )}
+          {event.ceremony_time && (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-muted/50 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Horário da cerimônia</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {event.ceremony_time}{event.duration ? ` · ${event.duration}h de duração` : ''}
+                </p>
+              </div>
+            </div>
+          )}
+          {event.location_text && (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-muted/50 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Local</p>
+                <p className="text-sm font-semibold text-foreground">{event.location_text}</p>
+              </div>
+            </div>
+          )}
+          {event.guest_count != null && (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-muted/50 flex items-center justify-center flex-shrink-0">
+                <Users className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Convidados</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {event.guest_count} total
+                  {(event.non_paying_guests ?? 0) > 0 && ` · ${event.non_paying_guests} cortesia`}
+                  {(event.children_count ?? 0) > 0 && ` · ${event.children_count} crianças`}
+                </p>
+              </div>
+            </div>
+          )}
+          {event.event_type && (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-muted/50 flex items-center justify-center flex-shrink-0">
+                <Tag className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Tipo</p>
+                <p className="text-sm font-semibold text-foreground">{event.event_type}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Client card */}
+        {event.clients && (
+          <div className="bg-white rounded-2xl border border-border p-4 space-y-3">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Cliente</p>
+            <p className="font-semibold text-foreground text-base">{event.clients.name ?? '—'}</p>
+            {event.clients.phone && (
+              <a href={whatsappUrl ?? `tel:${event.clients.phone}`}
+                 className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 active:opacity-80">
+                <Phone className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs text-emerald-600 font-semibold">WhatsApp / Telefone</p>
+                  <p className="text-sm font-bold text-emerald-700">{fmtPhone(event.clients.phone)}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-emerald-500" />
+              </a>
+            )}
+            {event.clients.email && (
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <p className="text-sm text-foreground">{event.clients.email}</p>
+              </div>
+            )}
+            {event.clients.cpf && (
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <p className="text-sm text-foreground">CPF: {event.clients.cpf}</p>
+              </div>
+            )}
+            {event.clients.address && (
+              <div className="flex items-center gap-3">
+                <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <p className="text-sm text-foreground">{event.clients.address}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pricing card */}
+        {(event.price_per_pax || event.contract_value) && (
+          <div className="bg-white rounded-2xl border border-border p-4 space-y-3">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Valores</p>
+            {event.pricing_mode === 'per_pax' ? (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Valor por pessoa</span>
+                  <span className="font-semibold">{fmtMoney(event.price_per_pax)}</span>
+                </div>
+                {(event.children_count ?? 0) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {event.children_count} crianças ({event.children_discount ?? 0}% desc.)
+                    </span>
+                    <span className="font-semibold text-amber-600">
+                      {fmtMoney((event.price_per_pax ?? 0) * (event.children_count ?? 0) * (1 - (event.children_discount ?? 0) / 100))}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Valor fixo</span>
+                <span className="font-semibold">{fmtMoney(event.contract_value)}</span>
+              </div>
+            )}
+            {(event.additional_hours ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{event.additional_hours}h adicional</span>
+                <span className="font-semibold text-amber-600">{fmtMoney(addHoursValue)}</span>
+              </div>
+            )}
+            <div className="border-t border-border pt-2 flex justify-between">
+              <span className="font-bold text-foreground">Total</span>
+              <span className="font-bold text-foreground text-base">{fmtMoney(totalValue)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Financial summary */}
+        {payments.length > 0 && (
+          <div className="bg-white rounded-2xl border border-border p-4 space-y-3">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Financeiro</p>
+            <div className="space-y-2">
+              {payments.map((p, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  {p.is_confirmed
+                    ? <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    : <Circle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{fmtMoney(p.value)}</p>
+                    {p.payment_date && (
+                      <p className="text-xs text-muted-foreground">{fmtFull(p.payment_date)}{p.notes ? ` · ${p.notes}` : ''}</p>
+                    )}
+                  </div>
+                  {!p.is_confirmed && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">Pendente</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-border pt-3 space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Recebido</span>
+                <span className="font-semibold text-emerald-600">{fmtMoney(confirmedTotal)}</span>
+              </div>
+              {pendingTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Pendente</span>
+                  <span className="font-semibold text-amber-600">{fmtMoney(pendingTotal)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-bold">
+                <span className={remaining > 0 ? 'text-red-600' : 'text-foreground'}>
+                  {remaining > 0 ? 'Saldo devedor' : 'Saldo'}
+                </span>
+                <span className={remaining > 0 ? 'text-red-600' : 'text-emerald-600'}>{fmtMoney(remaining)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Observations */}
+        {event.observations && (
+          <div className="bg-white rounded-2xl border border-border p-4 space-y-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Observações</p>
+            <p className="text-sm text-foreground whitespace-pre-wrap">{event.observations}</p>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default function MobileSupervisorApp() {
-  const [tab, setTab]         = useState<Tab>('home');
-  const [events, setEvents]   = useState<Event[]>([]);
-  const [sessions, setSessions] = useState<SessionExtra[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tab, setTab]             = useState<Tab>('home');
+  const [events, setEvents]       = useState<Event[]>([]);
+  const [sessions, setSessions]   = useState<SessionExtra[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -794,14 +1118,22 @@ export default function MobileSupervisorApp() {
     })();
   }, []);
 
+  const handleSelect = (id: string) => setSelectedEventId(id);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {tab === 'home'     && <HomeScreen     events={events} sessions={sessions} loading={loading} setTab={setTab} />}
-      {tab === 'events'   && <EventsScreen   events={events} loading={loading} />}
-      {tab === 'quotes'   && <QuotesScreen   events={events} loading={loading} />}
-      {tab === 'agenda'   && <AgendaScreen   events={events} sessions={sessions} loading={loading} />}
-      {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} />}
-      <BottomNav tab={tab} setTab={setTab} />
+      {selectedEventId ? (
+        <MobileEventDetailScreen eventId={selectedEventId} onBack={() => setSelectedEventId(null)} />
+      ) : (
+        <>
+          {tab === 'home'     && <HomeScreen     events={events} sessions={sessions} loading={loading} setTab={setTab} onSelect={handleSelect} />}
+          {tab === 'events'   && <EventsScreen   events={events} loading={loading} onSelect={handleSelect} />}
+          {tab === 'quotes'   && <QuotesScreen   events={events} loading={loading} onSelect={handleSelect} />}
+          {tab === 'agenda'   && <AgendaScreen   events={events} sessions={sessions} loading={loading} onSelect={handleSelect} />}
+          {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} />}
+          <BottomNav tab={tab} setTab={setTab} />
+        </>
+      )}
     </div>
   );
 }
