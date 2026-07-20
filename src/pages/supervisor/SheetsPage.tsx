@@ -1109,13 +1109,25 @@ export default function SupervisorSheetsPage() {
             onClick={e => e.stopPropagation()}
           />
           <div className="flex items-center gap-2 mt-4" onClick={e => e.stopPropagation()}>
-            <a
-              href={lightboxUrl}
-              download
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(lightboxUrl);
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = lightboxUrl.split('/').pop()?.split('?')[0] ?? 'foto.jpg';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  toast.error('Não foi possível baixar a imagem');
+                }
+              }}
               className="flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-lg transition-colors backdrop-blur-sm"
             >
               <Download className="w-3.5 h-3.5" /> Download
-            </a>
+            </button>
             <button
               onClick={async () => {
                 try {
