@@ -3,12 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  Home, List, FileText, CalendarDays, Utensils,
+  Home, List, FileText, CalendarDays, Utensils, BookOpen,
   ChevronRight, ChevronLeft, LogOut, ArrowRight,
   MapPin, Users, Search, X, QrCode,
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import MobileEventDetailScreen from './MobileEventDetailScreen';
+import MobileSheetsScreen from './MobileSheetsScreen';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Event = {
@@ -42,7 +43,7 @@ type LinkedEvent = {
   guest_count: number | null;
 };
 
-type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings';
+type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings' | 'sheets';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const RON_950 = '#0e1f4a';
@@ -139,6 +140,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
     { id: 'quotes',   label: 'Orçam.',   Icon: FileText },
     { id: 'agenda',   label: 'Agenda',   Icon: CalendarDays },
     { id: 'tastings', label: 'Degust.',  Icon: Utensils },
+    { id: 'sheets',   label: 'Fichas',   Icon: BookOpen },
   ];
 
   return (
@@ -1096,6 +1098,7 @@ export default function MobileSupervisorApp() {
           {tab === 'quotes'   && <QuotesScreen   events={events} loading={loading} onSelect={setSelectedEventId} />}
           {tab === 'agenda'   && <AgendaScreen   events={events} sessions={sessions} loading={loading} onSelect={setSelectedEventId} />}
           {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} onTasting={setSelectedTastingId} />}
+          {tab === 'sheets'   && <MobileSheetsScreen />}
           <BottomNav tab={tab} setTab={setTab} />
         </>
       )}
