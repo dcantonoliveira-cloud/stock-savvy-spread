@@ -216,6 +216,7 @@ export default function SupervisorSheetsPage() {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [viewingSheet, setViewingSheet] = useState<Sheet | null>(null);
   const [editingSheet, setEditingSheet] = useState<Sheet | null>(null);
   const [filterCategory, setFilterCategory] = useState('all');
@@ -1087,6 +1088,27 @@ export default function SupervisorSheetsPage() {
         </div>
       )}
 
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Sheet list */}
       <div className="rounded-xl border border-border overflow-hidden bg-white shadow-sm">
         <table className="w-full text-sm">
@@ -1111,7 +1133,12 @@ export default function SupervisorSheetsPage() {
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2">
                     {sheet.image_url && (
-                      <img src={sheet.image_url} alt={sheet.name} className="w-10 h-10 rounded-md object-cover flex-shrink-0 border border-border" />
+                      <img
+                        src={sheet.image_url}
+                        alt={sheet.name}
+                        className="w-10 h-10 rounded-md object-cover flex-shrink-0 border border-border cursor-zoom-in hover:opacity-80 transition-opacity"
+                        onClick={e => { e.stopPropagation(); setLightboxUrl(sheet.image_url); }}
+                      />
                     )}
                     <div className="min-w-0">
                       {editingCell?.id === sheet.id && editingCell.field === 'name' ? (
