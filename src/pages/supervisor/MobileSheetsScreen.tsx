@@ -172,7 +172,7 @@ function PhotoViewer({
           <span className="text-[11px] text-white/70 font-medium">{uploading ? 'Enviando…' : 'Trocar foto'}</span>
         </button>
 
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpload} />
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
       </div>
     </div>
   );
