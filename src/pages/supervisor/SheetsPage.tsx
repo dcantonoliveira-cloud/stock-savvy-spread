@@ -1097,15 +1097,41 @@ export default function SupervisorSheetsPage() {
           <img
             src={lightboxUrl}
             alt=""
-            className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"
+            className="max-w-full max-h-[80vh] rounded-xl shadow-2xl object-contain"
             onClick={e => e.stopPropagation()}
           />
+          {/* Fechar */}
           <button
             onClick={() => setLightboxUrl(null)}
             className="absolute top-4 right-4 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
+          {/* Ações */}
+          <div className="absolute bottom-6 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+            <a
+              href={lightboxUrl}
+              download
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-lg transition-colors backdrop-blur-sm"
+            >
+              <Download className="w-3.5 h-3.5" /> Download
+            </a>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(lightboxUrl);
+                  const blob = await res.blob();
+                  await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+                  toast.success('Foto copiada!');
+                } catch {
+                  toast.error('Não foi possível copiar a imagem');
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-lg transition-colors backdrop-blur-sm"
+            >
+              <Copy className="w-3.5 h-3.5" /> Copiar
+            </button>
+          </div>
         </div>
       )}
 
