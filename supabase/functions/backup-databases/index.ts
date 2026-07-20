@@ -126,23 +126,30 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-  const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  // Supabase migrou para novo formato de chaves (sb_secret_...).
+  // SUPABASE_SECRET_KEY deve ser configurado nos Function Secrets com a nova chave.
+  // Fallback para SUPABASE_SERVICE_ROLE_KEY (formato JWT legado).
+  const SERVICE_ROLE = Deno.env.get('SUPABASE_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE)
 
   const authHeader = req.headers.get('Authorization') ?? ''
   const token = authHeader.replace('Bearer ', '')
-  const isCron = token === SERVICE_ROLE
+  // Aceita tanto a nova chave quanto a JWT legada como identificador de cron
+  const LEGACY_CRON_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? SERVICE_ROLE
+  const isCron = token === SERVICE_ROLE || token === LEGACY_CRON_KEY
 
   let body: { force?: boolean } = {}
   try { body = await req.json() } catch { /* corpo vazio (cron) */ }
 
   // ── Disparo automático: roda para TODAS as empresas com backup ativo ───────
   if (isCron) {
-    const { data: integrations } = await supabase
+    const { data: integrations, error: integError } = await supabase
       .from('company_integrations')
       .select('id, company_id, api_key, enabled')
       .eq('provider', 'drive_backup')
       .eq('enabled', true)
+
+    if (integError) return json({ ok: false, error: integError.message, code: integError.code }, 500)
 
     const results: any[] = []
     for (const integ of (integrations ?? []) as any[]) {
