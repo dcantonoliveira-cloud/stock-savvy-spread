@@ -1025,7 +1025,11 @@ export default function SupervisorSheetsPage() {
 
       {/* Viewing sheet detail */}
       {viewingSheet && (
-        <div className="glass-card rounded-xl p-6 mb-6 animate-fade-in">
+        <div className="glass-card rounded-xl overflow-hidden mb-6 animate-fade-in">
+          {viewingSheet.image_url && (
+            <img src={viewingSheet.image_url} alt={viewingSheet.name} className="w-full max-h-52 object-cover" />
+          )}
+          <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-display font-semibold text-foreground text-lg">{viewingSheet.name}</h3>
@@ -1079,6 +1083,7 @@ export default function SupervisorSheetsPage() {
               <p className="text-sm text-muted-foreground whitespace-pre-line">{viewingSheet.instructions}</p>
             </div>
           )}
+          </div>
         </div>
       )}
 
