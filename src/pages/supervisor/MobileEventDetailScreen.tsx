@@ -746,7 +746,7 @@ export default function MobileEventDetailScreen({ eventId, onBack }: { eventId: 
       )}
 
       {/* ── Hero ── */}
-      <div className="bg-gradient-to-br from-[#172554] via-[#1E3A8A] to-[#1D4ED8] px-5 pt-hero pb-6 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#172554] via-[#1E3A8A] to-[#1E3A8A] px-5 pt-hero pb-6 relative overflow-hidden">
         <div className="absolute -top-8 -right-8 w-36 h-36 bg-white/5 rounded-full" />
         <div className="absolute top-8 right-6 w-2.5 h-2.5 bg-[#C4973A]/40 rounded-full" />
         <div className="absolute top-14 right-16 w-1.5 h-1.5 bg-[#C4973A]/25 rounded-full" />

@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { QRCodeSVG } from 'qrcode.react';
 import {
-  Home, List, FileText, CalendarDays, Utensils,
+  Home, List, FileText, CalendarDays, Utensils, BarChart2,
   ChevronRight, ChevronLeft, LogOut, ArrowRight,
-  MapPin, Users, Search, X, Phone, Mail, DollarSign,
-  Clock, Tag, CheckCircle2, Circle, AlertCircle,
+  MapPin, Users, Search, X, QrCode,
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import MobileEventDetailScreen from './MobileEventDetailScreen';
@@ -27,15 +27,29 @@ type Session = {
   max_couples: number | null;
 };
 
-type SessionStats = {
-  session_id: string;
+type SessionExtra = Session & {
   total: number;
   fechados: number;
+  next_event_date: string | null;
+  linked_events: LinkedEvent[];
 };
 
-type SessionExtra = Session & { total: number; fechados: number; next_event_date: string | null };
+type LinkedEvent = {
+  id: string;
+  event_name: string | null;
+  event_date: string | null;
+  status: string;
+  guest_count: number | null;
+};
 
-type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings';
+type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings' | 'stats';
+
+// ─── Colors ───────────────────────────────────────────────────────────────────
+const RON_950 = '#172554';
+const RON_900 = '#1E3A8A';
+const RON_800 = '#1D4ED8';
+const GOLD_400 = '#C4973A';
+const GOLD_300 = '#D4AB52';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CONFIRMED  = ['confirmed', 'completed'];
@@ -60,6 +74,10 @@ const STATUS_CLS: Record<string, string> = {
   cancelled: 'bg-rose-100 text-rose-600',
   lost: 'bg-red-100 text-red-700',
 };
+const STATUS_COLOR: Record<string, string> = {
+  lead: '#38bdf8', negotiating: '#fbbf24', tasting_scheduled: '#a78bfa',
+  confirmed: '#34d399', completed: '#059669', cancelled: '#f87171', lost: '#ef4444',
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function parseDate(d: string) { return new Date(d + 'T12:00:00'); }
@@ -72,76 +90,22 @@ function fmtShort(d: string) {
   const dt = parseDate(d);
   return `${dt.getDate().toString().padStart(2,'0')} ${MONTH_SHORT[dt.getMonth()].toLowerCase()}.`;
 }
-function yyyyMM(d: string) { return d.slice(0, 7); }
 function today() { return new Date().toISOString().slice(0, 10); }
 
-// ─── Components ───────────────────────────────────────────────────────────────
-function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
-  const items = [
-    { id: 'home'     as Tab, label: 'Início',  Icon: Home },
-    { id: 'events'   as Tab, label: 'Eventos', Icon: List },
-    { id: 'quotes'   as Tab, label: 'Orçam.',  Icon: FileText },
-    { id: 'agenda'   as Tab, label: 'Agenda',  Icon: CalendarDays },
-    { id: 'tastings' as Tab, label: 'Degust.', Icon: Utensils },
-  ];
+// ─── Shared UI ────────────────────────────────────────────────────────────────
+function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-border flex z-50">
-      {items.map(({ id, label, Icon }) => {
-        const active = tab === id;
-        return (
-          <button key={id} onClick={() => setTab(id)}
-            className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors"
-            style={{ color: active ? 'hsl(222 35% 18%)' : 'hsl(215 16% 57%)' }}>
-            <div className={active
-              ? 'bg-[hsl(222_35%_18%)] text-white rounded-2xl px-4 py-1.5'
-              : ''}>
-              <Icon className="w-5 h-5" />
-            </div>
-            <span className="text-[11px] font-semibold">{label}</span>
-          </button>
-        );
-      })}
-    </nav>
+    <p className="text-[11px] font-black uppercase tracking-widest mb-3 mt-1" style={{ color: RON_800 }}>
+      {children}
+    </p>
   );
 }
 
-function HeroHeader({ title, sub }: { title: string; sub?: string }) {
-  return (
-    <div className="relative overflow-hidden px-5 pt-14 pb-8"
-         style={{ background: 'linear-gradient(135deg, hsl(222 45% 13%) 0%, hsl(222 35% 22%) 100%)' }}>
-      <div className="absolute top-4 right-8 w-24 h-24 rounded-full opacity-10"
-           style={{ background: 'hsl(222 35% 50%)' }} />
-      <div className="absolute top-14 right-16 w-12 h-12 rounded-full opacity-8"
-           style={{ background: 'hsl(222 35% 50%)' }} />
-      <h1 className="text-4xl font-bold text-white tracking-tight">{title}</h1>
-      {sub && <p className="text-xs font-semibold text-white/40 uppercase tracking-widest mt-1">{sub}</p>}
-    </div>
-  );
-}
-
-// Amber date badge used in event cards
-function DateBadge({ date }: { date: string }) {
-  const dt = parseDate(date);
-  return (
-    <div className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center flex-shrink-0"
-         style={{ background: 'hsl(38 75% 94%)', border: '1px solid hsl(38 75% 80%)' }}>
-      <span className="text-[9px] font-bold uppercase tracking-widest leading-none"
-            style={{ color: 'hsl(38 65% 40%)' }}>
-        {WEEK_SHORT[dt.getDay()]}
-      </span>
-      <span className="text-2xl font-bold leading-tight" style={{ color: 'hsl(222 35% 18%)' }}>
-        {dt.getDate().toString().padStart(2,'0')}
-      </span>
-    </div>
-  );
-}
-
-// Dark badge used in Inicio list
 function DarkDateBadge({ date }: { date: string }) {
   const dt = parseDate(date);
   return (
     <div className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center flex-shrink-0"
-         style={{ background: 'hsl(222 35% 18%)' }}>
+         style={{ background: RON_950 }}>
       <span className="text-[9px] font-bold text-white/50 uppercase tracking-widest leading-none">
         {MONTH_SHORT[dt.getMonth()].toUpperCase()}
       </span>
@@ -152,32 +116,94 @@ function DarkDateBadge({ date }: { date: string }) {
   );
 }
 
-// ─── Home Screen ─────────────────────────────────────────────────────────────
+function GoldDateBadge({ date }: { date: string }) {
+  const dt = parseDate(date);
+  return (
+    <div className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center flex-shrink-0"
+         style={{ background: 'rgba(212,171,82,0.15)', border: `1px solid ${GOLD_300}40` }}>
+      <span className="text-[9px] font-bold uppercase tracking-widest leading-none" style={{ color: GOLD_400 }}>
+        {WEEK_SHORT[dt.getDay()]}
+      </span>
+      <span className="text-2xl font-bold leading-tight" style={{ color: RON_950 }}>
+        {dt.getDate().toString().padStart(2,'0')}
+      </span>
+    </div>
+  );
+}
+
+// ─── BottomNav ────────────────────────────────────────────────────────────────
+function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+  const items: { id: Tab; label: string; Icon: React.FC<{ className?: string }> }[] = [
+    { id: 'home',     label: 'Início',   Icon: Home },
+    { id: 'events',   label: 'Eventos',  Icon: List },
+    { id: 'quotes',   label: 'Orçam.',   Icon: FileText },
+    { id: 'agenda',   label: 'Agenda',   Icon: CalendarDays },
+    { id: 'tastings', label: 'Degust.',  Icon: Utensils },
+    { id: 'stats',    label: 'Stats',    Icon: BarChart2 },
+  ];
+
+  return (
+    <nav className="fixed bottom-4 left-4 right-4 z-50 flex items-center justify-around bg-white/95 backdrop-blur-xl rounded-3xl px-2 pb-safe"
+         style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.08)' }}>
+      {items.map(({ id, label, Icon }) => {
+        const active = tab === id;
+        return (
+          <button key={id} onClick={() => setTab(id)}
+            className="flex-1 flex flex-col items-center gap-0.5 py-3 transition-all">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-2xl transition-all ${active ? 'shadow-lg' : ''}`}
+                 style={active ? { background: RON_950, boxShadow: `0 4px 12px ${RON_900}50` } : {}}>
+              <Icon className={`w-4 h-4 ${active ? 'text-white' : 'text-gray-400'}`} />
+            </div>
+            <span className={`text-[10px] font-semibold transition-colors ${active ? 'text-gray-800' : 'text-gray-400'}`}>
+              {label}
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+function Hero({ title, sub, actions }: { title: string; sub?: string; actions?: React.ReactNode }) {
+  return (
+    <div className="relative overflow-hidden px-5 pt-hero pb-8"
+         style={{ background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 60%, ${RON_900} 100%)` }}>
+      <div className="absolute top-12 right-6 w-28 h-28 rounded-full opacity-[0.06]"
+           style={{ background: `radial-gradient(circle, white, transparent)` }} />
+      {actions && <div className="absolute top-safe right-4 pt-3">{actions}</div>}
+      <h1 className="text-4xl font-bold text-white tracking-tight">{title}</h1>
+      {sub && <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Home Screen ──────────────────────────────────────────────────────────────
 function HomeScreen({ events, sessions, loading, setTab, onSelect }: {
-  events: Event[]; sessions: SessionExtra[]; loading: boolean; setTab: (t: Tab) => void; onSelect: (id: string) => void;
+  events: Event[]; sessions: SessionExtra[]; loading: boolean;
+  setTab: (t: Tab) => void; onSelect: (id: string) => void;
 }) {
   const { signOut } = useAuth();
   const now = new Date();
   const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
 
-  const eventsMonth  = events.filter(e => e.event_date && CONFIRMED.includes(e.status) && e.event_date >= mStart && e.event_date <= mEnd);
-  const tastMonth    = sessions.filter(s => s.scheduled_date && s.scheduled_date >= mStart && s.scheduled_date <= mEnd);
-  const openQuotes   = events.filter(e => OPEN.includes(e.status));
-  const upcoming     = events.filter(e => e.event_date && e.event_date >= today() && CONFIRMED.includes(e.status))
-                             .sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''));
-  const nextEvent    = upcoming[0] ?? null;
-  const curMonth     = MONTH_FULL[now.getMonth()].toUpperCase();
+  const eventsMonth = events.filter(e => e.event_date && CONFIRMED.includes(e.status) && e.event_date >= mStart && e.event_date <= mEnd);
+  const tastMonth   = sessions.filter(s => s.scheduled_date && s.scheduled_date >= mStart && s.scheduled_date <= mEnd);
+  const openQuotes  = events.filter(e => OPEN.includes(e.status));
+  const upcoming    = events
+    .filter(e => e.event_date && e.event_date >= today() && CONFIRMED.includes(e.status))
+    .sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''));
+  const nextEvent = upcoming[0] ?? null;
+  const curMonth  = MONTH_FULL[now.getMonth()].toUpperCase();
 
   return (
-    <div className="flex-1 overflow-y-auto pb-24">
+    <div className="flex-1 overflow-y-auto scrollbar-none pb-32">
       {/* Hero */}
       <div className="relative overflow-hidden px-5 pt-12 pb-8"
-           style={{ background: 'linear-gradient(135deg, hsl(222 45% 13%) 0%, hsl(222 35% 22%) 100%)' }}>
-        <div className="absolute top-3 right-6 w-20 h-20 rounded-full opacity-10"
-             style={{ background: 'hsl(222 35% 50%)' }} />
-        <div className="absolute top-10 right-14 w-10 h-10 rounded-full opacity-8"
-             style={{ background: 'hsl(222 35% 50%)' }} />
+           style={{ background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 60%, ${RON_900} 100%)` }}>
+        <div className="absolute top-8 right-6 w-28 h-28 rounded-full opacity-[0.06]"
+             style={{ background: 'radial-gradient(circle, white, transparent)' }} />
         <button onClick={signOut}
           className="absolute top-4 right-4 p-2 text-white/30 hover:text-white/60 transition-colors">
           <LogOut className="w-4 h-4" />
@@ -187,38 +213,42 @@ function HomeScreen({ events, sessions, loading, setTab, onSelect }: {
       </div>
 
       <div className="px-4 -mt-5 space-y-4">
-        {/* Stat cards */}
+        {/* KPI cards */}
         <div className="grid grid-cols-3 gap-3">
-          <button onClick={() => setTab('events')} className="rounded-2xl p-4 flex flex-col gap-1 active:opacity-80"
-                  style={{ background: 'hsl(222 35% 18%)' }}>
-            <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">EVENTOS</p>
+          <button onClick={() => setTab('events')}
+            className="rounded-3xl p-4 flex flex-col gap-1 active:scale-95 transition-transform shadow-sm"
+            style={{ background: RON_950 }}>
+            <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">EVENTOS</p>
             <p className="text-3xl font-bold text-white leading-none">{loading ? '—' : eventsMonth.length}</p>
-            <p className="text-[10px] font-semibold text-white/30 uppercase tracking-wide">{curMonth}</p>
+            <p className="text-[9px] font-semibold text-white/30 uppercase">{curMonth}</p>
           </button>
-          <button onClick={() => setTab('tastings')} className="rounded-2xl p-4 flex flex-col gap-1 active:opacity-80"
-                  style={{ background: 'hsl(38 55% 42%)' }}>
-            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">DEGUST.</p>
+          <button onClick={() => setTab('tastings')}
+            className="rounded-3xl p-4 flex flex-col gap-1 active:scale-95 transition-transform shadow-sm"
+            style={{ background: GOLD_400 }}>
+            <p className="text-[9px] font-black text-white/70 uppercase tracking-widest">DEGUST.</p>
             <p className="text-3xl font-bold text-white leading-none">{loading ? '—' : tastMonth.length}</p>
-            <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wide">{curMonth}</p>
+            <p className="text-[9px] font-semibold text-white/50 uppercase">{curMonth}</p>
           </button>
-          <button onClick={() => setTab('quotes')} className="rounded-2xl p-4 flex flex-col gap-1 active:opacity-80"
-                  style={{ background: 'hsl(263 55% 45%)' }}>
-            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">ORÇAM.</p>
+          <button onClick={() => setTab('quotes')}
+            className="rounded-3xl p-4 flex flex-col gap-1 active:scale-95 transition-transform shadow-sm"
+            style={{ background: '#6D28D9' }}>
+            <p className="text-[9px] font-black text-white/70 uppercase tracking-widest">ORÇAM.</p>
             <p className="text-3xl font-bold text-white leading-none">{loading ? '—' : openQuotes.length}</p>
-            <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wide">EM ABERTO</p>
+            <p className="text-[9px] font-semibold text-white/50 uppercase">EM ABERTO</p>
           </button>
         </div>
 
-        {/* Next event */}
+        {/* Próximo evento highlight */}
         {nextEvent && (
-          <button onClick={() => onSelect(nextEvent.id)} className="rounded-2xl p-5 relative overflow-hidden w-full text-left active:opacity-80"
-               style={{ background: 'hsl(222 35% 18%)' }}>
-            <div className="absolute inset-0 opacity-5"
-                 style={{ background: 'radial-gradient(circle at 80% 50%, hsl(222 60% 60%), transparent 60%)' }} />
+          <button onClick={() => onSelect(nextEvent.id)}
+            className="rounded-3xl p-5 relative overflow-hidden w-full text-left active:scale-95 transition-transform shadow-sm"
+            style={{ background: RON_900 }}>
+            <div className="absolute inset-0 opacity-[0.08]"
+                 style={{ background: `radial-gradient(circle at 85% 50%, ${GOLD_300}, transparent 65%)` }} />
             <div className="relative">
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Próximo Evento</p>
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: GOLD_300 }} />
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: GOLD_300 }}>Próximo Evento</p>
               </div>
               <h2 className="text-xl font-bold text-white leading-tight mb-1">
                 {nextEvent.event_name ?? 'Sem nome'}
@@ -243,32 +273,34 @@ function HomeScreen({ events, sessions, loading, setTab, onSelect }: {
           </button>
         )}
 
-        {/* Upcoming list */}
+        {/* Próximos eventos list */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-foreground">Próximos Eventos</h3>
+            <SectionTitle>Próximos Eventos</SectionTitle>
             <button onClick={() => setTab('events')}
-              className="flex items-center gap-1 text-sm font-semibold"
-              style={{ color: 'hsl(222 35% 30%)' }}>
-              Ver todos <ChevronRight className="w-4 h-4" />
+              className="flex items-center gap-1 text-xs font-semibold text-gray-400">
+              Ver todos <ChevronRight className="w-3 h-3" />
             </button>
           </div>
           {loading ? (
-            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
           ) : upcoming.length === 0 ? (
-            <p className="text-center text-muted-foreground text-sm py-8">Nenhum evento confirmado</p>
+            <p className="text-center text-gray-400 text-sm py-8">Nenhum evento confirmado</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {upcoming.slice(0, 6).map(ev => (
-                <button key={ev.id} onClick={() => onSelect(ev.id)} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-4 w-full text-left active:opacity-80">
+                <button key={ev.id} onClick={() => onSelect(ev.id)}
+                  className="bg-white rounded-3xl shadow-sm p-4 flex items-center gap-4 w-full text-left active:scale-95 transition-transform">
                   {ev.event_date && <DarkDateBadge date={ev.event_date} />}
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground truncate">{ev.event_name ?? 'Sem nome'}</p>
+                    <p className="font-semibold text-gray-900 truncate">{ev.event_name ?? 'Sem nome'}</p>
                     {ev.location_text && (
-                      <p className="text-sm text-muted-foreground mt-0.5 truncate">{ev.location_text}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 truncate flex items-center gap-1">
+                        <MapPin className="w-3 h-3 flex-shrink-0" />{ev.location_text}
+                      </p>
                     )}
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
                 </button>
               ))}
             </div>
@@ -280,10 +312,11 @@ function HomeScreen({ events, sessions, loading, setTab, onSelect }: {
 }
 
 // ─── Events Screen ────────────────────────────────────────────────────────────
-function EventsScreen({ events, loading, onSelect }: { events: Event[]; loading: boolean; onSelect: (id: string) => void }) {
+function EventsScreen({ events, loading, onSelect }: {
+  events: Event[]; loading: boolean; onSelect: (id: string) => void;
+}) {
   const confirmed = events.filter(e => CONFIRMED.includes(e.status));
 
-  // Year navigation
   const years = useMemo(() => {
     const ys = new Set(confirmed.map(e => e.event_date?.slice(0, 4)).filter(Boolean) as string[]);
     return [...ys].sort();
@@ -294,7 +327,6 @@ function EventsScreen({ events, loading, onSelect }: { events: Event[]; loading:
 
   const yearEvents = confirmed.filter(e => e.event_date?.startsWith(year));
 
-  // Month counts
   const monthCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     yearEvents.forEach(e => {
@@ -310,13 +342,14 @@ function EventsScreen({ events, loading, onSelect }: { events: Event[]; loading:
     return monthCounts[m] ? m : months[0] ?? '';
   });
 
-  // Update month when year changes
   useEffect(() => {
     const m = (new Date().getMonth() + 1).toString().padStart(2, '0');
     setMonth(monthCounts[m] ? m : Object.keys(monthCounts).sort()[0] ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
 
-  const filtered = yearEvents.filter(e => e.event_date?.slice(5, 7) === month)
+  const filtered = yearEvents
+    .filter(e => e.event_date?.slice(5, 7) === month)
     .sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''));
 
   const todayStr = today();
@@ -324,61 +357,74 @@ function EventsScreen({ events, loading, onSelect }: { events: Event[]; loading:
   const past     = filtered.filter(e => (e.event_date ?? '') < todayStr);
 
   return (
-    <div className="flex-1 overflow-y-auto pb-24">
-      <HeroHeader title={year} sub={`${yearEvents.length} eventos`} />
-      <div className="px-4 mt-4 space-y-4">
+    <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
+      <Hero title={year} sub={`${yearEvents.length} eventos confirmados`} />
+      <div className="px-4 -mt-4 space-y-4 pt-4">
         {/* Year nav */}
-        <div className="flex items-center justify-between">
-          <button onClick={() => setYear(y => String(Number(y) - 1))} className="p-2 rounded-xl bg-white border border-border text-muted-foreground">
-            <ChevronLeft className="w-4 h-4" />
+        <div className="flex items-center justify-between bg-white rounded-3xl shadow-sm px-4 py-3">
+          <button onClick={() => setYear(y => String(Number(y) - 1))}
+            className="p-1.5 rounded-xl text-gray-400 active:scale-95 transition-transform">
+            <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-lg font-bold text-foreground">{year}</span>
-          <button onClick={() => setYear(y => String(Number(y) + 1))} className="p-2 rounded-xl bg-white border border-border text-muted-foreground">
-            <ChevronRight className="w-4 h-4" />
+          <span className="text-lg font-bold text-gray-900">{year}</span>
+          <button onClick={() => setYear(y => String(Number(y) + 1))}
+            className="p-1.5 rounded-xl text-gray-400 active:scale-95 transition-transform">
+            <ChevronRight className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Month pills */}
+        {/* Month pills with count dots */}
         {months.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {months.map(m => (
-              <button key={m} onClick={() => setMonth(m)}
-                className={`flex-shrink-0 flex flex-col items-center px-4 py-2 rounded-2xl border text-sm font-bold transition-all ${month === m ? 'text-white border-transparent' : 'bg-white border-border text-muted-foreground'}`}
-                style={month === m ? { background: 'hsl(222 35% 18%)' } : {}}>
-                <span className="text-[10px] uppercase tracking-wide">{MONTH_SHORT[Number(m) - 1]}</span>
-                <span className="text-lg leading-tight">{monthCounts[m]}</span>
-              </button>
-            ))}
+          <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 -mx-4 px-4">
+            {months.map(m => {
+              const active = month === m;
+              return (
+                <button key={m} onClick={() => setMonth(m)}
+                  className="flex-shrink-0 flex flex-col items-center px-3.5 py-2.5 rounded-2xl text-sm font-bold transition-all shadow-sm"
+                  style={active
+                    ? { background: RON_950, color: 'white' }
+                    : { background: 'white', color: '#9ca3af' }}>
+                  <span className="text-[10px] uppercase tracking-wide">{MONTH_SHORT[Number(m) - 1]}</span>
+                  <span className="text-lg leading-tight">{monthCounts[m]}</span>
+                  {active && (
+                    <span className="w-1 h-1 rounded-full bg-white/60 mt-0.5" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
+          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
         ) : (
           <>
             {upcoming.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest">
-                    Próximos <span className="ml-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{upcoming.length}</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest">
+                    Próximos
+                    <span className="ml-1.5 bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      {upcoming.length}
+                    </span>
                   </p>
                 </div>
-                <div className="space-y-3">
-                  {upcoming.map(ev => <EventCard key={ev.id} ev={ev} onSelect={onSelect} />)}
+                <div className="space-y-2">
+                  {upcoming.map(ev => <EvCard key={ev.id} ev={ev} onSelect={onSelect} />)}
                 </div>
               </div>
             )}
             {past.length > 0 && (
               <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Realizados</p>
-                <div className="space-y-3 opacity-50">
-                  {past.reverse().map(ev => <EventCard key={ev.id} ev={ev} onSelect={onSelect} />)}
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">Realizados</p>
+                <div className="space-y-2 opacity-50">
+                  {[...past].reverse().map(ev => <EvCard key={ev.id} ev={ev} onSelect={onSelect} />)}
                 </div>
               </div>
             )}
             {filtered.length === 0 && (
-              <p className="text-center text-muted-foreground py-12 text-sm">Nenhum evento neste mês</p>
+              <p className="text-center text-gray-400 py-12 text-sm">Nenhum evento neste mês</p>
             )}
           </>
         )}
@@ -387,131 +433,140 @@ function EventsScreen({ events, loading, onSelect }: { events: Event[]; loading:
   );
 }
 
-function EventCard({ ev, onSelect }: { ev: Event; onSelect: (id: string) => void }) {
+function EvCard({ ev, onSelect }: { ev: Event; onSelect: (id: string) => void }) {
   return (
-    <button onClick={() => onSelect(ev.id)} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-4 w-full text-left active:opacity-80">
-      {ev.event_date && <DateBadge date={ev.event_date} />}
+    <button onClick={() => onSelect(ev.id)}
+      className="bg-white rounded-3xl shadow-sm p-4 flex items-center gap-4 w-full text-left active:scale-95 transition-transform">
+      {ev.event_date && <GoldDateBadge date={ev.event_date} />}
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-foreground truncate">{ev.event_name ?? 'Sem nome'}</p>
+        <p className="font-semibold text-gray-900 truncate">{ev.event_name ?? 'Sem nome'}</p>
         <div className="flex items-center gap-3 mt-0.5 flex-wrap">
           {ev.location_text && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1 text-xs text-gray-400">
               <MapPin className="w-3 h-3" />{ev.location_text}
             </span>
           )}
           {ev.guest_count != null && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Users className="w-3 h-3" />{ev.guest_count}
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <Users className="w-3 h-3" />{ev.guest_count} conv.
             </span>
           )}
         </div>
       </div>
-      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
     </button>
   );
 }
 
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
-const QUOTE_FILTERS = [
-  { key: 'all',              label: 'Em aberto' },
-  { key: 'lead',             label: '1º Contato' },
-  { key: 'negotiating',      label: 'Negociando' },
-  { key: 'tasting_scheduled',label: 'Degustação' },
-  { key: 'cancelled',        label: 'Não fechou' },
-  { key: 'lost',             label: 'Cancelado' },
-];
-
-function QuotesScreen({ events, loading, onSelect }: { events: Event[]; loading: boolean; onSelect: (id: string) => void }) {
-  const quotes = events.filter(e => ALL_OPEN.includes(e.status));
+function QuotesScreen({ events, loading, onSelect }: {
+  events: Event[]; loading: boolean; onSelect: (id: string) => void;
+}) {
+  const pipeline = events.filter(e => ['lead', 'negotiating'].includes(e.status));
+  const other    = events.filter(e => ['tasting_scheduled', 'cancelled', 'lost'].includes(e.status));
+  const all      = events.filter(e => ALL_OPEN.includes(e.status));
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
 
-  const filtered = quotes.filter(e => {
-    const matchStatus = filter === 'all' || e.status === filter;
-    const matchSearch = !search || (e.event_name ?? '').toLowerCase().includes(search.toLowerCase());
-    return matchStatus && matchSearch;
-  }).sort((a, b) => (a.event_date ?? 'zzzz').localeCompare(b.event_date ?? 'zzzz'));
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: quotes.length };
-    quotes.forEach(e => { c[e.status] = (c[e.status] ?? 0) + 1; });
-    return c;
-  }, [quotes]);
+  const filtered = all
+    .filter(e => !search || (e.event_name ?? '').toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (a.event_date ?? 'zzzz').localeCompare(b.event_date ?? 'zzzz'));
 
   return (
-    <div className="flex-1 overflow-y-auto pb-24">
-      <HeroHeader title="Orçamentos" sub={`${counts.all} em aberto`} />
-      <div className="px-4 mt-4 space-y-3">
+    <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
+      <Hero title="Orçamentos" sub={`${pipeline.length} em negociação`} />
+      <div className="px-4 -mt-4 pt-4 space-y-4">
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
-            className="w-full h-11 pl-9 pr-10 bg-white rounded-2xl border border-border text-sm outline-none focus:border-primary"
-            placeholder="Buscar por nome..."
+            className="w-full h-12 pl-11 pr-10 bg-white rounded-3xl shadow-sm text-sm outline-none focus:ring-2 text-gray-900 placeholder-gray-400"
+            style={{ focusRingColor: RON_800 } as React.CSSProperties}
+            placeholder="Buscar evento..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
 
-        {/* Filter pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {QUOTE_FILTERS.filter(f => f.key === 'all' || counts[f.key]).map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-semibold border transition-all ${filter === f.key ? 'text-white border-transparent' : 'bg-white border-border text-muted-foreground'}`}
-              style={filter === f.key ? { background: 'hsl(222 35% 18%)' } : {}}>
-              {f.label}{f.key !== 'all' && counts[f.key] ? ` ${counts[f.key]}` : ''}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
-        ) : filtered.length === 0 ? (
-          <p className="text-center text-muted-foreground py-12 text-sm">Nenhum resultado</p>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map(ev => (
-              <button key={ev.id} onClick={() => onSelect(ev.id)} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-3 w-full text-left active:opacity-80">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-semibold text-foreground flex-1 truncate">{ev.event_name ?? 'Sem nome'}</p>
-                    <span className={`flex-shrink-0 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${STATUS_CLS[ev.status] ?? 'bg-muted text-muted-foreground'}`}>
-                      {STATUS_LABEL[ev.status] ?? ev.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    {ev.event_date && (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <CalendarDays className="w-3 h-3" />{fmtFull(ev.event_date)}
-                      </span>
-                    )}
-                    {ev.location_text && (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="w-3 h-3" />{ev.location_text}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              </button>
-            ))}
+        {/* Pipeline */}
+        {!search && pipeline.length > 0 && (
+          <div>
+            <SectionTitle>Pipeline</SectionTitle>
+            <div className="space-y-2">
+              {pipeline.map(ev => <QuoteCard key={ev.id} ev={ev} onSelect={onSelect} />)}
+            </div>
           </div>
+        )}
+
+        {!search && other.length > 0 && (
+          <div>
+            <SectionTitle>Outros</SectionTitle>
+            <div className="space-y-2">
+              {other.map(ev => <QuoteCard key={ev.id} ev={ev} onSelect={onSelect} />)}
+            </div>
+          </div>
+        )}
+
+        {search && (
+          loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
+          ) : filtered.length === 0 ? (
+            <p className="text-center text-gray-400 py-12 text-sm">Nenhum resultado</p>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map(ev => <QuoteCard key={ev.id} ev={ev} onSelect={onSelect} />)}
+            </div>
+          )
+        )}
+
+        {!search && all.length === 0 && !loading && (
+          <p className="text-center text-gray-400 py-12 text-sm">Nenhum orçamento em aberto</p>
         )}
       </div>
     </div>
   );
 }
 
+function QuoteCard({ ev, onSelect }: { ev: Event; onSelect: (id: string) => void }) {
+  return (
+    <button onClick={() => onSelect(ev.id)}
+      className="bg-white rounded-3xl shadow-sm p-4 flex items-start gap-3 w-full text-left active:scale-95 transition-transform">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <p className="font-semibold text-gray-900 flex-1 truncate">{ev.event_name ?? 'Sem nome'}</p>
+          <span className={`flex-shrink-0 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${STATUS_CLS[ev.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            {STATUS_LABEL[ev.status] ?? ev.status}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {ev.event_date && (
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <CalendarDays className="w-3 h-3" />{fmtFull(ev.event_date)}
+            </span>
+          )}
+          {ev.location_text && (
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <MapPin className="w-3 h-3" />{ev.location_text}
+            </span>
+          )}
+        </div>
+      </div>
+      <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" />
+    </button>
+  );
+}
+
 // ─── Agenda Screen ────────────────────────────────────────────────────────────
-function AgendaScreen({ events, sessions, loading, onSelect }: { events: Event[]; sessions: SessionExtra[]; loading: boolean; onSelect: (id: string) => void }) {
+function AgendaScreen({ events, sessions, loading, onSelect }: {
+  events: Event[]; sessions: SessionExtra[]; loading: boolean; onSelect: (id: string) => void;
+}) {
   const now = new Date();
-  const [year, setYear]   = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth()); // 0-indexed
+  const [year, setYear]    = useState(now.getFullYear());
+  const [month, setMonth]  = useState(now.getMonth());
   const [selDay, setSelDay] = useState<number | null>(now.getDate());
 
   const prevMonth = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); setSelDay(null); };
@@ -519,83 +574,69 @@ function AgendaScreen({ events, sessions, loading, onSelect }: { events: Event[]
 
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-  // Map day → items
-  const dayEvents   = useMemo(() => {
+  const dayEvents = useMemo(() => {
     const m: Record<number, Event[]> = {};
     events.filter(e => e.event_date?.startsWith(prefix) && CONFIRMED.includes(e.status))
-      .forEach(e => {
-        const d = parseInt(e.event_date!.slice(8, 10));
-        (m[d] ??= []).push(e);
-      });
+      .forEach(e => { const d = parseInt(e.event_date!.slice(8, 10)); (m[d] ??= []).push(e); });
     return m;
   }, [events, prefix]);
 
-  const dayQuotes   = useMemo(() => {
+  const dayQuotes = useMemo(() => {
     const m: Record<number, Event[]> = {};
     events.filter(e => e.event_date?.startsWith(prefix) && OPEN.includes(e.status))
-      .forEach(e => {
-        const d = parseInt(e.event_date!.slice(8, 10));
-        (m[d] ??= []).push(e);
-      });
+      .forEach(e => { const d = parseInt(e.event_date!.slice(8, 10)); (m[d] ??= []).push(e); });
     return m;
   }, [events, prefix]);
 
   const dayTastings = useMemo(() => {
     const m: Record<number, SessionExtra[]> = {};
     sessions.filter(s => s.scheduled_date?.startsWith(prefix))
-      .forEach(s => {
-        const d = parseInt(s.scheduled_date!.slice(8, 10));
-        (m[d] ??= []).push(s);
-      });
+      .forEach(s => { const d = parseInt(s.scheduled_date!.slice(8, 10)); (m[d] ??= []).push(s); });
     return m;
   }, [sessions, prefix]);
 
-  // Calendar grid
-  const firstDow = new Date(year, month, 1).getDay(); // 0=Sun
+  const firstDow    = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  const cells       = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
   const selEvents   = selDay ? (dayEvents[selDay]   ?? []) : [];
   const selQuotes   = selDay ? (dayQuotes[selDay]   ?? []) : [];
   const selTastings = selDay ? (dayTastings[selDay] ?? []) : [];
   const selAll      = [...selEvents, ...selQuotes];
 
-  const todayDate = now.getDate();
+  const todayDate      = now.getDate();
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
 
   return (
-    <div className="flex-1 overflow-y-auto pb-24">
-      <HeroHeader title={MONTH_FULL[month]} sub={`${Object.values(dayEvents).flat().length + Object.values(dayTastings).flat().length} items · ${year}`} />
-      <div className="px-4 mt-4 space-y-4">
-        {/* Month nav */}
-        <div className="bg-white rounded-2xl border border-border p-4">
+    <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
+      <Hero title={MONTH_FULL[month]} sub={`${Object.values(dayEvents).flat().length + Object.values(dayTastings).flat().length} items · ${year}`} />
+      <div className="px-4 -mt-4 pt-4 space-y-4">
+        {/* Calendar */}
+        <div className="bg-white rounded-3xl shadow-sm p-4">
+          {/* Nav */}
           <div className="flex items-center justify-between mb-4">
-            <button onClick={prevMonth} className="p-1.5 rounded-xl text-muted-foreground hover:bg-muted transition-colors">
+            <button onClick={prevMonth} className="p-1.5 rounded-xl text-gray-400 active:scale-95">
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <span className="font-bold text-foreground">{MONTH_FULL[month]} {year}</span>
-            <button onClick={nextMonth} className="p-1.5 rounded-xl text-muted-foreground hover:bg-muted transition-colors">
+            <span className="font-bold text-gray-900">{MONTH_FULL[month]} {year}</span>
+            <button onClick={nextMonth} className="p-1.5 rounded-xl text-gray-400 active:scale-95">
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
 
           {/* Legend */}
           <div className="flex items-center gap-4 mb-4">
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="w-2 h-2 rounded-full" style={{ background: 'hsl(222 35% 18%)' }} /> Fechado
-            </span>
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="w-2 h-2 rounded-full bg-amber-400" /> Reserva
-            </span>
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="w-2 h-2 rounded-full bg-purple-400" /> Degust.
-            </span>
+            {[['Fechado', RON_900], ['Reserva', '#f59e0b'], ['Degust.', '#a78bfa']].map(([l, c]) => (
+              <span key={l} className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                <span className="w-2 h-2 rounded-full" style={{ background: c }} /> {l}
+              </span>
+            ))}
           </div>
 
           {/* Weekday headers */}
           <div className="grid grid-cols-7 mb-1">
             {['D','S','T','Q','Q','S','S'].map((d, i) => (
-              <div key={i} className="text-center text-[11px] font-semibold text-muted-foreground py-1">{d}</div>
+              <div key={i} className="text-center text-[11px] font-semibold text-gray-400 py-1">{d}</div>
             ))}
           </div>
 
@@ -610,12 +651,14 @@ function AgendaScreen({ events, sessions, loading, onSelect }: { events: Event[]
               const isSel   = day === selDay;
               return (
                 <button key={i} onClick={() => setSelDay(day === selDay ? null : day)}
-                  className={`flex flex-col items-center py-1.5 rounded-xl transition-colors ${isSel ? 'text-white' : isToday ? 'font-bold' : ''}`}
-                  style={isSel ? { background: 'hsl(222 35% 18%)' } : {}}>
-                  <span className={`text-sm leading-tight ${isSel ? 'text-white' : 'text-foreground'}`}>{day}</span>
+                  className="flex flex-col items-center py-1.5 rounded-xl transition-all active:scale-95"
+                  style={isSel ? { background: RON_950 } : isToday ? { background: `${RON_950}15` } : {}}>
+                  <span className={`text-sm leading-tight font-${isToday && !isSel ? 'bold' : 'medium'} ${isSel ? 'text-white' : 'text-gray-900'}`}>
+                    {day}
+                  </span>
                   {(hasEv || hasQ || hasT) && (
                     <div className="flex gap-0.5 mt-0.5">
-                      {hasEv && <span className="w-1.5 h-1.5 rounded-full" style={{ background: isSel ? 'white' : 'hsl(222 35% 18%)' }} />}
+                      {hasEv && <span className="w-1.5 h-1.5 rounded-full" style={{ background: isSel ? 'white' : RON_900 }} />}
                       {hasQ  && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                       {hasT  && <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />}
                     </div>
@@ -626,124 +669,125 @@ function AgendaScreen({ events, sessions, loading, onSelect }: { events: Event[]
           </div>
         </div>
 
-        {/* Selected day events */}
+        {/* Selected day */}
         {selDay && (
           <div>
-            <p className="text-sm font-bold text-foreground mb-3 capitalize">
-              {WEEK_SHORT[new Date(year, month, selDay).getDay()]}, {selDay} de {MONTH_FULL[month]}
+            <p className="text-sm font-bold text-gray-900 mb-3 capitalize">
+              {WEEK_SHORT[new Date(year, month, selDay).getDay()]}, {selDay} de {MONTH_FULL[month].toLowerCase()}
             </p>
             {selAll.length === 0 && selTastings.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-border p-8 text-center text-muted-foreground text-sm">
+              <div className="bg-white rounded-3xl shadow-sm p-8 text-center text-gray-400 text-sm">
                 Sem eventos neste dia
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {selAll.map(ev => (
-                  <button key={ev.id} onClick={() => onSelect(ev.id)} className="bg-white rounded-2xl border border-border p-4 flex items-center gap-3 w-full text-left active:opacity-80">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0"
-                         style={{ background: CONFIRMED.includes(ev.status) ? 'hsl(222 35% 18%)' : 'hsl(38 75% 52%)' }} />
+                  <button key={ev.id} onClick={() => onSelect(ev.id)}
+                    className="bg-white rounded-3xl shadow-sm p-4 flex items-center gap-3 w-full text-left active:scale-95 transition-transform overflow-hidden">
+                    <div className="w-1 self-stretch rounded-full flex-shrink-0"
+                         style={{ background: CONFIRMED.includes(ev.status) ? RON_900 : '#f59e0b' }} />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground truncate">{ev.event_name ?? 'Sem nome'}</p>
+                      <p className="font-semibold text-gray-900 truncate">{ev.event_name ?? 'Sem nome'}</p>
                       {ev.location_text && (
-                        <p className="text-xs text-muted-foreground">{ev.location_text}</p>
+                        <p className="text-xs text-gray-400">{ev.location_text}</p>
                       )}
                     </div>
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATUS_CLS[ev.status] ?? ''}`}>
+                    <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0 ${STATUS_CLS[ev.status] ?? ''}`}>
                       {STATUS_LABEL[ev.status] ?? ev.status}
                     </span>
                   </button>
                 ))}
                 {selTastings.map(s => (
-                  <div key={s.id} className="bg-white rounded-2xl border border-purple-200 p-4 flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-purple-400 flex-shrink-0" />
+                  <div key={s.id}
+                    className="bg-white rounded-3xl shadow-sm p-4 flex items-center gap-3 overflow-hidden">
+                    <div className="w-1 self-stretch rounded-full flex-shrink-0 bg-purple-400" />
                     <div className="flex-1">
-                      <p className="font-semibold text-foreground">Degustação</p>
-                      {s.total > 0 && <p className="text-xs text-muted-foreground">{s.total} eventos</p>}
+                      <p className="font-semibold text-gray-900">Degustação</p>
+                      {s.total > 0 && (
+                        <p className="text-xs text-gray-400">{s.total} evento{s.total !== 1 ? 's' : ''} · {s.fechados} fechado{s.fechados !== 1 ? 's' : ''}</p>
+                      )}
                     </div>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Degust.</span>
+                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700">Degust.</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
         )}
+        {loading && <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>}
       </div>
     </div>
   );
 }
 
 // ─── Tastings Screen ──────────────────────────────────────────────────────────
-type TastingTab = 'all' | 'upcoming' | 'past';
+type TastingFilter = 'upcoming' | 'past';
 
-function TastingsScreen({ sessions, loading }: { sessions: SessionExtra[]; loading: boolean }) {
-  const [tab, setTab] = useState<TastingTab>('all');
+function TastingsScreen({ sessions, loading, onTasting }: {
+  sessions: SessionExtra[]; loading: boolean; onTasting: (id: string) => void;
+}) {
+  const [filter, setFilter] = useState<TastingFilter>('upcoming');
   const todayStr = today();
 
-  const upcoming = sessions.filter(s => s.scheduled_date && s.scheduled_date >= todayStr)
-                           .sort((a, b) => (a.scheduled_date ?? '').localeCompare(b.scheduled_date ?? ''));
-  const past     = sessions.filter(s => s.scheduled_date && s.scheduled_date < todayStr)
-                           .sort((a, b) => (b.scheduled_date ?? '').localeCompare(a.scheduled_date ?? ''));
-  const all      = [...upcoming, ...past];
+  const upcoming = sessions
+    .filter(s => s.scheduled_date && s.scheduled_date >= todayStr)
+    .sort((a, b) => (a.scheduled_date ?? '').localeCompare(b.scheduled_date ?? ''));
+  const past = sessions
+    .filter(s => s.scheduled_date && s.scheduled_date < todayStr)
+    .sort((a, b) => (b.scheduled_date ?? '').localeCompare(a.scheduled_date ?? ''));
 
-  const shown = tab === 'all' ? all : tab === 'upcoming' ? upcoming : past;
-
-  const TABS: { id: TastingTab; label: string }[] = [
-    { id: 'all',      label: 'Todas' },
-    { id: 'upcoming', label: 'Próximas' },
-    { id: 'past',     label: 'Realizadas' },
-  ];
+  const shown = filter === 'upcoming' ? upcoming : past;
 
   return (
-    <div className="flex-1 overflow-y-auto pb-24">
-      <HeroHeader title="Degustações" sub={`${upcoming.length} próximas · ${sessions.length} total`} />
-      <div className="px-4 mt-4 space-y-3">
-        {/* Tabs */}
-        <div className="flex gap-2 bg-muted/40 rounded-2xl p-1">
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${tab === t.id ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground'}`}>
-              {t.label}
+    <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
+      <Hero title="Degustações" sub={`${upcoming.length} próximas · ${sessions.length} total`} />
+      <div className="px-4 -mt-4 pt-4 space-y-4">
+        {/* Filter tabs */}
+        <div className="flex gap-2 bg-white rounded-3xl shadow-sm p-1">
+          {([['upcoming', 'Próximas'], ['past', 'Realizadas']] as [TastingFilter, string][]).map(([id, label]) => (
+            <button key={id} onClick={() => setFilter(id)}
+              className="flex-1 py-2.5 rounded-2xl text-sm font-bold transition-all"
+              style={filter === id
+                ? { background: RON_950, color: 'white', boxShadow: `0 4px 12px ${RON_900}40` }
+                : { color: '#9ca3af' }}>
+              {label}
             </button>
           ))}
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
+          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
         ) : shown.length === 0 ? (
-          <p className="text-center text-muted-foreground py-12 text-sm">Nenhuma degustação</p>
+          <p className="text-center text-gray-400 py-12 text-sm">Nenhuma degustação</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {shown.map(s => (
-              <div key={s.id} className="bg-white rounded-2xl border border-border p-4 flex items-start gap-4">
-                <div className="w-1 self-stretch rounded-full bg-purple-300 flex-shrink-0" />
+              <button key={s.id} onClick={() => onTasting(s.id)}
+                className="bg-white rounded-3xl shadow-sm px-4 py-4 flex items-center gap-3 w-full text-left active:scale-95 transition-transform overflow-hidden">
+                <div className="w-1 self-stretch rounded-full flex-shrink-0"
+                     style={{ background: filter === 'upcoming' ? '#a78bfa' : '#d1d5db' }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-semibold text-foreground">Degustação</p>
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 flex-shrink-0">
-                      Agendada
+                    <p className="font-semibold text-gray-900">
+                      Degustação · {s.type ?? 'Grupo'}
+                    </p>
+                    <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0 ${filter === 'upcoming' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {filter === 'upcoming' ? 'Agendada' : 'Realizada'}
                     </span>
                   </div>
                   {s.scheduled_date && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <CalendarDays className="w-3 h-3 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">{fmtFull(s.scheduled_date)}</p>
-                    </div>
+                    <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-1">
+                      <CalendarDays className="w-3 h-3" />{fmtFull(s.scheduled_date)}
+                    </p>
                   )}
-                  <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-                    <span>{s.total} evento{s.total !== 1 ? 's' : ''}</span>
-                    {s.next_event_date && (
-                      <>
-                        <span className="text-border">·</span>
-                        <span>{fmtShort(s.next_event_date)}</span>
-                      </>
-                    )}
-                    <span className="text-border">·</span>
-                    <span className={s.fechados > 0 ? 'text-emerald-600 font-semibold' : ''}>
-                      {s.fechados} fech.
-                    </span>
-                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {s.total} evento{s.total !== 1 ? 's' : ''}
+                    {s.fechados > 0 && <span className="text-emerald-500 font-semibold"> · {s.fechados} fechado{s.fechados !== 1 ? 's' : ''}</span>}
+                    {s.next_event_date && <span> · próx. {fmtShort(s.next_event_date)}</span>}
+                  </p>
                 </div>
-              </div>
+                <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+              </button>
             ))}
           </div>
         )}
@@ -752,15 +796,212 @@ function TastingsScreen({ sessions, loading }: { sessions: SessionExtra[]; loadi
   );
 }
 
+// ─── Tasting Detail Screen ────────────────────────────────────────────────────
+type TastingDetailTab = 'eventos' | 'qrcode';
 
+function TastingDetailScreen({ session, onBack, onSelect }: {
+  session: SessionExtra; onBack: () => void; onSelect: (id: string) => void;
+}) {
+  const [tab, setTab] = useState<TastingDetailTab>('eventos');
+  const qrValue = `https://rondello.com.br/degustacao/${session.id}`;
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#f2f2f2] flex flex-col">
+      {/* Hero */}
+      <div className="relative overflow-hidden px-5 pt-12 pb-8"
+           style={{ background: `linear-gradient(135deg, ${RON_950} 0%, ${RON_900} 60%, ${RON_900} 100%)` }}>
+        <div className="absolute top-8 right-6 w-28 h-28 rounded-full opacity-[0.06]"
+             style={{ background: 'radial-gradient(circle, white, transparent)' }} />
+        <button onClick={onBack} className="flex items-center gap-2 text-white/60 mb-4 hover:text-white transition-colors">
+          <ChevronLeft className="w-5 h-5" />
+          <span className="text-sm font-semibold">Voltar</span>
+        </button>
+        <h1 className="text-3xl font-bold text-white tracking-tight">Degustação</h1>
+        {session.scheduled_date && (
+          <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">
+            {fmtFull(session.scheduled_date)}
+          </p>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="px-4 -mt-4 pt-4">
+        <div className="flex gap-2 bg-white rounded-3xl shadow-sm p-1 mb-4">
+          {([['eventos', 'Eventos'], ['qrcode', 'QR Code']] as [TastingDetailTab, string][]).map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
+              className="flex-1 py-2.5 rounded-2xl text-sm font-bold transition-all"
+              style={tab === id
+                ? { background: RON_950, color: 'white' }
+                : { color: '#9ca3af' }}>
+              {id === 'qrcode' && <QrCode className="w-4 h-4 inline mr-1.5" />}
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'eventos' && (
+          <div className="space-y-2 pb-32">
+            <SectionTitle>{session.total} evento{session.total !== 1 ? 's' : ''} vinculados</SectionTitle>
+            {session.linked_events.length === 0 ? (
+              <p className="text-center text-gray-400 py-8 text-sm">Nenhum evento vinculado</p>
+            ) : (
+              session.linked_events
+                .sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? ''))
+                .map(ev => (
+                  <button key={ev.id} onClick={() => onSelect(ev.id)}
+                    className="bg-white rounded-3xl shadow-sm p-4 flex items-center gap-4 w-full text-left active:scale-95 transition-transform">
+                    {ev.event_date && <GoldDateBadge date={ev.event_date} />}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{ev.event_name ?? 'Sem nome'}</p>
+                      <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-block mt-1 ${STATUS_CLS[ev.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {STATUS_LABEL[ev.status] ?? ev.status}
+                      </span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  </button>
+                ))
+            )}
+          </div>
+        )}
+
+        {tab === 'qrcode' && (
+          <div className="pb-32">
+            <div className="bg-white rounded-3xl shadow-sm p-8 flex flex-col items-center gap-4">
+              <div className="p-4 rounded-2xl" style={{ background: `${RON_950}08` }}>
+                <QRCodeSVG value={qrValue} size={200} bgColor="transparent" fgColor={RON_950} />
+              </div>
+              <p className="text-xs text-gray-400 text-center break-all">{qrValue}</p>
+              <p className="text-sm text-gray-500 text-center">
+                Mostre este QR Code para o casal acessar as informações da degustação
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Stats Screen ─────────────────────────────────────────────────────────────
+function StatsScreen({ events, loading }: { events: Event[]; loading: boolean }) {
+  const now = new Date();
+
+  const total     = events.length;
+  const confirmed = events.filter(e => CONFIRMED.includes(e.status)).length;
+  const open      = events.filter(e => OPEN.includes(e.status)).length;
+  const lost      = events.filter(e => ['cancelled', 'lost'].includes(e.status)).length;
+
+  // By status counts
+  const statusCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    events.forEach(e => { c[e.status] = (c[e.status] ?? 0) + 1; });
+    return c;
+  }, [events]);
+
+  const statusOrder = ['confirmed', 'completed', 'lead', 'negotiating', 'tasting_scheduled', 'cancelled', 'lost'];
+  const maxCount = Math.max(...Object.values(statusCounts), 1);
+
+  // Monthly confirmed events — last 12 months
+  const monthly = useMemo(() => {
+    const months: { label: string; count: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const count = events.filter(e => CONFIRMED.includes(e.status) && e.event_date?.startsWith(prefix)).length;
+      months.push({ label: MONTH_SHORT[d.getMonth()], count });
+    }
+    return months;
+  }, [events]);
+
+  const maxMonthly = Math.max(...monthly.map(m => m.count), 1);
+
+  return (
+    <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
+      <Hero title="Estatísticas" sub="Visão geral do negócio" />
+      <div className="px-4 -mt-4 pt-4 space-y-4">
+        {/* KPI row */}
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { label: 'Total', value: total, color: RON_950 },
+            { label: 'Confirmados', value: confirmed, color: '#059669' },
+            { label: 'Em aberto', value: open, color: GOLD_400 },
+            { label: 'Não fechou', value: lost, color: '#f87171' },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="bg-white rounded-3xl shadow-sm p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">{label}</p>
+              <p className="text-4xl font-bold leading-none" style={{ color }}>
+                {loading ? '—' : value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* By status */}
+        <div className="bg-white rounded-3xl shadow-sm p-5">
+          <SectionTitle>Por status</SectionTitle>
+          {loading ? (
+            <div className="flex justify-center py-4"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
+          ) : (
+            <div className="space-y-3">
+              {statusOrder.filter(s => statusCounts[s]).map(s => (
+                <div key={s}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-gray-700">{STATUS_LABEL[s]}</span>
+                    <span className="text-xs font-bold text-gray-900">{statusCounts[s]}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500"
+                         style={{ width: `${(statusCounts[s] / maxCount) * 100}%`, background: STATUS_COLOR[s] }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Monthly chart */}
+        <div className="bg-white rounded-3xl shadow-sm p-5">
+          <SectionTitle>Eventos por mês (12m)</SectionTitle>
+          {loading ? (
+            <div className="flex justify-center py-4"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
+          ) : (
+            <div className="flex items-end gap-1.5 h-28">
+              {monthly.map(({ label, count }, i) => {
+                const isCurrentMonth = i === 11;
+                const height = count === 0 ? 4 : Math.max(10, (count / maxMonthly) * 100);
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    {count > 0 && (
+                      <span className="text-[9px] font-bold text-gray-500">{count}</span>
+                    )}
+                    <div className="w-full rounded-t-lg transition-all duration-500"
+                         style={{
+                           height: `${height}%`,
+                           background: isCurrentMonth ? RON_800 : `${RON_900}40`,
+                           minHeight: '4px',
+                         }} />
+                    <span className={`text-[9px] font-bold ${isCurrentMonth ? 'text-gray-700' : 'text-gray-400'}`}>
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function MobileSupervisorApp() {
-  const [tab, setTab]             = useState<Tab>('home');
-  const [events, setEvents]       = useState<Event[]>([]);
-  const [sessions, setSessions]   = useState<SessionExtra[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [tab, setTab]                       = useState<Tab>('home');
+  const [events, setEvents]                 = useState<Event[]>([]);
+  const [sessions, setSessions]             = useState<SessionExtra[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [selectedEventId, setSelectedEventId]     = useState<string | null>(null);
+  const [selectedTastingId, setSelectedTastingId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -769,7 +1010,7 @@ export default function MobileSupervisorApp() {
         supabase.from('events').select('id, event_name, event_date, guest_count, status, location_text').order('event_date'),
         (supabase.from as any)('tasting_sessions').select('id, scheduled_date, type, max_couples').order('scheduled_date', { ascending: false }),
         (supabase.from as any)('tasting_session_stats').select('session_id, total, fechados'),
-        (supabase.from as any)('tasting_session_events').select('session_id, event_id, events(event_date, status)'),
+        (supabase.from as any)('tasting_session_events').select('session_id, event_id, events(id, event_name, event_date, status, guest_count)'),
       ]);
 
       if (eventsRes.data) setEvents(eventsRes.data as Event[]);
@@ -779,13 +1020,22 @@ export default function MobileSupervisorApp() {
         statsMap[r.session_id] = { total: r.total ?? 0, fechados: r.fechados ?? 0 };
       }
 
-      // Next event date per session
+      // Group linked events per session
+      const linkedMap: Record<string, LinkedEvent[]> = {};
       const nextMap: Record<string, string> = {};
       const todayStr = today();
+
       for (const r of (tseRes.data ?? []) as any[]) {
-        const d = (r.events as any)?.event_date;
-        if (!d || d < todayStr) continue;
-        if (!nextMap[r.session_id] || d < nextMap[r.session_id]) nextMap[r.session_id] = d;
+        const ev = r.events as any;
+        if (!ev) continue;
+        (linkedMap[r.session_id] ??= []).push({
+          id: ev.id, event_name: ev.event_name, event_date: ev.event_date,
+          status: ev.status, guest_count: ev.guest_count,
+        });
+        const d = ev.event_date;
+        if (d && d >= todayStr) {
+          if (!nextMap[r.session_id] || d < nextMap[r.session_id]) nextMap[r.session_id] = d;
+        }
       }
 
       const enriched: SessionExtra[] = ((sessRes.data ?? []) as Session[]).map(s => ({
@@ -793,25 +1043,34 @@ export default function MobileSupervisorApp() {
         total:           statsMap[s.id]?.total    ?? 0,
         fechados:        statsMap[s.id]?.fechados  ?? 0,
         next_event_date: nextMap[s.id] ?? null,
+        linked_events:   linkedMap[s.id] ?? [],
       }));
+
       setSessions(enriched);
       setLoading(false);
     })();
   }, []);
 
-  const handleSelect = (id: string) => setSelectedEventId(id);
+  const selectedSession = selectedTastingId ? sessions.find(s => s.id === selectedTastingId) ?? null : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#f2f2f2] flex flex-col">
       {selectedEventId ? (
         <MobileEventDetailScreen eventId={selectedEventId} onBack={() => setSelectedEventId(null)} />
+      ) : selectedSession ? (
+        <TastingDetailScreen
+          session={selectedSession}
+          onBack={() => setSelectedTastingId(null)}
+          onSelect={(id) => { setSelectedTastingId(null); setSelectedEventId(id); }}
+        />
       ) : (
         <>
-          {tab === 'home'     && <HomeScreen     events={events} sessions={sessions} loading={loading} setTab={setTab} onSelect={handleSelect} />}
-          {tab === 'events'   && <EventsScreen   events={events} loading={loading} onSelect={handleSelect} />}
-          {tab === 'quotes'   && <QuotesScreen   events={events} loading={loading} onSelect={handleSelect} />}
-          {tab === 'agenda'   && <AgendaScreen   events={events} sessions={sessions} loading={loading} onSelect={handleSelect} />}
-          {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} />}
+          {tab === 'home'     && <HomeScreen     events={events} sessions={sessions} loading={loading} setTab={setTab} onSelect={setSelectedEventId} />}
+          {tab === 'events'   && <EventsScreen   events={events} loading={loading} onSelect={setSelectedEventId} />}
+          {tab === 'quotes'   && <QuotesScreen   events={events} loading={loading} onSelect={setSelectedEventId} />}
+          {tab === 'agenda'   && <AgendaScreen   events={events} sessions={sessions} loading={loading} onSelect={setSelectedEventId} />}
+          {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} onTasting={setSelectedTastingId} />}
+          {tab === 'stats'    && <StatsScreen    events={events} loading={loading} />}
           <BottomNav tab={tab} setTab={setTab} />
         </>
       )}
