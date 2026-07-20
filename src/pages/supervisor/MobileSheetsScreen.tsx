@@ -187,7 +187,7 @@ export default function MobileSheetsScreen() {
 
   useEffect(() => {
     (supabase.from as any)('technical_sheets')
-      .select('id, name, image_url, sheet_categories(name)')
+      .select('id, name, image_url, category')
       .order('name')
       .then(({ data }: any) => {
         setSheets(
@@ -195,7 +195,7 @@ export default function MobileSheetsScreen() {
             id: s.id,
             name: s.name,
             image_url: s.image_url ?? null,
-            category: s.sheet_categories?.name ?? null,
+            category: s.category ?? null,
           }))
         );
         setLoading(false);
