@@ -451,7 +451,9 @@ export default function SupervisorSheetsPage() {
   const filteredSheets = sheets.filter(s => {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase());
     const matchCat = filterCategory === 'all' || s.category === filterCategory;
-    const matchStatus = filterStatus === 'all' || (filterStatus === 'active' ? s.is_active !== false : s.is_active === false);
+    const matchStatus = search.trim()
+      ? true
+      : filterStatus === 'all' || (filterStatus === 'active' ? s.is_active !== false : s.is_active === false);
     return matchSearch && matchCat && matchStatus;
   });
 
