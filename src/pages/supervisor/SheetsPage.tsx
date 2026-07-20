@@ -247,10 +247,29 @@ export default function SupervisorSheetsPage() {
   const [prepTime, setPrepTime] = useState('0');
   const [instructions, setInstructions] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
+  const imageFileRef = useRef<HTMLInputElement>(null);
   const [formItems, setFormItems] = useState<SheetItem[]>([]);
 
   // File import ref
   const importFileRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return; }
+    setImageUploading(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg';
+      const path = `sheets/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from('item-images').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('item-images').getPublicUrl(path);
+      setImageUrl(publicUrl);
+    } catch {
+      toast.error('Erro ao fazer upload da imagem');
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -859,8 +878,34 @@ export default function SupervisorSheetsPage() {
               </div>
 
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Foto do Prato (URL)</label>
-                <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://exemplo.com/foto-do-prato.jpg" />
+                <label className="text-sm text-muted-foreground mb-1 block">Foto do Prato</label>
+                <div
+                  className="relative border-2 border-dashed border-border rounded-xl overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+                  style={{ height: imageUrl ? 140 : 72 }}
+                  onClick={() => !imageUploading && imageFileRef.current?.click()}
+                >
+                  {imageUrl ? (
+                    <>
+                      <img src={imageUrl} alt="preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-xs font-medium flex items-center gap-1.5"><Upload className="w-3.5 h-3.5" />Trocar foto</span>
+                      </div>
+                      <button type="button" onClick={e => { e.stopPropagation(); setImageUrl(''); }}
+                        className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full gap-2 text-muted-foreground">
+                      {imageUploading
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /><span className="text-xs">Enviando...</span></>
+                        : <><Upload className="w-4 h-4" /><span className="text-xs">Clique para adicionar foto</span></>}
+                    </div>
+                  )}
+                  {imageUploading && imageUrl && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-white" /></div>}
+                </div>
+                <input ref={imageFileRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ''; }} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
