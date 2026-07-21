@@ -101,6 +101,12 @@ const MenuSelectionPage      = lazy(() => import("./pages/public/MenuSelectionPa
 const ClientRegisterPage     = lazy(() => import("./pages/public/ClientRegisterPage"));
 const ContractFormPage       = lazy(() => import("./pages/public/ContractFormPage"));
 
+// ─── Assessora portal (lazy) ───
+const AssesoraLayout         = lazy(() => import("./pages/assessora/AssesoraLayout"));
+const AssesoraEventosPage    = lazy(() => import("./pages/assessora/AssesoraEventosPage"));
+const AssesoraEventoDetailPage = lazy(() => import("./pages/assessora/AssesoraEventoDetailPage"));
+const AssesoraDegustacoes    = lazy(() => import("./pages/assessora/AssesoraDegustacoes"));
+
 // ─── Client portal (lazy) ───
 const ClientPortalLayout     = lazy(() => import("./pages/portal/ClientPortalLayout"));
 const PortalEventoPage       = lazy(() => import("./pages/portal/PortalEventoPage"));
@@ -184,6 +190,23 @@ function AppRoutes() {
             <Route path="checklist"   element={<PortalChecklistPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/portal" replace />} />
+        </Routes>
+      </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
+  if (role === 'assessor') {
+    return (
+      <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/assessora" element={<AssesoraLayout />}>
+            <Route index element={<AssesoraEventosPage />} />
+            <Route path="evento/:id"   element={<AssesoraEventoDetailPage />} />
+            <Route path="degustacoes"  element={<AssesoraDegustacoes />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/assessora" replace />} />
         </Routes>
       </Suspense>
       </ErrorBoundary>
