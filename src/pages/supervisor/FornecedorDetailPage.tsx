@@ -3,144 +3,205 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  ArrowLeft, Truck, Star, ExternalLink, Pencil, Trash2,
-  Plus, Loader2, ChevronsUpDown, Check, Phone, Mail, MapPin, FileText,
+  ArrowLeft, Truck, Star, ExternalLink, Pencil, Trash2, Plus, Loader2,
+  ChevronsUpDown, Check, Phone, Mail, FileText, Package, ThumbsUp, ThumbsDown,
+  AlertTriangle, CheckCircle, TrendingUp, TrendingDown,
 } from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { fmtNum } from '@/lib/format';
+import { fmtCur, fmtDate, fmtNum } from '@/lib/format';
 
-// Supplier profile stored in localStorage
-type SupplierProfile = { phone: string; email: string; address: string; notes: string };
-const PROFILES_KEY = 'supplierProfiles';
-function getProfiles(): Record<string, SupplierProfile> {
-  try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || '{}'); } catch { return {}; }
-}
-function saveProfile(name: string, p: SupplierProfile) {
-  const all = getProfiles();
-  all[name] = p;
-  localStorage.setItem(PROFILES_KEY, JSON.stringify(all));
-}
+const CATEGORIAS = [
+  { value: 'hortifruti',   label: 'Hortifruti' },
+  { value: 'proteinas',    label: 'Proteínas' },
+  { value: 'bebidas',      label: 'Bebidas' },
+  { value: 'descartaveis', label: 'Descartáveis' },
+  { value: 'embalagens',   label: 'Embalagens' },
+  { value: 'outros',       label: 'Outros' },
+];
 
-type SupplierItem = {
-  record_id: string;
-  item_id: string;
-  item_name: string;
-  item_unit: string;
-  unit_price: number;
-  is_preferred: boolean;
-  notes: string | null;
+type Fornecedor = {
+  id: string; nome: string; cnpj: string | null;
+  telefone: string | null; email: string | null;
+  categoria: string | null; status: string; observacoes: string | null;
 };
-type StockItemOption = { id: string; name: string; unit: string };
-type ItemFormState = { selectedItemId: string | null; unitPrice: string; isPreferred: boolean; notes: string };
-const EMPTY_ITEM_FORM: ItemFormState = { selectedItemId: null, unitPrice: '', isPreferred: false, notes: '' };
+
+type ItemRow = {
+  record_id: string; item_id: string; item_name: string; item_unit: string;
+  unit_price: number; is_preferred: boolean; ativo: boolean; notes: string | null;
+  pedido_minimo: number | null; prazo_entrega_dias: number | null; condicao_pagamento: string | null;
+};
+
+type StockOption  = { id: string; name: string; unit: string };
+type Avaliacao    = { id: string; data: string; tipo: string; observacao: string | null };
+type Scorecard    = { pct_pontualidade: number | null; pct_nao_conformidade: number | null; pct_atraso: number | null; total_avaliacoes: number };
+
+type ItemFormState = {
+  selectedItemId: string | null; unitPrice: string; isPreferred: boolean;
+  notes: string; pedidoMinimo: string; prazoEntrega: string; condicaoPagamento: string;
+};
+const EMPTY_FORM: ItemFormState = {
+  selectedItemId: null, unitPrice: '', isPreferred: false,
+  notes: '', pedidoMinimo: '', prazoEntrega: '', condicaoPagamento: '',
+};
+
+type AvalForm = { tipo: string; observacao: string };
 
 export default function FornecedorDetailPage() {
-  const { supplierName: encodedName } = useParams<{ supplierName: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const supplierName = decodeURIComponent(encodedName || '');
-  const isNew = encodedName === 'novo';
+  const isNew = id === 'novo';
 
-  // Profile
-  const [profile, setProfile] = useState<SupplierProfile>({ phone: '', email: '', address: '', notes: '' });
-  const [editingProfile, setEditingProfile] = useState(isNew);
-  const [profileDraft, setProfileDraft] = useState<SupplierProfile & { name: string }>({ name: supplierName, phone: '', email: '', address: '', notes: '' });
+  const [forn, setForn]             = useState<Fornecedor | null>(null);
+  const [editingForn, setEditingForn] = useState(isNew);
+  const [draft, setDraft]           = useState<Partial<Fornecedor>>({
+    nome: '', cnpj: '', telefone: '', email: '', categoria: '', status: 'ativo', observacoes: '',
+  });
+  const [savingForn, setSavingForn]   = useState(false);
 
-  // Items
-  const [items, setItems] = useState<SupplierItem[]>([]);
+  const [items, setItems]           = useState<ItemRow[]>([]);
   const [loadingItems, setLoadingItems] = useState(!isNew);
-  const [stockItems, setStockItems] = useState<StockItemOption[]>([]);
+  const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
 
-  // Item dialog
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const [itemForm, setItemForm] = useState<ItemFormState>(EMPTY_ITEM_FORM);
+  const [itemForm, setItemForm]     = useState<ItemFormState>(EMPTY_FORM);
   const [savingItem, setSavingItem] = useState(false);
-  const [itemComboOpen, setItemComboOpen] = useState(false);
+  const [comboOpen, setComboOpen]   = useState(false);
+
+  const [avaliacoes, setAvaliacoes]   = useState<Avaliacao[]>([]);
+  const [scorecard, setScorecard]     = useState<Scorecard | null>(null);
+  const [avalDialogOpen, setAvalDialogOpen] = useState(false);
+  const [avalForm, setAvalForm]       = useState<AvalForm>({ tipo: 'entrega_no_prazo', observacao: '' });
+  const [savingAval, setSavingAval]   = useState(false);
 
   useEffect(() => {
-    if (!isNew) {
-      const saved = getProfiles()[supplierName];
-      if (saved) { setProfile(saved); setProfileDraft({ name: supplierName, ...saved }); }
-      else { setProfileDraft(d => ({ ...d, name: supplierName })); }
+    if (!isNew && id) {
+      loadFornecedor();
       loadItems();
+      loadAvaliacoes();
     }
-    loadStockItems();
-  }, [supplierName]);
+    loadStockOptions();
+  }, [id]);
+
+  const loadFornecedor = async () => {
+    const { data } = await (supabase.from('fornecedores' as any) as any)
+      .select('*').eq('id', id).single();
+    if (data) { setForn(data as Fornecedor); setDraft(data as Fornecedor); }
+  };
 
   const loadItems = async () => {
     setLoadingItems(true);
-    const { data } = await supabase
-      .from('item_suppliers')
-      .select('id, item_id, supplier_name, unit_price, is_preferred, notes, stock_items(name, unit)')
-      .eq('supplier_name', supplierName)
-      .order('item_id');
-    setItems(((data || []) as any[]).map(r => ({
-      record_id: r.id,
-      item_id: r.item_id,
-      item_name: r.stock_items?.name || '?',
-      item_unit: r.stock_items?.unit || '',
-      unit_price: r.unit_price || 0,
-      is_preferred: r.is_preferred || false,
-      notes: r.notes || null,
+    const { data } = await (supabase.from('item_suppliers' as any) as any)
+      .select('id,item_id,unit_price,is_preferred,ativo,notes,pedido_minimo,prazo_entrega_dias,condicao_pagamento,stock_items(name,unit)')
+      .eq('fornecedor_id', id)
+      .order('is_preferred', { ascending: false });
+    setItems(((data || []) as any[]).map((r: any) => ({
+      record_id:          r.id,
+      item_id:            r.item_id,
+      item_name:          r.stock_items?.name || '?',
+      item_unit:          r.stock_items?.unit || '',
+      unit_price:         r.unit_price ?? 0,
+      is_preferred:       r.is_preferred ?? false,
+      ativo:              r.ativo ?? true,
+      notes:              r.notes,
+      pedido_minimo:      r.pedido_minimo,
+      prazo_entrega_dias: r.prazo_entrega_dias,
+      condicao_pagamento: r.condicao_pagamento,
     })));
     setLoadingItems(false);
   };
 
-  const loadStockItems = async () => {
-    const { data } = await supabase.from('stock_items').select('id, name, unit').order('name').range(0, 9999);
-    setStockItems((data || []) as StockItemOption[]);
+  const loadStockOptions = async () => {
+    const { data } = await supabase.from('stock_items').select('id,name,unit').order('name').range(0, 9999);
+    setStockOptions((data || []) as StockOption[]);
   };
 
-  const saveProfileChanges = async () => {
-    if (!profileDraft.name.trim()) { toast.error('Nome do fornecedor é obrigatório'); return; }
-    const p: SupplierProfile = { phone: profileDraft.phone, email: profileDraft.email, address: profileDraft.address, notes: profileDraft.notes };
-    // If name changed, update all item_suppliers records
-    if (!isNew && profileDraft.name.trim() !== supplierName) {
-      const { error } = await supabase
-        .from('item_suppliers')
-        .update({ supplier_name: profileDraft.name.trim() } as any)
-        .eq('supplier_name', supplierName);
-      if (error) { toast.error('Erro ao atualizar nome'); return; }
-      saveProfile(profileDraft.name.trim(), p);
-      // Remove old profile key
-      const all = getProfiles();
-      delete all[supplierName];
-      localStorage.setItem(PROFILES_KEY, JSON.stringify(all));
-      navigate(`/fornecedores/${encodeURIComponent(profileDraft.name.trim())}`, { replace: true });
+  const loadAvaliacoes = async () => {
+    const [{ data: avals }, { data: sc }] = await Promise.all([
+      (supabase.from('avaliacoes_fornecedor' as any) as any)
+        .select('id,data,tipo,observacao')
+        .eq('fornecedor_id', id)
+        .order('data', { ascending: false })
+        .limit(20),
+      (supabase.from('vw_scorecard_fornecedor' as any) as any)
+        .select('*').eq('fornecedor_id', id).single(),
+    ]);
+    setAvaliacoes((avals || []) as Avaliacao[]);
+    setScorecard(sc as Scorecard | null);
+  };
+
+  // ── Fornecedor CRUD ──────────────────────────────────────────
+  const saveFornecedor = async () => {
+    if (!(draft.nome || '').trim()) { toast.error('Nome é obrigatório'); return; }
+    setSavingForn(true);
+    const payload = {
+      nome:        (draft.nome || '').trim(),
+      cnpj:        draft.cnpj || null,
+      telefone:    draft.telefone || null,
+      email:       draft.email   || null,
+      categoria:   draft.categoria || null,
+      status:      draft.status || 'ativo',
+      observacoes: draft.observacoes || null,
+    };
+    if (isNew) {
+      const { data, error } = await (supabase.from('fornecedores' as any) as any).insert(payload).select().single();
+      if (error) { toast.error('Erro ao criar fornecedor'); setSavingForn(false); return; }
+      toast.success('Fornecedor criado!');
+      navigate(`/fornecedores/${(data as any).id}`, { replace: true });
     } else {
-      saveProfile(profileDraft.name.trim(), p);
+      const { error } = await (supabase.from('fornecedores' as any) as any).update(payload).eq('id', id);
+      if (error) { toast.error('Erro ao salvar'); setSavingForn(false); return; }
+      setForn({ ...forn!, ...payload });
+      setEditingForn(false);
+      toast.success('Dados atualizados!');
     }
-    setProfile(p);
-    setEditingProfile(false);
-    toast.success(isNew ? 'Fornecedor criado!' : 'Dados atualizados!');
-    if (isNew) navigate(`/fornecedores/${encodeURIComponent(profileDraft.name.trim())}`, { replace: true });
+    setSavingForn(false);
   };
 
-  const openAddItem = () => { setEditingRecordId(null); setItemForm(EMPTY_ITEM_FORM); setItemDialogOpen(true); };
-  const openEditItem = (item: SupplierItem) => {
-    setEditingRecordId(item.record_id);
-    setItemForm({ selectedItemId: item.item_id, unitPrice: String(item.unit_price), isPreferred: item.is_preferred, notes: item.notes || '' });
+  // ── Item CRUD ────────────────────────────────────────────────
+  const openAddItem = () => { setEditingRecordId(null); setItemForm(EMPTY_FORM); setItemDialogOpen(true); };
+  const openEditItem = (row: ItemRow) => {
+    setEditingRecordId(row.record_id);
+    setItemForm({
+      selectedItemId:    row.item_id,
+      unitPrice:         String(row.unit_price),
+      isPreferred:       row.is_preferred,
+      notes:             row.notes || '',
+      pedidoMinimo:      row.pedido_minimo != null ? String(row.pedido_minimo) : '',
+      prazoEntrega:      row.prazo_entrega_dias != null ? String(row.prazo_entrega_dias) : '',
+      condicaoPagamento: row.condicao_pagamento || '',
+    });
     setItemDialogOpen(true);
   };
 
   const handleSaveItem = async () => {
     if (!itemForm.selectedItemId) { toast.error('Selecione um insumo'); return; }
     setSavingItem(true);
-    const payload = {
-      item_id: itemForm.selectedItemId,
-      supplier_name: supplierName,
-      unit_price: parseFloat(itemForm.unitPrice) || 0,
-      is_preferred: itemForm.isPreferred,
-      notes: itemForm.notes.trim() || null,
+    const payload: any = {
+      item_id:            itemForm.selectedItemId,
+      fornecedor_id:      id,
+      supplier_name:      forn?.nome || '',
+      unit_price:         parseFloat(itemForm.unitPrice) || 0,
+      is_preferred:       itemForm.isPreferred,
+      notes:              itemForm.notes.trim() || null,
+      pedido_minimo:      itemForm.pedidoMinimo ? parseFloat(itemForm.pedidoMinimo) : null,
+      prazo_entrega_dias: itemForm.prazoEntrega ? parseInt(itemForm.prazoEntrega) : null,
+      condicao_pagamento: itemForm.condicaoPagamento.trim() || null,
     };
     const { error } = editingRecordId
-      ? await supabase.from('item_suppliers').update(payload as any).eq('id', editingRecordId)
-      : await supabase.from('item_suppliers').insert(payload as any);
+      ? await (supabase.from('item_suppliers' as any) as any).update(payload).eq('id', editingRecordId)
+      : await (supabase.from('item_suppliers' as any) as any).insert(payload);
     if (error) { toast.error('Erro ao salvar'); setSavingItem(false); return; }
     toast.success(editingRecordId ? 'Item atualizado!' : 'Item adicionado!');
     setSavingItem(false);
@@ -149,31 +210,66 @@ export default function FornecedorDetailPage() {
   };
 
   const handleDeleteItem = async (recordId: string) => {
-    if (!confirm('Remover este item do fornecedor?')) return;
-    await supabase.from('item_suppliers').delete().eq('id', recordId);
-    toast.success('Item removido');
+    if (!confirm('Remover este insumo do fornecedor?')) return;
+    await (supabase.from('item_suppliers' as any) as any).delete().eq('id', recordId);
+    toast.success('Insumo removido');
     loadItems();
   };
 
   const handleInlinePrice = async (recordId: string, price: number) => {
-    await supabase.from('item_suppliers').update({ unit_price: price } as any).eq('id', recordId);
+    await (supabase.from('item_suppliers' as any) as any).update({ unit_price: price }).eq('id', recordId);
     setItems(prev => prev.map(i => i.record_id === recordId ? { ...i, unit_price: price } : i));
     toast.success('Preço atualizado!');
   };
 
+  // ── Avaliação ────────────────────────────────────────────────
+  const handleSaveAval = async () => {
+    if (!avalForm.tipo) return;
+    setSavingAval(true);
+    const { error } = await (supabase.from('avaliacoes_fornecedor' as any) as any).insert({
+      fornecedor_id: id,
+      tipo:          avalForm.tipo,
+      observacao:    avalForm.observacao.trim() || null,
+    });
+    if (error) { toast.error('Erro ao salvar avaliação'); setSavingAval(false); return; }
+    toast.success('Avaliação registrada!');
+    setSavingAval(false);
+    setAvalDialogOpen(false);
+    setAvalForm({ tipo: 'entrega_no_prazo', observacao: '' });
+    loadAvaliacoes();
+  };
+
+  const tipoLabel = (t: string) => ({
+    entrega_no_prazo:    'Entrega no prazo',
+    entrega_atrasada:    'Entrega atrasada',
+    produto_nao_conforme:'Produto não conforme',
+    produto_ok:          'Produto OK',
+  }[t] ?? t);
+
+  const tipoIcon = (t: string) => {
+    if (t === 'entrega_no_prazo' || t === 'produto_ok') return <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />;
+    return <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />;
+  };
+
   const selectedItemLabel = itemForm.selectedItemId
-    ? stockItems.find(s => s.id === itemForm.selectedItemId)?.name || 'Selecionar insumo...'
+    ? stockOptions.find(s => s.id === itemForm.selectedItemId)?.name || 'Selecionar...'
     : 'Selecionar insumo...';
 
-  const displayName = isNew ? (profileDraft.name || 'Novo Fornecedor') : supplierName;
+  if (!isNew && !forn && !editingForn) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const displayName = isNew ? (draft.nome || 'Novo Fornecedor') : (forn?.nome || '');
 
   return (
     <div>
-      {/* Back */}
       <button onClick={() => navigate('/fornecedores')}
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
-        <ArrowLeft className="w-4 h-4" />
-        Voltar para Fornecedores
+        <ArrowLeft className="w-4 h-4" />Voltar para Fornecedores
       </button>
 
       {/* Header */}
@@ -184,192 +280,296 @@ export default function FornecedorDetailPage() {
           </div>
           <div>
             <h1 className="text-3xl font-display font-bold gold-text">{displayName}</h1>
-            {!isNew && (
-              <p className="text-muted-foreground text-sm mt-0.5">
-                {items.length} item{items.length !== 1 ? 's' : ''} · {items.filter(i => i.is_preferred).length} preferido{items.filter(i => i.is_preferred).length !== 1 ? 's' : ''}
-              </p>
+            {!isNew && forn && (
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-muted-foreground text-sm">
+                  {items.length} insumo{items.length !== 1 ? 's' : ''}
+                </p>
+                <Badge variant={forn.status === 'ativo' ? 'default' : 'secondary'} className="text-xs">
+                  {forn.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                </Badge>
+                {forn.categoria && (
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {CATEGORIAS.find(c => c.value === forn.categoria)?.label}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
-        {!editingProfile && (
-          <Button variant="outline" size="sm" onClick={() => { setProfileDraft({ name: supplierName, ...profile }); setEditingProfile(true); }} className="gap-2 flex-shrink-0">
+        {!editingForn && !isNew && (
+          <Button variant="outline" size="sm" onClick={() => setEditingForn(true)} className="gap-2 flex-shrink-0">
             <Pencil className="w-3.5 h-3.5" />Editar dados
           </Button>
         )}
       </div>
 
+      {/* Scorecard KPIs (only when has avaliacoes) */}
+      {!isNew && scorecard && scorecard.total_avaliacoes > 0 && (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-white rounded-xl border border-border p-4 text-center">
+            <div className="text-2xl font-bold text-emerald-600">{scorecard.pct_pontualidade ?? 0}%</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Entregas no prazo</div>
+          </div>
+          <div className="bg-white rounded-xl border border-border p-4 text-center">
+            <div className="text-2xl font-bold text-amber-600">{scorecard.pct_atraso ?? 0}%</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Atrasos</div>
+          </div>
+          <div className="bg-white rounded-xl border border-border p-4 text-center">
+            <div className="text-2xl font-bold text-red-600">{scorecard.pct_nao_conformidade ?? 0}%</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Não conformidade</div>
+          </div>
+        </div>
+      )}
+
       {/* Profile card */}
       <div className="bg-white rounded-xl border border-border p-5 mb-6">
-        {editingProfile ? (
+        {editingForn ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Nome *</label>
-              <Input value={profileDraft.name} onChange={e => setProfileDraft(d => ({ ...d, name: e.target.value }))} placeholder="Nome do fornecedor" autoFocus />
+              <Input value={draft.nome || ''} onChange={e => setDraft(d => ({ ...d, nome: e.target.value }))} placeholder="Nome do fornecedor" autoFocus />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">CNPJ</label>
+              <Input value={draft.cnpj || ''} onChange={e => setDraft(d => ({ ...d, cnpj: e.target.value }))} placeholder="00.000.000/0001-00" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Categoria</label>
+              <Select value={draft.categoria || ''} onValueChange={v => setDraft(d => ({ ...d, categoria: v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Telefone / WhatsApp</label>
-              <Input value={profileDraft.phone} onChange={e => setProfileDraft(d => ({ ...d, phone: e.target.value }))} placeholder="(11) 99999-9999" />
+              <Input value={draft.telefone || ''} onChange={e => setDraft(d => ({ ...d, telefone: e.target.value }))} placeholder="(11) 99999-9999" />
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">E-mail</label>
-              <Input value={profileDraft.email} onChange={e => setProfileDraft(d => ({ ...d, email: e.target.value }))} placeholder="contato@fornecedor.com" />
+              <Input value={draft.email || ''} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} placeholder="contato@fornecedor.com" />
             </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Endereço</label>
-              <Input value={profileDraft.address} onChange={e => setProfileDraft(d => ({ ...d, address: e.target.value }))} placeholder="Endereço completo" />
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Status</label>
+              <Select value={draft.status || 'ativo'} onValueChange={v => setDraft(d => ({ ...d, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ativo">Ativo</SelectItem>
+                  <SelectItem value="inativo">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Observações</label>
-              <Input value={profileDraft.notes} onChange={e => setProfileDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Condições de pagamento, prazo de entrega..." />
+              <Input value={draft.observacoes || ''} onChange={e => setDraft(d => ({ ...d, observacoes: e.target.value }))} placeholder="Condições gerais, prazo padrão..." />
             </div>
             <div className="sm:col-span-2 flex gap-2">
-              <Button onClick={saveProfileChanges} className="gap-2">Salvar dados</Button>
-              {!isNew && <Button variant="outline" onClick={() => setEditingProfile(false)}>Cancelar</Button>}
+              <Button onClick={saveFornecedor} disabled={savingForn} className="gap-2">
+                {savingForn && <Loader2 className="w-4 h-4 animate-spin" />}
+                Salvar dados
+              </Button>
+              {!isNew && <Button variant="outline" onClick={() => setEditingForn(false)}>Cancelar</Button>}
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {profile.phone && (
+            {forn?.telefone && (
               <div className="flex items-center gap-2.5 text-sm">
                 <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-foreground">{profile.phone}</span>
+                <span>{forn.telefone}</span>
               </div>
             )}
-            {profile.email && (
+            {forn?.email && (
               <div className="flex items-center gap-2.5 text-sm">
                 <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-foreground">{profile.email}</span>
+                <span>{forn.email}</span>
               </div>
             )}
-            {profile.address && (
-              <div className="flex items-center gap-2.5 text-sm sm:col-span-2">
-                <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-foreground">{profile.address}</span>
+            {forn?.cnpj && (
+              <div className="flex items-center gap-2.5 text-sm">
+                <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground">{forn.cnpj}</span>
               </div>
             )}
-            {profile.notes && (
+            {forn?.observacoes && (
               <div className="flex items-start gap-2.5 text-sm sm:col-span-2">
                 <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <span className="text-muted-foreground">{profile.notes}</span>
+                <span className="text-muted-foreground">{forn.observacoes}</span>
               </div>
             )}
-            {!profile.phone && !profile.email && !profile.address && !profile.notes && (
+            {!forn?.telefone && !forn?.email && !forn?.cnpj && !forn?.observacoes && (
               <p className="text-sm text-muted-foreground sm:col-span-2">
-                Nenhum dado de contato cadastrado.{' '}
-                <button className="text-primary underline" onClick={() => { setProfileDraft({ name: supplierName, ...profile }); setEditingProfile(true); }}>
-                  Adicionar agora
-                </button>
+                Nenhum dado de contato.{' '}
+                <button className="text-primary underline" onClick={() => setEditingForn(true)}>Adicionar agora</button>
               </p>
             )}
           </div>
         )}
       </div>
 
-      {/* Items section */}
+      {/* Tabs: Insumos | Avaliações */}
       {!isNew && (
-        <>
+        <Tabs defaultValue="insumos">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Produtos</h2>
-            <Button size="sm" variant="outline" onClick={openAddItem} className="gap-1.5">
-              <Plus className="w-3.5 h-3.5" />Adicionar produto
-            </Button>
+            <TabsList>
+              <TabsTrigger value="insumos" className="gap-1.5">
+                <Package className="w-3.5 h-3.5" />Insumos ({items.length})
+              </TabsTrigger>
+              <TabsTrigger value="avaliacoes" className="gap-1.5">
+                <ThumbsUp className="w-3.5 h-3.5" />Avaliações ({avaliacoes.length})
+              </TabsTrigger>
+            </TabsList>
           </div>
 
-          <div className="bg-white rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs" style={{ background: 'hsl(40 30% 97%)' }}>
-                  <th className="text-left px-5 py-3 font-semibold text-muted-foreground">INSUMO</th>
-                  <th className="text-right px-4 py-3 font-semibold text-muted-foreground">PREÇO UNIT.</th>
-                  <th className="text-center px-4 py-3 font-semibold text-muted-foreground">PREFERIDO</th>
-                  <th className="text-left px-4 py-3 font-semibold text-muted-foreground">OBSERVAÇÕES</th>
-                  <th className="w-28 px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {loadingItems ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <tr key={i}>
-                      {[50, 20, 10, 30, 15].map((w, j) => (
-                        <td key={j} className="px-5 py-3">
-                          <div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${w}%` }} />
-                        </td>
-                      ))}
+          {/* ── INSUMOS ─────────────────────────────────── */}
+          <TabsContent value="insumos">
+            <div className="flex justify-end mb-3">
+              <Button size="sm" variant="outline" onClick={openAddItem} className="gap-1.5">
+                <Plus className="w-3.5 h-3.5" />Adicionar insumo
+              </Button>
+            </div>
+            <div className="bg-white rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs" style={{ background: 'hsl(40 30% 97%)' }}>
+                    <th className="text-left px-5 py-3 font-semibold text-muted-foreground">INSUMO</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted-foreground">PREÇO UNIT.</th>
+                    <th className="text-right px-4 py-3 font-semibold text-muted-foreground">PED. MÍN.</th>
+                    <th className="text-center px-4 py-3 font-semibold text-muted-foreground">PRAZO</th>
+                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">PAGAMENTO</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground">PREF.</th>
+                    <th className="w-28 px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {loadingItems ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <tr key={i}>
+                        {[40, 15, 10, 10, 12, 5, 8].map((w, j) => (
+                          <td key={j} className="px-5 py-3">
+                            <div className="h-4 bg-muted/40 rounded animate-pulse" style={{ width: `${w}%` }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : items.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground text-sm">
+                        Nenhum insumo cadastrado para este fornecedor.
+                      </td>
                     </tr>
-                  ))
-                ) : items.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-5 py-12 text-center text-muted-foreground text-sm">
-                      Nenhum produto cadastrado para este fornecedor.
-                    </td>
-                  </tr>
-                ) : items.map(item => (
-                  <tr key={item.record_id} className="hover:bg-amber-50/30 transition-colors">
-                    <td className="px-5 py-3">
-                      <span className="font-medium text-foreground">{item.item_name}</span>
-                      <span className="text-muted-foreground text-xs ml-1.5">({item.item_unit})</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="text-xs text-muted-foreground">R$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          defaultValue={item.unit_price}
-                          onBlur={e => {
-                            const v = parseFloat(e.target.value) || 0;
-                            if (v !== item.unit_price) handleInlinePrice(item.record_id, v);
-                          }}
-                          onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                          className="w-24 text-right text-sm font-medium border border-transparent rounded px-1.5 py-0.5 hover:border-border focus:border-primary focus:outline-none bg-transparent focus:bg-white transition-all"
-                          title="Clique para editar o preço"
-                        />
-                        <span className="text-xs text-muted-foreground">/{item.item_unit}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {item.is_preferred
-                        ? <Star className="w-4 h-4 text-amber-500 fill-amber-400 mx-auto" />
-                        : <span className="text-muted-foreground/30 text-xs">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {item.notes || <span className="opacity-30">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 justify-end">
-                        <Button variant="ghost" size="icon" className="w-7 h-7" title="Ver insumo"
-                          onClick={() => navigate(`/items/${item.item_id}`)}>
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="w-7 h-7" title="Editar"
-                          onClick={() => openEditItem(item)}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="w-7 h-7 text-destructive/60 hover:text-destructive"
-                          title="Remover" onClick={() => handleDeleteItem(item.record_id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+                  ) : items.map(row => (
+                    <tr key={row.record_id} className={`hover:bg-amber-50/30 transition-colors ${!row.ativo ? 'opacity-50' : ''}`}>
+                      <td className="px-5 py-3">
+                        <span className="font-medium">{row.item_name}</span>
+                        <span className="text-muted-foreground text-xs ml-1.5">({row.item_unit})</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-xs text-muted-foreground">R$</span>
+                          <input
+                            type="number" step="0.01" min="0"
+                            defaultValue={row.unit_price}
+                            onBlur={e => {
+                              const v = parseFloat(e.target.value) || 0;
+                              if (v !== row.unit_price) handleInlinePrice(row.record_id, v);
+                            }}
+                            onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                            className="w-24 text-right text-sm font-medium border border-transparent rounded px-1.5 py-0.5 hover:border-border focus:border-primary focus:outline-none bg-transparent focus:bg-white transition-all"
+                          />
+                          <span className="text-xs text-muted-foreground">/{row.item_unit}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground text-xs">
+                        {row.pedido_minimo != null ? fmtNum(row.pedido_minimo, 0) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center text-muted-foreground text-xs">
+                        {row.prazo_entrega_dias != null ? `${row.prazo_entrega_dias}d` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {row.condicao_pagamento || '—'}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        {row.is_preferred
+                          ? <Star className="w-4 h-4 text-amber-500 fill-amber-400 mx-auto" />
+                          : <span className="text-muted-foreground/30 text-xs">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1 justify-end">
+                          <Button variant="ghost" size="icon" className="w-7 h-7" title="Ver insumo"
+                            onClick={() => navigate(`/items/${row.item_id}`)}>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => openEditItem(row)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="w-7 h-7 text-destructive/60 hover:text-destructive"
+                            onClick={() => handleDeleteItem(row.record_id)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </TabsContent>
+
+          {/* ── AVALIAÇÕES ──────────────────────────────── */}
+          <TabsContent value="avaliacoes">
+            <div className="flex justify-end mb-3">
+              <Button size="sm" variant="outline" onClick={() => setAvalDialogOpen(true)} className="gap-1.5">
+                <Plus className="w-3.5 h-3.5" />Nova avaliação
+              </Button>
+            </div>
+            {avaliacoes.length === 0 ? (
+              <div className="bg-white rounded-xl border border-border p-12 text-center text-muted-foreground text-sm">
+                Nenhuma avaliação registrada.
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-xs" style={{ background: 'hsl(40 30% 97%)' }}>
+                      <th className="text-left px-5 py-3 font-semibold text-muted-foreground">DATA</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">TIPO</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">OBSERVAÇÃO</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {avaliacoes.map(a => (
+                      <tr key={a.id}>
+                        <td className="px-5 py-3 text-muted-foreground text-xs">{fmtDate(a.data)}</td>
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-1.5">
+                            {tipoIcon(a.tipo)}
+                            <span className="text-xs font-medium">{tipoLabel(a.tipo)}</span>
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{a.observacao || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       {/* Item Dialog */}
       <Dialog open={itemDialogOpen} onOpenChange={o => { if (!o) setItemDialogOpen(false); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editingRecordId ? 'Editar produto' : 'Adicionar produto'}</DialogTitle>
+            <DialogTitle>{editingRecordId ? 'Editar insumo' : 'Adicionar insumo'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Insumo *</label>
-              <Popover open={itemComboOpen} onOpenChange={setItemComboOpen}>
+              <Popover open={comboOpen} onOpenChange={setComboOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" className="w-full justify-between font-normal text-sm">
                     <span className={cn('truncate', !itemForm.selectedItemId && 'text-muted-foreground')}>
@@ -382,11 +582,11 @@ export default function FornecedorDetailPage() {
                   <Command>
                     <CommandInput placeholder="Buscar insumo..." />
                     <CommandList>
-                      <CommandEmpty>Nenhum insumo encontrado.</CommandEmpty>
+                      <CommandEmpty>Nenhum insumo.</CommandEmpty>
                       <CommandGroup>
-                        {stockItems.map(si => (
+                        {stockOptions.map(si => (
                           <CommandItem key={si.id} value={si.name}
-                            onSelect={() => { setItemForm(f => ({ ...f, selectedItemId: si.id })); setItemComboOpen(false); }}>
+                            onSelect={() => { setItemForm(f => ({ ...f, selectedItemId: si.id })); setComboOpen(false); }}>
                             <Check className={cn('mr-2 h-4 w-4', itemForm.selectedItemId === si.id ? 'opacity-100' : 'opacity-0')} />
                             <span className="flex-1">{si.name}</span>
                             <span className="text-xs text-muted-foreground ml-2">{si.unit}</span>
@@ -398,10 +598,27 @@ export default function FornecedorDetailPage() {
                 </PopoverContent>
               </Popover>
             </div>
-            <div>
-              <label className="text-sm text-muted-foreground mb-1 block">Preço unitário (R$)</label>
-              <Input type="number" step="0.01" value={itemForm.unitPrice}
-                onChange={e => setItemForm(f => ({ ...f, unitPrice: e.target.value }))} placeholder="0,00" />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Preço unitário (R$)</label>
+                <Input type="number" step="0.01" value={itemForm.unitPrice}
+                  onChange={e => setItemForm(f => ({ ...f, unitPrice: e.target.value }))} placeholder="0,00" />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Pedido mínimo</label>
+                <Input type="number" value={itemForm.pedidoMinimo}
+                  onChange={e => setItemForm(f => ({ ...f, pedidoMinimo: e.target.value }))} placeholder="—" />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Prazo entrega (dias)</label>
+                <Input type="number" value={itemForm.prazoEntrega}
+                  onChange={e => setItemForm(f => ({ ...f, prazoEntrega: e.target.value }))} placeholder="—" />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Cond. pagamento</label>
+                <Input value={itemForm.condicaoPagamento}
+                  onChange={e => setItemForm(f => ({ ...f, condicaoPagamento: e.target.value }))} placeholder="à vista, 30d..." />
+              </div>
             </div>
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Observações</label>
@@ -409,15 +626,46 @@ export default function FornecedorDetailPage() {
                 onChange={e => setItemForm(f => ({ ...f, notes: e.target.value }))} placeholder="Opcional" />
             </div>
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="item-preferred" checked={itemForm.isPreferred}
+              <input type="checkbox" id="pref" checked={itemForm.isPreferred}
                 onChange={e => setItemForm(f => ({ ...f, isPreferred: e.target.checked }))} className="w-4 h-4" />
-              <label htmlFor="item-preferred" className="text-sm text-foreground cursor-pointer">
-                Fornecedor preferido para este insumo
-              </label>
+              <label htmlFor="pref" className="text-sm cursor-pointer">Fornecedor preferido para este insumo</label>
             </div>
             <Button className="w-full" onClick={handleSaveItem} disabled={savingItem}>
               {savingItem && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              {editingRecordId ? 'Salvar alterações' : 'Adicionar produto'}
+              {editingRecordId ? 'Salvar alterações' : 'Adicionar insumo'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Avaliação Dialog */}
+      <Dialog open={avalDialogOpen} onOpenChange={o => { if (!o) setAvalDialogOpen(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Nova avaliação</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Tipo *</label>
+              <Select value={avalForm.tipo} onValueChange={v => setAvalForm(f => ({ ...f, tipo: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="entrega_no_prazo">✅ Entrega no prazo</SelectItem>
+                  <SelectItem value="entrega_atrasada">⚠️ Entrega atrasada</SelectItem>
+                  <SelectItem value="produto_ok">✅ Produto OK</SelectItem>
+                  <SelectItem value="produto_nao_conforme">⚠️ Produto não conforme</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Observação</label>
+              <Input value={avalForm.observacao}
+                onChange={e => setAvalForm(f => ({ ...f, observacao: e.target.value }))}
+                placeholder="Opcional" />
+            </div>
+            <Button className="w-full" onClick={handleSaveAval} disabled={savingAval}>
+              {savingAval && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Registrar avaliação
             </Button>
           </div>
         </DialogContent>

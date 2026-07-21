@@ -45,6 +45,8 @@ const EventMenusPage           = lazy(() => import("./pages/supervisor/EventMenu
 const EventMenuDetailPage      = lazy(() => import("./pages/supervisor/EventMenuDetailPage"));
 const FornecedoresPage         = lazy(() => import("./pages/supervisor/FornecedoresPage"));
 const FornecedorDetailPage     = lazy(() => import("./pages/supervisor/FornecedorDetailPage"));
+const CotacoesPage             = lazy(() => import("./pages/supervisor/CotacoesPage"));
+const ComprasDashboardPage     = lazy(() => import("./pages/supervisor/ComprasDashboardPage"));
 const ShoppingListsPage        = lazy(() => import("./pages/supervisor/ShoppingListsPage"));
 const ShoppingListDetailPage   = lazy(() => import("./pages/supervisor/ShoppingListDetailPage"));
 const MobileSupervisorApp      = lazy(() => import("./pages/supervisor/MobileSupervisorApp"));
@@ -263,7 +265,9 @@ function AppRoutes() {
             <Route path="/users/:id" element={<EmployeeDetailPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/fornecedores" element={<FornecedoresPage />} />
-            <Route path="/fornecedores/:supplierName" element={<FornecedorDetailPage />} />
+            <Route path="/fornecedores/:id" element={<FornecedorDetailPage />} />
+            <Route path="/cotacoes" element={<CotacoesPage />} />
+            <Route path="/compras-dashboard" element={<ComprasDashboardPage />} />
             <Route path="/materiais" element={<MateriaisInventarioPage />} />
             <Route path="/materiais/categorias" element={<MateriaisCategoriasPage />} />
             <Route path="/materiais/emprestimos" element={<EmprestimosPage />} />
