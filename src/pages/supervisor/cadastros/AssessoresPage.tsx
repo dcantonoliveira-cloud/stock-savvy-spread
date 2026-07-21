@@ -164,8 +164,9 @@ function AssessoraModal({
   const sendWpp = async () => {
     const phone = editPhone || assessora.phone;
     if (!phone) { toast.error('Salve o telefone da assessora antes de enviar'); return; }
+    if (!tempPwd) { toast.error('Redefina a senha primeiro para incluí-la na mensagem'); return; }
     setSendingWpp(true);
-    const result = await sendWhatsApp(phone, buildWppMessage(tempPwd || '••••••••••'));
+    const result = await sendWhatsApp(phone, buildWppMessage(tempPwd));
     setSendingWpp(false);
     if (result.ok) toast.success('Mensagem enviada!');
     else toast.error('Erro ao enviar: ' + result.error);
