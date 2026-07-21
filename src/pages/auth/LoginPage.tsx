@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { LogIn, UserPlus, ChefHat, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');

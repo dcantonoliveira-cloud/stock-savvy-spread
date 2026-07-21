@@ -124,35 +124,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let currentUserId: string | null = null;
-    let initialized = false;
 
-    // getSession resolve o estado inicial — setLoading(false) só após role resolvido
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        currentUserId = session.user.id;
-        setUser(session.user);
-        await fetchUserData(session.user.id, session.user);
-      }
-      initialized = true;
-      setLoading(false);
-    });
-
-    // onAuthStateChange cobre login/logout subsequentes
+    // onAuthStateChange é a fonte de verdade — cobre inicial + login/logout
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         currentUserId = session.user.id;
         setUser(session.user);
-        // setTimeout evita deadlock interno do Supabase; loading só sobe depois do fetch
+        // setTimeout evita deadlock interno do Supabase client
         setTimeout(async () => {
           await fetchUserData(session.user.id, session.user);
-          if (!initialized) { initialized = true; setLoading(false); }
+          setLoading(false);
         }, 0);
       } else {
         currentUserId = null;
         setUser(null);
         setRole(null);
         setProfile(null);
-        if (!initialized) { initialized = true; }
         setLoading(false);
       }
     });
