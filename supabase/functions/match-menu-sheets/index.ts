@@ -91,7 +91,7 @@ serve(async (req) => {
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY não configurada");
 
-    const menuItems = extractMenuItems(menu_text.slice(0, 3000));
+    const menuItems = extractMenuItems(menu_text.slice(0, 20000));
 
     // ── Stage 1: Local fuzzy matching ─────────────────────────────────────────
     const matched_ids: string[] = [];
@@ -148,7 +148,7 @@ JSON (array com um objeto por item, na mesma ordem):
         },
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 1024,
+          max_tokens: 4096,
           messages: [{ role: "user", content: prompt }],
         }),
       });
