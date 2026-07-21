@@ -106,7 +106,7 @@ export default function AssesoraLayout() {
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <img src={logoRondello} alt="Rondello Buffet" className="h-7" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 hidden sm:block ml-1">Portal Assessora</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 hidden sm:block ml-1">Assessoria</span>
         </div>
         <div className="flex items-center gap-3">
           {info?.name && <span className="text-sm font-medium text-foreground hidden sm:block">{info.name}</span>}
