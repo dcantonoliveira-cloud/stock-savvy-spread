@@ -108,8 +108,8 @@ serve(async (req) => {
         // High confidence → auto match
         if (!matched_ids.includes(best.id)) matched_ids.push(best.id);
       } else {
-        // Send to AI with top candidates
-        const candidates = scored.filter(s => s.score >= 0.1).slice(0, 8);
+        // Send to AI with top candidates (always top 12, even with low score)
+        const candidates = scored.slice(0, 12);
         toAI.push({ menu_item: item, candidates });
       }
     }
@@ -125,16 +125,21 @@ serve(async (req) => {
         return `[${i}] "${x.menu_item}"\nCandidatos:\n${cands}`;
       }).join("\n\n");
 
-      const prompt = `Você é um especialista em buffet. Para cada item do cardápio, identifique a melhor ficha técnica entre os candidatos listados.
+      const prompt = `Você é um especialista em buffet e gastronomia. Para cada item do cardápio, identifique a melhor ficha técnica entre os candidatos listados.
 
-Compare ignorando maiúsculas, acentos e pequenas variações de grafia (ex: "chips" = "CHIPPS", "kafta" = "kafta de cordeiro"). Foque no significado: "mini kafta com tahine e iogurte" corresponde a "Kafta cordeiro molho de tahine com iogurte".
+Regras de matching (seja generoso — prefira "matched" a "uncertain" sempre que possível):
+- Ignore maiúsculas, acentos e variações ortográficas
+- Ingredientes extras ou modo de preparo não impedem o match: "Queijo tipo brie em massa filo com geleia de damasco" → "Brie em massa filo e geleia de frutas vermelhas" é match
+- Nomes parciais contam: "Mini Temaki de salmão" → "Temaki salmão cream cheese" é match
+- Bebidas simples (água, refrigerante, suco, cerveja) raramente têm ficha técnica — marque como unmatched se nenhum candidato for relevante
+- Se o candidato de maior score fizer sentido semântico mesmo com grafia diferente, use "matched"
 
 ${aiItems}
 
 Para cada item [i], responda com:
-- "matched": índice do candidato se for correspondência clara ou muito provável (>60% de certeza)
-- "uncertain": lista de índices dos melhores candidatos (até 3) se houver dúvida
-- "unmatched": se nenhum candidato fizer sentido
+- "matched": índice do candidato se for correspondência clara ou provável (>50% de certeza)
+- "uncertain": lista de índices dos melhores candidatos (até 3) se houver dúvida real
+- "unmatched": true se nenhum candidato fizer sentido (ex: bebidas industrializadas sem ficha)
 
 JSON (array com um objeto por item, na mesma ordem):
 [{"i":0,"matched":2},{"i":1,"uncertain":[0,1]},{"i":2,"unmatched":true}]`;
