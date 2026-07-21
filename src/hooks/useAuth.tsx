@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let resolvedRole: Role = null;
     if (rolesRes.data && rolesRes.data.length > 0) {
       const roles = rolesRes.data.map(r => r.role);
-      resolvedRole = roles.includes('supervisor') ? 'supervisor' : roles.includes('client') ? 'client' : 'employee';
+      resolvedRole = roles.includes('supervisor') ? 'supervisor' : roles.includes('client') ? 'client' : roles.includes('assessor') ? 'assessor' : 'employee';
     } else if (clientRes.data) {
       // Já tem portal vinculado
       resolvedRole = 'client';
