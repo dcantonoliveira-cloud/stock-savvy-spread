@@ -47,6 +47,7 @@ const FornecedoresPage         = lazy(() => import("./pages/supervisor/Fornecedo
 const FornecedorDetailPage     = lazy(() => import("./pages/supervisor/FornecedorDetailPage"));
 const CotacoesPage             = lazy(() => import("./pages/supervisor/CotacoesPage"));
 const ComprasDashboardPage     = lazy(() => import("./pages/supervisor/ComprasDashboardPage"));
+const ComparacaoPrecoPage      = lazy(() => import("./pages/supervisor/CompracoesPrecoPage"));
 const ShoppingListsPage        = lazy(() => import("./pages/supervisor/ShoppingListsPage"));
 const ShoppingListDetailPage   = lazy(() => import("./pages/supervisor/ShoppingListDetailPage"));
 const MobileSupervisorApp      = lazy(() => import("./pages/supervisor/MobileSupervisorApp"));
@@ -268,6 +269,7 @@ function AppRoutes() {
             <Route path="/fornecedores/:id" element={<FornecedorDetailPage />} />
             <Route path="/cotacoes" element={<CotacoesPage />} />
             <Route path="/compras-dashboard" element={<ComprasDashboardPage />} />
+            <Route path="/compras/precos" element={<ComparacaoPrecoPage />} />
             <Route path="/materiais" element={<MateriaisInventarioPage />} />
             <Route path="/materiais/categorias" element={<MateriaisCategoriasPage />} />
             <Route path="/materiais/emprestimos" element={<EmprestimosPage />} />
