@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Search, X, Check, ExternalLink, Merge, Pencil, AlertTriangle, KeyRound, Send, Copy, CheckCheck } from 'lucide-react';
+import { Plus, Search, X, Check, ExternalLink, Merge, Pencil, AlertTriangle, KeyRound, Send, Copy, CheckCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { getStatus } from '@/lib/eventStatus';
 import { sendWhatsApp } from '@/lib/whatsapp';
@@ -106,19 +106,35 @@ function AssessoraModal({
     onClose();
   };
 
-  const createAccess = async () => {
-    if (!accessEmail.trim()) { toast.error('Informe o e-mail'); return; }
-    setCreatingAccess(true);
+  const callEdgeFunction = async (body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-assessor`, {
+    return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-assessor`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token}`,
         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ supplier_id: assessora.id, email: accessEmail.trim(), display_name: assessora.name }),
+      body: JSON.stringify(body),
     });
+  };
+
+  const resetPassword = async () => {
+    if (!confirm('Redefinir a senha da assessora? A senha atual deixará de funcionar.')) return;
+    setCreatingAccess(true);
+    const res = await callEdgeFunction({ action: 'reset_password', supplier_id: assessora.id });
+    const json = await res.json();
+    setCreatingAccess(false);
+    if (!res.ok) { toast.error(json.error ?? 'Erro ao redefinir'); return; }
+    setTempPwd(json.temp_password);
+    toast.success('Senha redefinida! Envie a nova senha para a assessora.');
+  };
+
+  const createAccess = async () => {
+    if (!accessEmail.trim()) { toast.error('Informe o e-mail'); return; }
+    setCreatingAccess(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await callEdgeFunction({ supplier_id: assessora.id, email: accessEmail.trim(), display_name: assessora.name });
     const json = await res.json();
     setCreatingAccess(false);
     if (!res.ok) { toast.error(json.error ?? 'Erro ao criar acesso'); return; }
@@ -311,16 +327,23 @@ function AssessoraModal({
                   )}
 
                   {!tempPwd && (
-                    <div className="flex gap-2">
-                      <button onClick={copyCredentials}
-                        className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium border border-border rounded-lg hover:bg-muted/50 transition-colors">
-                        <Copy className="w-4 h-4" />
-                        Copiar mensagem de acesso
-                      </button>
-                      <button onClick={sendWpp} disabled={sendingWpp || (!editPhone && !assessora.phone)}
-                        className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
-                        <Send className="w-4 h-4" />
-                        {sendingWpp ? 'Enviando…' : 'Reenviar WhatsApp'}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <button onClick={copyCredentials}
+                          className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                          <Copy className="w-4 h-4" />
+                          Copiar mensagem
+                        </button>
+                        <button onClick={sendWpp} disabled={sendingWpp || (!editPhone && !assessora.phone)}
+                          className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                          <Send className="w-4 h-4" />
+                          {sendingWpp ? 'Enviando…' : 'Enviar WhatsApp'}
+                        </button>
+                      </div>
+                      <button onClick={resetPassword} disabled={creatingAccess}
+                        className="flex items-center justify-center gap-2 h-9 px-4 text-sm font-medium border border-border rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors text-muted-foreground">
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        {creatingAccess ? 'Redefinindo…' : 'Redefinir senha'}
                       </button>
                     </div>
                   )}

@@ -33,7 +33,21 @@ serve(async (req) => {
     const { data: callerRole } = await adminClient.from('user_roles').select('role').eq('user_id', caller.id).eq('role', 'supervisor').maybeSingle();
     if (!callerRole) return new Response(JSON.stringify({ error: 'Apenas supervisores podem criar acessos' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    const { supplier_id, email, display_name } = await req.json();
+    const { supplier_id, email, display_name, action } = await req.json();
+
+    // ── Reset password for existing assessor ─────────────────────────────────
+    if (action === 'reset_password') {
+      if (!supplier_id) return new Response(JSON.stringify({ error: 'supplier_id obrigatório' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const { data: existing } = await adminClient.from('suppliers').select('user_id').eq('id', supplier_id).maybeSingle() as any;
+      if (!existing?.user_id) return new Response(JSON.stringify({ error: 'Assessora sem acesso criado' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const tempPassword = generatePassword();
+      const { error: updErr } = await adminClient.auth.admin.updateUserById(existing.user_id, { password: tempPassword });
+      if (updErr) return new Response(JSON.stringify({ error: updErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      await adminClient.from('suppliers').update({ must_change_password: true }).eq('id', supplier_id) as any;
+      return new Response(JSON.stringify({ success: true, temp_password: tempPassword }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── Create new assessor account ───────────────────────────────────────────
     if (!supplier_id || !email || !display_name?.trim()) return new Response(JSON.stringify({ error: 'supplier_id, email e nome são obrigatórios' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     // Check if already has account
