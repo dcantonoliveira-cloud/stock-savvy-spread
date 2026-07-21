@@ -241,6 +241,17 @@ export default function TastingDetailPage() {
               <Plus className="w-4 h-4" />
               Alocar clientes
             </button>
+            <button onClick={async () => {
+              if (!confirm('Excluir esta degustação? Todos os casais vinculados serão removidos.')) return;
+              const { error } = await (supabase.from('tasting_sessions' as any) as any).delete().eq('id', id);
+              if (error) { toast.error('Erro ao excluir'); return; }
+              toast.success('Degustação excluída');
+              navigate(stateFrom);
+            }}
+              className="p-1.5 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors text-muted-foreground"
+              title="Excluir degustação">
+              <Trash2 className="w-4 h-4" />
+            </button>
             <button onClick={() => navigate(stateFrom)}
               className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
               <X className="w-4 h-4" />
