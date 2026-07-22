@@ -50,11 +50,13 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
   return (
     <div className="flex items-start justify-between gap-4 py-2.5 border-b border-border/40 last:border-0">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60 w-36 shrink-0">{label}</span>
-      <span className="text-sm text-foreground text-right flex-1">{value}</span>
+      {value
+        ? <span className="text-sm text-foreground text-right flex-1">{value}</span>
+        : <span className="text-sm text-muted-foreground/40 text-right flex-1 italic">Não informado</span>
+      }
     </div>
   );
 }
