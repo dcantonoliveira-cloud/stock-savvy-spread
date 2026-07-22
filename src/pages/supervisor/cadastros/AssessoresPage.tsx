@@ -178,12 +178,18 @@ function AssessoraModal({
   };
 
   const buildInviteMessage = async () => {
-    const { buildMessage } = await import('@/lib/whatsapp');
-    return buildMessage('assessor_invite', {
-      assessorName: assessora.name,
-      cadastroUrl: `${window.location.origin}/assessora/cadastro?code=${inviteCode}`,
-      code: inviteCode,
-    });
+    const url = `${window.location.origin}/assessora/cadastro?code=${inviteCode}`;
+    const { getMessageTemplates } = await import('@/lib/whatsapp');
+    const templates = await getMessageTemplates();
+    const tpl = templates['assessor_invite'];
+    // If template still uses old vars, fall back to built-in format
+    if (tpl.includes('{{portalUrl}}') || tpl.includes('{{password}}') || tpl.includes('{{email}}')) {
+      return `Olá, ${assessora.name}! 👋\n\nCriamos um portal exclusivo para assessoras parceiras do Rondello Buffet — por lá você acompanha todos os eventos em que estamos juntas, passados e futuros.\n\nPara criar sua conta é simples:\n\n1️⃣ Acesse o link abaixo\n2️⃣ Digite o código de convite\n3️⃣ Escolha seu e-mail e senha\n\n🔗 *Link:* ${url}\n🔑 *Código:* ${inviteCode}\n\nQualquer dúvida, é só chamar! 💙`;
+    }
+    return tpl
+      .replaceAll('{{assessorName}}', assessora.name)
+      .replaceAll('{{cadastroUrl}}', url)
+      .replaceAll('{{code}}', inviteCode);
   };
 
   const copyCredentials = async () => {
