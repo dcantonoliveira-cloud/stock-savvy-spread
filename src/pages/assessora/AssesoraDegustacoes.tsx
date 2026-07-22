@@ -57,9 +57,9 @@ export default function AssesoraDegustacoes() {
       // Build mapping session → events
       const sessionEvents: Record<string, any[]> = {};
       (tses as any[]).forEach((tse: any) => {
-        if (!sessionEvents[tse.tasting_session_id]) sessionEvents[tse.tasting_session_id] = [];
+        if (!sessionEvents[tse.session_id]) sessionEvents[tse.session_id] = [];
         const evt = eventMap[tse.event_id];
-        if (evt) sessionEvents[tse.tasting_session_id].push(evt);
+        if (evt) sessionEvents[tse.session_id].push(evt);
       });
 
       const rows: TastingRow[] = (sessions ?? []).map((s: any) => ({
@@ -100,46 +100,60 @@ export default function AssesoraDegustacoes() {
     const open = expanded.has(t.id);
     return (
       <div className={`bg-white rounded-2xl border border-border overflow-hidden ${isPast ? 'opacity-70' : ''}`}>
-        <button onClick={() => toggle(t.id)}
-          className="w-full text-left px-4 py-4 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isPast ? 'bg-slate-100' : 'bg-primary/10'}`}>
-              <Coffee className={`w-4 h-4 ${isPast ? 'text-slate-400' : 'text-primary'}`} />
-            </div>
-            <div className="min-w-0">
-              <p className={`text-sm font-semibold capitalize ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>
-                {fmtDate(t.scheduled_date)}
-              </p>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                {t.type && <span>{t.type}</span>}
-                <span className="flex items-center gap-1"><Users className="w-3 h-3" />{t.eventos.length} cliente{t.eventos.length !== 1 ? 's' : ''} seu{t.eventos.length !== 1 ? 's' : ''}</span>
+        <div className="px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isPast ? 'bg-slate-100' : 'bg-primary/10'}`}>
+                <Coffee className={`w-4 h-4 ${isPast ? 'text-slate-400' : 'text-primary'}`} />
+              </div>
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold capitalize ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>
+                  {fmtDate(t.scheduled_date)}
+                </p>
+                {t.type && <p className="text-xs text-muted-foreground mt-0.5">{t.type}</p>}
               </div>
             </div>
+            <button onClick={() => toggle(t.id)} className="p-1 text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
+              {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
           </div>
-          {open ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
-        </button>
 
-        {open && t.eventos.length > 0 && (
-          <div className="border-t border-border/50 px-4 py-3 space-y-2">
-            {t.eventos.map(e => (
-              <div key={e.id} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50">
-                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <span className="text-[10px] font-bold text-primary">
-                    {(e.clients?.name ?? e.event_name ?? '?').charAt(0).toUpperCase()}
-                  </span>
+          {/* Casais sempre visíveis */}
+          {t.eventos.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {t.eventos.map(e => (
+                <span key={e.id}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${isPast ? 'bg-slate-100 text-slate-600' : 'bg-primary/10 text-primary'}`}>
+                  <Users className="w-3 h-3" />
+                  {e.clients?.name ?? e.event_name ?? '—'}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Detalhes expandidos */}
+          {open && t.eventos.length > 0 && (
+            <div className="mt-3 border-t border-border/40 pt-3 space-y-2">
+              {t.eventos.map(e => (
+                <div key={e.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-primary">
+                      {(e.clients?.name ?? e.event_name ?? '?').charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {e.clients?.name ?? '—'}
+                    </p>
+                    {e.event_name && (
+                      <p className="text-xs text-muted-foreground truncate">{e.event_name}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">
-                    {e.clients?.name ?? e.event_name ?? '—'}
-                  </p>
-                  {e.event_name && e.clients?.name && (
-                    <p className="text-[10px] text-muted-foreground truncate">{e.event_name}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
