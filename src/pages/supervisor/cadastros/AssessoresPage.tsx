@@ -146,27 +146,29 @@ function AssessoraModal({
     onRefresh();
   };
 
-  const copyCredentials = () => {
-    const text = buildWppMessage(tempPwd || '••••••••••');
+  const copyCredentials = async () => {
+    const text = await buildWppMessage(tempPwd || '••••••••••');
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const buildWppMessage = (pwd: string) =>
-    `Olá ${assessora.name}! 👋\n\nSeu acesso ao portal Rondello Buffet foi criado.\n\n` +
-    `🔗 *Link:* ${window.location.origin}/assessora\n` +
-    `📧 *E-mail:* ${assessora.email ?? accessEmail}\n` +
-    `🔑 *Senha temporária:* ${pwd}\n\n` +
-    `Na primeira vez que você acessar, o sistema pedirá para você criar uma nova senha. É rápido!\n\n` +
-    `Qualquer dúvida, fale comigo. 😊`;
+  const buildWppMessage = async (pwd: string) => {
+    const { buildMessage } = await import('@/lib/whatsapp');
+    return buildMessage('assessor_invite', {
+      assessorName: assessora.name,
+      portalUrl: `${window.location.origin}/assessora`,
+      email: assessora.email ?? accessEmail ?? '',
+      password: pwd,
+    });
+  };
 
   const sendWpp = async () => {
     const phone = editPhone || assessora.phone;
     if (!phone) { toast.error('Salve o telefone da assessora antes de enviar'); return; }
     if (!tempPwd) { toast.error('Redefina a senha primeiro para incluí-la na mensagem'); return; }
     setSendingWpp(true);
-    const result = await sendWhatsApp(phone, buildWppMessage(tempPwd));
+    const result = await sendWhatsApp(phone, await buildWppMessage(tempPwd));
     setSendingWpp(false);
     if (result.ok) toast.success('Mensagem enviada!');
     else toast.error('Erro ao enviar: ' + result.error);
