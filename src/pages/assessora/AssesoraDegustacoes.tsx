@@ -42,12 +42,12 @@ export default function AssesoraDegustacoes() {
 
       // Get tasting_session_events for those events
       const { data: tses } = await (supabase.from('tasting_session_events' as any) as any)
-        .select('tasting_session_id, event_id')
+        .select('session_id, event_id')
         .in('event_id', eventIds);
 
       if (!tses || tses.length === 0) { setLoading(false); return; }
 
-      const sessionIds = [...new Set((tses as any[]).map((t: any) => t.tasting_session_id))] as string[];
+      const sessionIds = [...new Set((tses as any[]).map((t: any) => t.session_id))] as string[];
 
       const { data: sessions } = await (supabase.from('tasting_sessions' as any) as any)
         .select('id, scheduled_date, type, max_couples')
