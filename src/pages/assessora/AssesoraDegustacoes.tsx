@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Coffee, CalendarDays, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { Coffee, Users, ChevronDown, ChevronUp, UtensilsCrossed } from 'lucide-react';
 import type { AssesoraInfo } from './AssesoraLayout';
 
 interface TastingRow {
@@ -10,6 +10,7 @@ interface TastingRow {
   scheduled_date: string;
   type: string | null;
   max_couples: number | null;
+  menu_text: string | null;
   eventos: { id: string; event_name: string | null; clients: { name: string | null } | null }[];
 }
 
@@ -50,7 +51,7 @@ export default function AssesoraDegustacoes() {
       const sessionIds = [...new Set((tses as any[]).map((t: any) => t.session_id))] as string[];
 
       const { data: sessions } = await (supabase.from('tasting_sessions' as any) as any)
-        .select('id, scheduled_date, type, max_couples')
+        .select('id, scheduled_date, type, max_couples, menu_text')
         .in('id', sessionIds)
         .order('scheduled_date', { ascending: false });
 
@@ -132,8 +133,8 @@ export default function AssesoraDegustacoes() {
           )}
 
           {/* Detalhes expandidos */}
-          {open && t.eventos.length > 0 && (
-            <div className="mt-3 border-t border-border/40 pt-3 space-y-2">
+          {open && (
+            <div className="mt-3 border-t border-border/40 pt-3 space-y-3">
               {t.eventos.map(e => (
                 <div key={e.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50">
                   <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -151,6 +152,18 @@ export default function AssesoraDegustacoes() {
                   </div>
                 </div>
               ))}
+              {t.menu_text && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <UtensilsCrossed className="w-3.5 h-3.5 text-amber-600" />
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700">Cardápio</p>
+                  </div>
+                  <div
+                    className="text-xs text-amber-900 leading-relaxed prose prose-xs max-w-none"
+                    dangerouslySetInnerHTML={{ __html: t.menu_text }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
