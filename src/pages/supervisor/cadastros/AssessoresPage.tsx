@@ -253,7 +253,7 @@ function AssessoraModal({
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button
-              onClick={() => navigate(`/assessora?preview=${assessora.id}`)}
+              onClick={() => window.open(`/assessora?preview=${assessora.id}`, '_blank')}
               title="Visualizar portal da assessora"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 transition-colors">
               <ExternalLink className="w-3.5 h-3.5" />
