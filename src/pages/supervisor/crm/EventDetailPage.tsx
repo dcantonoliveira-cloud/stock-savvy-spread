@@ -219,6 +219,7 @@ export default function EventDetailPage() {
   const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clientTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formRef = useRef<Partial<EventDetail>>({});
+  const lastSavedRef = useRef<Partial<EventDetail>>({});
   const clientFormRef = useRef<Record<string, string>>({});
   const eventIdRef = useRef<string | undefined>(undefined);
   const menuAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -243,6 +244,7 @@ export default function EventDetailPage() {
         setEvent(eventData);
         setForm(eventData);
         formRef.current = eventData;
+        lastSavedRef.current = eventData;
         eventIdRef.current = id;
         const c = (data as EventDetail).clients;
         if (c) {
@@ -260,6 +262,39 @@ export default function EventDetailPage() {
     const eid = eventIdRef.current;
     if (!eid) return;
     setSaveStatus('saving');
+
+    // Detect critical field changes and create smart alerts
+    const prev = lastSavedRef.current;
+    const criticalFields: Array<{ key: keyof EventDetail; label: string; isMenu?: boolean }> = [
+      { key: 'menu_text', label: 'Cardápio', isMenu: true },
+      { key: 'event_date', label: 'Data do evento' },
+      { key: 'location_text', label: 'Local' },
+      { key: 'guest_count', label: 'Número de convidados' },
+      { key: 'event_name', label: 'Nome do evento' },
+    ];
+    const alertsToCreate: any[] = [];
+    for (const { key, label, isMenu } of criticalFields) {
+      const oldVal = prev?.[key];
+      const newVal = data[key];
+      if (oldVal !== undefined && String(oldVal ?? '') !== String(newVal ?? '')) {
+        const eventLabel = prev?.event_name ?? data.event_name ?? 'Evento';
+        const oldDisplay = isMenu
+          ? (oldVal ? 'Cardápio anterior salvo' : 'Sem cardápio')
+          : (String(oldVal ?? '—') || '—');
+        alertsToCreate.push({
+          type: isMenu ? 'menu_change' : 'field_change',
+          severity: 'urgent',
+          title: `${label} alterado — ${eventLabel}`,
+          description: `Valor anterior: ${oldDisplay}`,
+          entity_type: 'event',
+          entity_id: eid,
+        });
+      }
+    }
+    if (alertsToCreate.length > 0) {
+      await (supabase as any).from('smart_alerts').insert(alertsToCreate);
+    }
+
     const { error } = await supabase.from('events').update({
       event_name: data.event_name, event_type: data.event_type,
       event_date: data.event_date || null,
@@ -290,6 +325,7 @@ export default function EventDetailPage() {
       contract_value: toNum(data.contract_value),
     }).eq('id', eid);
     if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar: ' + error.message); return; }
+    lastSavedRef.current = { ...lastSavedRef.current, ...data };
     setSaveStatus('saved');
     toast.success('Salvo com sucesso');
     setTimeout(() => setSaveStatus('idle'), 2000);

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { CalendarDays, MapPin, Users, ChevronRight, Clock } from 'lucide-react';
+import { CalendarDays, MapPin, Users, ChevronRight, Clock, Search } from 'lucide-react';
 import type { AssesoraInfo } from './AssesoraLayout';
 
 interface Evento {
@@ -39,6 +39,7 @@ export default function AssesoraEventosPage() {
   const navigate = useNavigate();
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!user || !info?.id) return;
@@ -53,8 +54,15 @@ export default function AssesoraEventosPage() {
     })();
   }, [user, info?.id]);
 
-  const upcoming = eventos.filter(e => e.event_date && e.event_date >= new Date().toISOString().slice(0, 10) && e.status !== 'cancelled');
-  const past     = eventos.filter(e => !upcoming.includes(e));
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? eventos.filter(e =>
+        (e.event_name ?? '').toLowerCase().includes(q) ||
+        (e.clients?.name ?? '').toLowerCase().includes(q)
+      )
+    : eventos;
+  const upcoming = filtered.filter(e => e.event_date && e.event_date >= new Date().toISOString().slice(0, 10) && e.status !== 'cancelled');
+  const past     = filtered.filter(e => !upcoming.includes(e));
 
   if (loading) return (
     <div className="flex items-center justify-center h-40">
@@ -120,6 +128,22 @@ export default function AssesoraEventosPage() {
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto space-y-6">
+      {/* Busca */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por nome do evento ou cliente..."
+          className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-border bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
+        />
+      </div>
+
+      {filtered.length === 0 && q && (
+        <div className="text-center py-10 text-sm text-muted-foreground">Nenhum evento encontrado para "{search}".</div>
+      )}
+
       {upcoming.length > 0 && (
         <section>
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 mb-3">Próximos eventos</h2>
