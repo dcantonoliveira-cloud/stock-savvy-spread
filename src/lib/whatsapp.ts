@@ -14,7 +14,7 @@ export const DEFAULT_TEMPLATES: MessageTemplates = {
   review:        `Olá, {{clientName}}! ⭐\n\nFoi uma honra realizar o *{{eventName}}*!\n\nGostaríamos muito de saber sua opinião sobre nossos serviços. Sua avaliação é muito importante para nós!\n\nObrigado pela confiança!\n— Rondello Buffet`,
   portal_invite: `Olá, {{clientName}}! 🎉\n\nSeu portal do cliente está pronto! Por lá você acompanha tudo sobre o seu evento *{{eventName}}*: financeiro, arquivos e informações da festa.\n\n*Como acessar:*\n1. Acesse: {{portalUrl}}\n2. Crie sua conta\n3. Use o código: *{{accessCode}}*\n\n— Rondello Buffet`,
   tasting_availability: `Olá! 😊 Temos as seguintes datas disponíveis para degustação:\n\n{{dates}}\n\nQual data funciona melhor pra vocês? 🍽️\n\n— Rondello Buffet`,
-  assessor_invite: `Olá, {{assessorName}}! 👋\n\nVocê foi convidada para acessar o portal de assessorias do Rondello Buffet.\n\nPara criar sua conta, acesse o link abaixo e use o código de convite:\n\n🔗 *Link:* {{cadastroUrl}}\n🔑 *Código:* {{code}}\n\nÉ rápido! Você escolhe seu próprio e-mail e senha.\n\nQualquer dúvida, fale comigo. 😊`,
+  assessor_invite: `Olá, {{assessorName}}! 👋\n\nCriamos um portal exclusivo para assessoras parceiras do Rondello Buffet — por lá você acompanha todos os eventos em que estamos juntas, passados e futuros.\n\nPara criar sua conta é simples:\n\n1️⃣ Acesse o link abaixo\n2️⃣ Digite o código de convite\n3️⃣ Escolha seu e-mail e senha\n\n🔗 *Link:* {{cadastroUrl}}\n🔑 *Código:* {{code}}\n\nQualquer dúvida, é só chamar! 💙`,
 };
 
 export const TEMPLATE_LABELS: Record<MessageTemplateKey, string> = {
