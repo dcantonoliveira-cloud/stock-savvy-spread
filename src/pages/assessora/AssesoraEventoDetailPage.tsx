@@ -12,15 +12,18 @@ interface Evento {
   event_date: string | null;
   event_type: string | null;
   status: string | null;
+  product_name: string | null;
   guest_count: number | null;
   children_50_pct: number | null;
   non_paying_guests: number | null;
   location_text: string | null;
   ceremony_time: string | null;
+  duration_hours: number | null;
   additional_hours: number | null;
   total_value: number | null;
   price_per_person: number | null;
   professional_count: number | null;
+  professional_meal_value: number | null;
   professional_meal_type: string | null;
   organizer: string | null;
   decorator: string | null;
@@ -29,6 +32,7 @@ interface Evento {
   photo_video: string | null;
   bartender: string | null;
   other_professionals: string | null;
+  extra_attractions: string | null;
   clients: { name: string | null; phone: string | null } | null;
 }
 
@@ -86,11 +90,11 @@ export default function AssesoraEventoDetailPage() {
       const [{ data: ev }, { data: pay }, { data: add }] = await Promise.all([
         (supabase.from('events' as any) as any)
           .select(`id, event_name, event_date, event_type, status,
-            guest_count, children_50_pct, non_paying_guests,
-            location_text, ceremony_time, additional_hours,
+            product_name, guest_count, children_50_pct, non_paying_guests,
+            location_text, ceremony_time, duration_hours, additional_hours,
             total_value, price_per_person,
-            professional_count, professional_meal_type,
-            organizer, decorator, pastry_chef, band_dj, photo_video, bartender, other_professionals,
+            professional_count, professional_meal_value, professional_meal_type,
+            organizer, decorator, pastry_chef, band_dj, photo_video, bartender, other_professionals, extra_attractions,
             clients(name, phone)`)
           .eq('id', id)
           .maybeSingle(),
@@ -131,9 +135,6 @@ export default function AssesoraEventoDetailPage() {
   const paid       = confirmed.reduce((s, p) => s + p.value, 0);
   const outstanding = total - paid;
   const pct        = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
-
-  const hasProfessionals = evento.decorator || evento.pastry_chef || evento.band_dj ||
-    evento.photo_video || evento.bartender || evento.other_professionals;
 
   return (
     <div className="px-4 py-5 max-w-5xl mx-auto">
@@ -199,13 +200,19 @@ export default function AssesoraEventoDetailPage() {
 
           {/* Detalhes */}
           <Card title="Detalhes do evento">
-            <InfoRow label="Local"              value={evento.location_text} />
-            <InfoRow label="Tipo"               value={evento.event_type} />
-            <InfoRow label="Horário"            value={evento.ceremony_time} />
-            {evento.additional_hours ? <InfoRow label="Horas extras" value={`+${evento.additional_hours}h`} /> : null}
-            <InfoRow label="Convidados"         value={evento.guest_count ? String(evento.guest_count) : null} />
-            {evento.children_50_pct ? <InfoRow label="Crianças (50%)" value={`${evento.children_50_pct}%`} /> : null}
-            {evento.non_paying_guests ? <InfoRow label="Não pagantes" value={String(evento.non_paying_guests)} /> : null}
+            <InfoRow label="Nome do evento"    value={evento.event_name} />
+            <InfoRow label="Local"             value={evento.location_text} />
+            <InfoRow label="Data"              value={evento.event_date ? fmtDateLong(evento.event_date) : null} />
+            <InfoRow label="Tipo"              value={evento.event_type} />
+            <InfoRow label="Produto escolhido" value={evento.product_name} />
+            <InfoRow label="Horário de início" value={evento.ceremony_time} />
+            <InfoRow label="Duração"           value={evento.duration_hours != null ? `${Math.floor(evento.duration_hours)}h${Math.round((evento.duration_hours % 1) * 60) > 0 ? ` ${Math.round((evento.duration_hours % 1) * 60)}min` : ''}` : null} />
+            <InfoRow label="Convidados"        value={evento.guest_count != null ? String(evento.guest_count) : null} />
+            <InfoRow label="Preço / Pax"       value={evento.price_per_person != null ? fmtBRL(evento.price_per_person) : null} />
+            <InfoRow label="Crianças (50%)"    value={evento.children_50_pct != null ? String(evento.children_50_pct) : null} />
+            <InfoRow label="Não pagantes"      value={evento.non_paying_guests != null ? String(evento.non_paying_guests) : null} />
+            <InfoRow label="Qtd. profissionais"      value={evento.professional_count != null ? String(evento.professional_count) : null} />
+            <InfoRow label="Valor alim. prof." value={evento.professional_meal_value != null ? fmtBRL(evento.professional_meal_value) : null} />
           </Card>
 
           {/* Cliente */}
@@ -227,26 +234,17 @@ export default function AssesoraEventoDetailPage() {
             </Card>
           )}
 
-          {/* Profissionais */}
-          {hasProfessionals && (
-            <Card title="Equipe contratada">
-              <InfoRow label="Organizadora"  value={evento.organizer} />
-              <InfoRow label="Decoração"     value={evento.decorator} />
-              <InfoRow label="Confeitaria"   value={evento.pastry_chef} />
-              <InfoRow label="Música"        value={evento.band_dj} />
-              <InfoRow label="Foto/Vídeo"   value={evento.photo_video} />
-              <InfoRow label="Bar"           value={evento.bartender} />
-              <InfoRow label="Outros"        value={evento.other_professionals} />
-            </Card>
-          )}
-
-          {/* Buffet */}
-          {(evento.professional_count || evento.professional_meal_type) && (
-            <Card title="Profissionais do buffet">
-              {evento.professional_count ? <InfoRow label="Qtd. profissionais" value={String(evento.professional_count)} /> : null}
-              <InfoRow label="Alimentação" value={evento.professional_meal_type} />
-            </Card>
-          )}
+          {/* Equipe contratada — sempre mostra */}
+          <Card title="Equipe contratada">
+            <InfoRow label="Organizadora"        value={evento.organizer} />
+            <InfoRow label="Decoração"           value={evento.decorator} />
+            <InfoRow label="Confeitaria"         value={evento.pastry_chef} />
+            <InfoRow label="Banda / DJ"          value={evento.band_dj} />
+            <InfoRow label="Foto / Filmagem"     value={evento.photo_video} />
+            <InfoRow label="Bartender"           value={evento.bartender} />
+            <InfoRow label="Outros profissionais" value={evento.other_professionals} />
+            <InfoRow label="Atrações à parte"    value={evento.extra_attractions} />
+          </Card>
         </div>
 
         {/* Coluna direita — Financeiro */}
