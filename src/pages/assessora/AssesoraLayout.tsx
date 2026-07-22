@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { CalendarDays, Coffee, LogOut, Menu, X, Heart, KeyRound, Loader2 } from 'lucide-react';
+import { CalendarDays, Coffee, LogOut, Menu, X, Heart, KeyRound, Loader2, Eye } from 'lucide-react';
 import logoRondello from '@/assets/logo-rondello.png';
 
 export type AssesoraInfo = {
@@ -73,30 +73,37 @@ function ChangePasswordScreen({ onDone }: { onDone: () => void }) {
 }
 
 export default function AssesoraLayout() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, role } = useAuth();
   const navigate = useNavigate();
-  const [info, setInfo]           = useState<AssesoraInfo | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [searchParams] = useSearchParams();
+  const previewId = searchParams.get('preview');
+  const isPreview = role === 'supervisor' && !!previewId;
+
+  const [info, setInfo]             = useState<AssesoraInfo | null>(null);
+  const [loading, setLoading]       = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mustChange, setMustChange] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const { data } = await (supabase.from('suppliers' as any) as any)
-        .select('id, name, email, phone, must_change_password')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Supervisor no modo preview carrega pelo id passado na URL
+      const query = (supabase.from('suppliers' as any) as any)
+        .select('id, name, email, phone, must_change_password');
+      const { data } = isPreview
+        ? await query.eq('id', previewId).maybeSingle()
+        : await query.eq('user_id', user.id).maybeSingle();
       if (data) {
         setInfo(data as AssesoraInfo);
-        setMustChange(data.must_change_password === true);
-        // Log this access session
-        (supabase.from('supplier_access_logs' as any) as any)
-          .insert({ supplier_id: data.id });
+        if (!isPreview) {
+          setMustChange(data.must_change_password === true);
+          (supabase.from('supplier_access_logs' as any) as any)
+            .insert({ supplier_id: data.id });
+        }
       }
       setLoading(false);
     })();
-  }, [user]);
+  }, [user, previewId]);
 
   const handleSignOut = async () => { await signOut(); navigate('/login'); };
 
@@ -159,11 +166,20 @@ export default function AssesoraLayout() {
 
         {/* Main */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+          {isPreview && (
+            <div className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-400 text-amber-900 text-xs font-semibold">
+              <div className="flex items-center gap-2">
+                <Eye className="w-3.5 h-3.5 shrink-0" />
+                Visualizando como <span className="font-black">{info?.name ?? '…'}</span> — modo supervisor
+              </div>
+              <button onClick={() => navigate(-1)} className="underline hover:no-underline shrink-0">Sair</button>
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : mustChange ? (
+          ) : mustChange && !isPreview ? (
             <ChangePasswordScreen onDone={() => setMustChange(false)} />
           ) : (
             <Outlet context={{ info }} />

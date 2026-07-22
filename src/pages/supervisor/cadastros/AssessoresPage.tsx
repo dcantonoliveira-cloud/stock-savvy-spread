@@ -245,9 +245,18 @@ function AssessoraModal({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground shrink-0">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => navigate(`/assessora?preview=${assessora.id}`)}
+              title="Visualizar portal da assessora"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 transition-colors">
+              <ExternalLink className="w-3.5 h-3.5" />
+              Ver portal
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
