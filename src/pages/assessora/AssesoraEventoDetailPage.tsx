@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -84,6 +85,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 export default function AssesoraEventoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { info } = useOutletContext<{ info: import('./AssesoraLayout').AssesoraInfo | null }>();
   const [evento,      setEvento]      = useState<Evento | null>(null);
   const [payments,    setPayments]    = useState<Payment[]>([]);
   const [additionals, setAdditionals] = useState<Additional[]>([]);
@@ -91,7 +93,7 @@ export default function AssesoraEventoDetailPage() {
   const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !info) return;
     (async () => {
       const [{ data: ev }, { data: pay }, { data: add }, { data: fil }] = await Promise.all([
         (supabase.from('events' as any) as any)
@@ -103,6 +105,7 @@ export default function AssesoraEventoDetailPage() {
             organizer, decorator, pastry_chef, band_dj, photo_video, bartender, other_professionals, extra_attractions,
             clients(name, phone)`)
           .eq('id', id)
+          .or(`organizer_id.eq.${info.id},organizer.eq.${info.name}`)
           .maybeSingle(),
         (supabase.from('event_payments' as any) as any)
           .select('id, value, payment_date, is_confirmed, notes')
@@ -116,6 +119,7 @@ export default function AssesoraEventoDetailPage() {
           .eq('event_id', id)
           .order('created_at', { ascending: false }),
       ]);
+      if (!ev) { navigate('/assessora', { replace: true }); return; }
       setEvento(ev as Evento);
       setPayments(pay ?? []);
       setAdditionals(add ?? []);

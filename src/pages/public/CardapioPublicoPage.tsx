@@ -51,17 +51,6 @@ function LeadForm({ tastingId, onDone }: { tastingId: string; onDone: (lead: Lea
   const [como,         setComo]         = useState('');
   const [saving,       setSaving]       = useState(false);
   const [err,          setErr]          = useState('');
-  const [emailExists,  setEmailExists]  = useState(false);
-
-  async function checkEmail(val: string) {
-    if (!val || !val.includes('@')) { setEmailExists(false); return; }
-    const { data } = await (supabase as any)
-      .from('profiles')
-      .select('user_id')
-      .eq('email', val.trim().toLowerCase())
-      .maybeSingle();
-    setEmailExists(!!data);
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,16 +108,9 @@ function LeadForm({ tastingId, onDone }: { tastingId: string; onDone: (lead: Lea
 
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">E-mail</label>
-            <input value={email} onChange={e => { setEmail(e.target.value); setEmailExists(false); }}
-              onBlur={e => checkEmail(e.target.value)}
+            <input value={email} onChange={e => setEmail(e.target.value)}
               placeholder="opcional" type="email"
               className={inputCls} />
-            {emailExists && (
-              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-800 leading-relaxed">
-                <p className="font-bold mb-1">Você já tem uma conta no portal! 👋</p>
-                <p>Acesse <a href="https://rondellobuffet-app.com.br/login" className="underline font-semibold">rondellobuffet-app.com.br/login</a> para ver seu evento, financeiro e arquivos. Use "Esqueci minha senha" se precisar.</p>
-              </div>
-            )}
           </div>
 
           <div>
