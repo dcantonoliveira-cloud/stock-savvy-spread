@@ -90,6 +90,9 @@ export default function AssesoraLayout() {
       if (data) {
         setInfo(data as AssesoraInfo);
         setMustChange(data.must_change_password === true);
+        // Log this access session
+        (supabase.from('supplier_access_logs' as any) as any)
+          .insert({ supplier_id: data.id });
       }
       setLoading(false);
     })();

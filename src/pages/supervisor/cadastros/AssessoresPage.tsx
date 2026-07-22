@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Search, X, Check, ExternalLink, Merge, Pencil, AlertTriangle, KeyRound, Send, Copy, CheckCheck, RefreshCw } from 'lucide-react';
+import { Plus, Search, X, Check, ExternalLink, Merge, Pencil, AlertTriangle, KeyRound, Send, Copy, CheckCheck, RefreshCw, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { getStatus } from '@/lib/eventStatus';
 import { sendWhatsApp } from '@/lib/whatsapp';
@@ -68,6 +68,24 @@ function AssessoraModal({
   const [tempPwd, setTempPwd]               = useState('');
   const [copied, setCopied]                 = useState(false);
   const [sendingWpp, setSendingWpp]         = useState(false);
+
+  // Histórico de acessos
+  const [accessLogs, setAccessLogs]         = useState<{ id: string; accessed_at: string }[]>([]);
+  const [loadingLogs, setLoadingLogs]       = useState(false);
+
+  useEffect(() => {
+    if (tab !== 'acesso' || !assessora.id) return;
+    setLoadingLogs(true);
+    (supabase.from('supplier_access_logs' as any) as any)
+      .select('id, accessed_at')
+      .eq('supplier_id', assessora.id)
+      .order('accessed_at', { ascending: false })
+      .limit(50)
+      .then(({ data }: { data: any }) => {
+        setAccessLogs(data ?? []);
+        setLoadingLogs(false);
+      });
+  }, [tab, assessora.id]);
 
   useEffect(() => {
     const load = async () => {
@@ -376,6 +394,36 @@ function AssessoraModal({
                   </button>
                 </div>
               )}
+
+              {/* Histórico de acessos */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold text-foreground">Histórico de acessos</p>
+                </div>
+                {loadingLogs ? (
+                  <p className="text-xs text-muted-foreground">Carregando…</p>
+                ) : accessLogs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">Nenhum acesso registrado ainda.</p>
+                ) : (
+                  <div className="flex flex-col gap-1 max-h-52 overflow-y-auto pr-1">
+                    {accessLogs.map((log, i) => {
+                      const dt = new Date(log.accessed_at);
+                      const date = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                      const time = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                      const isFirst = i === accessLogs.length - 1;
+                      return (
+                        <div key={log.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50 text-xs">
+                          <span className="text-foreground font-medium">{date} às {time}</span>
+                          {isFirst && (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">Primeiro acesso</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
