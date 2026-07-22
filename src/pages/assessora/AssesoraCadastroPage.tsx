@@ -45,11 +45,13 @@ export default function AssesoraCadastroPage() {
     if (pwd !== pwd2) { setError('As senhas não coincidem'); return; }
 
     setSubmitting(true);
+    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-assessor`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
       },
       body: JSON.stringify({
         action: 'self_register',
