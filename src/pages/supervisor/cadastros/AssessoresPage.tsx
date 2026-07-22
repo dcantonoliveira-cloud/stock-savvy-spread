@@ -465,6 +465,28 @@ function AssessoraModal({
 
               <div className="border-t border-border pt-5">
                 <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <p className="text-sm font-semibold text-red-600">Excluir assessora</p>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Remove o cadastro de <strong>{assessora.name}</strong>. Os eventos vinculados não serão apagados, mas perderão o vínculo com esta assessora.
+                </p>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Excluir "${assessora.name}"? Esta ação não pode ser desfeita.`)) return;
+                    await (supabase.from('suppliers' as any) as any).delete().eq('id', assessora.id);
+                    toast.success('Assessora excluída');
+                    onRefresh();
+                    onClose();
+                  }}
+                  className="flex items-center gap-2 h-9 px-4 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors w-fit mb-6">
+                  <X className="w-3.5 h-3.5" />
+                  Excluir assessora
+                </button>
+              </div>
+
+              <div className="border-t border-border pt-5">
+                <div className="flex items-center gap-2 mb-2">
                   <Merge className="w-4 h-4 text-amber-600" />
                   <p className="text-sm font-semibold">Mesclar com outra assessora</p>
                 </div>
@@ -506,6 +528,7 @@ function AssessoraModal({
 export default function AssessoresPage() {
   const [rows, setRows]       = useState<Assessora[]>([]);
   const [search, setSearch]   = useState('');
+  const [filterAccess, setFilterAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Assessora | null>(null);
   const [adding, setAdding]   = useState(false);
@@ -525,8 +548,11 @@ export default function AssessoresPage() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() =>
-    rows.filter(r => r.name.toLowerCase().includes(search.toLowerCase())),
-    [rows, search]
+    rows.filter(r =>
+      r.name.toLowerCase().includes(search.toLowerCase()) &&
+      (!filterAccess || !!r.user_id)
+    ),
+    [rows, search, filterAccess]
   );
 
   const add = async () => {
@@ -563,10 +589,12 @@ export default function AssessoresPage() {
           <p className="text-[11px] text-muted-foreground">Total</p>
           <p className="text-lg font-bold">{rows.length}</p>
         </div>
-        <div className="bg-white border border-border rounded-xl px-4 py-2.5">
+        <button
+          onClick={() => setFilterAccess(v => !v)}
+          className={`border rounded-xl px-4 py-2.5 text-left transition-colors ${filterAccess ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-border hover:bg-muted/30'}`}>
           <p className="text-[11px] text-muted-foreground">Com acesso</p>
-          <p className="text-lg font-bold text-emerald-600">{rows.filter(r => r.user_id).length}</p>
-        </div>
+          <p className={`text-lg font-bold ${filterAccess ? 'text-emerald-600' : 'text-emerald-600'}`}>{rows.filter(r => r.user_id).length}</p>
+        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-border overflow-hidden flex-1">
