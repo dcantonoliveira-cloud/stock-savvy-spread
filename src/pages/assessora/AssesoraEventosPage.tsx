@@ -46,7 +46,7 @@ export default function AssesoraEventosPage() {
       const { data } = await (supabase.from('events' as any) as any)
         .select('id, event_name, event_date, event_type, status, guest_count, location_text, ceremony_time, total_value, clients(name)')
         .or(`organizer_id.eq.${info.id},organizer.eq.${info.name}`)
-        .in('status', ['confirmed', 'completed'])
+        .not('status', 'in', '("cancelled","lost")')
         .order('event_date', { ascending: false });
       setEventos((data ?? []) as Evento[]);
       setLoading(false);
