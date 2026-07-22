@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  ArrowLeft, MapPin, Users, CalendarDays, Clock, Phone,
+  ArrowLeft, Users, CalendarDays, Clock, Phone,
   User, CheckCircle2, Receipt, AlertCircle,
+  FolderOpen, FileText, Download, ExternalLink,
 } from 'lucide-react';
 
 interface Evento {
@@ -38,6 +39,10 @@ interface Evento {
 
 type Payment    = { id: string; value: number; payment_date: string; is_confirmed: boolean; notes: string | null };
 type Additional = { id: string; description: string; value: number };
+type EventFile  = { id: string; name: string; url: string; created_at: string };
+
+const isImage = (name: string) => /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(name);
+const isPdf   = (name: string) => /\.pdf$/i.test(name);
 
 const fmtDateLong = (d: string) =>
   new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
@@ -82,12 +87,13 @@ export default function AssesoraEventoDetailPage() {
   const [evento,      setEvento]      = useState<Evento | null>(null);
   const [payments,    setPayments]    = useState<Payment[]>([]);
   const [additionals, setAdditionals] = useState<Additional[]>([]);
+  const [files,       setFiles]       = useState<EventFile[]>([]);
   const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const [{ data: ev }, { data: pay }, { data: add }] = await Promise.all([
+      const [{ data: ev }, { data: pay }, { data: add }, { data: fil }] = await Promise.all([
         (supabase.from('events' as any) as any)
           .select(`id, event_name, event_date, event_type, status,
             product_name, guest_count, children_50_pct, non_paying_guests,
@@ -105,10 +111,15 @@ export default function AssesoraEventoDetailPage() {
         (supabase.from('event_additional_values' as any) as any)
           .select('id, description, value')
           .eq('event_id', id),
+        (supabase.from('event_files' as any) as any)
+          .select('id, name, url, created_at')
+          .eq('event_id', id)
+          .order('created_at', { ascending: false }),
       ]);
       setEvento(ev as Evento);
       setPayments(pay ?? []);
       setAdditionals(add ?? []);
+      setFiles(fil ?? []);
       setLoading(false);
     })();
   }, [id]);
@@ -245,6 +256,60 @@ export default function AssesoraEventoDetailPage() {
             <InfoRow label="Outros profissionais" value={evento.other_professionals} />
             <InfoRow label="Atrações à parte"    value={evento.extra_attractions} />
           </Card>
+
+          {/* Arquivos */}
+          <div className="bg-white rounded-2xl border border-border overflow-hidden">
+            <div className="px-5 py-3 border-b border-border bg-muted/20 flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-muted-foreground" />
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                Arquivos compartilhados{files.length > 0 ? ` (${files.length})` : ''}
+              </p>
+            </div>
+            {files.length === 0 ? (
+              <div className="px-5 py-8 text-center">
+                <FolderOpen className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground/60">Nenhum arquivo disponível ainda.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/40">
+                {files.filter(f => !isImage(f.name)).map(f => (
+                  <div key={f.id} className="px-5 py-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      {isPdf(f.name)
+                        ? <FileText className="w-4 h-4 text-primary" />
+                        : <FolderOpen className="w-4 h-4 text-muted-foreground" />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{f.name}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(f.created_at).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    <a href={f.url} download={f.name}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shrink-0">
+                      <Download className="w-3 h-3" />
+                      Baixar
+                    </a>
+                  </div>
+                ))}
+                {files.filter(f => isImage(f.name)).length > 0 && (
+                  <div className="px-5 py-3">
+                    <p className="text-xs font-semibold text-muted-foreground/60 mb-2">Fotos</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {files.filter(f => isImage(f.name)).map(f => (
+                        <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer"
+                          className="relative aspect-square rounded-xl overflow-hidden border border-border group bg-muted">
+                          <img src={f.url} alt={f.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                            <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Coluna direita — Financeiro */}
