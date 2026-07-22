@@ -16,17 +16,22 @@ interface TastingRow {
 }
 
 function parseMenuText(text: string): string {
-  // Already HTML
   if (text.trim().startsWith('<')) return text;
-  return text
-    .replace(/\[h2\]\[b\](.*?)\[\/b\]\[\/h2\]/gs, '<h3 class="font-bold text-amber-800 mt-3 mb-1">$1</h3>')
-    .replace(/\[h2\](.*?)\[\/h2\]/gs, '<h3 class="font-bold text-amber-800 mt-3 mb-1">$1</h3>')
-    .replace(/\[b\](.*?)\[\/b\]/gs, '<strong>$1</strong>')
-    .replace(/\[ul\](.*?)\[\/ul\]/gs, '<ul class="list-disc pl-4 space-y-0.5">$1</ul>')
-    .replace(/\[ml\](.*?)\[\/ml\]/gs, '<ul class="list-disc pl-4 space-y-0.5">$1</ul>')
-    .replace(/\[li[^\]]*\](.*?)\[\/li\]/gs, '<li>$1</li>')
-    .replace(/\[\/?(ol|li indent[^\]]*)\]/g, '')
-    .replace(/\n{2,}/g, '<br/>');
+  let s = text;
+  // Headings: [h2][b]Title[/b][/h2] or [h2]Title[/h2]
+  s = s.replace(/\[h2\]\s*\[b\]([\s\S]*?)\[\/b\]\s*\[\/h2\]/g,
+    '<h3 style="font-weight:700;margin-top:10px;margin-bottom:2px;color:#92400e">$1</h3>');
+  s = s.replace(/\[h2\]([\s\S]*?)\[\/h2\]/g,
+    '<h3 style="font-weight:700;margin-top:10px;margin-bottom:2px;color:#92400e">$1</h3>');
+  // Bold
+  s = s.replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<strong>$1</strong>');
+  // List items
+  s = s.replace(/\[li[^\]]*\]([\s\S]*?)\[\/li\]/g, '<li style="margin-left:12px;list-style:disc">$1</li>');
+  // Strip [ul], [/ul], [ml], [/ml], [ol], [/ol]
+  s = s.replace(/\[\/?(?:ul|ml|ol)[^\]]*\]/g, '');
+  // Strip any remaining [tag] patterns
+  s = s.replace(/\[[^\]]+\]/g, '');
+  return s.trim();
 }
 
 const fmtDate = (d: string) =>
