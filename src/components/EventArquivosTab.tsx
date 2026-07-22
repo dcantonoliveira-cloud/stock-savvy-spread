@@ -535,17 +535,14 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       const dbUpdates: any = { zapsign_data: updated };
       if (allSigned) dbUpdates.contract_signed = true;
       await supabase.from('events').update(dbUpdates).eq('id', eventId);
-      // Inserir alert para cada novo assinante
+      // Inserir notificação normal para cada novo assinante
       for (const signer of newlySigned) {
         const eventName = event.event_name ?? 'Evento';
-        await (supabase as any).from('smart_alerts').insert({
-          company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89',
+        await (supabase as any).from('app_notifications').insert({
           type: 'zapsign_signed',
-          severity: 'warning',
           title: `${signer.name} assinou o contrato`,
-          description: eventName,
-          entity_type: 'event',
-          entity_id: eventId,
+          message: eventName,
+          data: { entity_type: 'event', entity_id: eventId },
         });
       }
       if (!silent) toast.success('Status atualizado');
