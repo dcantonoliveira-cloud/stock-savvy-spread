@@ -217,6 +217,23 @@ function AppRoutes() {
     );
   }
 
+  if (role === 'supervisor' && window.location.pathname.startsWith('/assessora')) {
+    return (
+      <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/assessora" element={<AssesoraLayout />}>
+            <Route index element={<AssesoraEventosPage />} />
+            <Route path="evento/:id"   element={<AssesoraEventoDetailPage />} />
+            <Route path="degustacoes"  element={<AssesoraDegustacoes />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
   if (role === 'supervisor') {
     if (isMobile) {
       return (
@@ -312,23 +329,7 @@ function AppRoutes() {
     );
   }
 
-  // Supervisor acessando preview do portal da assessora
-  if (role === 'supervisor' && window.location.pathname.startsWith('/assessora')) {
-    return (
-      <ErrorBoundary>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/assessora" element={<AssesoraLayout />}>
-            <Route index element={<AssesoraEventosPage />} />
-            <Route path="evento/:id"   element={<AssesoraEventoDetailPage />} />
-            <Route path="degustacoes"  element={<AssesoraDegustacoes />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-      </ErrorBoundary>
-    );
-  }
+
 
   return (
     <EmployeeLayout>
