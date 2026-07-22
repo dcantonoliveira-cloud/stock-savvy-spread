@@ -148,18 +148,28 @@ function AssessoraModal({
     toast.success('Senha redefinida! Envie a nova senha para a assessora.');
   };
 
+  const generateEmail = (name: string) => {
+    const slug = name
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9\s]/g, '')
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .join('.');
+    return `${slug}@assessora.rondellobuffet.com.br`;
+  };
+
   const createAccess = async () => {
-    if (!accessEmail.trim()) { toast.error('Informe o e-mail'); return; }
+    const email = accessEmail.trim() || generateEmail(assessora.name);
     setCreatingAccess(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await callEdgeFunction({ supplier_id: assessora.id, email: accessEmail.trim(), display_name: assessora.name });
+    const res = await callEdgeFunction({ supplier_id: assessora.id, email, display_name: assessora.name });
     const json = await res.json();
     setCreatingAccess(false);
     if (!res.ok) { toast.error(json.error ?? 'Erro ao criar acesso'); return; }
     setTempPwd(json.temp_password);
-    setAssessora(prev => ({ ...prev, user_id: json.user_id, email: accessEmail.trim() }));
-    // Save email to suppliers too
-    await (supabase.from('suppliers' as any) as any).update({ email: accessEmail.trim() }).eq('id', assessora.id);
+    setAssessora(prev => ({ ...prev, user_id: json.user_id, email }));
+    await (supabase.from('suppliers' as any) as any).update({ email }).eq('id', assessora.id);
     toast.success('Acesso criado! Compartilhe a senha com a assessora.');
     onRefresh();
   };
@@ -374,20 +384,10 @@ function AssessoraModal({
                   <div>
                     <p className="text-sm font-medium text-foreground mb-1">Criar acesso para {assessora.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Um login com senha temporária será criado. A assessora poderá acessar o portal com os eventos dela e deverá trocar a senha no primeiro acesso.
+                      Um login com senha temporária será criado automaticamente. A assessora deverá trocar a senha no primeiro acesso.
                     </p>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70 mb-1.5">E-mail de acesso</label>
-                    <input
-                      type="email"
-                      value={accessEmail}
-                      onChange={e => setAccessEmail(e.target.value)}
-                      placeholder="email@assessora.com.br"
-                      className="w-full h-10 px-3 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                  </div>
-                  <button onClick={createAccess} disabled={creatingAccess || !accessEmail.trim()}
+                  <button onClick={createAccess} disabled={creatingAccess}
                     className="flex items-center justify-center gap-2 h-10 px-5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
                     <KeyRound className="w-4 h-4" />
                     {creatingAccess ? 'Criando acesso…' : 'Criar acesso'}
