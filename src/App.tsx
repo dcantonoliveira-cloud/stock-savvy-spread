@@ -166,6 +166,10 @@ function AppRoutes() {
     if (window.location.pathname.startsWith('/portal/cadastro')) {
       return <Suspense fallback={<PageLoader />}><ClientRegisterPage /></Suspense>;
     }
+    if (window.location.pathname.startsWith('/assessora/cadastro')) {
+      const AssesoraCadastroPage = lazy(() => import('./pages/assessora/AssesoraCadastroPage'));
+      return <Suspense fallback={<PageLoader />}><AssesoraCadastroPage /></Suspense>;
+    }
     if (window.location.pathname.startsWith('/contrato-cliente/')) {
       return <Suspense fallback={<PageLoader />}><ContractFormPage /></Suspense>;
     }

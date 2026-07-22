@@ -14,7 +14,7 @@ export const DEFAULT_TEMPLATES: MessageTemplates = {
   review:        `Olá, {{clientName}}! ⭐\n\nFoi uma honra realizar o *{{eventName}}*!\n\nGostaríamos muito de saber sua opinião sobre nossos serviços. Sua avaliação é muito importante para nós!\n\nObrigado pela confiança!\n— Rondello Buffet`,
   portal_invite: `Olá, {{clientName}}! 🎉\n\nSeu portal do cliente está pronto! Por lá você acompanha tudo sobre o seu evento *{{eventName}}*: financeiro, arquivos e informações da festa.\n\n*Como acessar:*\n1. Acesse: {{portalUrl}}\n2. Crie sua conta\n3. Use o código: *{{accessCode}}*\n\n— Rondello Buffet`,
   tasting_availability: `Olá! 😊 Temos as seguintes datas disponíveis para degustação:\n\n{{dates}}\n\nQual data funciona melhor pra vocês? 🍽️\n\n— Rondello Buffet`,
-  assessor_invite: `Olá, {{assessorName}}! 👋\n\nSeu acesso ao portal Rondello Buffet foi criado.\n\n🔗 *Link:* {{portalUrl}}\n📧 *E-mail:* {{email}}\n🔑 *Senha temporária:* {{password}}\n\nNa primeira vez que você acessar, o sistema pedirá para você criar uma nova senha. É rápido!\n\nQualquer dúvida, fale comigo. 😊`,
+  assessor_invite: `Olá, {{assessorName}}! 👋\n\nVocê foi convidada para acessar o portal de assessorias do Rondello Buffet.\n\nPara criar sua conta, acesse o link abaixo e use o código de convite:\n\n🔗 *Link:* {{cadastroUrl}}\n🔑 *Código:* {{code}}\n\nÉ rápido! Você escolhe seu próprio e-mail e senha.\n\nQualquer dúvida, fale comigo. 😊`,
 };
 
 export const TEMPLATE_LABELS: Record<MessageTemplateKey, string> = {
@@ -34,7 +34,7 @@ export const TEMPLATE_VARS: Record<MessageTemplateKey, string[]> = {
   review:        ['{{clientName}}', '{{eventName}}'],
   portal_invite: ['{{clientName}}', '{{eventName}}', '{{accessCode}}', '{{portalUrl}}'],
   tasting_availability: ['{{dates}}'],
-  assessor_invite: ['{{assessorName}}', '{{portalUrl}}', '{{email}}', '{{password}}'],
+  assessor_invite: ['{{assessorName}}', '{{cadastroUrl}}', '{{code}}'],
 };
 
 // Busca templates salvos no banco (provider = 'whatsapp_messages')

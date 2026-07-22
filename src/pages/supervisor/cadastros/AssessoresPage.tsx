@@ -14,6 +14,7 @@ interface Assessora {
   email?: string | null;
   user_id?: string | null;
   must_change_password?: boolean | null;
+  invite_code?: string | null;
   created_at: string;
 }
 
@@ -63,9 +64,8 @@ function AssessoraModal({
   const [confirmMerge, setConfirmMerge] = useState(false);
 
   // Acesso
-  const [accessEmail, setAccessEmail]       = useState(assessora.email ?? '');
   const [creatingAccess, setCreatingAccess] = useState(false);
-  const [tempPwd, setTempPwd]               = useState('');
+  const [inviteCode, setInviteCode]         = useState(assessora.invite_code ?? '');
   const [copied, setCopied]                 = useState(false);
   const [sendingWpp, setSendingWpp]         = useState(false);
 
@@ -148,47 +148,49 @@ function AssessoraModal({
     toast.success('Senha redefinida! Envie a nova senha para a assessora.');
   };
 
-  const generateEmail = (name: string) => {
-    const slug = name
-      .toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9\s]/g, '')
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .join('.');
-    return `${slug}@assessora.rondellobuffet.com.br`;
+  const generateCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
   };
 
-  const createAccess = async () => {
-    const email = accessEmail.trim() || generateEmail(assessora.name);
+  const createInviteCode = async () => {
     setCreatingAccess(true);
-    const res = await callEdgeFunction({ supplier_id: assessora.id, email, display_name: assessora.name });
-    const json = await res.json();
+    const code = generateCode();
+    const { error } = await (supabase.from('suppliers' as any) as any)
+      .update({ invite_code: code })
+      .eq('id', assessora.id);
     setCreatingAccess(false);
-    if (!res.ok) { toast.error(json.error ?? 'Erro ao criar acesso'); return; }
-    setTempPwd(json.temp_password);
-    setAssessora(prev => ({ ...prev, user_id: json.user_id, email }));
-    await (supabase.from('suppliers' as any) as any).update({ email }).eq('id', assessora.id);
-    toast.success('Acesso criado! Compartilhe a senha com a assessora.');
+    if (error) { toast.error('Erro ao gerar código'); return; }
+    setInviteCode(code);
+    setAssessora(prev => ({ ...prev, invite_code: code }));
+    toast.success('Código gerado!');
     onRefresh();
   };
 
-  const copyCredentials = async () => {
-    const text = await buildWppMessage(tempPwd || '••••••••••');
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const revokeInviteCode = async () => {
+    if (!confirm('Revogar o código? O link atual deixará de funcionar.')) return;
+    await (supabase.from('suppliers' as any) as any).update({ invite_code: null }).eq('id', assessora.id);
+    setInviteCode('');
+    setAssessora(prev => ({ ...prev, invite_code: null }));
+    onRefresh();
   };
 
-  const buildWppMessage = async (pwd: string) => {
+  const buildInviteMessage = async () => {
     const { buildMessage } = await import('@/lib/whatsapp');
     return buildMessage('assessor_invite', {
       assessorName: assessora.name,
-      portalUrl: `${window.location.origin}/assessora`,
-      email: assessora.email ?? accessEmail ?? '',
-      password: pwd,
+      cadastroUrl: `${window.location.origin}/assessora/cadastro?code=${inviteCode}`,
+      code: inviteCode,
     });
+  };
+
+  const copyCredentials = async () => {
+    const text = await buildInviteMessage();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const sendWpp = async () => {
@@ -196,7 +198,7 @@ function AssessoraModal({
     if (!phone) { toast.error('Salve o telefone da assessora antes de enviar'); return; }
     if (!tempPwd) { toast.error('Redefina a senha primeiro para incluí-la na mensagem'); return; }
     setSendingWpp(true);
-    const result = await sendWhatsApp(phone, await buildWppMessage(tempPwd));
+    const result = await sendWhatsApp(phone, await buildInviteMessage());
     setSendingWpp(false);
     if (result.ok) toast.success('Mensagem enviada!');
     else toast.error('Erro ao enviar: ' + result.error);
@@ -318,82 +320,76 @@ function AssessoraModal({
           {/* ── Tab Acesso ── */}
           {tab === 'acesso' && (
             <div className="p-5 max-w-md flex flex-col gap-5">
+              {/* Status do acesso */}
               {hasAccess ? (
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-                    <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                      <KeyRound className="w-4 h-4 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-emerald-800">Acesso ativo</p>
-                      <p className="text-xs text-emerald-600">{assessora.email}</p>
-                    </div>
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                    <KeyRound className="w-4 h-4 text-emerald-600" />
                   </div>
-
-                  {tempPwd && (
-                    <div className="flex flex-col gap-3">
-                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-                        <p className="text-xs font-semibold text-amber-800 mb-1 uppercase tracking-wide">Senha temporária gerada</p>
-                        <p className="text-lg font-mono font-bold text-amber-900 tracking-widest">{tempPwd}</p>
-                        <p className="text-xs text-amber-600 mt-1">A assessora será solicitada a trocar na primeira entrada.</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={copyCredentials}
-                          className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium border border-border rounded-lg hover:bg-muted/50 transition-colors">
-                          {copied ? <CheckCheck className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                          {copied ? 'Copiado!' : 'Copiar mensagem'}
-                        </button>
-                        <button onClick={sendWpp} disabled={sendingWpp || !editPhone}
-                          className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
-                          <Send className="w-4 h-4" />
-                          {sendingWpp ? 'Enviando…' : 'Enviar WhatsApp'}
-                        </button>
-                      </div>
-                      {!editPhone && !assessora.phone && (
-                        <p className="text-xs text-amber-600">
-                          Para enviar por WhatsApp, salve o telefone na aba <strong>Editar</strong> primeiro.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {!tempPwd && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2">
-                        <button onClick={copyCredentials}
-                          className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium border border-border rounded-lg hover:bg-muted/50 transition-colors">
-                          <Copy className="w-4 h-4" />
-                          Copiar mensagem
-                        </button>
-                        <button onClick={sendWpp} disabled={sendingWpp || (!editPhone && !assessora.phone)}
-                          className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
-                          <Send className="w-4 h-4" />
-                          {sendingWpp ? 'Enviando…' : 'Enviar WhatsApp'}
-                        </button>
-                      </div>
-                      <button onClick={resetPassword} disabled={creatingAccess}
-                        className="flex items-center justify-center gap-2 h-9 px-4 text-sm font-medium border border-border rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors text-muted-foreground">
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        {creatingAccess ? 'Redefinindo…' : 'Redefinir senha'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-1">Criar acesso para {assessora.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Um login com senha temporária será criado automaticamente. A assessora deverá trocar a senha no primeiro acesso.
-                    </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-emerald-800">Acesso ativo</p>
+                    <p className="text-xs text-emerald-600 truncate">{assessora.email}</p>
                   </div>
-                  <button onClick={createAccess} disabled={creatingAccess}
-                    className="flex items-center justify-center gap-2 h-10 px-5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
-                    <KeyRound className="w-4 h-4" />
-                    {creatingAccess ? 'Criando acesso…' : 'Criar acesso'}
+                  <button onClick={resetPassword} disabled={creatingAccess}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors shrink-0">
+                    <RefreshCw className="w-3 h-3" />
+                    {creatingAccess ? 'Redefinindo…' : 'Redefinir senha'}
                   </button>
                 </div>
+              ) : (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50 border border-border">
+                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <KeyRound className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Sem acesso ao portal ainda.</p>
+                </div>
               )}
+
+              {/* Convite por código */}
+              <div className="flex flex-col gap-3">
+                <p className="text-sm font-semibold text-foreground">Convite de acesso</p>
+                {inviteCode ? (
+                  <>
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex flex-col gap-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">Código ativo</p>
+                      <p className="text-2xl font-mono font-black tracking-[0.2em] text-amber-900">{inviteCode}</p>
+                      <p className="text-xs text-amber-700 mt-0.5 break-all">
+                        {`${window.location.origin}/assessora/cadastro?code=${inviteCode}`}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={copyCredentials}
+                        className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                        {copied ? <CheckCheck className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                        {copied ? 'Copiado!' : 'Copiar mensagem'}
+                      </button>
+                      <button onClick={sendWpp} disabled={sendingWpp || (!editPhone && !assessora.phone)}
+                        className="flex-1 flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                        <Send className="w-4 h-4" />
+                        {sendingWpp ? 'Enviando…' : 'Enviar WhatsApp'}
+                      </button>
+                    </div>
+                    {!editPhone && !assessora.phone && (
+                      <p className="text-xs text-amber-600">Para enviar por WhatsApp, salve o telefone na aba <strong>Editar</strong>.</p>
+                    )}
+                    <button onClick={revokeInviteCode}
+                      className="text-xs text-muted-foreground hover:text-red-500 transition-colors self-start">
+                      Revogar código
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Gere um código e envie para a assessora. Ela acessa o link e cria a própria conta — simples assim.
+                    </p>
+                    <button onClick={createInviteCode} disabled={creatingAccess}
+                      className="flex items-center justify-center gap-2 h-10 px-5 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                      <KeyRound className="w-4 h-4" />
+                      {creatingAccess ? 'Gerando…' : 'Gerar código de convite'}
+                    </button>
+                  </>
+                )}
+              </div>
 
               {/* Histórico de acessos */}
               <div className="flex flex-col gap-2">
@@ -503,7 +499,7 @@ export default function AssessoresPage() {
   const load = async () => {
     setLoading(true);
     const { data, error } = await (supabase.from('suppliers' as any) as any)
-      .select('id, name, notes, phone, email, user_id, must_change_password, created_at')
+      .select('id, name, notes, phone, email, user_id, must_change_password, invite_code, created_at')
       .eq('type', 'organizer')
       .order('name');
     if (error) toast.error('Erro: ' + error.message);
