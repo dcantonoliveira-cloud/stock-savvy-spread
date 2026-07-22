@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { LogIn, UserPlus, ChefHat, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { LogIn, UserPlus, KeyRound, Eye, EyeOff } from 'lucide-react';
+import logoRondello from '@/assets/logo-rondello.png';
 
 export default function LoginPage() {
   const { signIn } = useAuth();
@@ -84,13 +85,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-8 relative z-10">
         {/* Logo */}
         <div className="text-center space-y-3">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto animate-pulse-glow">
-            <ChefHat className="w-8 h-8 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-extrabold gold-text tracking-wide">RONDELLO</h1>
-            <p className="text-xs text-muted-foreground mt-1 tracking-[0.2em] uppercase font-medium">Sistema de Gestão</p>
-          </div>
+          <img src={logoRondello} alt="Rondello Buffet" className="h-20 mx-auto" />
+          <p className="text-xs text-muted-foreground tracking-[0.2em] uppercase font-medium">Sistema de Gestão</p>
         </div>
 
         {/* Form */}
