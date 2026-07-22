@@ -636,7 +636,7 @@ export default function AssessoresPage() {
           assessora={selected}
           allAssessoras={rows}
           onClose={() => setSelected(null)}
-          onRefresh={() => { load(); setSelected(null); }}
+          onRefresh={() => load()}
         />
       )}
     </div>
