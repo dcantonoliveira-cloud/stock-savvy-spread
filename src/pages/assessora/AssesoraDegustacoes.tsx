@@ -144,9 +144,9 @@ export default function AssesoraDegustacoes() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">
-                      {e.clients?.name ?? '—'}
+                      {e.clients?.name ?? e.event_name ?? '—'}
                     </p>
-                    {e.event_name && (
+                    {e.clients?.name && e.event_name && (
                       <p className="text-xs text-muted-foreground truncate">{e.event_name}</p>
                     )}
                   </div>
