@@ -15,6 +15,20 @@ interface TastingRow {
   eventos: { id: string; event_name: string | null; location_text: string | null }[];
 }
 
+function parseMenuText(text: string): string {
+  // Already HTML
+  if (text.trim().startsWith('<')) return text;
+  return text
+    .replace(/\[h2\]\[b\](.*?)\[\/b\]\[\/h2\]/gs, '<h3 class="font-bold text-amber-800 mt-3 mb-1">$1</h3>')
+    .replace(/\[h2\](.*?)\[\/h2\]/gs, '<h3 class="font-bold text-amber-800 mt-3 mb-1">$1</h3>')
+    .replace(/\[b\](.*?)\[\/b\]/gs, '<strong>$1</strong>')
+    .replace(/\[ul\](.*?)\[\/ul\]/gs, '<ul class="list-disc pl-4 space-y-0.5">$1</ul>')
+    .replace(/\[ml\](.*?)\[\/ml\]/gs, '<ul class="list-disc pl-4 space-y-0.5">$1</ul>')
+    .replace(/\[li[^\]]*\](.*?)\[\/li\]/gs, '<li>$1</li>')
+    .replace(/\[\/?(ol|li indent[^\]]*)\]/g, '')
+    .replace(/\n{2,}/g, '<br/>');
+}
+
 const fmtDate = (d: string) =>
   new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -159,7 +173,7 @@ export default function AssesoraDegustacoes() {
                   </div>
                   <div
                     className="text-xs text-amber-900 leading-relaxed prose prose-xs max-w-none"
-                    dangerouslySetInnerHTML={{ __html: t.menu_text }}
+                    dangerouslySetInnerHTML={{ __html: parseMenuText(t.menu_text) }}
                   />
                 </div>
               )}
