@@ -81,7 +81,7 @@ export default function NotificationsPage() {
   async function resolve(id: string) {
     setResolving(id);
     const { error } = await (supabase as any).from('smart_alert_acks')
-      .upsert({ alert_id: id }, { onConflict: 'alert_id,user_id' });
+      .upsert({ alert_id: id, user_id: user?.id }, { onConflict: 'alert_id,user_id' });
     if (error) toast.error('Erro ao marcar como ciente');
     else {
       setAckedIds(prev => new Set([...prev, id]));
@@ -93,7 +93,7 @@ export default function NotificationsPage() {
   async function resolveAll() {
     setResolvingAll(true);
     const ids = active.map(a => a.id);
-    const rows = ids.map(alert_id => ({ alert_id }));
+    const rows = ids.map(alert_id => ({ alert_id, user_id: user?.id }));
     const { error } = await (supabase as any).from('smart_alert_acks')
       .upsert(rows, { onConflict: 'alert_id,user_id' });
     if (error) toast.error('Erro ao marcar todos como ciente');
