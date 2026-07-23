@@ -103,11 +103,14 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
       const { data: acks } = await (supabase as any).from('smart_alert_acks').select('alert_id');
       const ackedIds = (acks ?? []).map((a: any) => a.alert_id);
 
-      let alertsQ = (supabase as any).from('smart_alerts').select('id, title, severity, created_at');
-      if (ackedIds.length > 0) alertsQ = alertsQ.not('id', 'in', `(${ackedIds.join(',')})`);
-      const { data: alertsData } = await alertsQ.order('created_at', { ascending: false }).limit(300);
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: alertsData } = await (supabase as any)
+        .from('smart_alerts').select('id, title, severity, created_at')
+        .gte('created_at', sevenDaysAgo)
+        .order('created_at', { ascending: false }).limit(300);
 
-      const all = (alertsData ?? []) as { id: string; title: string; severity: string; created_at: string }[];
+      const all = ((alertsData ?? []) as { id: string; title: string; severity: string; created_at: string }[])
+        .filter(a => !ackedIds.includes(a.id));
       const urgentList = all.filter(a => a.severity === 'urgent');
       setUnread(all.length);
       setUrgentAlerts(urgentList.length);
