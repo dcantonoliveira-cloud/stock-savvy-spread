@@ -233,8 +233,7 @@ export default function SupervisorProducaoPage() {
     if (!confirm('Excluir este pedido?')) return;
     const { error } = await (supabase.from as any)('production_orders')
       .delete()
-      .eq('id', id)
-      .eq('company_id', COMPANY_ID);
+      .eq('id', id);
     if (error) { toast.error(`Erro ao excluir: ${error.message}`); return; }
     setOrders(prev => prev.filter(o => o.id !== id));
     toast.success('Pedido excluído');
