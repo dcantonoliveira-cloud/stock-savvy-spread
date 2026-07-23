@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed } from 'lucide-react';
+import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
@@ -150,6 +150,7 @@ export default function SupervisorProducaoPage() {
   const [orders, setOrders]       = useState<Order[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
   const [form, setForm]           = useState(BLANK);
   const [eventSearch, setEventSearch]   = useState('');
@@ -198,12 +199,27 @@ export default function SupervisorProducaoPage() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  const openEdit = (o: Order) => {
+    setEditingId(o.id);
+    setForm({
+      title:            o.title,
+      description:      o.description ?? '',
+      delivery_address: o.delivery_address ?? '',
+      event_id:         o.event_id ?? '',
+      delivery_date:    o.delivery_date,
+      delivery_time:    o.delivery_time ?? '',
+      extra_value:      o.extra_value != null ? String(o.extra_value) : '',
+      payment_method:   o.payment_method ?? '',
+    });
+    setEventSearch(o.event_name ?? '');
+    setModalOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.delivery_date) return;
     setSaving(true);
-    const { error } = await (supabase.from as any)('production_orders').insert({
-      company_id:       COMPANY_ID,
+    const payload = {
       title:            form.title,
       description:      form.description || null,
       delivery_address: form.delivery_address || null,
@@ -212,12 +228,19 @@ export default function SupervisorProducaoPage() {
       delivery_time:    form.delivery_time || null,
       extra_value:      form.extra_value ? parseFloat(form.extra_value.replace(',', '.')) : null,
       payment_method:   form.payment_method || null,
-      status:           'pending',
-    });
-    if (error) { toast.error('Erro ao criar pedido'); setSaving(false); return; }
-    toast.success('Pedido criado!');
+    };
+    if (editingId) {
+      const { error } = await (supabase.from as any)('production_orders').update(payload).eq('id', editingId);
+      if (error) { toast.error('Erro ao salvar pedido'); setSaving(false); return; }
+      toast.success('Pedido atualizado!');
+    } else {
+      const { error } = await (supabase.from as any)('production_orders').insert({ company_id: COMPANY_ID, ...payload, status: 'pending' });
+      if (error) { toast.error('Erro ao criar pedido'); setSaving(false); return; }
+      toast.success('Pedido criado!');
+    }
     setSaving(false);
     setModalOpen(false);
+    setEditingId(null);
     setForm(BLANK);
     setEventSearch('');
     load();
@@ -288,7 +311,7 @@ export default function SupervisorProducaoPage() {
             {pending === 0 && inProgress === 0 && 'Tudo em dia'}
           </p>
         </div>
-        <button onClick={() => { setForm(BLANK); setEventSearch(''); setModalOpen(true); }}
+        <button onClick={() => { setForm(BLANK); setEventSearch(''); setEditingId(null); setModalOpen(true); }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
           <Plus className="w-4 h-4" /> Novo pedido
         </button>
@@ -376,6 +399,10 @@ export default function SupervisorProducaoPage() {
                               className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap">
                               {cfg.nextLabel}
                             </button>
+                            <button onClick={() => openEdit(o)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
                             <button onClick={() => deleteOrder(o.id)}
                               className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
                               <Trash2 className="w-3.5 h-3.5" />
@@ -405,13 +432,13 @@ export default function SupervisorProducaoPage() {
 
       {/* Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setModalOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { setModalOpen(false); setEditingId(null); }}>
           <div className="absolute inset-0 bg-black/30" />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <p className="font-semibold text-sm">Novo pedido de produção</p>
-              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+              <p className="font-semibold text-sm">{editingId ? 'Editar pedido' : 'Novo pedido de produção'}</p>
+              <button onClick={() => { setModalOpen(false); setEditingId(null); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
