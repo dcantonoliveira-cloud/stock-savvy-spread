@@ -49,8 +49,9 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function NotificationsPage() {
   const navigate   = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [alerts, setAlerts]         = useState<SmartAlert[]>([]);
+  const [ackedIds, setAckedIds]     = useState<Set<string>>(new Set());
   const [loading, setLoading]       = useState(true);
   const [tab, setTab]               = useState<'active' | 'resolved'>('active');
   const [resolving, setResolving]   = useState<string | null>(null);
@@ -58,11 +59,14 @@ export default function NotificationsPage() {
   const [resending, setResending]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await (supabase as any)
-      .from('smart_alerts').select('*')
-      .order('severity', { ascending: true })
-      .order('created_at', { ascending: false }).limit(300);
-    setAlerts((data ?? []) as SmartAlert[]);
+    const [{ data: alertsData }, { data: acksData }] = await Promise.all([
+      (supabase as any).from('smart_alerts').select('*')
+        .order('severity', { ascending: true })
+        .order('created_at', { ascending: false }).limit(300),
+      (supabase as any).from('smart_alert_acks').select('alert_id'),
+    ]);
+    setAlerts((alertsData ?? []) as SmartAlert[]);
+    setAckedIds(new Set((acksData ?? []).map((a: any) => a.alert_id)));
     setLoading(false);
   }, []);
 
@@ -76,12 +80,11 @@ export default function NotificationsPage() {
 
   async function resolve(id: string) {
     setResolving(id);
-    const now = new Date().toISOString();
-    const { error } = await (supabase as any).from('smart_alerts')
-      .update({ resolved_at: now, resolved_by_name: profile?.display_name ?? 'Usuário' }).eq('id', id);
-    if (error) toast.error('Erro ao marcar como resolvido');
+    const { error } = await (supabase as any).from('smart_alert_acks')
+      .upsert({ alert_id: id }, { onConflict: 'alert_id,user_id' });
+    if (error) toast.error('Erro ao marcar como ciente');
     else {
-      setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved_at: now, resolved_by_name: profile?.display_name ?? 'Usuário' } : a));
+      setAckedIds(prev => new Set([...prev, id]));
       toast.success('Marcado como ciente');
     }
     setResolving(null);
@@ -89,22 +92,21 @@ export default function NotificationsPage() {
 
   async function resolveAll() {
     setResolvingAll(true);
-    const now = new Date().toISOString();
     const ids = active.map(a => a.id);
-    const { error } = await (supabase as any).from('smart_alerts')
-      .update({ resolved_at: now, resolved_by_name: profile?.display_name ?? 'Usuário' })
-      .in('id', ids);
+    const rows = ids.map(alert_id => ({ alert_id }));
+    const { error } = await (supabase as any).from('smart_alert_acks')
+      .upsert(rows, { onConflict: 'alert_id,user_id' });
     if (error) toast.error('Erro ao marcar todos como ciente');
     else {
-      setAlerts(prev => prev.map(a => ids.includes(a.id) ? { ...a, resolved_at: now, resolved_by_name: profile?.display_name ?? 'Usuário' } : a));
+      setAckedIds(prev => new Set([...prev, ...ids]));
       toast.success(`${ids.length} alertas marcados como ciente`);
     }
     setResolvingAll(false);
   }
 
   async function reopen(id: string) {
-    await (supabase as any).from('smart_alerts').update({ resolved_at: null, resolved_by_name: null }).eq('id', id);
-    setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved_at: null, resolved_by_name: null } : a));
+    await (supabase as any).from('smart_alert_acks').delete().eq('alert_id', id);
+    setAckedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
   }
 
   async function resend(alert: SmartAlert) {
@@ -123,10 +125,10 @@ export default function NotificationsPage() {
     setResending(null);
   }
 
-  // Filtra ativos: remove os com mais de 7 dias
-  const allActive  = alerts.filter(a => !a.resolved_at);
+  // Filtra por ack do usuário atual
+  const allActive  = alerts.filter(a => !ackedIds.has(a.id));
   const active     = allActive.filter(a => Date.now() - new Date(a.created_at).getTime() <= SEVEN_DAYS_MS);
-  const resolved   = alerts.filter(a => !!a.resolved_at);
+  const resolved   = alerts.filter(a => ackedIds.has(a.id));
   const urgent     = active.filter(a => a.severity === 'urgent');
   const warning    = active.filter(a => a.severity === 'warning');
   const shown      = tab === 'active' ? active : resolved;

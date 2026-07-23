@@ -100,18 +100,24 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     const load = async () => {
-      const [{ count: totalCount }, { data: urgentData, count: urgentCount }] = await Promise.all([
-        (supabase as any).from('smart_alerts').select('*', { count: 'exact', head: true }).is('resolved_at', null),
-        (supabase as any).from('smart_alerts').select('title', { count: 'exact' }).is('resolved_at', null).eq('severity', 'urgent').order('created_at', { ascending: false }).limit(1),
-      ]);
-      setUnread(totalCount || 0);
-      setUrgentAlerts(urgentCount ?? 0);
-      setTopUrgent(urgentData?.[0]?.title ?? null);
+      const { data: acks } = await (supabase as any).from('smart_alert_acks').select('alert_id');
+      const ackedIds = (acks ?? []).map((a: any) => a.alert_id);
+
+      let alertsQ = (supabase as any).from('smart_alerts').select('id, title, severity, created_at');
+      if (ackedIds.length > 0) alertsQ = alertsQ.not('id', 'in', `(${ackedIds.join(',')})`);
+      const { data: alertsData } = await alertsQ.order('created_at', { ascending: false }).limit(300);
+
+      const all = (alertsData ?? []) as { id: string; title: string; severity: string; created_at: string }[];
+      const urgentList = all.filter(a => a.severity === 'urgent');
+      setUnread(all.length);
+      setUrgentAlerts(urgentList.length);
+      setTopUrgent(urgentList[0]?.title ?? null);
     };
     load();
     const ch = (supabase as any)
       .channel('smart-alerts-layout')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alerts' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alert_acks' }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
