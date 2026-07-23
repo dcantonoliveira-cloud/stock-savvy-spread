@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
@@ -47,6 +47,13 @@ const BLANK = { title: '', description: '', delivery_address: '', event_id: '', 
 
 // ─── Financial Tab ─────────────────────────────────────────────────────────────
 function FinanceiroView({ orders }: { orders: Order[] }) {
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const toggle = useCallback((id: string) => setChecked(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  }), []);
+
   const withExtra = orders.filter(o => o.extra_value != null && o.extra_value > 0);
   const total     = withExtra.reduce((s, o) => s + (o.extra_value ?? 0), 0);
   const done      = orders.filter(o => o.status === 'done' && (o.extra_value ?? 0) > 0);
@@ -114,9 +121,11 @@ function FinanceiroView({ orders }: { orders: Order[] }) {
                   const cfg = STATUS_CFG[o.status];
                   const pm  = PAYMENT_METHODS.find(m => m.value === o.payment_method);
                   return (
-                    <tr key={o.id} className="hover:bg-muted/10">
+                    <tr key={o.id}
+                      onClick={() => toggle(o.id)}
+                      className={`cursor-pointer transition-colors select-none ${checked.has(o.id) ? 'bg-emerald-50' : 'hover:bg-muted/10'}`}>
                       <td className="px-5 py-3">
-                        <p className="font-medium text-foreground">{o.title}</p>
+                        <p className={`font-medium ${checked.has(o.id) ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{o.title}</p>
                         {pm && <p className="text-xs text-muted-foreground mt-0.5">{pm.label}</p>}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
@@ -125,8 +134,11 @@ function FinanceiroView({ orders }: { orders: Order[] }) {
                       <td className="px-4 py-3 text-center">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${cfg.cls}`}>{cfg.label}</span>
                       </td>
-                      <td className="px-5 py-3 text-right font-bold text-emerald-600 whitespace-nowrap">
-                        {fmtBRL(o.extra_value!)}
+                      <td className="px-5 py-3 text-right font-bold whitespace-nowrap">
+                        {checked.has(o.id)
+                          ? <span className="text-emerald-600 flex items-center justify-end gap-1"><CheckCircle2 className="w-3.5 h-3.5" />{fmtBRL(o.extra_value!)}</span>
+                          : <span className="text-emerald-600">{fmtBRL(o.extra_value!)}</span>
+                        }
                       </td>
                     </tr>
                   );
