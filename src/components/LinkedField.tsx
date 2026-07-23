@@ -9,6 +9,7 @@ interface Props {
   label: string;
   table: string;
   typeFilter?: string;
+  companyId?: string;
   valueId: string | null;
   valueName: string;
   onChangeId: (id: string | null) => void;
@@ -21,7 +22,7 @@ const inputCls =
   'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors';
 
 export default function LinkedField({
-  label, table, typeFilter, valueId, valueName, onChangeId, onChangeName, createLabel,
+  label, table, typeFilter, companyId, valueId, valueName, onChangeId, onChangeName, createLabel,
 }: Props) {
   const [items, setItems]       = useState<Item[]>([]);
   const [search, setSearch]     = useState('');   // what user is actively typing
@@ -34,11 +35,12 @@ export default function LinkedField({
   const load = async () => {
     let q = supabase.from(table as any).select('id, name').order('name');
     if (typeFilter) q = (q as any).eq('type', typeFilter);
+    if (companyId) q = (q as any).eq('company_id', companyId);
     const { data } = await q;
     setItems((data ?? []) as Item[]);
   };
 
-  useEffect(() => { load(); }, [table, typeFilter]);
+  useEffect(() => { load(); }, [table, typeFilter, companyId]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

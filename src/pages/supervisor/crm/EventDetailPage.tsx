@@ -263,8 +263,14 @@ export default function EventDetailPage() {
     if (!eid) return;
     setSaveStatus('saving');
 
-    // Detect critical field changes and create smart alerts
+    // Detect critical field changes and create smart alerts (only within 15 days of event)
     const prev = lastSavedRef.current;
+    const eventDate = data.event_date ?? prev?.event_date;
+    const daysToEvent = eventDate
+      ? Math.ceil((new Date(eventDate + 'T12:00:00').getTime() - Date.now()) / 86400000)
+      : null;
+    const isNearEvent = daysToEvent !== null && daysToEvent <= 15;
+
     const criticalFields: Array<{ key: keyof EventDetail; label: string; isMenu?: boolean }> = [
       { key: 'menu_text', label: 'Cardápio', isMenu: true },
       { key: 'event_date', label: 'Data do evento' },
@@ -291,7 +297,7 @@ export default function EventDetailPage() {
         });
       }
     }
-    if (alertsToCreate.length > 0) {
+    if (alertsToCreate.length > 0 && isNearEvent) {
       await (supabase as any).from('smart_alerts').insert(alertsToCreate);
     }
 
@@ -718,6 +724,7 @@ export default function EventDetailPage() {
                 <LinkedField
                   label="Local do evento"
                   table="event_locations"
+                  companyId="c56c2ccd-2c35-4ebb-b868-e153727e5d89"
                   valueId={form.location_id ?? null}
                   valueName={s('location_text')}
                   onChangeId={id => setF('location_id', id)}
@@ -732,6 +739,7 @@ export default function EventDetailPage() {
                 <LinkedField
                   label="Produto escolhido"
                   table="event_products"
+                  companyId="c56c2ccd-2c35-4ebb-b868-e153727e5d89"
                   valueId={form.product_id ?? null}
                   valueName={s('product_name')}
                   onChangeId={id => setF('product_id', id)}
