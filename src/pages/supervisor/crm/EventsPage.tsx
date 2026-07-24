@@ -400,10 +400,16 @@ export default function EventsPage() {
       toast.success('Evento atualizado!');
       setEditMode(false);
     } else {
-      const { error } = await supabase.from('events').insert(payload);
+      const { data: created, error } = await supabase.from('events').insert(payload).select('id').single();
       if (error) { toast.error('Erro ao criar: ' + error.message); setSaving(false); return; }
       toast.success('Evento criado!');
       setNewOpen(false);
+      setSaving(false);
+      setForm({ ...EMPTY_FORM });
+      setClientQuery('');
+      setLocationQuery('');
+      navigate(`/events/${created.id}`);
+      return;
     }
 
     setSaving(false);
