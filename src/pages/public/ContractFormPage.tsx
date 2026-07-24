@@ -130,6 +130,20 @@ export default function ContractFormPage() {
       return;
     }
 
+    // Atualiza também o registro do cliente para aparecer na aba Dados do Cliente
+    if (clientId) {
+      await (supabase.from as any)('clients').update({
+        name:     form.name     || undefined,
+        phone:    form.phone    || undefined,
+        email:    form.email    || undefined,
+        cpf:      form.cpf      || undefined,
+        rg:       form.rg       || undefined,
+        address:  form.address  || undefined,
+        zip_code: form.zip_code || undefined,
+        source:   form.source   || undefined,
+      }).eq('id', clientId);
+    }
+
     setSaving(false);
     setState('done');
   };
