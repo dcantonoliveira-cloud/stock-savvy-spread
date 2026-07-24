@@ -126,7 +126,7 @@ export default function ContractFormPage() {
     }).eq('id', eventId);
     if (eventErr) {
       setSaving(false);
-      alert('Erro: ' + eventErr.message);
+      alert('Erro ao enviar seus dados. Por favor, tente novamente ou entre em contato com o buffet.');
       return;
     }
 
