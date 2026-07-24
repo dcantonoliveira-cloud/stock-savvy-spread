@@ -1181,6 +1181,8 @@ function buildStats(
 
   return Object.entries(map).map(([name, { fc: fcs, ab: abs }]) => {
     const receita = sum(fcs.map(e => e.total_value ?? 0));
+    // Conv% = confirmados / (todos exceto cancelado/lost/lead)
+    const absNoLead = abs.filter(e => e.status !== 'lead');
     const total = fcs.length + abs.length;
     const paxList = fcs.filter(e => e.guest_count).map(e => e.guest_count!);
     const anos = [...new Set(fcs.filter(e => e.event_date).map(e => yearOf(e.event_date!)))].sort();
@@ -1200,7 +1202,7 @@ function buildStats(
       total,
       receita,
       ticketMedio: fcs.length ? receita / fcs.length : 0,
-      txConv: total ? fcs.length / total * 100 : 0,
+      txConv: (fcs.length + absNoLead.length) ? fcs.length / (fcs.length + absNoLead.length) * 100 : 0,
       paxMedio: paxList.length ? Math.round(avg(paxList)) : 0,
       receitaFutura: abs.length * ticketMedioGlobal,
       anos,
