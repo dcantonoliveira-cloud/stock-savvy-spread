@@ -298,7 +298,7 @@ export default function EventDetailPage() {
       }
     }
     if (alertsToCreate.length > 0 && isNearEvent) {
-      await (supabase as any).from('smart_alerts').insert(alertsToCreate);
+      await (supabase as any).from('smart_alerts').upsert(alertsToCreate, { onConflict: 'type,entity_id,title', ignoreDuplicates: true });
     }
 
     const { error } = await supabase.from('events').update({
