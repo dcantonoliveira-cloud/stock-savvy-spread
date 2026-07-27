@@ -889,7 +889,12 @@ export default function EventDetailPage() {
                 </div>
                 <div>
                   <label className={labelCls}>De onde nos conheceu</label>
-                  <input className={inputCls} value={clientForm.source ?? ''} onChange={e => setC('source', e.target.value)} placeholder="Instagram, indicação..." />
+                  <select className={inputCls} value={clientForm.source ?? ''} onChange={e => setC('source', e.target.value)}>
+                    <option value="">Selecione...</option>
+                    {['Google','Indicação de amigos','Indicação de assessor','Indicação de salão','Instagram','Influencer','Já fui em uma festa','Outros','Portais de casamentos','Site'].map(o => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
