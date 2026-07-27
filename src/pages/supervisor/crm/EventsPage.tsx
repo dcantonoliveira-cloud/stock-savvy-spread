@@ -119,6 +119,11 @@ export default function EventsPage() {
 
   // Sheets
   const [newOpen, setNewOpen] = useState(() => !!(location.state as any)?.openNew);
+  // Pré-preenche data se vier do calendário
+  useEffect(() => {
+    const newDate = (location.state as any)?.newDate;
+    if (newDate) setForm(f => ({ ...f, event_date: newDate }));
+  }, []);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailEvent, setDetailEvent] = useState<EventRow | null>(null);
   const [editMode, setEditMode] = useState(false);

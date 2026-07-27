@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ChevronLeft, ChevronRight, Users, CalendarCheck,
-  Clock, ExternalLink, UtensilsCrossed, X, CalendarPlus, Mail, MapPin,
+  Clock, ExternalLink, UtensilsCrossed, X, CalendarPlus, Mail, MapPin, Plus,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -345,10 +345,23 @@ export default function CalendarPage() {
 
           {/* Events panel */}
           <div className="bg-white border border-border rounded-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-border">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
                 {selected ? `${selected} de ${MONTHS[month]}` : 'Próximos eventos'}
               </p>
+              {selected && (
+                <button
+                  onClick={() => {
+                    const d = `${year}-${String(month + 1).padStart(2, '0')}-${String(selected).padStart(2, '0')}`;
+                    navigate('/events', { state: { openNew: true, newDate: d } });
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+                  title="Novo orçamento para este dia"
+                >
+                  <Plus className="w-3 h-3" />
+                  Orçamento
+                </button>
+              )}
             </div>
 
             {selected ? (
