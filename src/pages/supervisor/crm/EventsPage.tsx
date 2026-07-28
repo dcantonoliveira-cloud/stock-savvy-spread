@@ -115,6 +115,7 @@ export default function EventsPage() {
   });
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set(['confirmed']));
   const [filterOpen, setFilterOpen] = useState(false);
+  const [filterUnsignedOnly, setFilterUnsignedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'event_date' | 'contract_signed_date'>('event_date');
 
   // Sheets
@@ -308,6 +309,7 @@ export default function EventsPage() {
     const pool = search.trim().length >= 2 ? searchResults : events;
     const result = pool.filter(e => {
       if (statusFilter.size > 0 && !statusFilter.has(e.status)) return false;
+      if (filterUnsignedOnly && e.contract_signed) return false;
       // Ordenação por fechamento ignora filtro de mês/ano — mostra todos os eventos
       if (sortBy === 'contract_signed_date') return true;
       if (search.trim().length >= 2) return true;
@@ -329,7 +331,7 @@ export default function EventsPage() {
       });
     }
     return result;
-  }, [events, searchResults, year, month, search, statusFilter, sortBy]);
+  }, [events, searchResults, year, month, search, statusFilter, sortBy, filterUnsignedOnly]);
 
   const confirmedFiltered = filtered.filter(e => e.status === 'confirmed');
   const statsValue = confirmedFiltered.reduce((s,e) => s + (e.total_value ?? 0), 0);
@@ -824,14 +826,14 @@ export default function EventsPage() {
             <button
               onClick={() => setFilterOpen(o => !o)}
               className={`relative p-2 rounded-lg border transition-colors ${
-                statusFilter.size !== 1 || !statusFilter.has('confirmed')
+                statusFilter.size !== 1 || !statusFilter.has('confirmed') || filterUnsignedOnly
                   ? 'border-primary bg-primary/5 text-primary'
                   : 'border-border bg-white hover:bg-muted text-muted-foreground'
               }`}
               title="Filtrar por status"
             >
               <SlidersHorizontal className="w-4 h-4" />
-              {(statusFilter.size !== 1 || !statusFilter.has('confirmed')) && (
+              {(statusFilter.size !== 1 || !statusFilter.has('confirmed') || filterUnsignedOnly) && (
                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-primary rounded-full text-[9px] text-white font-bold flex items-center justify-center">
                   {statusFilter.size === 0 ? '4' : statusFilter.size}
                 </span>
@@ -880,8 +882,20 @@ export default function EventsPage() {
                       </label>
                     );
                   })}
+                  <div className="pt-2 pb-1 border-t border-border mt-2">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Contrato</p>
+                    <label className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filterUnsignedOnly}
+                        onChange={() => setFilterUnsignedOnly(v => !v)}
+                        className="w-3.5 h-3.5 accent-primary"
+                      />
+                      <span className="text-xs font-medium text-muted-foreground">Sem contrato assinado</span>
+                    </label>
+                  </div>
                   <div className="pt-2 border-t border-border flex gap-2">
-                    <button onClick={() => { setStatusFilter(new Set(['confirmed'])); setFilterOpen(false); }}
+                    <button onClick={() => { setStatusFilter(new Set(['confirmed'])); setFilterUnsignedOnly(false); setFilterOpen(false); }}
                       className="flex-1 text-[11px] py-1 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground font-medium">
                       Resetar
                     </button>
