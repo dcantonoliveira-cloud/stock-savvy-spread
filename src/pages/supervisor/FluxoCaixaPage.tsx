@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, X, ChevronLeft, ChevronRight, ExternalLink, TrendingUp, TrendingDown, Wallet, Check } from 'lucide-react';
+import { Plus, X, ChevronLeft, ChevronRight, ExternalLink, TrendingUp, TrendingDown, Wallet, Check, UtensilsCrossed } from 'lucide-react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -218,7 +218,7 @@ export default function FluxoCaixaPage() {
         ) : (
           <div className="divide-y divide-border/50">
             {entries.map(e => (
-              <div key={e.id} className={`px-5 py-3 grid grid-cols-[100px_1fr_160px_120px_36px_36px] gap-3 items-center hover:bg-slate-50 transition-colors group ${e._source === 'event_payment' ? 'bg-emerald-50/30' : ''}`}>
+              <div key={e.id} className={`px-5 py-3 grid grid-cols-[100px_1fr_160px_120px_36px_36px] gap-3 items-center transition-colors group ${e.reconciled ? 'bg-emerald-50 hover:bg-emerald-100/60' : e._source === 'event_payment' ? 'bg-emerald-50/30 hover:bg-slate-50' : 'hover:bg-slate-50'}`}>
                 <span className="text-sm tabular-nums text-muted-foreground">{fmtDate(e.date)}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -228,6 +228,11 @@ export default function FluxoCaixaPage() {
                     <p className="text-sm font-medium truncate text-foreground">{e.description}</p>
                     {e._source === 'event_payment' && (
                       <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">evento</span>
+                    )}
+                    {e.category === 'tasting' && (
+                      <span className="shrink-0 flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                        <UtensilsCrossed className="w-3 h-3" />degustação
+                      </span>
                     )}
                   </div>
                   {e._source === 'event_payment' && e.event_id ? (
