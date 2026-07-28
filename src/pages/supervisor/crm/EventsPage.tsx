@@ -1075,7 +1075,7 @@ export default function EventsPage() {
                       {(() => {
                         const zap = ev.zapsign_data as any;
                         const allZapSigned = zap?.signers?.length > 0 && zap.signers.every((s: any) => s.status === 'signed');
-                        const signed = ev.contract_signed || allZapSigned || !!ev.contract_signed_url;
+                        const signed = ev.contract_signed || allZapSigned;
                         const pending = !signed && zap?.signers?.length > 0;
                         return (
                           <button
