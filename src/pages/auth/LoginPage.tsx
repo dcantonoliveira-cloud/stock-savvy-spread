@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { LogIn, UserPlus, KeyRound, Eye, EyeOff } from 'lucide-react';
+import logoRondello from '@/assets/logo-rondello.png';
 
 export default function LoginPage() {
   const { signIn } = useAuth();
@@ -83,14 +84,8 @@ export default function LoginPage() {
 
       <div className="w-full max-w-sm space-y-8 relative z-10">
         {/* Logo */}
-        <div className="text-center space-y-4">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center relative" style={{ background: '#C2185B' }}>
-              <span className="text-white text-3xl leading-none font-semibold" style={{ fontFamily: 'Fraunces, serif' }}>N</span>
-              <div className="absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full" style={{ background: '#F4A0BE' }} />
-            </div>
-            <span className="text-2xl font-medium tracking-[-0.02em]" style={{ color: '#2B1A22', fontFamily: 'Inter, sans-serif' }}>nuply</span>
-          </div>
+        <div className="text-center space-y-3">
+          <img src={logoRondello} alt="Rondello Buffet" className="h-20 mx-auto" />
           <p className="text-xs text-muted-foreground tracking-[0.2em] uppercase font-medium">Sistema de Gestão</p>
         </div>
 
