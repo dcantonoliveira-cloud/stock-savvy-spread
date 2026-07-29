@@ -184,7 +184,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
                 className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-accent transition-colors">
                 <div className="relative">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
-                       style={{ background: 'hsl(220 70% 30% / 0.12)', color: 'hsl(220 70% 35%)' }}>
+                       style={{ background: 'hsl(337 76% 43% / 0.12)', color: 'hsl(337 76% 43%)' }}>
                     {profile?.display_name?.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() || '?'}
                   </div>
                   {pendingPayslips > 0 && (
@@ -200,7 +200,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
               </button>
 
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-border rounded-xl shadow-lg py-1 z-50">
+                <div className="absolute right-0 top-full mt-1.5 w-52 bg-card border border-border rounded-xl shadow-lg py-1 z-50">
                   <div className="px-3 py-2 border-b border-border mb-1">
                     <p className="text-xs font-medium text-foreground truncate">{profile?.display_name}</p>
                     <p className="text-[11px] text-muted-foreground truncate">{profile?.email}</p>

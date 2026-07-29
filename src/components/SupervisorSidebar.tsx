@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
-import logoRondello from '@/assets/logo-rondello.png';
 import type { Permissions } from '@/hooks/useAuth';
 
 type NavItem = { path: string; label: string; icon: any };
@@ -105,7 +104,7 @@ export default function SupervisorSidebar() {
 
   const visible = navStructure.filter(item => {
     const key = (item as any).permKey as keyof Permissions | undefined;
-    if (!key) return true; // Dashboard always visible
+    if (!key) return true;
     return permissions[key] === true;
   });
 
@@ -135,14 +134,19 @@ export default function SupervisorSidebar() {
 
       {/* Logo */}
       <div className="px-4 pt-5 pb-4 flex items-center gap-2.5">
-        <img src={logoRondello} alt="Rondello" className="h-7 object-contain shrink-0" />
-        <p className="text-[9px] tracking-[0.15em] uppercase font-semibold hidden xl:block"
-           style={{ color: 'hsl(220 40% 55%)' }}>
-          Sistema de Gestão
-        </p>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center relative shrink-0" style={{ background: '#C2185B' }}>
+          <span className="text-white font-semibold text-base leading-none" style={{ fontFamily: 'Fraunces, serif' }}>N</span>
+          <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full" style={{ background: '#F4A0BE' }} />
+        </div>
+        <div className="min-w-0">
+          <span className="text-[15px] font-semibold tracking-tight block" style={{ color: 'hsl(332 20% 88%)', fontFamily: 'Inter, sans-serif', letterSpacing: '-0.01em' }}>nuply</span>
+          <p className="text-[9px] tracking-[0.15em] uppercase font-semibold hidden xl:block" style={{ color: 'hsl(337 30% 58%)' }}>
+            Sistema de Gestão
+          </p>
+        </div>
       </div>
 
-      <div className="mx-3 h-px" style={{ background: 'hsl(220 40% 16%)' }} />
+      <div className="mx-3 h-px" style={{ background: 'hsl(332 30% 16%)' }} />
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-0.5">
@@ -153,7 +157,7 @@ export default function SupervisorSidebar() {
             return (
               <Link key={(item as any).path} to={(item as any).path}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] font-medium transition-colors ${active ? 'nav-item-active' : 'hover:bg-white/5'}`}
-                style={{ color: active ? undefined : 'hsl(220 20% 62%)' }}>
+                style={{ color: active ? undefined : 'hsl(332 20% 62%)' }}>
                 <Icon className="w-4 h-4 shrink-0" />
                 <span className="truncate">{(item as any).label}</span>
               </Link>
@@ -168,7 +172,7 @@ export default function SupervisorSidebar() {
             <div key={item.label}>
               <button onClick={() => toggleGroup(item.label)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] font-medium transition-colors ${isActiveGroup ? 'bg-white/5' : 'hover:bg-white/5'}`}
-                style={{ color: isActiveGroup ? 'hsl(220 25% 75%)' : 'hsl(220 15% 55%)' }}>
+                style={{ color: isActiveGroup ? 'hsl(337 60% 74%)' : 'hsl(332 15% 58%)' }}>
                 <Icon className="w-4 h-4 shrink-0" />
                 <span className="flex-1 text-left truncate">{item.label}</span>
                 <ChevronDown className="w-3 h-3 shrink-0 transition-transform duration-200"
@@ -177,7 +181,7 @@ export default function SupervisorSidebar() {
 
               <div style={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 220ms cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
                 <div style={{ overflow: 'hidden' }}>
-                  <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2" style={{ borderColor: 'hsl(220 35% 20%)' }}>
+                  <div className="mt-0.5 mb-1 ml-3 border-l space-y-0.5 pl-2" style={{ borderColor: 'hsl(332 30% 20%)' }}>
                     {item.items.map(sub => {
                       const SubIcon = sub.icon;
                       const active = pathname === sub.path || (
@@ -187,7 +191,7 @@ export default function SupervisorSidebar() {
                       return (
                         <Link key={sub.path} to={sub.path}
                           className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${active ? 'nav-item-active' : 'hover:bg-white/5'}`}
-                          style={{ color: active ? undefined : 'hsl(220 15% 52%)' }}>
+                          style={{ color: active ? undefined : 'hsl(332 15% 56%)' }}>
                           <SubIcon className="w-3.5 h-3.5 shrink-0" />
                           <span className="truncate">{sub.label}</span>
                         </Link>
@@ -203,10 +207,10 @@ export default function SupervisorSidebar() {
 
       {/* Online users */}
       {onlineUsers.length > 0 && (
-        <div className="mx-2 mb-2 px-3 py-2 rounded-lg" style={{ background: 'hsl(220 45% 15%)' }}>
+        <div className="mx-2 mb-2 px-3 py-2 rounded-lg" style={{ background: 'hsl(332 40% 14%)' }}>
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider truncate" style={{ color: 'hsl(220 20% 48%)' }}>
+            <span className="text-[10px] font-semibold uppercase tracking-wider truncate" style={{ color: 'hsl(332 20% 52%)' }}>
               Online · {onlineUsers.length}
             </span>
           </div>
@@ -216,10 +220,10 @@ export default function SupervisorSidebar() {
               return (
                 <div key={u.user_id} className="flex items-center gap-2">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0"
-                       style={{ background: 'hsl(220 55% 28% / 0.6)', color: 'hsl(220 80% 72%)' }}>
+                       style={{ background: 'hsl(337 55% 28% / 0.6)', color: 'hsl(337 80% 78%)' }}>
                     {uInitials}
                   </div>
-                  <span className="text-[11px] truncate" style={{ color: 'hsl(220 20% 58%)' }}>{u.display_name}</span>
+                  <span className="text-[11px] truncate" style={{ color: 'hsl(332 20% 60%)' }}>{u.display_name}</span>
                 </div>
               );
             })}
@@ -227,23 +231,23 @@ export default function SupervisorSidebar() {
         </div>
       )}
 
-      <div className="mx-3 h-px" style={{ background: 'hsl(220 40% 16%)' }} />
+      <div className="mx-3 h-px" style={{ background: 'hsl(332 30% 16%)' }} />
 
       {/* User footer */}
       <div className="p-2 space-y-1">
         <div className="flex items-center gap-2 px-2 py-1.5">
           <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-               style={{ background: 'hsl(220 60% 28%)', color: 'hsl(220 80% 82%)' }}>
+               style={{ background: 'hsl(337 60% 30%)', color: 'hsl(337 80% 84%)' }}>
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-semibold truncate" style={{ color: 'hsl(220 25% 82%)' }}>{profile?.display_name}</p>
-            <p className="text-[10px] truncate" style={{ color: 'hsl(220 15% 48%)' }}>{profile?.email}</p>
+            <p className="text-[12px] font-semibold truncate" style={{ color: 'hsl(332 25% 82%)' }}>{profile?.display_name}</p>
+            <p className="text-[10px] truncate" style={{ color: 'hsl(332 15% 50%)' }}>{profile?.email}</p>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={signOut}
           className="w-full justify-start rounded-lg text-[12px] h-8 hover:bg-red-500/10 hover:text-red-400"
-          style={{ color: 'hsl(220 15% 45%)' }}>
+          style={{ color: 'hsl(332 15% 48%)' }}>
           <LogOut className="w-3.5 h-3.5 mr-2 shrink-0" />
           <span className="truncate">Sair da conta</span>
         </Button>

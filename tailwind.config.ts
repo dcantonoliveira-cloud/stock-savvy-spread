@@ -28,8 +28,10 @@ export default {
   				'sans-serif'
   			],
   			display: [
-  				'Plus Jakarta Sans',
-  				'sans-serif'
+  				'Fraunces',
+  				'ui-serif',
+  				'Georgia',
+  				'serif'
   			],
   			mono: [
   				'Space Mono',
@@ -43,7 +45,7 @@ export default {
   				'monospace'
   			],
   			serif: [
-  				'Lora',
+  				'Fraunces',
   				'ui-serif',
   				'Georgia',
   				'Cambria',
