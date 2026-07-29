@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
+        cacheId: 'rondello-v2',
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/, /^\/functions/],

@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
@@ -153,6 +154,54 @@ function FinanceiroView({ orders }: { orders: Order[] }) {
           Nenhum pedido com valor extra cadastrado.
         </div>
       )}
+
+      {/* Faturamento por mês */}
+      <MonthlyChart orders={orders} />
+    </div>
+  );
+}
+
+const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function MonthlyChart({ orders }: { orders: Order[] }) {
+  const data = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const o of orders) {
+      if (!o.extra_value || o.extra_value <= 0) continue;
+      const [y, m] = o.delivery_date.split('-');
+      const key = `${y}-${m}`;
+      map[key] = (map[key] ?? 0) + o.extra_value;
+    }
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, total]) => {
+        const [y, m] = key.split('-');
+        return { mes: `${MONTH_NAMES[parseInt(m) - 1]}/${y.slice(2)}`, total };
+      });
+  }, [orders]);
+
+  if (data.length === 0) return null;
+
+  return (
+    <div className="bg-white border border-border rounded-2xl overflow-hidden">
+      <p className="px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60 bg-muted/30 border-b border-border">
+        Faturamento por mês
+      </p>
+      <div className="px-4 py-4">
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={data} barSize={32}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <XAxis dataKey="mes" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
+              tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} width={48} />
+            <Tooltip
+              formatter={(v: number) => [v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Total']}
+              cursor={{ fill: '#f8fafc' }}
+            />
+            <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -369,6 +418,7 @@ export default function SupervisorProducaoPage() {
               <thead>
                 <tr className="bg-muted/30 border-b border-border text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                   <th className="text-left px-5 py-3">Pedido</th>
+                  <th className="text-left px-4 py-3">Entrega / Pagamento</th>
                   <th className="text-left px-4 py-3">Evento</th>
                   <th className="text-center px-4 py-3">Entrega</th>
                   <th className="text-center px-4 py-3">Extra</th>
@@ -384,11 +434,13 @@ export default function SupervisorProducaoPage() {
                     const pm = PAYMENT_METHODS.find(m => m.value === o.payment_method);
                     return (
                       <tr key={o.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-3 max-w-xs">
                           <p className="font-medium text-foreground">{o.title}</p>
-                          {o.description && <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{o.description}</p>}
-                          {o.delivery_address && <p className="text-xs text-blue-600 mt-0.5">📍 {o.delivery_address}</p>}
-                          {pm && <p className="text-xs text-muted-foreground/70 mt-0.5">{pm.label}</p>}
+                          {o.description && <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{o.description}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-xs min-w-[160px]">
+                          {o.delivery_address && <p className="text-blue-600 flex items-start gap-1"><span className="shrink-0">📍</span>{o.delivery_address}</p>}
+                          {pm && <p className="text-muted-foreground/70 mt-1">{pm.label}</p>}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">
                           {o.event_name ? <span className="flex items-center gap-1"><ChefHat className="w-3 h-3" />{o.event_name}</span> : '—'}
