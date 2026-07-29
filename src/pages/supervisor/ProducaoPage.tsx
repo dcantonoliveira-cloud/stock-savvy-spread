@@ -248,31 +248,29 @@ function MonthlyChart({ orders }: { orders: Order[] }) {
             </ResponsiveContainer>
           </div>
 
-          {/* Tabela mensal */}
-          <div className="border-t border-border">
-            <table className="w-full text-xs">
+          {/* Tabela mensal horizontal */}
+          <div className="border-t border-border overflow-x-auto">
+            <table className="w-full text-xs min-w-[900px]">
               <thead>
                 <tr className="bg-muted/20 border-b border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  <th className="text-left px-5 py-2">Mês</th>
-                  <th className="text-right px-5 py-2">Faturamento</th>
+                  <th className="text-left px-4 py-2 whitespace-nowrap w-28">Faturamento</th>
+                  {tableData.map(({ name }) => (
+                    <th key={name} className="text-right px-3 py-2 whitespace-nowrap">{name}</th>
+                  ))}
+                  <th className="text-right px-4 py-2 whitespace-nowrap">Total {year}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/40">
-                {tableData.map(({ name, total }) => (
-                  <tr key={name} className={total > 0 ? 'hover:bg-muted/10' : 'opacity-40'}>
-                    <td className="px-5 py-2 font-medium text-foreground">{name}</td>
-                    <td className="px-5 py-2 text-right font-semibold text-emerald-600">
+              <tbody>
+                <tr className="hover:bg-muted/10">
+                  <td className="px-4 py-2.5 font-semibold text-foreground whitespace-nowrap">Extras</td>
+                  {tableData.map(({ name, total }) => (
+                    <td key={name} className={`px-3 py-2.5 text-right font-semibold whitespace-nowrap ${total > 0 ? 'text-emerald-600' : 'text-muted-foreground/40'}`}>
                       {total > 0 ? fmtBRL(total) : '—'}
                     </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-border bg-muted/20">
-                  <td className="px-5 py-2.5 font-bold text-foreground text-xs">Total {year}</td>
-                  <td className="px-5 py-2.5 text-right font-bold text-foreground text-xs">{fmtBRL(yearTotal)}</td>
+                  ))}
+                  <td className="px-4 py-2.5 text-right font-bold text-foreground whitespace-nowrap">{fmtBRL(yearTotal)}</td>
                 </tr>
-              </tfoot>
+              </tbody>
             </table>
           </div>
         </>
