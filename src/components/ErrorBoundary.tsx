@@ -48,22 +48,28 @@ export class ErrorBoundary extends Component<Props, State> {
         </>
         <button
           onClick={async () => {
-            try {
-              if ('serviceWorker' in navigator) {
+            // 1. Desregistra todos os service workers
+            if ('serviceWorker' in navigator) {
+              try {
                 const regs = await navigator.serviceWorker.getRegistrations();
                 await Promise.all(regs.map(r => r.unregister()));
-              }
-              if ('caches' in window) {
+              } catch (_) {}
+            }
+            // 2. Limpa todos os caches do PWA
+            if ('caches' in window) {
+              try {
                 const keys = await caches.keys();
                 await Promise.all(keys.map(k => caches.delete(k)));
-              }
-            } catch (_) {}
-            sessionStorage.clear();
-            localStorage.removeItem('__chunk_v');
-            // Force browser to fetch fresh HTML — bypass all caches
-            const url = new URL(window.location.href);
-            url.searchParams.set('_', Date.now().toString());
-            window.location.replace(url.toString());
+              } catch (_) {}
+            }
+            // 3. Limpa storage
+            try { sessionStorage.clear(); } catch (_) {}
+            try { localStorage.removeItem('__chunk_v'); } catch (_) {}
+            // 4. Aguarda um tick para garantir que o SW foi desregistrado
+            //    antes de recarregar — resolve o problema de iOS Safari
+            await new Promise(r => setTimeout(r, 300));
+            // 5. Hard reload sem cache
+            window.location.href = window.location.origin + '/?nocache=' + Date.now();
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
         >
