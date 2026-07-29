@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
@@ -72,6 +72,9 @@ function FinanceiroView({ orders }: { orders: Order[] }) {
 
   return (
     <div className="space-y-5">
+      {/* Faturamento por mês */}
+      <MonthlyChart orders={orders} />
+
       {/* KPI cards */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white border border-border rounded-2xl p-4">
@@ -154,9 +157,6 @@ function FinanceiroView({ orders }: { orders: Order[] }) {
           Nenhum pedido com valor extra cadastrado.
         </div>
       )}
-
-      {/* Faturamento por mês */}
-      <MonthlyChart orders={orders} />
     </div>
   );
 }
@@ -164,44 +164,119 @@ function FinanceiroView({ orders }: { orders: Order[] }) {
 const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function MonthlyChart({ orders }: { orders: Order[] }) {
-  const data = useMemo(() => {
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    for (const o of orders) {
+      if (!o.extra_value || o.extra_value <= 0) continue;
+      years.add(o.delivery_date.slice(0, 4));
+    }
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [orders]);
+
+  const [year, setYear] = useState<string>(() => new Date().getFullYear().toString());
+
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(year)) {
+      setYear(availableYears[0]);
+    }
+  }, [availableYears]);
+
+  const { chartData, tableData, yearTotal } = useMemo(() => {
     const map: Record<string, number> = {};
     for (const o of orders) {
       if (!o.extra_value || o.extra_value <= 0) continue;
-      const [y, m] = o.delivery_date.split('-');
-      const key = `${y}-${m}`;
-      map[key] = (map[key] ?? 0) + o.extra_value;
+      if (o.delivery_date.slice(0, 4) !== year) continue;
+      const m = o.delivery_date.slice(5, 7);
+      map[m] = (map[m] ?? 0) + o.extra_value;
     }
-    return Object.entries(map)
+    const chartData = Object.entries(map)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, total]) => {
-        const [y, m] = key.split('-');
-        return { mes: `${MONTH_NAMES[parseInt(m) - 1]}/${y.slice(2)}`, total };
-      });
-  }, [orders]);
+      .map(([m, total]) => ({ mes: MONTH_NAMES[parseInt(m) - 1], total, monthNum: m }));
+    const tableData = MONTH_NAMES.map((name, i) => {
+      const m = String(i + 1).padStart(2, '0');
+      return { name, total: map[m] ?? 0 };
+    });
+    const yearTotal = Object.values(map).reduce((s, v) => s + v, 0);
+    return { chartData, tableData, yearTotal };
+  }, [orders, year]);
 
-  if (data.length === 0) return null;
+  if (availableYears.length === 0) return null;
+
+  const fmtShort = (v: number) => {
+    if (v >= 1000) return `R$${(v / 1000).toFixed(1).replace('.', ',')}k`;
+    return `R$${v.toFixed(0)}`;
+  };
 
   return (
     <div className="bg-white border border-border rounded-2xl overflow-hidden">
-      <p className="px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60 bg-muted/30 border-b border-border">
-        Faturamento por mês
-      </p>
-      <div className="px-4 py-4">
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={data} barSize={32}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-            <XAxis dataKey="mes" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
-              tickFormatter={v => `R$${(v/1000).toFixed(0)}k`} width={48} />
-            <Tooltip
-              formatter={(v: number) => [v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Total']}
-              cursor={{ fill: '#f8fafc' }}
-            />
-            <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="px-5 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
+          Faturamento por mês
+        </p>
+        <div className="flex items-center gap-1">
+          {availableYears.map(y => (
+            <button key={y} onClick={() => setYear(y)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                y === year ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              }`}>
+              {y}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {chartData.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-10">Sem dados para {year}.</p>
+      ) : (
+        <>
+          <div className="px-4 pt-4 pb-2">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chartData} barSize={36} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
+                  tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} width={48} />
+                <Tooltip
+                  formatter={(v: number) => [v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Total']}
+                  cursor={{ fill: '#f8fafc' }}
+                />
+                <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="total" position="top" formatter={fmtShort}
+                    style={{ fontSize: 10, fontWeight: 600, fill: '#374151' }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Tabela mensal */}
+          <div className="border-t border-border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-muted/20 border-b border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                  <th className="text-left px-5 py-2">Mês</th>
+                  <th className="text-right px-5 py-2">Faturamento</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {tableData.map(({ name, total }) => (
+                  <tr key={name} className={total > 0 ? 'hover:bg-muted/10' : 'opacity-40'}>
+                    <td className="px-5 py-2 font-medium text-foreground">{name}</td>
+                    <td className="px-5 py-2 text-right font-semibold text-emerald-600">
+                      {total > 0 ? fmtBRL(total) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-border bg-muted/20">
+                  <td className="px-5 py-2.5 font-bold text-foreground text-xs">Total {year}</td>
+                  <td className="px-5 py-2.5 text-right font-bold text-foreground text-xs">{fmtBRL(yearTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
