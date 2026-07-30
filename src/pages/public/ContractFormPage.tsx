@@ -75,6 +75,7 @@ export default function ContractFormPage() {
   const [state, setState] = useState<'loading' | 'form' | 'submitted' | 'invalid' | 'done'>('loading');
   const [eventId, setEventId] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [company, setCompany] = useState<Company | null>(null);
   const [form, setForm] = useState<FormData>(BLANK);
@@ -87,13 +88,14 @@ export default function ContractFormPage() {
       .then(({ data }) => { if (data) setCompany(data as Company); });
 
     (supabase.from as any)('events')
-      .select('id, contract_form_submitted, client_id, clients(id)')
+      .select('id, contract_form_submitted, client_id, company_id, clients(id)')
       .eq('contract_form_token', token)
       .maybeSingle()
       .then(({ data }: any) => {
         if (!data) { setState('invalid'); return; }
         if (data.contract_form_submitted) { setState('submitted'); return; }
         setEventId(data.id);
+        setCompanyId(data.company_id ?? null);
         setClientId(data.clients?.id ?? null);
         setState('form');
       });
@@ -130,8 +132,25 @@ export default function ContractFormPage() {
       return;
     }
 
-    // Atualiza também o registro do cliente para aparecer na aba Dados do Cliente
-    if (clientId) {
+    // Atualiza (ou cria) o cliente para aparecer na aba Dados do Cliente
+    let resolvedClientId = clientId;
+    if (!resolvedClientId && companyId && form.name) {
+      const { data: newClient } = await (supabase.from as any)('clients').insert({
+        company_id: companyId,
+        name:     form.name     || null,
+        phone:    form.phone    || null,
+        email:    form.email    || null,
+        cpf:      form.cpf      || null,
+        rg:       form.rg       || null,
+        address:  form.address  || null,
+        zip_code: form.zip_code || null,
+        source:   form.source   || null,
+      }).select('id').single();
+      if (newClient) {
+        resolvedClientId = newClient.id;
+        await (supabase.from as any)('events').update({ client_id: resolvedClientId }).eq('id', eventId);
+      }
+    } else if (resolvedClientId) {
       await (supabase.from as any)('clients').update({
         name:     form.name     || undefined,
         phone:    form.phone    || undefined,
@@ -141,7 +160,7 @@ export default function ContractFormPage() {
         address:  form.address  || undefined,
         zip_code: form.zip_code || undefined,
         source:   form.source   || undefined,
-      }).eq('id', clientId);
+      }).eq('id', resolvedClientId);
     }
 
     setSaving(false);
