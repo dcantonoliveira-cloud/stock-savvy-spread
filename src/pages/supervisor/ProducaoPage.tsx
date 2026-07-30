@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil } from 'lucide-react';
@@ -281,6 +282,9 @@ function MonthlyChart({ orders }: { orders: Order[] }) {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function SupervisorProducaoPage() {
+  const { permissions, role } = useAuth();
+  const canFinanceiro = permissions?.is_admin || role === 'supervisor' || permissions?.access_financeiro;
+
   const [orders, setOrders]       = useState<Order[]>([]);
   const [loading, setLoading]     = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -461,7 +465,7 @@ export default function SupervisorProducaoPage() {
           </div>
         )}
         <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-          {(['pending', 'in_progress', 'done', 'financeiro'] as const).map(f => (
+          {(['pending', 'in_progress', 'done', ...(canFinanceiro ? ['financeiro' as const] : [])] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filter === f ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
