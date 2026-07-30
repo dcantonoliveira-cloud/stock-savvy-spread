@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { CalendarDays, DollarSign, FolderOpen, Info, LogOut, Menu, X, Heart, KeyRound, Loader2, ListChecks } from 'lucide-react';
+import { CalendarDays, DollarSign, FolderOpen, Info, LogOut, Menu, X, Heart, KeyRound, Loader2, ListChecks, Eye } from 'lucide-react';
 import logoRondello from '@/assets/logo-rondello.png';
 
 export type PortalEvent = {
@@ -128,18 +128,40 @@ const PAGE_MAP: Record<string, string> = {
   '/portal/informacoes': 'informacoes',
 };
 
+async function loadPortalEventByEventId(eventId: string): Promise<PortalContextType> {
+  const { data } = await (supabase.from as any)('events')
+    .select(`id, event_name, event_date, event_type, status,
+      guest_count, children_50_pct, non_paying_guests,
+      total_value, price_per_person, location_text,
+      ceremony_time, additional_hours,
+      professional_count, professional_meal_value, professional_meal_type,
+      organizer, decorator, pastry_chef, band_dj, photo_video, bartender, other_professionals,
+      clients(name, phone)`)
+    .eq('id', eventId)
+    .maybeSingle();
+  if (!data) return { event: null, portalId: null };
+  return { event: data as PortalEvent, portalId: null };
+}
+
 export default function ClientPortalLayout() {
-  const { user, signOut } = useAuth();
+  const { user, role, signOut } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
+  const [searchParams] = useSearchParams();
+  const previewEventId = searchParams.get('preview');
+  const isPreview = !!previewEventId && (role === 'supervisor' || role === 'admin');
   const [ctx, setCtx] = useState<PortalContextType>({ event: null, portalId: null });
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    loadPortalEvent(user.id).then(c => { setCtx(c); setLoading(false); });
-  }, [user]);
+    if (isPreview && previewEventId) {
+      loadPortalEventByEventId(previewEventId).then(c => { setCtx(c); setLoading(false); });
+    } else {
+      if (!user) return;
+      loadPortalEvent(user.id).then(c => { setCtx(c); setLoading(false); });
+    }
+  }, [user, previewEventId]);
 
   // Loga acesso a cada página visitada
   const logAccess = useCallback((path: string) => {
@@ -158,6 +180,14 @@ export default function ClientPortalLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
+      {/* Preview banner */}
+      {isPreview && (
+        <div className="bg-amber-500 text-white text-xs font-semibold flex items-center justify-center gap-2 px-4 py-1.5 sticky top-0 z-50">
+          <Eye className="w-3.5 h-3.5 shrink-0" />
+          Modo visualização — você está vendo o portal como o cliente
+          <button onClick={() => window.close()} className="ml-3 underline opacity-80 hover:opacity-100">Fechar</button>
+        </div>
+      )}
       {/* Top bar */}
       <header className="bg-white border-b border-border px-4 h-14 flex items-center justify-between shrink-0 sticky top-0 z-30">
         <div className="flex items-center gap-3">
@@ -230,10 +260,14 @@ export default function ClientPortalLayout() {
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : !ctx.event ? (
-            <EnterCodeScreen onLinked={async () => {
-              setLoading(true);
-              loadPortalEvent(user!.id).then(c => { setCtx(c); setLoading(false); });
-            }} />
+            isPreview ? (
+              <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">Evento não encontrado para visualização.</div>
+            ) : (
+              <EnterCodeScreen onLinked={async () => {
+                setLoading(true);
+                loadPortalEvent(user!.id).then(c => { setCtx(c); setLoading(false); });
+              }} />
+            )
           ) : (
             <Outlet context={ctx} />
           )}

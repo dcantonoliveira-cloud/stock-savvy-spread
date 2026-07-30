@@ -217,6 +217,25 @@ function AppRoutes() {
     );
   }
 
+  if ((role === 'supervisor' || role === 'admin') && window.location.pathname.startsWith('/portal') && new URLSearchParams(window.location.search).has('preview')) {
+    return (
+      <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/portal" element={<ClientPortalLayout />}>
+            <Route index element={<PortalEventoPage />} />
+            <Route path="financeiro"  element={<PortalFinanceiroPage />} />
+            <Route path="arquivos"    element={<PortalArquivosPage />} />
+            <Route path="informacoes" element={<PortalInformacoesPage />} />
+            <Route path="checklist"   element={<PortalChecklistPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
   if (role === 'supervisor' && window.location.pathname.startsWith('/assessora')) {
     return (
       <ErrorBoundary>

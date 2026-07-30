@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Clock, Copy, Send, XCircle, Trash2, RefreshCw, UserPlus, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Clock, Copy, Send, XCircle, Trash2, RefreshCw, UserPlus, CheckCircle2, RotateCcw, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 import { buildMessage, sendWhatsApp, openWhatsAppLink, getMessageTemplates } from '@/lib/whatsapp';
@@ -164,6 +164,13 @@ function PortalSection({ eventId, clientEmail, clientWhatsapp, clientName, event
           <p className="text-sm text-muted-foreground mt-0.5">
             O portal é onde o cliente acompanha tudo sobre o evento.
           </p>
+          <button
+            onClick={() => window.open(`/portal?preview=${eventId}`, '_blank')}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Visualizar portal do cliente
+          </button>
         </div>
         {/* Toggle */}
         <button
