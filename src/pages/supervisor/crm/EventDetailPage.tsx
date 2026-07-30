@@ -247,11 +247,20 @@ export default function EventDetailPage() {
         lastSavedRef.current = eventData;
         eventIdRef.current = id;
         const c = (data as EventDetail).clients;
-        if (c) {
-          const cf = { name: c.name ?? '', phone: c.phone ?? '', email: c.email ?? '', cpf: c.cpf ?? '', rg: c.rg ?? '', address: c.address ?? '', zip_code: c.zip_code ?? '', source: c.source ?? '' };
-          setClientForm(cf);
-          clientFormRef.current = cf;
-        }
+        const ev = data as any;
+        // Prioriza dados do cliente; usa contratante_* do evento como fallback (preenchido pelo formulário público)
+        const cf = {
+          name:     c?.name     || ev.contratante_name     || '',
+          phone:    c?.phone    || ev.contratante_phone    || '',
+          email:    c?.email    || ev.contratante_email    || '',
+          cpf:      c?.cpf      || ev.contratante_cpf      || '',
+          rg:       c?.rg       || ev.contratante_rg       || '',
+          address:  c?.address  || ev.contratante_address  || '',
+          zip_code: c?.zip_code || ev.contratante_zip_code || '',
+          source:   c?.source   || ev.contratante_source   || '',
+        };
+        setClientForm(cf);
+        clientFormRef.current = cf;
         setLoading(false);
       });
   }, [id]);
