@@ -366,8 +366,6 @@ export default function EventDetailPage() {
     }
     const updates: Record<string, any> = { status: newStatus };
     if (newStatus === 'confirmed') {
-      updates.contract_signed = true;
-      updates.contract_signed_date = new Date().toISOString().split('T')[0];
       updates.date_reserved = false;
     }
     if (newStatus === 'cancelled' || newStatus === 'lost') {
@@ -376,7 +374,7 @@ export default function EventDetailPage() {
     const { error } = await supabase.from('events').update(updates).eq('id', id);
     if (error) { toast.error('Erro ao alterar status: ' + error.message); return; }
     setEvent(prev => prev ? { ...prev, ...updates } : prev);
-    toast.success(newStatus === 'confirmed' ? 'Evento confirmado — contrato registrado!' : 'Status atualizado');
+    toast.success('Status atualizado');
   };
 
   const cancelEvent = async () => {
