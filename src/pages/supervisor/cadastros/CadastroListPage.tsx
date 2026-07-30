@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Pencil, Trash2, Search, X, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X, Check, Merge } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Config {
@@ -9,6 +9,8 @@ interface Config {
   typeFilter?: { column: string; value: string };
   namePlaceholder?: string;
   columns?: { key: string; label: string }[];
+  /** Habilita botão de mesclar. Passa a tabela que referencia este cadastro e o nome da coluna FK. */
+  merge?: { refTable: string; refColumn: string };
 }
 
 export default function CadastroListPage({
@@ -17,6 +19,7 @@ export default function CadastroListPage({
   typeFilter,
   namePlaceholder = 'Nome...',
   columns = [{ key: 'name', label: 'Nome' }],
+  merge,
 }: Config) {
   const [rows, setRows] = useState<any[]>([]);
   const [search, setSearch] = useState('');
@@ -25,6 +28,9 @@ export default function CadastroListPage({
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mergeTarget, setMergeTarget] = useState<any | null>(null);
+  const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
+  const [merging, setMerging] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -77,8 +83,67 @@ export default function CadastroListPage({
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   };
 
+  const doMerge = async () => {
+    if (!mergeTarget || mergeSelected.size === 0) return;
+    setMerging(true);
+    const ids = Array.from(mergeSelected);
+    const { error } = await supabase
+      .from(merge!.refTable as any)
+      .update({ [merge!.refColumn]: mergeTarget.id } as any)
+      .in(merge!.refColumn, ids);
+    if (error) { toast.error('Erro ao mesclar: ' + error.message); setMerging(false); return; }
+    for (const id of ids) {
+      await supabase.from(table as any).delete().eq('id', id);
+    }
+    toast.success(`${ids.length} local(is) mesclado(s) em "${mergeTarget.name}"`);
+    setMergeTarget(null);
+    setMergeSelected(new Set());
+    setMerging(false);
+    load();
+  };
+
   return (
     <div className="flex flex-col gap-4 h-full">
+
+      {/* Modal de merge */}
+      {mergeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => { setMergeTarget(null); setMergeSelected(new Set()); }} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-bold mb-1">Mesclar em "{mergeTarget.name}"</h3>
+            <p className="text-xs text-muted-foreground mb-4">Selecione os locais duplicados que serão substituídos por este. Os eventos vinculados a eles serão atualizados automaticamente.</p>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto mb-5">
+              {rows.filter(r => r.id !== mergeTarget.id).map(r => (
+                <label key={r.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/40 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={mergeSelected.has(r.id)}
+                    onChange={e => {
+                      setMergeSelected(prev => {
+                        const n = new Set(prev);
+                        e.target.checked ? n.add(r.id) : n.delete(r.id);
+                        return n;
+                      });
+                    }}
+                    className="w-4 h-4 accent-primary"
+                  />
+                  <span className="text-sm font-medium">{r.name}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setMergeTarget(null); setMergeSelected(new Set()); }}
+                className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
+                Cancelar
+              </button>
+              <button onClick={doMerge} disabled={mergeSelected.size === 0 || merging}
+                className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                {merging ? 'Mesclando...' : `Mesclar (${mergeSelected.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header bar */}
       <div className="flex items-center justify-between gap-4">
@@ -211,6 +276,15 @@ export default function CadastroListPage({
                       </div>
                     ) : (
                       <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        {merge && (
+                          <button
+                            onClick={() => { setMergeTarget(row); setMergeSelected(new Set()); }}
+                            className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors"
+                            title="Mesclar duplicados neste"
+                          >
+                            <Merge className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => { setEditId(row.id); setEditName(row.name); }}
                           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
