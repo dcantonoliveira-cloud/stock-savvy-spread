@@ -77,6 +77,85 @@ function Countdown({ days }: { days: number }) {
   );
 }
 
+function NuplyBanner({ event }: { event: any }) {
+  if (event.event_type !== 'Casamento') return null;
+
+  const email = encodeURIComponent(event.clients?.email ?? '');
+  const nome  = encodeURIComponent(event.event_name ?? '');
+  const valor = Math.round(event.total_value ?? 0);
+  const data  = event.event_date ?? '';
+  const id    = event.id ?? '';
+  const url   = `https://www.nuply.com.br/bem-vindo/rondello?e=${email}&n=${nome}&p=${id}&v=${valor}&d=${data}`;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block no-underline"
+      style={{ textDecoration: 'none' }}
+    >
+      <div style={{
+        borderRadius: 12,
+        border: '1px solid #EFE0E6',
+        background: '#FBF6F1',
+        display: 'flex',
+        overflow: 'hidden',
+        position: 'relative',
+      }}>
+        {/* Barra lateral */}
+        <div style={{ width: 4, background: '#C2185B', flexShrink: 0 }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', flex: 1, flexWrap: 'wrap' }}>
+          {/* Ícone */}
+          <div style={{
+            width: 44, height: 44, borderRadius: 10, background: '#fff',
+            border: '1px solid #EFE0E6', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 22, flexShrink: 0,
+          }}>
+            🎁
+          </div>
+
+          {/* Texto */}
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <p style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
+              textTransform: 'uppercase', color: '#C2185B', margin: '0 0 3px',
+            }}>
+              ✦ Cortesia incluída
+            </p>
+            <p style={{ fontSize: 15, fontWeight: 800, color: '#2B1A22', margin: '0 0 2px', lineHeight: 1.2 }}>
+              Planeje seu casamento no Nuply
+            </p>
+            <p style={{ fontSize: 12, color: '#6B5560', margin: 0 }}>
+              Checklist, fornecedores, finanças e convidados.
+            </p>
+          </div>
+
+          {/* Botão */}
+          <button
+            style={{
+              background: '#C2185B', color: '#fff', border: 'none',
+              borderRadius: 8, padding: '9px 18px', fontSize: 13,
+              fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              width: '100%',
+            }}
+            className="nuply-cta"
+          >
+            Acessar →
+          </button>
+        </div>
+
+        <style>{`
+          @media (min-width: 540px) {
+            .nuply-cta { width: auto !important; }
+          }
+        `}</style>
+      </div>
+    </a>
+  );
+}
+
 export default function PortalEventoPage() {
   const { event, portalId } = useOutletContext<PortalContextType>();
   const [paid,       setPaid]       = useState<number | null>(null);
@@ -130,6 +209,9 @@ export default function PortalEventoPage() {
           <p className="text-sm text-muted-foreground">{event.clients.name}</p>
         )}
       </div>
+
+      {/* Banner Nuply */}
+      <NuplyBanner event={event} />
 
       {/* Countdown */}
       {daysLeft !== null && <Countdown days={daysLeft} />}
