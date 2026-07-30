@@ -299,7 +299,7 @@ export default function SupervisorProducaoPage() {
     const { data } = await (supabase.from as any)('production_orders')
       .select('*, events(event_name)')
       .eq('company_id', COMPANY_ID)
-      .order('delivery_date').order('delivery_time');
+      .order('delivery_date', { ascending: false }).order('delivery_time', { ascending: false });
     setOrders((data ?? []).map((o: any) => ({ ...o, event_name: o.events?.event_name ?? null })));
     setLoading(false);
   };
