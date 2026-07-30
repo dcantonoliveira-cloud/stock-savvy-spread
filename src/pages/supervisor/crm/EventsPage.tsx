@@ -364,10 +364,10 @@ export default function EventsPage() {
     setSaving(true);
 
     let clientId = form.client_id || null;
-    if (!clientId && clientQuery.trim()) {
+    // Se não tem cliente vinculado, cria um novo com o nome do evento
+    if (!clientId && form.event_name?.trim()) {
       const { data: newClient } = await supabase.from('clients').insert({
-        name: clientQuery.trim(),
-        phone: form.client_phone.trim() || null,
+        name: form.event_name.trim(),
         company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89',
       }).select('id, name, phone, email').single();
 
@@ -477,65 +477,6 @@ export default function EventsPage() {
   // o campo perder o foco a cada tecla digitada).
   const renderFormPanel = () => (
     <div className="flex flex-col gap-5 pb-6">
-
-      {/* Cliente */}
-      <div>
-        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Cliente</label>
-        <div className="relative">
-          <input
-            ref={clientSearchRef}
-            value={clientQuery}
-            onChange={e => {
-              const v = e.target.value;
-              setClientQuery(v);
-              setClientDropOpen(true);
-              setF('client_id', '');
-              if (!form.event_name) setF('event_name', v);
-            }}
-            onFocus={() => setClientDropOpen(true)}
-            onBlur={() => setTimeout(() => setClientDropOpen(false), 150)}
-            placeholder="Nome do cliente..."
-            className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-          />
-          {form.client_id && selectedClient && (
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-emerald-600 font-medium">✓</span>
-          )}
-          {clientDropOpen && clientQuery && filteredClients.length > 0 && (
-            <div className="absolute z-50 top-full mt-1 w-full bg-white border border-border rounded-lg shadow-lg overflow-hidden">
-              {filteredClients.map(c => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 text-left"
-                  onClick={() => { setF('client_id', c.id); setF('client_phone', c.phone ?? ''); setClientQuery(c.name); setClientDropOpen(false); }}
-                >
-                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
-                    {c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}
-                  </span>
-                  <span className="font-medium">{c.name}</span>
-                  {c.phone && <span className="text-muted-foreground text-xs ml-auto">{c.phone}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Telefone do cliente */}
-      <div>
-        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Telefone do Cliente</label>
-        <Input
-          value={form.client_phone}
-          onChange={e => {
-            setF('client_phone', e.target.value);
-            if (form.client_id) {
-              supabase.from('clients').update({ phone: e.target.value || null }).eq('id', form.client_id);
-            }
-          }}
-          placeholder="(11) 99999-9999"
-          className="h-9"
-        />
-      </div>
 
       {/* Nome e Tipo */}
       <div className="grid grid-cols-2 gap-3">
