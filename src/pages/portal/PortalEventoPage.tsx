@@ -87,11 +87,16 @@ function NuplyBanner({ event }: { event: any }) {
   const id    = event.id ?? '';
   const url   = `https://www.nuply.com.br/bem-vindo/rondello?e=${email}&n=${nome}&p=${id}&v=${valor}&d=${data}`;
 
+  const handleClick = () => {
+    (supabase.rpc as any)('log_portal_access', { p_page: 'nuply_banner' }).then(null, () => {});
+  };
+
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={handleClick}
       className="block no-underline"
       style={{ textDecoration: 'none' }}
     >
