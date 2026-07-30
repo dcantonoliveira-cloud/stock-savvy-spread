@@ -31,6 +31,7 @@ export default function CadastroListPage({
   const [mergeTarget, setMergeTarget] = useState<any | null>(null);
   const [mergeSelected, setMergeSelected] = useState<Set<string>>(new Set());
   const [merging, setMerging] = useState(false);
+  const [mergeSearch, setMergeSearch] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -108,12 +109,20 @@ export default function CadastroListPage({
       {/* Modal de merge */}
       {mergeTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => { setMergeTarget(null); setMergeSelected(new Set()); }} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => { setMergeTarget(null); setMergeSelected(new Set()); setMergeSearch(''); }} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold mb-1">Mesclar em "{mergeTarget.name}"</h3>
-            <p className="text-xs text-muted-foreground mb-4">Selecione os locais duplicados que serão substituídos por este. Os eventos vinculados a eles serão atualizados automaticamente.</p>
-            <div className="space-y-1.5 max-h-64 overflow-y-auto mb-5">
-              {rows.filter(r => r.id !== mergeTarget.id).map(r => (
+            <p className="text-xs text-muted-foreground mb-3">Selecione os locais duplicados que serão substituídos por este. Os eventos vinculados a eles serão atualizados automaticamente.</p>
+            <input
+              autoFocus
+              type="text"
+              value={mergeSearch}
+              onChange={e => setMergeSearch(e.target.value)}
+              placeholder="Buscar..."
+              className="w-full h-8 px-3 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 mb-3"
+            />
+            <div className="space-y-1.5 max-h-56 overflow-y-auto mb-5">
+              {rows.filter(r => r.id !== mergeTarget.id && r.name.toLowerCase().includes(mergeSearch.toLowerCase())).map(r => (
                 <label key={r.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/40 cursor-pointer">
                   <input
                     type="checkbox"
@@ -132,7 +141,7 @@ export default function CadastroListPage({
               ))}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => { setMergeTarget(null); setMergeSelected(new Set()); }}
+              <button onClick={() => { setMergeTarget(null); setMergeSelected(new Set()); setMergeSearch(''); }}
                 className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
                 Cancelar
               </button>
@@ -278,7 +287,7 @@ export default function CadastroListPage({
                       <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                         {merge && (
                           <button
-                            onClick={() => { setMergeTarget(row); setMergeSelected(new Set()); }}
+                            onClick={() => { setMergeTarget(row); setMergeSelected(new Set()); setMergeSearch(''); }}
                             className="p-1.5 rounded-lg hover:bg-blue-50 text-muted-foreground hover:text-blue-600 transition-colors"
                             title="Mesclar duplicados neste"
                           >
