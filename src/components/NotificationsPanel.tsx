@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Bell, FileText, CalendarDays, DollarSign, CheckCircle2, UtensilsCrossed, ChevronRight, PenLine } from 'lucide-react';
+import { Bell, FileText, CalendarDays, DollarSign, CheckCircle2, ClipboardCheck, ChevronRight, PenLine, UserCheck, Users } from 'lucide-react';
 
 interface Notif {
   id: string;
@@ -14,13 +14,18 @@ interface Notif {
   created_at: string;
 }
 
+// cardapio_alterado é ALERTA, não notificação — filtrar da lista
+const EXCLUDED_TYPES = new Set(['cardapio_alterado']);
+
 const TYPE_CFG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-  novo_orcamento:    { icon: <FileText className="w-3.5 h-3.5" />,        color: 'text-blue-600',    bg: 'bg-blue-100' },
-  nova_degustacao:   { icon: <CalendarDays className="w-3.5 h-3.5" />,    color: 'text-purple-600',  bg: 'bg-purple-100' },
-  novo_pagamento:    { icon: <DollarSign className="w-3.5 h-3.5" />,      color: 'text-emerald-600', bg: 'bg-emerald-100' },
-  evento_fechado:    { icon: <CheckCircle2 className="w-3.5 h-3.5" />,    color: 'text-green-600',   bg: 'bg-green-100' },
-  cardapio_alterado:  { icon: <UtensilsCrossed className="w-3.5 h-3.5" />, color: 'text-orange-600',  bg: 'bg-orange-100' },
+  novo_orcamento:     { icon: <FileText className="w-3.5 h-3.5" />,        color: 'text-blue-600',    bg: 'bg-blue-100' },
+  nova_degustacao:    { icon: <CalendarDays className="w-3.5 h-3.5" />,    color: 'text-purple-600',  bg: 'bg-purple-100' },
+  novo_pagamento:     { icon: <DollarSign className="w-3.5 h-3.5" />,      color: 'text-emerald-600', bg: 'bg-emerald-100' },
+  evento_fechado:     { icon: <CheckCircle2 className="w-3.5 h-3.5" />,    color: 'text-green-600',   bg: 'bg-green-100' },
+  contract_form:      { icon: <ClipboardCheck className="w-3.5 h-3.5" />,  color: 'text-amber-600',   bg: 'bg-amber-100' },
   zapsign_assinatura: { icon: <PenLine className="w-3.5 h-3.5" />,         color: 'text-violet-600',  bg: 'bg-violet-100' },
+  portal_primeiro_acesso: { icon: <UserCheck className="w-3.5 h-3.5" />,  color: 'text-sky-600',     bg: 'bg-sky-100' },
+  assessora_acesso:   { icon: <Users className="w-3.5 h-3.5" />,           color: 'text-indigo-600',  bg: 'bg-indigo-100' },
 };
 const DEFAULT_CFG = { icon: <Bell className="w-3.5 h-3.5" />, color: 'text-muted-foreground', bg: 'bg-muted' };
 
@@ -55,7 +60,7 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
       .order('created_at', { ascending: false })
       .limit(50);
     console.log('[NotificationsPanel] data:', data?.length, 'error:', error?.message);
-    if (!error) setNotifs((data ?? []) as Notif[]);
+    if (!error) setNotifs((data ?? []).filter((n: any) => !EXCLUDED_TYPES.has(n.type)) as Notif[]);
   }, []);
 
   useEffect(() => {

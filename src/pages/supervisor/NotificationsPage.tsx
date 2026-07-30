@@ -24,7 +24,7 @@ const TYPE_META: Record<string, { emoji: string; icon: React.ReactNode; label: s
   field_change:     { emoji: '✏️', icon: <CalendarDays className="w-3.5 h-3.5" />,  label: 'Alteração' },
   payslip_unsigned: { emoji: '📄', icon: <FileText className="w-3.5 h-3.5" />,     label: 'Holerite' },
   exames:           { emoji: '🩺', icon: <Stethoscope className="w-3.5 h-3.5" />,  label: 'Exame' },
-  contract_form:    { emoji: '📋', icon: <ClipboardCheck className="w-3.5 h-3.5" />, label: 'Formulário' },
+  menu_change_alert: { emoji: '🍽️', icon: <CalendarDays className="w-3.5 h-3.5" />, label: 'Cardápio' },
   zapsign_signed:   { emoji: '✍️', icon: <PenLine className="w-3.5 h-3.5" />,        label: 'Assinatura' },
 };
 
