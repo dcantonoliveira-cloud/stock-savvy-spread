@@ -16,6 +16,7 @@ import {
   FileCheck2, FileClock, Loader2,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import LinkedField from '@/components/LinkedField';
 
 // ── Types ──────────────────────────────────────────────────────────
 type EventRow = {
@@ -58,7 +59,8 @@ const EMPTY_FORM = {
   pricing_mode: 'per_person',
   contract_signed: false, contract_signed_date: '', is_paid_in_full: false,
   notes: '',
-  organizer: '',
+  organizer: '', organizer_id: '' as string | null,
+  date_reserved: false,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -399,6 +401,8 @@ export default function EventsPage() {
       is_paid_in_full: form.is_paid_in_full,
       notes: form.notes || null,
       organizer: form.organizer || null,
+      organizer_id: form.organizer_id || null,
+      date_reserved: form.date_reserved,
     };
 
     if (editMode && detailEvent) {
@@ -653,14 +657,33 @@ export default function EventsPage() {
       </div>
 
       {/* Assessora */}
-      <div>
-        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Assessora</label>
-        <Input
-          value={form.organizer}
-          onChange={e => setF('organizer', e.target.value)}
-          placeholder="Nome da assessora..."
-          className="h-9"
-        />
+      <LinkedField
+        label="Assessora"
+        table="contacts"
+        typeFilter="organizer"
+        companyId="c56c2ccd-2c35-4ebb-b868-e153727e5d89"
+        valueId={form.organizer_id ?? null}
+        valueName={form.organizer}
+        onChangeId={id => setF('organizer_id', id)}
+        onChangeName={n => setF('organizer', n)}
+        createLabel="Assessora"
+      />
+
+      {/* Reservar data */}
+      <div className="flex items-center justify-between py-1">
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground">Reservar data</p>
+          <p className="text-[11px] text-muted-foreground/60 mt-0.5">Bloqueia a data no calendário como reservada</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setF('date_reserved', !form.date_reserved)}
+          className={`relative w-10 h-5.5 rounded-full transition-colors ${form.date_reserved ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+          style={{ height: '22px', width: '40px' }}
+        >
+          <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-transform ${form.date_reserved ? 'translate-x-[18px]' : ''}`}
+            style={{ width: '18px', height: '18px' }} />
+        </button>
       </div>
 
       {/* Observações */}
