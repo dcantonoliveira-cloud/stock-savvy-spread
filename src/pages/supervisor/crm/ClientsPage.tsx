@@ -13,11 +13,12 @@ type AccessLog = {
 };
 
 const PAGE_LABELS: Record<string, string> = {
-  inicio:      'Início',
-  financeiro:  'Financeiro',
-  arquivos:    'Arquivos',
-  informacoes: 'Informações',
-  checklist:   'Checklist',
+  inicio:        'Início',
+  financeiro:    'Financeiro',
+  arquivos:      'Arquivos',
+  informacoes:   'Informações',
+  checklist:     'Checklist',
+  nuply_banner:  'Nuply ↗',
 };
 
 type EventRow = { id: string; status: string; event_date: string | null; total_value: number | null; event_name: string | null; event_type: string | null };
