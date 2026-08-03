@@ -150,7 +150,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 import { EVENT_STATUS } from '@/lib/eventStatus';
-const ALL_STATUS_OPTIONS = ALL_STATUS_KEYS.map(k => ({ key: k, label: EVENT_STATUS[k].label, cls: EVENT_STATUS[k].cls }));
+const DROPDOWN_STATUS_KEYS = ALL_STATUS_KEYS.filter(k => k !== 'completed' && k !== 'tasting_scheduled');
+const ALL_STATUS_OPTIONS = DROPDOWN_STATUS_KEYS.map(k => ({ key: k, label: EVENT_STATUS[k].label, cls: EVENT_STATUS[k].cls }));
 
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
   const [open, setOpen] = useState(false);
