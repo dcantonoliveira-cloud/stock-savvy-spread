@@ -2791,7 +2791,7 @@
       _supa.from('quotation_history')
         .select('id, nome_evento, tipo_pacote, valor_total, data_geracao, dados_json, criado_por')
         .order('data_geracao', { ascending: false })
-        .limit(50)
+        .limit(500)
         .then(function(res) {
           var results = (res.data || []).map(function(r) {
             return {
