@@ -659,9 +659,8 @@ export default function EventsPage() {
       {/* Assessora */}
       <LinkedField
         label="Assessora"
-        table="contacts"
+        table="suppliers"
         typeFilter="organizer"
-        companyId="c56c2ccd-2c35-4ebb-b868-e153727e5d89"
         valueId={form.organizer_id ?? null}
         valueName={form.organizer}
         onChangeId={id => setF('organizer_id', id)}
