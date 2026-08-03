@@ -31,8 +31,8 @@ export const EVENT_STATUS: Record<EventStatusKey, {
   },
   confirmed: {
     label: 'Confirmado',
-    bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200',
-    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    bg: 'bg-emerald-500', text: 'text-white', border: 'border-emerald-500',
+    cls: 'bg-emerald-500 text-white border-emerald-500',
   },
   completed: {
     label: 'Realizado',

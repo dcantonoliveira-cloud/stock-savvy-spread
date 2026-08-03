@@ -376,6 +376,7 @@ export default function EventDetailPage() {
     const updates: Record<string, any> = { status: newStatus };
     if (newStatus === 'confirmed') {
       updates.date_reserved = false;
+      updates.contract_signed_date = new Date().toISOString().slice(0, 10);
     }
     if (newStatus === 'cancelled' || newStatus === 'lost') {
       updates.date_reserved = false;
