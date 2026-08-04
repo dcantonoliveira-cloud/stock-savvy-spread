@@ -1057,13 +1057,13 @@ export default function EventDetailPage() {
               witness_email: form.witness_email ?? null,
               witness_2_name: form.witness_2_name ?? null,
               witness_2_email: form.witness_2_email ?? null,
-              clients: event.clients ? {
-                name: event.clients.name ?? null,
-                cpf: event.clients.cpf ?? null,
-                rg: event.clients.rg ?? null,
-                address: event.clients.address ?? null,
-                email: event.clients.email ?? null,
-              } : null,
+              clients: {
+                name:    event.clients?.name    || event.contratante_name    || null,
+                cpf:     event.clients?.cpf     || event.contratante_cpf     || null,
+                rg:      event.clients?.rg      || event.contratante_rg      || null,
+                address: event.clients?.address || event.contratante_address || null,
+                email:   event.clients?.email   || event.contratante_email   || null,
+              },
             }}
           />
         )}
