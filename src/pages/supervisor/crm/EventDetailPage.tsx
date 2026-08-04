@@ -249,16 +249,16 @@ export default function EventDetailPage() {
         eventIdRef.current = id;
         const c = (data as EventDetail).clients;
         const ev = data as any;
-        // Prioriza dados do cliente; usa contratante_* do evento como fallback (preenchido pelo formulário público)
+        // contratante_* tem prioridade (preenchido pelo cliente via formulário público); clients é fallback
         const cf = {
-          name:     c?.name     || ev.contratante_name     || '',
-          phone:    c?.phone    || ev.contratante_phone    || '',
-          email:    c?.email    || ev.contratante_email    || '',
-          cpf:      c?.cpf      || ev.contratante_cpf      || '',
-          rg:       c?.rg       || ev.contratante_rg       || '',
-          address:  c?.address  || ev.contratante_address  || '',
-          zip_code: c?.zip_code || ev.contratante_zip_code || '',
-          source:   c?.source   || ev.contratante_source   || '',
+          name:     ev.contratante_name     || c?.name     || '',
+          phone:    ev.contratante_phone    || c?.phone    || '',
+          email:    ev.contratante_email    || c?.email    || '',
+          cpf:      ev.contratante_cpf      || c?.cpf      || '',
+          rg:       ev.contratante_rg       || c?.rg       || '',
+          address:  ev.contratante_address  || c?.address  || '',
+          zip_code: ev.contratante_zip_code || c?.zip_code || '',
+          source:   ev.contratante_source   || c?.source   || '',
         };
         setClientForm(cf);
         clientFormRef.current = cf;
@@ -1058,11 +1058,11 @@ export default function EventDetailPage() {
               witness_2_name: form.witness_2_name ?? null,
               witness_2_email: form.witness_2_email ?? null,
               clients: {
-                name:    event.clients?.name    || event.contratante_name    || null,
-                cpf:     event.clients?.cpf     || event.contratante_cpf     || null,
-                rg:      event.clients?.rg      || event.contratante_rg      || null,
-                address: event.clients?.address || event.contratante_address || null,
-                email:   event.clients?.email   || event.contratante_email   || null,
+                name:    event.contratante_name    || event.clients?.name    || null,
+                cpf:     event.contratante_cpf     || event.clients?.cpf     || null,
+                rg:      event.contratante_rg      || event.clients?.rg      || null,
+                address: event.contratante_address || event.clients?.address || null,
+                email:   event.contratante_email   || event.clients?.email   || null,
               },
             }}
           />
