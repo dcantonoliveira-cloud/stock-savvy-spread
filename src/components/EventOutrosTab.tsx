@@ -332,6 +332,52 @@ function ConfirmModal({ title, description, confirmLabel, confirmCls, onConfirm,
   );
 }
 
+// ── Data de fechamento ────────────────────────────────────────────────────────
+
+function ClosingDateSection({ eventId }: { eventId: string }) {
+  const [date, setDate]     = useState<string>('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (supabase.from as any)('events').select('contract_signed_date').eq('id', eventId).single()
+      .then(({ data }: any) => { if (data?.contract_signed_date) setDate(data.contract_signed_date); });
+  }, [eventId]);
+
+  const save = async (val: string) => {
+    setSaving(true);
+    await (supabase.from as any)('events').update({ contract_signed_date: val || null }).eq('id', eventId);
+    setSaving(false);
+    toast.success(val ? 'Data de fechamento atualizada' : 'Data de fechamento removida');
+  };
+
+  return (
+    <div className="bg-white border border-border rounded-2xl p-6 flex items-center justify-between gap-4">
+      <div>
+        <p className="font-semibold text-foreground text-[15px]">Data de fechamento</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Data em que o contrato foi fechado.</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <input
+          type="date"
+          value={date}
+          onChange={e => setDate(e.target.value)}
+          className="h-9 px-3 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
+        <button onClick={() => save(date)} disabled={saving}
+          className="h-9 px-4 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-60 transition-colors">
+          Salvar
+        </button>
+        {date && (
+          <button onClick={() => { setDate(''); save(''); }} disabled={saving}
+            className="h-9 px-3 text-sm font-medium text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+            Zerar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Ações perigosas ───────────────────────────────────────────────────────────
 
 function ActionsSection({ eventId, clientWhatsapp, clientName, eventName, onCancel, onDelete }: {
@@ -533,6 +579,7 @@ export default function EventOutrosTab({
   return (
     <div className="space-y-4">
       <PortalSection eventId={eventId} clientEmail={clientEmail} clientWhatsapp={clientWhatsapp} clientName={clientName} eventName={eventName} />
+      <ClosingDateSection eventId={eventId} />
       <ActionsSection
         eventId={eventId}
         clientWhatsapp={clientWhatsapp}
