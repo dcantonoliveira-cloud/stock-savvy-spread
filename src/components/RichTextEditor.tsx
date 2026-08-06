@@ -71,6 +71,27 @@ export default function RichTextEditor({ content, onChange, onBlur, placeholder 
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] px-4 py-3 text-sm text-foreground',
       },
+      handlePaste: (view, event) => {
+        const text = event.clipboardData?.getData('text/plain');
+        const html = event.clipboardData?.getData('text/html');
+        // HTML estruturado (listas, títulos) → processa normalmente
+        if (html && /<(ul|ol|li|h[1-6]|br)/i.test(html)) return false;
+        // Texto com quebras de linha → cada linha vira um parágrafo
+        if (text && text.includes('\n')) {
+          event.preventDefault();
+          const { schema, selection } = view.state;
+          const nodes = text.split('\n').map(line => {
+            const t = line.trim();
+            return t
+              ? schema.nodes.paragraph.create(null, schema.text(t))
+              : schema.nodes.paragraph.create();
+          });
+          const fragment = schema.nodes.doc.createChecked(null, nodes);
+          view.dispatch(view.state.tr.replaceWith(selection.from, selection.to, fragment.content));
+          return true;
+        }
+        return false;
+      },
     },
   });
 
