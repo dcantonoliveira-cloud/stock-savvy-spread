@@ -232,31 +232,41 @@ export default function CalendarPage() {
           <StatChip icon={<CalendarCheck className="w-3.5 h-3.5 text-emerald-600" />}
                     label="Confirmados" value={`${confirmed.length} evento${confirmed.length !== 1 ? 's' : ''}`}
                     color="bg-emerald-50 border-emerald-100" />
-          <StatChip icon={<UtensilsCrossed className="w-3.5 h-3.5 text-violet-600" />}
-                    label="Degustações" value={tastings.length > 0 ? `${tastings.length}` : '—'}
-                    color="bg-violet-50 border-violet-100" />
 
           {canFinanceiro && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-blue-50 border-blue-100 text-[11px] font-semibold text-blue-700">
-              <DollarSign className="w-3.5 h-3.5" />
-              <span className="uppercase tracking-wide">Financeiro</span>
-              {showFinanceiro ? (
+            <div className="flex items-center gap-2 px-3 rounded-xl border bg-blue-50 border-blue-100 text-[11px] font-semibold text-blue-700" style={{ height: '52px' }}>
+              <DollarSign className="w-3.5 h-3.5 shrink-0" />
+              <div className="flex flex-col leading-tight">
+                <span className="uppercase tracking-widest text-[9px] text-blue-400 font-bold">Financeiro</span>
+                {showFinanceiro ? (
+                  <span className="text-blue-700">{fmtBRL(totalRevenue)}</span>
+                ) : (
+                  <span className="text-blue-300 tracking-widest">••••••</span>
+                )}
+              </div>
+              {showFinanceiro && (
                 <>
-                  <span className="mx-1 text-blue-300">|</span>
-                  <span>{fmtBRL(totalRevenue)}</span>
-                  <span className="text-blue-400 font-normal">·</span>
-                  <span>{totalGuests} pax</span>
-                  <span className="text-blue-400 font-normal">·</span>
-                  <span>{confirmed.length > 0 ? fmtBRL(Math.round(totalRevenue / confirmed.length)) : '—'} /evento</span>
+                  <span className="w-px h-6 bg-blue-200 mx-1" />
+                  <div className="flex flex-col leading-tight">
+                    <span className="uppercase tracking-widest text-[9px] text-blue-400 font-bold">Pax</span>
+                    <span>{totalGuests}</span>
+                  </div>
+                  <span className="w-px h-6 bg-blue-200 mx-1" />
+                  <div className="flex flex-col leading-tight">
+                    <span className="uppercase tracking-widest text-[9px] text-blue-400 font-bold">Média</span>
+                    <span>{confirmed.length > 0 ? fmtBRL(Math.round(totalRevenue / confirmed.length)) : '—'}</span>
+                  </div>
                 </>
-              ) : (
-                <span className="text-blue-300 tracking-widest ml-1">••••••</span>
               )}
-              <button onClick={() => setShowFinanceiro(v => !v)} className="ml-1 hover:opacity-70 transition-opacity">
+              <button onClick={() => setShowFinanceiro(v => !v)} className="ml-1 hover:opacity-70 transition-opacity shrink-0">
                 {showFinanceiro ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
           )}
+
+          <StatChip icon={<UtensilsCrossed className="w-3.5 h-3.5 text-violet-600" />}
+                    label="Degustações" value={tastings.length > 0 ? `${tastings.length}` : '—'}
+                    color="bg-violet-50 border-violet-100" />
         </div>
       </div>
 
