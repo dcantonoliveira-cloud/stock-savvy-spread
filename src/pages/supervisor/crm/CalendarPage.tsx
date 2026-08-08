@@ -229,10 +229,6 @@ export default function CalendarPage() {
 
         {/* Stats */}
         <div className="flex items-center gap-3 flex-wrap">
-          <StatChip icon={<CalendarCheck className="w-3.5 h-3.5 text-emerald-600" />}
-                    label="Confirmados" value={`${confirmed.length} evento${confirmed.length !== 1 ? 's' : ''}`}
-                    color="bg-emerald-50 border-emerald-100" />
-
           {canFinanceiro && (
             <div className="flex items-center gap-2 px-3 rounded-xl border bg-blue-50 border-blue-100 text-[11px] font-semibold text-blue-700" style={{ height: '52px' }}>
               <DollarSign className="w-3.5 h-3.5 shrink-0" />
@@ -263,6 +259,10 @@ export default function CalendarPage() {
               </button>
             </div>
           )}
+
+          <StatChip icon={<CalendarCheck className="w-3.5 h-3.5 text-emerald-600" />}
+                    label="Confirmados" value={`${confirmed.length} evento${confirmed.length !== 1 ? 's' : ''}`}
+                    color="bg-emerald-50 border-emerald-100" />
 
           <StatChip icon={<UtensilsCrossed className="w-3.5 h-3.5 text-violet-600" />}
                     label="Degustações" value={tastings.length > 0 ? `${tastings.length}` : '—'}
