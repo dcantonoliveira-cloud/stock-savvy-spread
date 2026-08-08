@@ -288,21 +288,6 @@ export default function ContractFormPage() {
             </div>
           </div>
 
-          {/* Testemunha 2 */}
-          <div className="pt-2 border-t border-gray-100">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 mt-4">Testemunha 2 <span className="text-gray-300">(opcional)</span></p>
-            <div className="space-y-4">
-              <div>
-                <label className={labelCls}>Nome completo</label>
-                <input className={inputCls} value={form.witness_2_name} onChange={set('witness_2_name')} placeholder="Nome da testemunha" />
-              </div>
-              <div>
-                <label className={labelCls}>Email</label>
-                <input className={inputCls} type="email" value={form.witness_2_email} onChange={set('witness_2_email')} placeholder="email@exemplo.com" />
-              </div>
-            </div>
-          </div>
-
           <button type="submit" disabled={saving}
             className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 mt-2">
             {saving ? 'Salvando...' : 'Enviar dados'}
