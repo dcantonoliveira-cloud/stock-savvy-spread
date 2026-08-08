@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import {
   ChevronLeft, ChevronRight, Users, CalendarCheck,
-  Clock, ExternalLink, UtensilsCrossed, X, CalendarPlus, Mail, MapPin, Plus,
+  Clock, ExternalLink, UtensilsCrossed, X, CalendarPlus, Mail, MapPin, Plus, Eye, EyeOff, DollarSign,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -63,6 +64,9 @@ const daysIn   = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 
 // ── Component ───────────────────────────────────────────────────────────────────
 export default function CalendarPage() {
+  const { permissions, role } = useAuth();
+  const canFinanceiro = permissions?.is_admin || role === 'supervisor' || permissions?.access_financeiro;
+  const [showFinanceiro, setShowFinanceiro] = useState(false);
   const navigate   = useNavigate();
   const location   = useLocation();
   const [searchParams] = useSearchParams();
@@ -231,6 +235,28 @@ export default function CalendarPage() {
           <StatChip icon={<UtensilsCrossed className="w-3.5 h-3.5 text-violet-600" />}
                     label="Degustações" value={tastings.length > 0 ? `${tastings.length}` : '—'}
                     color="bg-violet-50 border-violet-100" />
+
+          {canFinanceiro && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-blue-50 border-blue-100 text-[11px] font-semibold text-blue-700">
+              <DollarSign className="w-3.5 h-3.5" />
+              <span className="uppercase tracking-wide">Financeiro</span>
+              {showFinanceiro ? (
+                <>
+                  <span className="mx-1 text-blue-300">|</span>
+                  <span>{fmtBRL(totalRevenue)}</span>
+                  <span className="text-blue-400 font-normal">·</span>
+                  <span>{totalGuests} pax</span>
+                  <span className="text-blue-400 font-normal">·</span>
+                  <span>{confirmed.length > 0 ? fmtBRL(Math.round(totalRevenue / confirmed.length)) : '—'} /evento</span>
+                </>
+              ) : (
+                <span className="text-blue-300 tracking-widest ml-1">••••••</span>
+              )}
+              <button onClick={() => setShowFinanceiro(v => !v)} className="ml-1 hover:opacity-70 transition-opacity">
+                {showFinanceiro ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
