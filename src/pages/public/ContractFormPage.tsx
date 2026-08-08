@@ -269,16 +269,16 @@ export default function ContractFormPage() {
 
           {/* Testemunha 1 */}
           <div className="pt-2 border-t border-gray-100">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 mt-4">Testemunha 1</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 mt-4">Testemunha 1 <span className="text-red-400">*</span></p>
             <div className="space-y-4">
               <div>
                 <label className={labelCls}>Nome completo</label>
-                <input className={inputCls} value={form.witness_name} onChange={set('witness_name')} placeholder="Nome da testemunha" />
+                <input className={inputCls} value={form.witness_name} onChange={set('witness_name')} placeholder="Nome da testemunha" required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>CPF</label>
-                  <input className={inputCls} value={form.witness_cpf} onChange={set('witness_cpf', maskCpfCnpj)} placeholder="000.000.000-00" inputMode="numeric" />
+                  <input className={inputCls} value={form.witness_cpf} onChange={set('witness_cpf', maskCpfCnpj)} placeholder="000.000.000-00" inputMode="numeric" required />
                 </div>
                 <div>
                   <label className={labelCls}>Email</label>
@@ -290,7 +290,7 @@ export default function ContractFormPage() {
 
           {/* Testemunha 2 */}
           <div className="pt-2 border-t border-gray-100">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 mt-4">Testemunha 2</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 mt-4">Testemunha 2 <span className="text-gray-300">(opcional)</span></p>
             <div className="space-y-4">
               <div>
                 <label className={labelCls}>Nome completo</label>
