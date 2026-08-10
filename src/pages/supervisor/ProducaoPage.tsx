@@ -190,13 +190,11 @@ function MonthlyChart({ orders }: { orders: Order[] }) {
       const m = o.delivery_date.slice(5, 7);
       map[m] = (map[m] ?? 0) + o.extra_value;
     }
-    const chartData = Object.entries(map)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([m, total]) => ({ mes: MONTH_NAMES[parseInt(m) - 1], total, monthNum: m }));
     const tableData = MONTH_NAMES.map((name, i) => {
       const m = String(i + 1).padStart(2, '0');
-      return { name, total: map[m] ?? 0 };
+      return { name, total: map[m] ?? 0, monthNum: m };
     });
+    const chartData = tableData.map(({ name, total, monthNum }) => ({ mes: name, total, monthNum }));
     const yearTotal = Object.values(map).reduce((s, v) => s + v, 0);
     return { chartData, tableData, yearTotal };
   }, [orders, year]);
