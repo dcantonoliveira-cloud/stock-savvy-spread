@@ -396,8 +396,8 @@ export default function EventsPage() {
       total_value: form.pricing_mode === 'fixed'
         ? (parseFloat(form.contract_value) || null)
         : autoTotal > 0 ? autoTotal : parseFloat(form.total_value) || null,
-      contract_signed: form.contract_signed,
-      contract_signed_date: form.contract_signed_date || null,
+      contract_signed: false,
+      contract_signed_date: null,
       is_paid_in_full: form.is_paid_in_full,
       notes: form.notes || null,
       organizer: form.organizer || null,
