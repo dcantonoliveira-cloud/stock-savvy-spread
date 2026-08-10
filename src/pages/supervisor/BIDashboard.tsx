@@ -1188,7 +1188,7 @@ function buildStats(
       if (!histMap[k]) histMap[k] = { fc: 0, total: 0 };
       histMap[k].fc++;
     });
-    allHist.filter(e => e.status !== 'cancelled').forEach(e => {
+    allHist.forEach(e => {
       const k = getKey(e)?.trim() || null;
       if (!k) return;
       if (!histMap[k]) histMap[k] = { fc: 0, total: 0 };
