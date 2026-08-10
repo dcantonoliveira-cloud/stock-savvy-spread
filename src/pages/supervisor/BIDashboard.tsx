@@ -1167,9 +1167,11 @@ const normStr = (s: string | null | undefined) =>
     .split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') || null;
 
 function buildStats(
-  fc: EventBI[], ab: EventBI[], getKey: (e: EventBI) => string | null, ticketMedioGlobal: number
+  fc: EventBI[], ab: EventBI[], getKey: (e: EventBI) => string | null, ticketMedioGlobal: number,
+  fcHist?: EventBI[], allHist?: EventBI[]
 ): ParceiraStat[] {
   const map: Record<string, { fc: EventBI[]; ab: EventBI[] }> = {};
+  const histMap: Record<string, { fc: number; total: number }> = {};
   const add = (e: EventBI, type: 'fc' | 'ab') => {
     const k = getKey(e)?.trim() || null;
     if (!k) return;
@@ -1178,6 +1180,21 @@ function buildStats(
   };
   fc.forEach(e => add(e, 'fc'));
   ab.forEach(e => add(e, 'ab'));
+
+  if (fcHist && allHist) {
+    fcHist.forEach(e => {
+      const k = getKey(e)?.trim() || null;
+      if (!k) return;
+      if (!histMap[k]) histMap[k] = { fc: 0, total: 0 };
+      histMap[k].fc++;
+    });
+    allHist.filter(e => e.status !== 'cancelled').forEach(e => {
+      const k = getKey(e)?.trim() || null;
+      if (!k) return;
+      if (!histMap[k]) histMap[k] = { fc: 0, total: 0 };
+      histMap[k].total++;
+    });
+  }
 
   return Object.entries(map).map(([name, { fc: fcs, ab: abs }]) => {
     const receita = sum(fcs.map(e => e.total_value ?? 0));
@@ -1202,7 +1219,9 @@ function buildStats(
       total,
       receita,
       ticketMedio: fcs.length ? receita / fcs.length : 0,
-      txConv: (fcs.length + absNoLead.length) ? fcs.length / (fcs.length + absNoLead.length) * 100 : 0,
+      txConv: (fcHist && allHist && histMap[name])
+        ? (histMap[name].total ? histMap[name].fc / histMap[name].total * 100 : 0)
+        : (fcs.length + absNoLead.length) ? fcs.length / (fcs.length + absNoLead.length) * 100 : 0,
       paxMedio: paxList.length ? Math.round(avg(paxList)) : 0,
       receitaFutura: abs.length * ticketMedioGlobal,
       anos,
@@ -1342,8 +1361,9 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
   fc: EventBI[]; ab: EventBI[]; all: EventBI[];
   locName: (e: EventBI) => string | null; ticketMedio: number;
 }) {
-  const assessorasStats = buildStats(fc, ab, e => normStr(e.organizer), ticketMedio);
-  const locaisStats     = buildStats(fc, ab, e => locName(e),           ticketMedio);
+  const fcAll  = all.filter(e => isFechado(e.status) && (e.total_value ?? 0) > 500);
+  const assessorasStats = buildStats(fc, ab, e => normStr(e.organizer), ticketMedio, fcAll, all);
+  const locaisStats     = buildStats(fc, ab, e => locName(e),           ticketMedio, fcAll, all);
 
   const semAssessora = fc.filter(e => !e.organizer?.trim()).length;
   const semLocal     = fc.filter(e => !locName(e)).length;
