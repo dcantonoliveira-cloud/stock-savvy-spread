@@ -104,7 +104,7 @@ const LOOKUPS: Record<string, { fk: string; refTable: string; refColumn: string;
 
 interface BackupConfig {
   delivery: 'drive' | 'email'
-  frequency: 'weekly' | 'monthly'
+  frequency: 'daily' | 'weekly' | 'monthly'
   day: number
   notify_email: string | null
   // modo drive
@@ -214,9 +214,11 @@ async function runBackupForCompany(
 
   if (!force) {
     const nowBR = new Date(Date.now() - 3 * 3600 * 1000)  // horário de Brasília
-    const matches = config.frequency === 'weekly'
-      ? nowBR.getUTCDay() === Number(config.day)
-      : nowBR.getUTCDate() === Number(config.day)
+    const matches = config.frequency === 'daily'
+      ? true
+      : config.frequency === 'weekly'
+        ? nowBR.getUTCDay() === Number(config.day)
+        : nowBR.getUTCDate() === Number(config.day)
     if (!matches) return { skipped: true, reason: 'Hoje não é dia de backup' }
   }
 

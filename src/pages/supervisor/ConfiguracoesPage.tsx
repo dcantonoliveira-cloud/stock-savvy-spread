@@ -547,7 +547,7 @@ function WhatsAppTemplatesCard({ savedJson, onSave }: {
 // ─── Backup automático (E-mail com ZIP · ou Google Drive OAuth) ───────────────
 interface BackupCfg {
   delivery: 'email' | 'drive';
-  frequency: 'weekly' | 'monthly';
+  frequency: 'daily' | 'weekly' | 'monthly';
   day: number;
   notify_email: string;
   refresh_token?: string | null;
@@ -752,12 +752,14 @@ function DriveBackupCard({ integration, onSave }: {
         <div>
           <label className={labelCls}><CalendarClock className="w-3 h-3 inline mr-1 -mt-0.5" />Frequência</label>
           <select className={inputCls} value={cfg.frequency}
-            onChange={e => upd({ frequency: e.target.value as 'weekly' | 'monthly', day: 1 })}>
+            onChange={e => upd({ frequency: e.target.value as 'daily' | 'weekly' | 'monthly', day: 1 })}>
+            <option value="daily">Diário</option>
             <option value="weekly">Semanal</option>
             <option value="monthly">Mensal</option>
           </select>
         </div>
 
+        {cfg.frequency !== 'daily' && (
         <div>
           <label className={labelCls}>{cfg.frequency === 'weekly' ? 'Dia da semana' : 'Dia do mês'}</label>
           {cfg.frequency === 'weekly' ? (
@@ -770,6 +772,7 @@ function DriveBackupCard({ integration, onSave }: {
             </select>
           )}
         </div>
+        )}
 
         <div className="col-span-2">
           <label className={labelCls}><Mail className="w-3 h-3 inline mr-1 -mt-0.5" />{isEmailMode ? 'E-mail de destino' : 'E-mail para aviso'}</label>
