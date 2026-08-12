@@ -129,6 +129,8 @@ export default function EventsPage() {
     const newDate = (location.state as any)?.newDate;
     if (newDate) setForm(f => ({ ...f, event_date: newDate }));
   }, []);
+  // Carrega degustações toda vez que o form de criação abre
+  useEffect(() => { if (newOpen) loadTastingSessions(); }, [newOpen]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [detailEvent, setDetailEvent] = useState<EventRow | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -189,11 +191,24 @@ export default function EventsPage() {
 
   const loadTastingSessions = async () => {
     const today = new Date().toISOString().slice(0, 10);
-    const { data } = await (supabase.from as any)('tasting_sessions')
-      .select('id, scheduled_date')
+    const { data: sessData } = await (supabase.from as any)('tasting_sessions')
+      .select('id, scheduled_date, max_couples')
       .gte('scheduled_date', today)
       .order('scheduled_date');
-    setTastingSessions((data ?? []) as { id: string; scheduled_date: string }[]);
+    if (!sessData) return;
+    const ids = sessData.map((s: any) => s.id);
+    const { data: tseRows } = await (supabase.from as any)('tasting_session_events')
+      .select('session_id')
+      .in('session_id', ids);
+    const countMap: Record<string, number> = {};
+    for (const row of (tseRows ?? []) as any[]) {
+      countMap[row.session_id] = (countMap[row.session_id] ?? 0) + 1;
+    }
+    // Só mostra sessões com vaga disponível
+    const available = sessData
+      .map((s: any) => ({ ...s, current: countMap[s.id] ?? 0 }))
+      .filter((s: any) => s.max_couples == null || s.current < s.max_couples);
+    setTastingSessions(available as { id: string; scheduled_date: string }[]);
   };
 
   // Busca global server-side — sem limite arbitrário, busca em todos os campos relevantes
