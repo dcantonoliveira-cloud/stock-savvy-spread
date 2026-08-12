@@ -9,7 +9,7 @@ interface Notif {
   title: string;
   message: string | null;
   actor_name: string | null;
-  data: { link?: string } | null;
+  data: { link?: string; event_date?: string; location_text?: string } | null;
   read: boolean;
   created_at: string;
 }
@@ -135,6 +135,13 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
                   </div>
                   {n.message && (
                     <p className="text-xs text-muted-foreground truncate">{n.message}</p>
+                  )}
+                  {(n.data?.event_date || n.data?.location_text) && (
+                    <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
+                      {n.data.event_date && new Date(n.data.event_date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      {n.data.event_date && n.data.location_text && ' · '}
+                      {n.data.location_text}
+                    </p>
                   )}
                   {n.actor_name && (
                     <p className="text-[11px] text-muted-foreground/60 mt-0.5">{n.actor_name}</p>
