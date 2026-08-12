@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil } from 'lucide-react';
+import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
@@ -278,6 +278,86 @@ function MonthlyChart({ orders }: { orders: Order[] }) {
   );
 }
 
+// ─── Calendar View ─────────────────────────────────────────────────────────────
+const MONTH_NAMES_CAL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DOW = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+function CalendarView({ orders, year, month, onPrev, onNext, onEdit }: {
+  orders: Order[];
+  year: number; month: number;
+  onPrev: () => void; onNext: () => void;
+  onEdit: (o: Order) => void;
+}) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  // pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const ordersForDay = (day: number) => {
+    const d = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    return orders.filter(o => o.delivery_date === d);
+  };
+
+  return (
+    <div className="bg-white border border-border rounded-2xl overflow-hidden">
+      {/* Nav */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+        <button onClick={onPrev} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <p className="text-sm font-semibold text-foreground">{MONTH_NAMES_CAL[month]} {year}</p>
+        <button onClick={onNext} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 border-b border-border">
+        {DOW.map(d => (
+          <div key={d} className="text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 py-2">{d}</div>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-7">
+        {cells.map((day, idx) => {
+          if (!day) return <div key={`empty-${idx}`} className="min-h-[90px] border-r border-b border-border/40 bg-muted/10 last:border-r-0" />;
+          const dayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          const dayOrders = ordersForDay(day);
+          const isToday = dayStr === today;
+          const isWeekend = [0,6].includes((idx) % 7);
+          return (
+            <div key={day}
+              className={`min-h-[90px] border-r border-b border-border/40 p-1.5 last:border-r-0 ${isWeekend ? 'bg-muted/10' : ''}`}>
+              <span className={`inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-semibold mb-1 ${
+                isToday ? 'bg-primary text-white' : 'text-muted-foreground'
+              }`}>{day}</span>
+              <div className="space-y-0.5">
+                {dayOrders.map(o => {
+                  const cfg = STATUS_CFG[o.status];
+                  return (
+                    <button key={o.id} onClick={() => onEdit(o)}
+                      className={`w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate border ${cfg.cls} hover:opacity-80 transition-opacity`}
+                      title={`${o.title}${o.delivery_time ? ' · ' + o.delivery_time.slice(0,5) : ''}`}>
+                      {o.delivery_time ? o.delivery_time.slice(0,5)+' ' : ''}{o.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function SupervisorProducaoPage() {
   const { permissions, role } = useAuth();
@@ -294,6 +374,9 @@ export default function SupervisorProducaoPage() {
   const [showDrop, setShowDrop]   = useState(false);
   const [filter, setFilter]       = useState<FilterType>('pending');
   const [search, setSearch]       = useState('');
+  const [viewMode, setViewMode]   = useState<'list' | 'calendar'>('list');
+  const [calYear, setCalYear]     = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth]   = useState(() => new Date().getMonth());
   const searchRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -447,10 +530,24 @@ export default function SupervisorProducaoPage() {
             {pending === 0 && inProgress === 0 && 'Tudo em dia'}
           </p>
         </div>
-        <button onClick={() => { setForm(BLANK); setEventSearch(''); setEditingId(null); setModalOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
-          <Plus className="w-4 h-4" /> Novo pedido
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
+            <button onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              title="Vista em lista">
+              <List className="w-4 h-4" />
+            </button>
+            <button onClick={() => setViewMode('calendar')}
+              className={`p-1.5 rounded-lg transition-colors ${viewMode === 'calendar' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              title="Vista em calendário">
+              <CalendarDays className="w-4 h-4" />
+            </button>
+          </div>
+          <button onClick={() => { setForm(BLANK); setEventSearch(''); setEditingId(null); setModalOpen(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
+            <Plus className="w-4 h-4" /> Novo pedido
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -481,8 +578,21 @@ export default function SupervisorProducaoPage() {
           : <FinanceiroView orders={orders} />
       )}
 
+      {/* Calendar view */}
+      {filter !== 'financeiro' && viewMode === 'calendar' && (
+        loading
+          ? <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+          : <CalendarView
+              orders={orders}
+              year={calYear} month={calMonth}
+              onPrev={() => { if (calMonth === 0) { setCalYear(y => y-1); setCalMonth(11); } else setCalMonth(m => m-1); }}
+              onNext={() => { if (calMonth === 11) { setCalYear(y => y+1); setCalMonth(0); } else setCalMonth(m => m+1); }}
+              onEdit={openEdit}
+            />
+      )}
+
       {/* Orders table */}
-      {filter !== 'financeiro' && (
+      {filter !== 'financeiro' && viewMode === 'list' && (
         loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
         ) : filtered.length === 0 ? (
