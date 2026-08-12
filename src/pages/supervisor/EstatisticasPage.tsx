@@ -605,7 +605,7 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {contratosMes.map(e => {
+                    {[...contratosMes].sort((a, b) => (a.event_date ?? '').localeCompare(b.event_date ?? '')).map(e => {
                       const st = getStatus(e.status);
                       return (
                         <tr key={e.id} className="hover:bg-muted/20 transition-colors">
