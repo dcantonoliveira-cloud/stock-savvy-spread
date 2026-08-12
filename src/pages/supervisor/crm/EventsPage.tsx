@@ -13,10 +13,11 @@ import {
   Download, SlidersHorizontal, CalendarX,
   MapPin, Users, DollarSign, FileText, X,
   Phone, Mail, Edit2, Trash2, ClipboardCheck, Filter,
-  FileCheck2, FileClock, Loader2,
+  FileCheck2, FileClock, Loader2, UtensilsCrossed,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import LinkedField from '@/components/LinkedField';
+import { buildMessage, openWhatsAppLink, sendWhatsApp } from '@/lib/whatsapp';
 
 // ── Types ──────────────────────────────────────────────────────────
 type EventRow = {
@@ -61,6 +62,7 @@ const EMPTY_FORM = {
   notes: '',
   organizer: '', organizer_id: '' as string | null,
   date_reserved: false,
+  tasting_session_id: '' as string,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -146,6 +148,7 @@ export default function EventsPage() {
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [locationQuery, setLocationQuery] = useState('');
   const [locationDropOpen, setLocationDropOpen] = useState(false);
+  const [tastingSessions, setTastingSessions] = useState<{ id: string; scheduled_date: string }[]>([]);
 
   // ── Load data ────────────────────────────────────────────────────
   const EVENT_SELECT = 'id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, contract_signed_url, zapsign_data, notes, client_id, clients(id, name, phone, email)';
@@ -182,6 +185,15 @@ export default function EventsPage() {
     if (clients.length > 0) return;
     const { data } = await supabase.from('clients').select('id, name, phone, email').order('name');
     setClients((data as Client[]) ?? []);
+  };
+
+  const loadTastingSessions = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await (supabase.from as any)('tasting_sessions')
+      .select('id, scheduled_date')
+      .gte('scheduled_date', today)
+      .order('scheduled_date');
+    setTastingSessions((data ?? []) as { id: string; scheduled_date: string }[]);
   };
 
   // Busca global server-side — sem limite arbitrário, busca em todos os campos relevantes
@@ -370,6 +382,7 @@ export default function EventsPage() {
     if (!clientId && form.event_name?.trim()) {
       const { data: newClient } = await supabase.from('clients').insert({
         name: form.event_name.trim(),
+        phone: form.client_phone?.trim() || null,
         company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89',
       }).select('id, name, phone, email').single();
 
@@ -413,6 +426,28 @@ export default function EventsPage() {
     } else {
       const { data: created, error } = await supabase.from('events').insert(payload).select('id').single();
       if (error) { toast.error('Erro ao criar: ' + error.message); setSaving(false); return; }
+
+      // Salva telefone no cliente existente se foi digitado
+      if (clientId && form.client_phone?.trim()) {
+        await supabase.from('clients').update({ phone: form.client_phone.trim() }).eq('id', clientId);
+      }
+
+      // Aloca em degustação se selecionada
+      if (form.tasting_session_id && created) {
+        await (supabase.from as any)('tasting_session_events')
+          .insert({ session_id: form.tasting_session_id, event_id: created.id, situation_snapshot: 'new' });
+
+        // WhatsApp
+        const sess = tastingSessions.find(s => s.id === form.tasting_session_id);
+        const phone = form.client_phone?.trim();
+        if (sess && phone) {
+          const dateFmt = new Date(sess.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+          const msg = await buildMessage('tasting', { clientName: form.event_name || '', date: dateFmt, address: '' });
+          const { ok } = await sendWhatsApp(phone, msg);
+          if (!ok) openWhatsAppLink(phone, msg);
+        }
+      }
+
       toast.success('Evento criado!');
       setNewOpen(false);
       setSaving(false);
@@ -633,28 +668,46 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {/* Contrato */}
-      <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contrato & Pagamento</p>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.contract_signed} onChange={e => setF('contract_signed', e.target.checked)}
-              className="w-4 h-4 rounded accent-primary" />
-            <span className="text-sm text-foreground">Contrato assinado</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.is_paid_in_full} onChange={e => setF('is_paid_in_full', e.target.checked)}
-              className="w-4 h-4 rounded accent-primary" />
-            <span className="text-sm text-foreground">Quitado</span>
-          </label>
-        </div>
-        {form.contract_signed && (
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Data da assinatura</label>
-            <Input type="date" value={form.contract_signed_date} onChange={e => setF('contract_signed_date', e.target.value)} className="h-9" />
-          </div>
-        )}
+      {/* Telefone */}
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Telefone (WhatsApp)</label>
+        <Input
+          type="tel"
+          value={form.client_phone}
+          onChange={e => setF('client_phone', e.target.value)}
+          placeholder="(11) 99999-9999"
+          className="h-9"
+        />
       </div>
+
+      {/* Degustação */}
+      {!editMode && (
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5">
+            <UtensilsCrossed className="w-3.5 h-3.5" />Alocar a uma degustação
+          </label>
+          <select
+            value={form.tasting_session_id}
+            onChange={e => setF('tasting_session_id', e.target.value)}
+            className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+          >
+            <option value="">Sem degustação</option>
+            {tastingSessions.map(s => (
+              <option key={s.id} value={s.id}>
+                {new Date(s.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })}
+              </option>
+            ))}
+          </select>
+          {form.tasting_session_id && form.client_phone && (
+            <p className="text-[11px] text-emerald-600 mt-1.5 flex items-center gap-1">
+              <Phone className="w-3 h-3" /> WhatsApp de confirmação será enviado ao criar
+            </p>
+          )}
+          {form.tasting_session_id && !form.client_phone && (
+            <p className="text-[11px] text-amber-600 mt-1.5">Informe o telefone para enviar o WhatsApp de confirmação</p>
+          )}
+        </div>
+      )}
 
       {/* Assessora */}
       <LinkedField
@@ -871,7 +924,7 @@ export default function EventsPage() {
               </>
             )}
           </div>
-          <Button onClick={() => { setForm({...EMPTY_FORM}); setClientQuery(''); setLocationQuery(''); setNewOpen(true); loadClients(); }}
+          <Button onClick={() => { setForm({...EMPTY_FORM}); setClientQuery(''); setLocationQuery(''); setNewOpen(true); loadClients(); loadTastingSessions(); }}
             className="gap-1.5 shrink-0 rounded-lg h-9 px-4">
             <Plus className="w-4 h-4" />
             Novo Evento
