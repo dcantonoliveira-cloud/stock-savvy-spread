@@ -419,17 +419,92 @@ async function fetchAll(
   return all
 }
 
+// ─── Tradução de colunas ──────────────────────────────────────────────────────
+const COL_PT: Record<string, string> = {
+  // gerais
+  id: 'id', company_id: 'empresa_id', created_at: 'criado_em', updated_at: 'atualizado_em',
+  // events
+  event_name: 'nome_evento', event_date: 'data_evento', event_type: 'tipo_evento',
+  status: 'status', guest_count: 'convidados', total_value: 'valor_total',
+  location_text: 'local_texto', location_id: 'local_id', client_id: 'cliente_id',
+  organizer_id: 'assessor_id', decorator_id: 'decorador_id', product_id: 'produto_id',
+  contract_signed: 'contrato_assinado', contract_signed_date: 'data_fechamento',
+  is_paid_in_full: 'quitado', notes: 'observacoes', date_reserved: 'reservado',
+  ceremony_time: 'horario_cerimonia', reception_time: 'horario_recepcao',
+  // clients
+  name: 'nome', email: 'email', phone: 'telefone', document: 'cpf_cnpj',
+  address: 'endereco', city: 'cidade', state: 'estado', zip: 'cep',
+  // event_payments
+  event_id: 'evento_id', amount: 'valor', due_date: 'vencimento',
+  paid_date: 'data_pagamento', paid: 'pago', payment_method: 'forma_pagamento',
+  description: 'descricao', installment_number: 'parcela', total_installments: 'total_parcelas',
+  // event_additional_values
+  value: 'valor', type: 'tipo', label: 'rotulo',
+  // suppliers
+  contact: 'contato', category: 'categoria', website: 'site', instagram: 'instagram',
+  // tasting_sessions
+  scheduled_date: 'data_agendada', max_couples: 'max_casais', session_type: 'tipo_sessao',
+  // tasting_session_events
+  session_id: 'sessao_id', allocated_at: 'alocado_em',
+  // production_orders
+  title: 'titulo', delivery_date: 'data_entrega', delivery_time: 'horario_entrega',
+  extra_value: 'valor_extra', payment_status: 'status_pagamento',
+  payment_method_prod: 'forma_pagamento', received_at: 'recebido_em',
+  // cash_flow_entries
+  entry_date: 'data', category_id: 'categoria_id', subcategory_id: 'subcategoria_id',
+  is_income: 'entrada', bank_account_id: 'conta_id', reference: 'referencia',
+  // bills_payable
+  supplier_id: 'fornecedor_id', bill_date: 'data_conta', paid_at: 'pago_em',
+  // stock_items
+  unit: 'unidade', quantity: 'quantidade', min_quantity: 'qtd_minima',
+  purchase_quantity: 'qtd_compra', purchase_unit: 'unidade_compra', price: 'preco',
+  // stock_item_locations
+  item_id: 'item_id', kitchen_id: 'cozinha_id', location_quantity: 'quantidade_local',
+  // stock_entries / outputs / transfers
+  entry_date_stock: 'data_entrada', quantity_in: 'qtd_entrada', quantity_out: 'qtd_saida',
+  source: 'origem', destination: 'destino', transfer_date: 'data_transferencia',
+  // inventory_counts
+  count_date: 'data_contagem', counted_by: 'contado_por', finalized: 'finalizado',
+  // inventory_count_items
+  count_id: 'contagem_id', counted_quantity: 'qtd_contada', expected_quantity: 'qtd_esperada',
+  // technical_sheets
+  sheet_id: 'ficha_id', yield_quantity: 'rendimento', yield_unit: 'unidade_rendimento',
+  cost_per_unit: 'custo_unitario', total_cost: 'custo_total',
+  // payslips
+  employee_id: 'funcionario_id', reference_month: 'mes_referencia', gross_salary: 'salario_bruto',
+  net_salary: 'salario_liquido', inss: 'inss', fgts: 'fgts', ir: 'ir',
+  // employees
+  role: 'cargo', hire_date: 'admissao', salary: 'salario', active: 'ativo',
+  // appointments
+  date: 'data', time: 'horario', location: 'local', invited_emails: 'emails_convidados',
+  // fields / menus
+  field_id: 'campo_id', field_value: 'valor_campo', menu_id: 'cardapio_id',
+  dish_id: 'prato_id', sort_order: 'ordem', is_required: 'obrigatorio',
+  // loans
+  loan_id: 'emprestimo_id', loan_date: 'data_emprestimo', return_date: 'data_devolucao',
+  returned: 'devolvido',
+}
+
+function translateCols(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  return rows.map(r => {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(r)) out[COL_PT[k] ?? k] = v
+    return out
+  })
+}
+
 // ─── CSV ─────────────────────────────────────────────────────────────────────
 function toCSV(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return ''
-  const cols = Array.from(rows.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set }, new Set<string>()))
+  const translated = translateCols(rows)
+  const cols = Array.from(translated.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set }, new Set<string>()))
   const esc = (v: unknown) => {
     if (v === null || v === undefined) return ''
     const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const head = cols.join(',')
-  const lines = rows.map(r => cols.map(c => esc(r[c])).join(','))
+  const lines = translated.map(r => cols.map(c => esc(r[c])).join(','))
   return '﻿' + head + '\n' + lines.join('\n')  // BOM p/ acentos no Excel
 }
 
