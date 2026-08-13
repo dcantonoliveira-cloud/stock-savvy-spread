@@ -34,17 +34,34 @@ const TABLE_GROUPS: Record<string, string[]> = {
     'event_locations', 'event_products',
     'event_field_definitions', 'event_field_values',
   ],
+  degustacoes: [
+    'tasting_sessions', 'tasting_session_events',
+  ],
+  producao: [
+    'production_orders',
+  ],
   financeiro: [
     'cash_flow_entries', 'bills_payable', 'bank_accounts', 'bank_transfers',
     'credit_cards', 'credit_card_expenses',
+    'invoices', 'invoice_items',
+    'payslips', 'payslip_versions',
   ],
   cadastros: [
     'categories', 'subcategories', 'tags', 'kitchens', 'suppliers',
     'contract_templates', 'annex_models',
     'checklist_templates', 'checklist_template_items',
+    'employees', 'employee_permissions',
+    'appointments',
   ],
-  estoque: ['stock_items', 'stock_item_locations'],
-  materiais: ['material_categories', 'material_items', 'material_base_list'],
+  estoque: [
+    'stock_items', 'stock_item_locations',
+    'stock_entries', 'stock_outputs', 'stock_transfers', 'stock_price_history',
+    'inventory_counts', 'inventory_count_items',
+  ],
+  materiais: [
+    'material_categories', 'material_items', 'material_base_list',
+    'material_loans', 'material_loan_items',
+  ],
   fichas_tecnicas: ['technical_sheets', 'technical_sheet_items', 'sheet_categories'],
 }
 const ALL_TABLES = Object.values(TABLE_GROUPS).flat()
@@ -56,7 +73,15 @@ const CHILD_TABLES: Record<string, { parent: string; fk: string }> = {
   event_field_values:       { parent: 'events', fk: 'event_id' },
   event_payments:           { parent: 'events', fk: 'event_id' },
   material_base_list:       { parent: 'material_items', fk: 'material_item_id' },
+  tasting_session_events:   { parent: 'tasting_sessions', fk: 'session_id' },
+  invoice_items:            { parent: 'invoices', fk: 'invoice_id' },
+  payslip_versions:         { parent: 'payslips', fk: 'payslip_id' },
+  inventory_count_items:    { parent: 'inventory_counts', fk: 'count_id' },
+  material_loan_items:      { parent: 'material_loans', fk: 'loan_id' },
 }
+
+// Tabelas sem company_id — fazem backup completo (único tenant).
+const GLOBAL_TABLES = new Set(['tasting_sessions'])
 
 // Colunas de referência (IDs) que ganham uma coluna extra com o nome legível ao
 // lado, para não precisar abrir outra planilha pra saber quem é quem. Se a
@@ -305,11 +330,15 @@ async function runBackupForCompany(
 async function fetchScoped(
   supabase: SupaClient, table: string, companyId: string, parentIdCache: Record<string, string[]>,
 ) {
+  if (GLOBAL_TABLES.has(table)) return fetchAll(supabase, table)
   const child = CHILD_TABLES[table]
   if (!child) return fetchAll(supabase, table, { companyId })
 
   if (!parentIdCache[child.parent]) {
-    const parentRows = await fetchAll(supabase, child.parent, { companyId, columns: 'id' })
+    const parentOpts = GLOBAL_TABLES.has(child.parent)
+      ? { columns: 'id' }
+      : { companyId, columns: 'id' }
+    const parentRows = await fetchAll(supabase, child.parent, parentOpts)
     parentIdCache[child.parent] = (parentRows as any[]).map(r => r.id)
   }
   const ids = parentIdCache[child.parent]
