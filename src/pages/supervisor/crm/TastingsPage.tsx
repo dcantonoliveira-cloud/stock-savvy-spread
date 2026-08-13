@@ -571,7 +571,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                     <span className="text-sm tabular-nums text-foreground">{row.guest_count ?? '—'}</span>
 
                     {/* Data do evento + reservado + calendário */}
-                    <div className="flex items-center gap-1.5 flex-nowrap">
+                    <div className="flex items-center gap-1.5 flex-nowrap" onClick={e => e.stopPropagation()}>
                       <span className="text-sm tabular-nums text-foreground shrink-0">{fmtDate(row.event_date)}</span>
                       {row.date_reserved && (
                         <span className="inline-flex shrink-0 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-600 border border-violet-200 leading-none">
@@ -580,8 +580,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                       )}
                       {row.event_date && (
                         <button
-                          onClick={e => {
-                            e.stopPropagation();
+                          onClick={() => {
                             const [y, m] = row.event_date!.split('-');
                             navigate(`/calendar?year=${y}&month=${m}`, { state: { backTo: '/degustacoes', backLabel: 'Degustações', backTab: 'aberto' } });
                           }}
