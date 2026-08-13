@@ -326,6 +326,10 @@ export default function TastingsPage() {
           rows={abertoRows}
           loading={abertoLoading}
           onNavigate={id => navigate(`/events/${id}`)}
+          onCalendar={date => {
+            const [y, m] = date.split('-');
+            navigate(`/calendar?year=${y}&month=${m}`, { state: { backTo: '/tastings', backLabel: 'Degustações', backTab: 'aberto' } });
+          }}
         />
       )}
 
@@ -445,10 +449,11 @@ const ABERTO_STATUS_OPTIONS = [
 ];
 
 // ─── Lista em aberto tab ──────────────────────────────────────────────────────
-function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
+function ListaAbertoTab({ rows: initialRows, loading, onNavigate, onCalendar }: {
   rows: AbertoRow[];
   loading: boolean;
   onNavigate: (id: string) => void;
+  onCalendar: (date: string) => void;
 }) {
   const [rows, setRows] = useState<AbertoRow[]>(initialRows);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -580,10 +585,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                       )}
                       {row.event_date && (
                         <button
-                          onClick={() => {
-                            const [y, m] = row.event_date!.split('-');
-                            navigate(`/calendar?year=${y}&month=${m}`, { state: { backTo: '/tastings', backLabel: 'Degustações', backTab: 'aberto' } });
-                          }}
+                          onClick={() => onCalendar(row.event_date!)}
                           className="shrink-0 flex items-center justify-center w-6 h-6 rounded hover:bg-primary/10 text-muted-foreground/50 hover:text-primary transition-colors"
                           title="Ver no calendário"
                         >
