@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, CalendarDays, Copy, Check, QrCode, X as XIcon, Download, ChevronDown, ChevronUp, StickyNote, ExternalLink, Calendar } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -68,7 +68,9 @@ function getStatusCfg(value: string) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function TastingsPage() {
   const navigate = useNavigate();
-  const [tab,           setTab]          = useState<ActiveTab>('degustacoes');
+  const location = useLocation();
+  const initTab = (location.state as any)?.backTab as ActiveTab | undefined;
+  const [tab,           setTab]          = useState<ActiveTab>(initTab ?? 'degustacoes');
   const [sessions,      setSessions]     = useState<Session[]>([]);
   const [statsMap,      setStatsMap]     = useState<Record<string, SessionStats>>({});
   const [loading,       setLoading]      = useState(true);
