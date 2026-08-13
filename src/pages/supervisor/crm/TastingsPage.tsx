@@ -584,7 +584,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate }: {
                             const [y, m] = row.event_date!.split('-');
                             navigate(`/calendar?year=${y}&month=${m}`, { state: { backTo: '/tastings', backLabel: 'Degustações', backTab: 'aberto' } });
                           }}
-                          className="shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground/40 hover:text-primary transition-colors"
+                          className="shrink-0 flex items-center justify-center w-6 h-6 rounded hover:bg-primary/10 text-muted-foreground/50 hover:text-primary transition-colors"
                           title="Ver no calendário"
                         >
                           <Calendar className="w-3.5 h-3.5" />
