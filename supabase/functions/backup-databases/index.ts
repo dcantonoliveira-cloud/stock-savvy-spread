@@ -252,9 +252,11 @@ async function runBackupForCompany(
       const accessToken = await getAccessToken(config.refresh_token!)
       const rootFolder = await ensureRootFolder(accessToken, config.folder_id ?? null)
       const backupFolderId = await createFolder(accessToken, `backup_${stamp}`, rootFolder)
+      const uploadErrors: string[] = []
       for (const f of csvFiles) {
-        await uploadCsv(accessToken, f.name, f.content, backupFolderId).catch(() => {})
+        await uploadCsv(accessToken, f.name, f.content, backupFolderId).catch(e => uploadErrors.push(`${f.name}: ${e.message}`))
       }
+      if (uploadErrors.length) throw new Error(`Upload falhou: ${uploadErrors.slice(0,3).join('; ')}`)
       deleted = await cleanOldBackups(accessToken, rootFolder, backupFolderId)
       config.folder_id = rootFolder
 
