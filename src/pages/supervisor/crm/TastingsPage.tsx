@@ -474,7 +474,6 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate, onCalendar }: 
     const updates: any = { status: newStatus };
     if (newStatus === 'lost' || newStatus === 'cancelled') updates.date_reserved = false;
     if (newStatus === 'lost' && lost_reason) updates.lost_reason = lost_reason;
-    if (newStatus !== 'lost') updates.lost_reason = null;
 
     const { error } = await supabase.from('events').update(updates).eq('id', row.event_id);
     if (error) { toast.error('Erro ao alterar status'); setSaving(null); return; }

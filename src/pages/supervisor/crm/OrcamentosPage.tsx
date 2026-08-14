@@ -124,7 +124,6 @@ export default function OrcamentosPage() {
     const patch: Record<string, unknown> = { status };
     if (negative) patch.date_reserved = null;
     if (status === 'lost' && lost_reason) patch.lost_reason = lost_reason;
-    if (status !== 'lost') patch.lost_reason = null;
     setRows(prev => prev.map(r => r.id === id
       ? { ...r, status, date_reserved: negative ? null : r.date_reserved, lost_reason: patch.lost_reason as string ?? r.lost_reason }
       : r));

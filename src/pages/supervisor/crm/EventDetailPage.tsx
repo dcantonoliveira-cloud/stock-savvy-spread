@@ -381,7 +381,6 @@ export default function EventDetailPage() {
       updates.date_reserved = false;
     }
     if (newStatus === 'lost' && lost_reason) updates.lost_reason = lost_reason;
-    if (newStatus !== 'lost') updates.lost_reason = null;
     const { error } = await supabase.from('events').update(updates).eq('id', id);
     if (error) { toast.error('Erro ao alterar status: ' + error.message); return; }
     setEvent(prev => prev ? { ...prev, ...updates } : prev);
