@@ -116,8 +116,13 @@ export default function OrcamentosPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const updateStatus = async (id: string, status: string) => {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-    await supabase.from('events').update({ status }).eq('id', id);
+    const negative = status === 'lost' || status === 'cancelled';
+    setRows(prev => prev.map(r => r.id === id
+      ? { ...r, status, date_reserved: negative ? null : r.date_reserved }
+      : r));
+    const patch: Record<string, unknown> = { status };
+    if (negative) patch.date_reserved = null;
+    await supabase.from('events').update(patch).eq('id', id);
   };
 
   const deleteRow = async (id: string) => {
@@ -132,7 +137,9 @@ export default function OrcamentosPage() {
       // Em aberto: pipeline + data futura (ou sem data)
       list = list.filter(r => PIPELINE_STATUSES.includes(r.status) && !isExpired(r));
     } else if (filter === 'lost') {
-      list = list.filter(r => LOST_STATUSES.includes(r.status));
+      list = list.filter(r => r.status === 'lost');
+    } else if (filter === 'cancelled') {
+      list = list.filter(r => r.status === 'cancelled');
     } else if (filter === 'vencidos') {
       list = list.filter(r => isExpired(r));
     } else {
@@ -171,7 +178,8 @@ export default function OrcamentosPage() {
 
   const countFor = (s: string) => {
     if (s === 'all')      return rows.filter(r => PIPELINE_STATUSES.includes(r.status) && !isExpired(r)).length;
-    if (s === 'lost')     return rows.filter(r => LOST_STATUSES.includes(r.status)).length;
+    if (s === 'lost')     return rows.filter(r => r.status === 'lost').length;
+    if (s === 'cancelled') return rows.filter(r => r.status === 'cancelled').length;
     if (s === 'vencidos') return rows.filter(r => isExpired(r)).length;
     return rows.filter(r => r.status === s && !isExpired(r)).length;
   };
@@ -243,9 +251,14 @@ export default function OrcamentosPage() {
             Vencidos <Count n={countFor('vencidos')} />
           </FilterBtn>
 
-          {/* Não fechados — vermelho claro, sem contagem */}
+          {/* Não fechados — rose */}
           <FilterBtn active={filter === 'lost'} onClick={() => setFilter('lost')} variant="rose">
-            Não fechados
+            Não fechados <Count n={countFor('lost')} />
+          </FilterBtn>
+
+          {/* Cancelados — cinza */}
+          <FilterBtn active={filter === 'cancelled'} onClick={() => setFilter('cancelled')} variant="gray">
+            Cancelados <Count n={countFor('cancelled')} />
           </FilterBtn>
         </div>
 
@@ -411,11 +424,12 @@ function FilterBtn({ active, onClick, children, variant }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
-  variant?: 'amber' | 'rose';
+  variant?: 'amber' | 'rose' | 'gray';
 }) {
   const styles = {
     amber: active ? 'bg-amber-400 text-white' : 'text-amber-600 hover:bg-amber-50',
     rose:  active ? 'bg-rose-400 text-white'  : 'text-rose-400 hover:bg-rose-50',
+    gray:  active ? 'bg-gray-500 text-white'  : 'text-gray-500 hover:bg-gray-100',
     default: active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
   };
   const cls = variant ? styles[variant] : styles.default;
