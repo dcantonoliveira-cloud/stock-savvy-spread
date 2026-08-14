@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Clock, LogIn, LogOut, CheckCircle2 } from 'lucide-react';
@@ -55,7 +56,7 @@ export default function PontoPage() {
     setPunching(true);
     const { data, error } = await supabase
       .from('time_entries' as any)
-      .insert({ employee_id: user.id, type: nextType })
+      .insert({ employee_id: user.id, company_id: COMPANY_ID, type: nextType })
       .select('id, type, recorded_at, note')
       .single();
     if (error) { toast.error('Erro ao registrar ponto'); setPunching(false); return; }
