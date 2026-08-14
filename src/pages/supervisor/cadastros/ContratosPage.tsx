@@ -456,6 +456,19 @@ export default function ContratosPage() {
 
           <div className="flex-1 flex flex-col overflow-hidden">
             {selectedClause ? (
+              <>
+                <div className="px-5 py-3 border-b border-border bg-muted/10 shrink-0">
+                  <p className={labelCls}>Tags disponíveis — clique para copiar</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {TAGS.map(tag => (
+                      <span key={tag}
+                        onClick={() => navigator.clipboard.writeText(tag).then(() => toast.success('Copiado!'))}
+                        className="text-[10px] font-mono bg-primary/8 text-primary border border-primary/20 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/15 transition-colors">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               <div className="flex-1 p-5 overflow-y-auto">
                 <RichTextEditor
                   content={selectedClause.content ?? ''}
@@ -466,6 +479,7 @@ export default function ContratosPage() {
                   placeholder="Escreva o texto da cláusula aqui..."
                 />
               </div>
+              </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground gap-3 p-10">
                 <FileText className="w-10 h-10 opacity-10" />
