@@ -3,6 +3,7 @@ export const LOST_REASONS = [
   { key: 'competitor', label: 'Se identificou mais com o concorrente' },
   { key: 'process',    label: 'Não gostou de algo no processo' },
   { key: 'date',       label: 'Data indisponível' },
+  { key: 'no_return',  label: 'Não retornou mais' },
   { key: 'no_reason',  label: 'Não passou o motivo' },
   { key: 'other',      label: 'Outro' },
 ] as const;
