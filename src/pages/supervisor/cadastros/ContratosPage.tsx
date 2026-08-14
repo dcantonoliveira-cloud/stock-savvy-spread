@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Star, Check, X } from 'lucide-react';
+import { Plus, Trash2, Star, Check, X, FileText } from 'lucide-react';
 import RichTextEditor from '@/components/RichTextEditor';
 
 interface Template { id: string; name: string; content: string | null; is_default: boolean }
 interface AnnexModel { id: string; name: string; content: string | null }
+interface Clause { id: string; name: string; content: string }
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
 
@@ -82,6 +83,9 @@ export default function ContratosPage() {
   const [annexes, setAnnexes]           = useState<AnnexModel[]>([]);
   const [newAnnexName, setNewAnnexName] = useState('');
   const [selectedAnnex, setSelectedAnnex] = useState<AnnexModel | null>(null);
+  const [clauses, setClauses]           = useState<Clause[]>([]);
+  const [newClauseName, setNewClauseName] = useState('');
+  const [selectedClause, setSelectedClause] = useState<Clause | null>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const loadTemplates = async () => {
@@ -94,7 +98,12 @@ export default function ContratosPage() {
       .select('id,name,content').eq('company_id', COMPANY_ID).order('name');
     setAnnexes((data ?? []) as AnnexModel[]);
   };
-  useEffect(() => { loadTemplates(); loadAnnexes(); }, []);
+  const loadClauses = async () => {
+    const { data } = await supabase.from('contract_clauses' as any)
+      .select('id,name,content').eq('company_id', COMPANY_ID).order('name');
+    setClauses((data ?? []) as Clause[]);
+  };
+  useEffect(() => { loadTemplates(); loadAnnexes(); loadClauses(); }, []);
 
   const addTemplate = async () => {
     if (!newName.trim()) return;
@@ -162,6 +171,33 @@ export default function ContratosPage() {
     if (selectedAnnex?.id === id) setSelectedAnnex(null);
     loadAnnexes();
     toast.success('Removido');
+  };
+
+  const addClause = async () => {
+    if (!newClauseName.trim()) return;
+    const { data, error } = await supabase.from('contract_clauses' as any)
+      .insert({ name: newClauseName.trim(), company_id: COMPANY_ID, content: '' })
+      .select('id,name,content').single();
+    if (error) { toast.error('Erro: ' + error.message); return; }
+    setNewClauseName('');
+    await loadClauses();
+    setSelectedClause(data as Clause);
+    toast.success('Cláusula criada');
+  };
+
+  const saveClauseContent = (id: string, content: string) => {
+    clearTimeout(timers.current['cl_' + id]);
+    timers.current['cl_' + id] = setTimeout(async () => {
+      await supabase.from('contract_clauses' as any).update({ content }).eq('id', id);
+    }, 1200);
+  };
+
+  const deleteClause = async (id: string) => {
+    if (!confirm('Remover esta cláusula?')) return;
+    await supabase.from('contract_clauses' as any).delete().eq('id', id);
+    if (selectedClause?.id === id) setSelectedClause(null);
+    loadClauses();
+    toast.success('Removida');
   };
 
   return (
@@ -366,6 +402,76 @@ export default function ContratosPage() {
                 <div>
                   <p className="text-sm font-semibold mb-1">Selecione um modelo de anexo</p>
                   <p className="text-xs">Escolha à esquerda ou crie um novo.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── CLÁUSULAS EXTRAS ───────────────────────────────────────── */}
+      <div className="bg-white border border-border rounded-2xl overflow-hidden">
+
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-muted/20">
+          <div>
+            <p className="text-sm font-semibold">Cláusulas extras</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Cláusulas não padrão que podem ser copiadas e coladas no contrato do evento conforme necessário.
+            </p>
+          </div>
+          {selectedClause && (
+            <button onClick={() => deleteClause(selectedClause.id)}
+              className="h-8 px-2.5 text-xs border border-border rounded-lg hover:bg-red-50 hover:border-red-200 hover:text-destructive transition-colors text-muted-foreground flex items-center gap-1">
+              <Trash2 className="w-3 h-3" />Remover
+            </button>
+          )}
+        </div>
+
+        <div className="flex" style={{ height: 380 }}>
+          <div className="w-72 shrink-0 border-r border-border flex flex-col bg-muted/10 h-full">
+            <div className="flex-1 min-h-0 p-2 overflow-y-auto space-y-0.5">
+              {clauses.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-8">Nenhuma cláusula ainda</p>
+              )}
+              {clauses.map(c => (
+                <button key={c.id} onClick={() => setSelectedClause(c)}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-colors ${
+                    selectedClause?.id === c.id ? 'bg-primary text-white' : 'hover:bg-muted text-foreground'
+                  }`}>
+                  <FileText className="w-3.5 h-3.5 shrink-0 opacity-50" />
+                  <span className="flex-1 text-sm font-medium truncate">{c.name}</span>
+                </button>
+              ))}
+            </div>
+            <div className="p-2 border-t border-border flex gap-1.5 shrink-0">
+              <input value={newClauseName} onChange={e => setNewClauseName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addClause(); }}
+                placeholder="Nome da cláusula..." className={inputCls + ' flex-1'} />
+              <button onClick={addClause}
+                className="h-8 w-8 bg-primary text-white rounded-lg hover:bg-primary/90 flex items-center justify-center shrink-0">
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {selectedClause ? (
+              <div className="flex-1 p-5 overflow-y-auto">
+                <RichTextEditor
+                  content={selectedClause.content ?? ''}
+                  onChange={html => {
+                    setSelectedClause(p => p ? { ...p, content: html } : p);
+                    saveClauseContent(selectedClause.id, html);
+                  }}
+                  placeholder="Escreva o texto da cláusula aqui..."
+                />
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground gap-3 p-10">
+                <FileText className="w-10 h-10 opacity-10" />
+                <div>
+                  <p className="text-sm font-semibold mb-1">Selecione uma cláusula</p>
+                  <p className="text-xs">Escolha à esquerda ou crie uma nova.</p>
                 </div>
               </div>
             )}

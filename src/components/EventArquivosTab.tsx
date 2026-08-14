@@ -280,6 +280,8 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [waTrigger, setWaTrigger]             = useState<WhatsAppTrigger | null>(null);
   // ZapSign
   const [zapToken, setZapToken]               = useState<string | null>(null);
+  const [showClauses, setShowClauses]         = useState(false);
+  const [clauses, setClauses]                 = useState<{ id: string; name: string; content: string }[]>([]);
   const [zapData, setZapData]                 = useState<ZapData | null>(null);
   const [zapSigners, setZapSigners]           = useState<{ name: string; email: string; role?: string }[]>([]);
   const [showZapForm, setShowZapForm]         = useState(false);
@@ -327,6 +329,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           const { data: axData } = await supabase.from('annex_models' as any)
             .select('id,name,content').eq('company_id', c.id).order('name');
           setAnnexModels((axData ?? []) as AnnexModel[]);
+          const { data: clData } = await supabase.from('contract_clauses' as any)
+            .select('id,name,content').eq('company_id', c.id).order('name');
+          setClauses((clData ?? []) as { id: string; name: string; content: string }[]);
         }
       }
       if (zapCfg) {
@@ -670,6 +675,12 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                 </button>
               </>
             )}
+            {clauses.length > 0 && (
+              <button onClick={() => setShowClauses(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide border border-border text-muted-foreground rounded-lg hover:bg-muted transition-colors">
+                <FileText className="w-3 h-3" />Cláusulas extras
+              </button>
+            )}
             <button onClick={generateContract}
               className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
               <RefreshCw className="w-3 h-3" />
@@ -884,6 +895,50 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           }}
         />
       )}
+
+      {/* Modal cláusulas extras */}
+      {showClauses && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowClauses(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div>
+                <p className="text-sm font-semibold">Cláusulas extras</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Clique em copiar e cole no contrato</p>
+              </div>
+              <button onClick={() => setShowClauses(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {clauses.map(c => <ClauseItem key={c.id} clause={c} />)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClauseItem({ clause }: { clause: { id: string; name: string; content: string } }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    const plain = clause.content.replace(/<[^>]+>/g, '').trim();
+    navigator.clipboard.writeText(plain).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <div className="border border-border rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-semibold text-foreground">{clause.name}</p>
+        <button onClick={copy}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+            copied ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'border border-border text-muted-foreground hover:bg-muted'
+          }`}>
+          {copied ? <><Check className="w-3 h-3" />Copiado</> : <><Copy className="w-3 h-3" />Copiar</>}
+        </button>
+      </div>
+      <div className="text-xs text-muted-foreground prose prose-xs max-w-none line-clamp-4"
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(clause.content) }} />
     </div>
   );
 }
@@ -1003,3 +1058,4 @@ function AllocTastingModal({ eventId, eventName, onClose, onAllocated }: {
     document.body,
   );
 }
+
