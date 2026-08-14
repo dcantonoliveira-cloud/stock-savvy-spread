@@ -150,6 +150,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 import { EVENT_STATUS } from '@/lib/eventStatus';
+import { LostReasonModal } from '@/components/LostReasonModal';
 const DROPDOWN_STATUS_KEYS = ALL_STATUS_KEYS.filter(k => k !== 'completed' && k !== 'tasting_scheduled');
 const ALL_STATUS_OPTIONS = DROPDOWN_STATUS_KEYS.map(k => ({ key: k, label: EVENT_STATUS[k].label, cls: EVENT_STATUS[k].cls }));
 
@@ -215,6 +216,7 @@ export default function EventDetailPage() {
   const [waTrigger, setWaTrigger] = useState<WhatsAppTrigger | null>(null);
   const [allocTastingOpen, setAllocTastingOpen] = useState(false);
   const [obsModal, setObsModal] = useState<{ open: boolean; text: string; customFields: any[]; company: any } | null>(null);
+  const [lostModal, setLostModal] = useState(false);
   const [form, setForm] = useState<Partial<EventDetail>>({});
   const [clientForm, setClientForm] = useState<Record<string, string>>({});
   const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -368,12 +370,8 @@ export default function EventDetailPage() {
     toast.success(next ? 'Data marcada como reservada' : 'Reserva de data removida');
   };
 
-  const changeStatus = async (newStatus: string) => {
+  const applyStatus = async (newStatus: string, lost_reason?: string) => {
     if (!id) return;
-    if (['confirmed', 'completed'].includes(newStatus) && !event?.event_date) {
-      toast.error('Defina a data do evento antes de confirmar.');
-      return;
-    }
     const updates: Record<string, any> = { status: newStatus };
     if (newStatus === 'confirmed') {
       updates.date_reserved = false;
@@ -382,10 +380,22 @@ export default function EventDetailPage() {
     if (newStatus === 'cancelled' || newStatus === 'lost') {
       updates.date_reserved = false;
     }
+    if (newStatus === 'lost' && lost_reason) updates.lost_reason = lost_reason;
+    if (newStatus !== 'lost') updates.lost_reason = null;
     const { error } = await supabase.from('events').update(updates).eq('id', id);
     if (error) { toast.error('Erro ao alterar status: ' + error.message); return; }
     setEvent(prev => prev ? { ...prev, ...updates } : prev);
     toast.success('Status atualizado');
+  };
+
+  const changeStatus = (newStatus: string) => {
+    if (!id) return;
+    if (['confirmed', 'completed'].includes(newStatus) && !event?.event_date) {
+      toast.error('Defina a data do evento antes de confirmar.');
+      return;
+    }
+    if (newStatus === 'lost') { setLostModal(true); return; }
+    applyStatus(newStatus);
   };
 
   const cancelEvent = async () => {
@@ -1152,6 +1162,13 @@ function EventHistorySection({ eventId }: { eventId: string }) {
 
       {waTrigger && (
         <WhatsAppConfirmModal trigger={waTrigger} onClose={() => setWaTrigger(null)} />
+      )}
+
+      {lostModal && (
+        <LostReasonModal
+          onConfirm={reason => { applyStatus('lost', reason); setLostModal(false); }}
+          onCancel={() => setLostModal(false)}
+        />
       )}
 
       {allocTastingOpen && event && (

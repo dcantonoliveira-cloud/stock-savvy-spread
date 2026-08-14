@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, ChevronDown, Info, Trash2, ChevronsUpDown, ChevronUp } from 'lucide-react';
+import { LostReasonModal } from '@/components/LostReasonModal';
+import { getLostReasonLabel } from '@/lib/lostReasons';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 interface Orcamento {
@@ -14,6 +16,7 @@ interface Orcamento {
   created_at: string | null;
   status: string;
   date_reserved: boolean | null;
+  lost_reason: string | null;
   clients: { name: string | null } | null;
   tasting_date?: string | null;
 }
@@ -55,6 +58,7 @@ export default function OrcamentosPage() {
   const [iframeToken, setIframeToken] = useState<string | null>(null);
   const [iframeUser,  setIframeUser]  = useState<string>('');
   const [sortAsc, setSortAsc] = useState(true);
+  const [lostModal, setLostModal] = useState<{ id: string } | null>(null);
 
   const handleSort = (col: string) => {
     if (sortCol === col) setSortAsc(a => !a);
@@ -66,7 +70,7 @@ export default function OrcamentosPage() {
     const [evRes, tseRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, clients(name)')
+        .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, lost_reason, clients(name)')
         .in('status', [...PIPELINE_STATUSES, 'cancelled', 'lost'])
         .not('event_name', 'is', null)
         .neq('event_name', '')
@@ -115,14 +119,21 @@ export default function OrcamentosPage() {
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const updateStatus = async (id: string, status: string) => {
+  const applyStatus = async (id: string, status: string, lost_reason?: string) => {
     const negative = status === 'lost' || status === 'cancelled';
-    setRows(prev => prev.map(r => r.id === id
-      ? { ...r, status, date_reserved: negative ? null : r.date_reserved }
-      : r));
     const patch: Record<string, unknown> = { status };
     if (negative) patch.date_reserved = null;
+    if (status === 'lost' && lost_reason) patch.lost_reason = lost_reason;
+    if (status !== 'lost') patch.lost_reason = null;
+    setRows(prev => prev.map(r => r.id === id
+      ? { ...r, status, date_reserved: negative ? null : r.date_reserved, lost_reason: patch.lost_reason as string ?? r.lost_reason }
+      : r));
     await supabase.from('events').update(patch).eq('id', id);
+  };
+
+  const updateStatus = (id: string, status: string) => {
+    if (status === 'lost') { setLostModal({ id }); return; }
+    applyStatus(id, status);
   };
 
   const deleteRow = async (id: string) => {
@@ -291,8 +302,9 @@ export default function OrcamentosPage() {
               <Th col="organizer"   sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Assessoria</Th>
               <Th col="event_date"  sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Data do evento</Th>
               <Th col="em_aberto"    sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Em aberto</Th>
-              <Th col="tasting_date" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>1ª Degustação</Th>
+              {filter !== 'lost' && <Th col="tasting_date" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>1ª Degustação</Th>}
               <Th col="status"       sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort}>Status</Th>
+              {filter === 'lost' && <Th>Motivo</Th>}
               <Th></Th>
             </tr>
           </thead>
@@ -323,14 +335,19 @@ export default function OrcamentosPage() {
                   </div>
                 </Td>
                 <Td className="text-muted-foreground tabular-nums">{diasEmAberto(row.created_at)}</Td>
-                <Td className="tabular-nums">
-                  {row.tasting_date
-                    ? <span className={`font-medium ${row.tasting_date < TODAY ? 'text-red-600' : 'text-violet-700'}`}>{fmtDate(row.tasting_date)}</span>
-                    : <span className="text-muted-foreground/40">—</span>}
-                </Td>
+                {filter !== 'lost' && (
+                  <Td className="tabular-nums">
+                    {row.tasting_date
+                      ? <span className={`font-medium ${row.tasting_date < TODAY ? 'text-red-600' : 'text-violet-700'}`}>{fmtDate(row.tasting_date)}</span>
+                      : <span className="text-muted-foreground/40">—</span>}
+                  </Td>
+                )}
                 <Td onClick={e => e.stopPropagation()}>
                   <StatusDropdown status={row.status} onChange={s => updateStatus(row.id, s)} />
                 </Td>
+                {filter === 'lost' && (
+                  <Td className="text-xs text-muted-foreground">{getLostReasonLabel(row.lost_reason)}</Td>
+                )}
                 <Td onClick={e => e.stopPropagation()}>
                   <button
                     onClick={() => setConfirmDelete(row.id)}
@@ -384,6 +401,13 @@ export default function OrcamentosPage() {
         document.body
       )}
       </>}
+
+      {lostModal && (
+        <LostReasonModal
+          onConfirm={reason => { applyStatus(lostModal.id, 'lost', reason); setLostModal(null); }}
+          onCancel={() => setLostModal(null)}
+        />
+      )}
     </div>
   );
 }

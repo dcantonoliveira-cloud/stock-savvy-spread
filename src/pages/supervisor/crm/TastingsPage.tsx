@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import { EVENT_STATUS } from '@/lib/eventStatus';
+import { LostReasonModal } from '@/components/LostReasonModal';
 
 const TIPOS = ['Jantar', 'Almoço'];
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
@@ -459,6 +460,7 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate, onCalendar }: 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [statusOpen, setStatusOpen] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [lostModal, setLostModal] = useState<{ row: AbertoRow } | null>(null);
 
   useEffect(() => { setRows(initialRows); }, [initialRows]);
 
@@ -467,21 +469,12 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate, onCalendar }: 
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const changeStatus = async (row: AbertoRow, newStatus: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setStatusOpen(null);
-    if (newStatus === row.status) return;
-
-    if (newStatus === 'confirmed') {
-      onNavigate(row.event_id);
-      return;
-    }
-
+  const applyStatus = async (row: AbertoRow, newStatus: string, lost_reason?: string) => {
     setSaving(row.event_id);
     const updates: any = { status: newStatus };
-    if (newStatus === 'lost' || newStatus === 'cancelled') {
-      updates.date_reserved = false;
-    }
+    if (newStatus === 'lost' || newStatus === 'cancelled') updates.date_reserved = false;
+    if (newStatus === 'lost' && lost_reason) updates.lost_reason = lost_reason;
+    if (newStatus !== 'lost') updates.lost_reason = null;
 
     const { error } = await supabase.from('events').update(updates).eq('id', row.event_id);
     if (error) { toast.error('Erro ao alterar status'); setSaving(null); return; }
@@ -493,10 +486,18 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate, onCalendar }: 
     ));
     setSaving(null);
 
-    // Remove da lista se perdeu o status "em aberto"
     if (['confirmed', 'lost', 'cancelled'].includes(newStatus)) {
       setTimeout(() => setRows(prev => prev.filter(r => r.event_id !== row.event_id)), 800);
     }
+  };
+
+  const changeStatus = (row: AbertoRow, newStatus: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setStatusOpen(null);
+    if (newStatus === row.status) return;
+    if (newStatus === 'confirmed') { onNavigate(row.event_id); return; }
+    if (newStatus === 'lost') { setLostModal({ row }); return; }
+    applyStatus(row, newStatus);
   };
 
   if (loading) return <div className="bg-white border border-border rounded-2xl py-16 text-center text-muted-foreground text-sm">Carregando...</div>;
@@ -627,6 +628,13 @@ function ListaAbertoTab({ rows: initialRows, loading, onNavigate, onCalendar }: 
             })}
           </div>
         </div>
+      )}
+
+      {lostModal && (
+        <LostReasonModal
+          onConfirm={reason => { applyStatus(lostModal.row, 'lost', reason); setLostModal(null); }}
+          onCancel={() => setLostModal(null)}
+        />
       )}
     </div>
   );
