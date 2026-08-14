@@ -345,7 +345,14 @@ export default function OrcamentosPage() {
                   <StatusDropdown status={row.status} onChange={s => updateStatus(row.id, s)} />
                 </Td>
                 {filter === 'lost' && (
-                  <Td className="text-xs text-muted-foreground">{getLostReasonLabel(row.lost_reason)}</Td>
+                  <Td onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => setLostModal({ id: row.id })}
+                      className="text-xs text-left text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {getLostReasonLabel(row.lost_reason)}
+                    </button>
+                  </Td>
                 )}
                 <Td onClick={e => e.stopPropagation()}>
                   <button
