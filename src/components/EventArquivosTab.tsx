@@ -908,7 +908,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
               <button onClick={() => setShowClauses(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X className="w-4 h-4" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {clauses.map(c => <ClauseItem key={c.id} clause={c} />)}
+              {clauses.map(c => <ClauseItem key={c.id} clause={c} event={event} w1Name={witness1Name} w1Cpf={witness1Cpf} />)}
             </div>
           </div>
         </div>
@@ -917,10 +917,16 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   );
 }
 
-function ClauseItem({ clause }: { clause: { id: string; name: string; content: string } }) {
+function ClauseItem({ clause, event, w1Name, w1Cpf }: {
+  clause: { id: string; name: string; content: string };
+  event: EventData;
+  w1Name: string;
+  w1Cpf: string;
+}) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    const plain = clause.content.replace(/<[^>]+>/g, '').trim();
+    const resolved = replaceTags(clause.content, event, w1Name, w1Cpf);
+    const plain = resolved.replace(/<[^>]+>/g, '').trim();
     navigator.clipboard.writeText(plain).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -938,7 +944,7 @@ function ClauseItem({ clause }: { clause: { id: string; name: string; content: s
         </button>
       </div>
       <div className="text-xs text-muted-foreground prose prose-xs max-w-none line-clamp-4"
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(clause.content) }} />
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(replaceTags(clause.content, event, w1Name, w1Cpf)) }} />
     </div>
   );
 }
