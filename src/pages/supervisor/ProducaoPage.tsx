@@ -49,10 +49,14 @@ const BLANK = { title: '', description: '', delivery_address: '', event_id: '', 
 
 // ─── Financial Tab ─────────────────────────────────────────────────────────────
 function FinanceiroView({ orders }: { orders: Order[] }) {
-  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('producao_checked') ?? '[]')); }
+    catch { return new Set(); }
+  });
   const toggle = useCallback((id: string) => setChecked(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
+    localStorage.setItem('producao_checked', JSON.stringify([...next]));
     return next;
   }), []);
 
