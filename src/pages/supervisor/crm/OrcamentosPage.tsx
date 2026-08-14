@@ -20,7 +20,7 @@ interface Orcamento {
 
 // ── Status ─────────────────────────────────────────────────────────────────────
 const PIPELINE_STATUSES = ['lead', 'negotiating', 'tasting_scheduled'];
-const LOST_STATUSES = ['cancelled', 'lost'];
+const LOST_STATUSES = ['lost'];
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -67,7 +67,7 @@ export default function OrcamentosPage() {
       supabase
         .from('events')
         .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, clients(name)')
-        .in('status', [...PIPELINE_STATUSES, 'cancelled'])
+        .in('status', [...PIPELINE_STATUSES, 'cancelled', 'lost'])
         .not('event_name', 'is', null)
         .neq('event_name', '')
         .order('created_at', { ascending: false }),
@@ -433,8 +433,8 @@ function Count({ n }: { n: number }) {
 const ALL_STATUS_OPTIONS = [
   ...PIPELINE_STATUSES.map(s => ({ key: s, ...STATUS_CONFIG[s] })),
   { key: 'confirmed', label: 'Confirmado', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
-  { key: 'cancelled', label: 'Não fechou', bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200' },
-  { key: 'lost', label: 'Cancelado', bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200' },
+  { key: 'lost', label: 'Não fechou', bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-200' },
+  { key: 'cancelled', label: 'Cancelado', bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
 ];
 
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
