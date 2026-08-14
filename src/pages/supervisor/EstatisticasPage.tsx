@@ -553,9 +553,12 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
 }) {
   const row = tableRows[activeCell.month];
   const monthLabel = MONTHS_FULL[activeCell.month];
+  const isBigTable = activeCell.key === 'contratos' || activeCell.key === 'faturamento' || activeCell.key === 'orcamentos';
   const isContratosOrFat = activeCell.key === 'contratos' || activeCell.key === 'faturamento';
 
-  const contratosMes = isContratosOrFat
+  const contratosMes = (activeCell.key === 'orcamentos')
+    ? (row._orcList as ContratoRow[])
+    : isContratosOrFat
     ? (row._contratosList as ContratoRow[])
     : [];
 
@@ -575,7 +578,7 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
       <div className="absolute inset-0 bg-black/30" />
       <div
         className="relative bg-white rounded-2xl shadow-xl w-full overflow-hidden flex flex-col"
-        style={{ maxWidth: isContratosOrFat ? '960px' : '420px', maxHeight: '90vh' }}
+        style={{ maxWidth: isBigTable ? '960px' : '420px', maxHeight: '90vh' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-border flex items-center justify-between shrink-0">
@@ -585,9 +588,9 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
           </button>
         </div>
 
-        {isContratosOrFat && (
+        {isBigTable && (
           contratosMes.length === 0
-            ? <p className="px-5 py-10 text-sm text-muted-foreground text-center">Nenhum contrato neste mês.</p>
+            ? <p className="px-5 py-10 text-sm text-muted-foreground text-center">Nenhum item neste mês.</p>
             : <div className="overflow-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -605,7 +608,11 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {[...contratosMes].sort((a, b) => (a.contract_signed_date ?? '').localeCompare(b.contract_signed_date ?? '')).map(e => {
+                    {[...contratosMes].sort((a, b) => {
+                      const aKey = activeCell.key === 'orcamentos' ? (a.event_date ?? '') : (a.contract_signed_date ?? '');
+                      const bKey = activeCell.key === 'orcamentos' ? (b.event_date ?? '') : (b.contract_signed_date ?? '');
+                      return aKey.localeCompare(bKey);
+                    }).map(e => {
                       const st = getStatus(e.status);
                       return (
                         <tr key={e.id} className="hover:bg-muted/20 transition-colors">
@@ -635,7 +642,7 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
                       );
                     })}
                   </tbody>
-                  {(activeCell.key === 'faturamento' || activeCell.key === 'contratos') && (() => {
+                  {isBigTable && (() => {
                     const totalVal  = contratosMes.reduce((s, e) => s + (e.total_value ?? 0), 0);
                     const totalPax  = contratosMes.reduce((s, e) => s + (e.guest_count ?? 0), 0);
                     const count     = contratosMes.filter(e => e.total_value != null).length;
@@ -645,7 +652,7 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
                     return (
                       <tfoot>
                         <tr className="border-t-2 border-border bg-muted/30 font-semibold text-xs">
-                          <td colSpan={3} className="px-3 py-2.5 text-foreground">{contratosMes.length} contratos</td>
+                          <td colSpan={3} className="px-3 py-2.5 text-foreground">{contratosMes.length} {activeCell.key === 'orcamentos' ? 'orçamentos' : 'contratos'}</td>
                           <td className="px-2 py-2.5 text-center text-foreground">{totalPax.toLocaleString('pt-BR')}</td>
                           <td colSpan={3} />
                           <td className="px-2 py-2.5 text-center text-foreground">{fmt(totalVal)}</td>
@@ -672,12 +679,10 @@ function CellPopup({ activeCell, tableRows, contratos, eventNameMap, onClose, on
               </div>
         )}
 
-        {!isContratosOrFat && (() => {
+        {!isBigTable && (() => {
           type SimpleItem = { label: string; sub?: string; id?: string };
           let items: SimpleItem[] = [];
-          if (activeCell.key === 'orcamentos')
-            items = row._orcList.map((e: any) => ({ label: e.event_name ?? '—', sub: fmtDate(e.event_date), id: e.id }));
-          else if (activeCell.key === 'degustacoes')
+          if (activeCell.key === 'degustacoes')
             items = row._sessionsList.map((s: any) => ({ label: s.type ?? 'Sem tipo', sub: fmtDate(s.date) }));
           else if (activeCell.key === 'eventos_deg')
             items = row._tastingEventsList.map((t: any) => ({ label: eventNameMap.get(t.event_id) ?? '—', sub: t.situation_snapshot ?? undefined, id: t.event_id }));
