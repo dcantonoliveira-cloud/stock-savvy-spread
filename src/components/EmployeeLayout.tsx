@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, ChefHat, Home, ClipboardList, CalendarDays, Warehouse, FileText, UtensilsCrossed } from 'lucide-react';
+import { LogOut, ChefHat, Home, ClipboardList, CalendarDays, Warehouse, FileText, UtensilsCrossed, Timer } from 'lucide-react';
 
 export default function EmployeeLayout({ children }: { children: ReactNode }) {
   const { signOut, profile, permissions } = useAuth();
@@ -24,6 +24,7 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
     ...(permissions.access_materials ? [{ to: '/materiais', label: 'Materiais', icon: Warehouse }] : []),
     ...(permissions.access_producao ? [{ to: '/producao', label: 'Produção', icon: UtensilsCrossed }] : []),
     { to: '/meus-holerites', label: 'Holerites', icon: FileText },
+    { to: '/meu-ponto', label: 'Ponto', icon: Timer },
   ];
 
   return (

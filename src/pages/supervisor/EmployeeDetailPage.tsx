@@ -6,8 +6,10 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, Mail, MapPin, Briefcase,
   FileText, Edit2, Save, X, Loader2,
-  Eye, Download, Plus, ShieldCheck, Trash2, KeyRound,
+  Eye, Download, Plus, ShieldCheck, Trash2, KeyRound, Timer, LogIn, LogOut, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, format as fmtDate } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -136,7 +138,7 @@ export default function EmployeeDetailPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
-  const [tab, setTab] = useState<'info' | 'holerites' | 'permissoes'>('info');
+  const [tab, setTab] = useState<'info' | 'holerites' | 'permissoes' | 'ponto'>('info');
   const [form, setForm] = useState<Partial<Profile>>({});
 
   useEffect(() => { if (id) load(); }, [id]);
@@ -417,6 +419,13 @@ export default function EmployeeDetailPage() {
             <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pending}</span>
           )}
         </button>
+        <button onClick={() => setTab('ponto')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            tab === 'ponto' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}>
+          <Timer className="w-3.5 h-3.5" />
+          Ponto
+        </button>
         {myPerms.is_admin && (
           <button onClick={() => setTab('permissoes')}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -642,9 +651,11 @@ export default function EmployeeDetailPage() {
         </div>
       )}
 
+      {/* ── Tab: Ponto ── */}
+      {tab === 'ponto' && id && <PontoTab employeeId={id} />}
+
       {/* ── Tab: Permissões ── */}
-      {tab === 'permissoes' && myPerms.is_admin && (
-        <div className="space-y-4">
+      {tab === 'permissoes' && myPerms.is_admin && (<div className="space-y-4">
 
           {/* Tipo de acesso */}
           <div className="bg-white border border-border rounded-2xl p-5">
@@ -707,6 +718,234 @@ export default function EmployeeDetailPage() {
               {savingPerms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Salvar permissões
             </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PontoTab ──────────────────────────────────────────────────────────────────
+interface TimeEntry { id: string; type: 'entry' | 'exit'; recorded_at: string; note: string | null; }
+
+function msToHHMM(ms: number) {
+  if (ms <= 0) return '0h00';
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  return `${h}h${m.toString().padStart(2, '0')}`;
+}
+
+function dayTotalMs(entries: TimeEntry[]) {
+  const sorted = [...entries].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+  let total = 0;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i].type === 'entry' && sorted[i + 1].type === 'exit') {
+      total += new Date(sorted[i + 1].recorded_at).getTime() - new Date(sorted[i].recorded_at).getTime();
+      i++;
+    }
+  }
+  return total;
+}
+
+function PontoTab({ employeeId }: { employeeId: string }) {
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewDate, setViewDate] = useState(() => new Date());
+  const [editModal, setEditModal] = useState<TimeEntry | null>(null);
+  const [editTime, setEditTime] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const monthStart = startOfMonth(viewDate);
+  const monthEnd   = endOfMonth(viewDate);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from('time_entries' as any)
+        .select('id, type, recorded_at, note')
+        .eq('employee_id', employeeId)
+        .gte('recorded_at', monthStart.toISOString())
+        .lte('recorded_at', monthEnd.toISOString())
+        .order('recorded_at', { ascending: true });
+      setEntries((data ?? []) as unknown as TimeEntry[]);
+      setLoading(false);
+    };
+    load();
+  }, [employeeId, viewDate.getFullYear(), viewDate.getMonth()]);
+
+  // Agrupa por dia
+  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const byDay = days.map(day => ({
+    day,
+    entries: entries.filter(e => isSameDay(parseISO(e.recorded_at), day)),
+  })).filter(d => d.entries.length > 0);
+
+  // Semanas
+  const weekMap = new Map<string, { ms: number; days: typeof byDay }>();
+  byDay.forEach(d => {
+    const ws = fmtDate(startOfWeek(d.day, { locale: ptBR }), 'yyyy-MM-dd');
+    if (!weekMap.has(ws)) weekMap.set(ws, { ms: 0, days: [] });
+    const w = weekMap.get(ws)!;
+    w.days.push(d);
+    w.ms += dayTotalMs(d.entries);
+  });
+
+  const monthTotalMs = byDay.reduce((s, d) => s + dayTotalMs(d.entries), 0);
+
+  const openEdit = (e: TimeEntry) => {
+    setEditModal(e);
+    setEditTime(fmtDate(parseISO(e.recorded_at), 'HH:mm'));
+  };
+
+  const saveEdit = async () => {
+    if (!editModal) return;
+    setSaving(true);
+    const base = editModal.recorded_at.slice(0, 10);
+    const recorded_at = new Date(`${base}T${editTime}:00`).toISOString();
+    await supabase.from('time_entries' as any).update({ recorded_at }).eq('id', editModal.id);
+    setEntries(prev => prev.map(e => e.id === editModal.id ? { ...e, recorded_at } : e));
+    setEditModal(null);
+    setSaving(false);
+  };
+
+  const deleteEntry = async (id: string) => {
+    await supabase.from('time_entries' as any).delete().eq('id', id);
+    setEntries(prev => prev.filter(e => e.id !== id));
+    setEditModal(null);
+  };
+
+  const prevMonth = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  const nextMonth = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+
+  return (
+    <div className="space-y-4">
+      {/* Navegação mês */}
+      <div className="bg-white border border-border rounded-2xl px-5 py-4 flex items-center justify-between">
+        <button onClick={prevMonth} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
+          <ChevronDown className="w-4 h-4 rotate-90" />
+        </button>
+        <div className="text-center">
+          <p className="font-semibold text-foreground capitalize">
+            {fmtDate(viewDate, 'MMMM yyyy', { locale: ptBR })}
+          </p>
+          {!loading && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Total: <span className="font-bold text-foreground">{msToHHMM(monthTotalMs)}</span>
+            </p>
+          )}
+        </div>
+        <button onClick={nextMonth} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
+          <ChevronUp className="w-4 h-4 rotate-90" />
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">Carregando...</div>
+      ) : byDay.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">Nenhum registro neste mês.</div>
+      ) : (
+        <div className="bg-white border border-border rounded-2xl overflow-hidden">
+          {/* Cabeçalho tabela */}
+          <div className="grid grid-cols-[1fr_80px_80px_70px_32px] gap-0 px-4 py-2 bg-muted/30 border-b border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+            <span>Dia</span>
+            <span className="text-center">Entrada</span>
+            <span className="text-center">Saída</span>
+            <span className="text-center">Total</span>
+            <span />
+          </div>
+
+          {/* Semanas */}
+          {[...weekMap.entries()].map(([ws, week]) => (
+            <div key={ws}>
+              {week.days.map(({ day, entries: de }) => {
+                const sorted = [...de].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+                const entryE = sorted.find(e => e.type === 'entry');
+                const exitE  = sorted.filter(e => e.type === 'exit').pop();
+                const total  = dayTotalMs(de);
+                const isWeekend = [0, 6].includes(day.getDay());
+                return (
+                  <div key={day.toISOString()}
+                    className={`grid grid-cols-[1fr_80px_80px_70px_32px] gap-0 px-4 py-2.5 border-b border-border/40 text-sm ${isWeekend ? 'bg-muted/20' : ''}`}>
+                    <span className="font-medium text-foreground capitalize text-xs">
+                      {fmtDate(day, "EEE dd/MM", { locale: ptBR })}
+                    </span>
+                    <button onClick={() => entryE && openEdit(entryE)}
+                      className="text-center text-xs text-emerald-600 font-medium hover:underline">
+                      {entryE ? fmtDate(parseISO(entryE.recorded_at), 'HH:mm') : '—'}
+                    </button>
+                    <button onClick={() => exitE && openEdit(exitE)}
+                      className="text-center text-xs text-rose-500 font-medium hover:underline">
+                      {exitE ? fmtDate(parseISO(exitE.recorded_at), 'HH:mm') : '—'}
+                    </button>
+                    <span className="text-center text-xs font-bold text-foreground">
+                      {total > 0 ? msToHHMM(total) : <span className="text-muted-foreground/40">—</span>}
+                    </span>
+                    <span />
+                  </div>
+                );
+              })}
+              {/* Subtotal semana */}
+              <div className="grid grid-cols-[1fr_80px_80px_70px_32px] gap-0 px-4 py-1.5 bg-primary/5 border-b border-border text-[11px]">
+                <span className="text-muted-foreground font-medium">
+                  Semana {fmtDate(parseISO(ws), 'dd/MM', { locale: ptBR })}
+                </span>
+                <span /><span />
+                <span className="text-center font-bold text-primary">{msToHHMM(week.ms)}</span>
+                <span />
+              </div>
+            </div>
+          ))}
+
+          {/* Total mês */}
+          <div className="grid grid-cols-[1fr_80px_80px_70px_32px] gap-0 px-4 py-3 bg-muted/40 text-sm font-bold">
+            <span className="text-foreground">Total do mês</span>
+            <span /><span />
+            <span className="text-center text-foreground">{msToHHMM(monthTotalMs)}</span>
+            <span />
+          </div>
+        </div>
+      )}
+
+      {/* Modal edição */}
+      {editModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setEditModal(null)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xs p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-foreground">
+                {editModal.type === 'entry' ? 'Editar entrada' : 'Editar saída'}
+              </p>
+              <button onClick={() => setEditModal(null)} className="p-1 hover:bg-muted rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest block mb-1">Horário</label>
+              <input
+                type="time"
+                value={editTime}
+                onChange={e => setEditTime(e.target.value)}
+                className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Dia: {fmtDate(parseISO(editModal.recorded_at), "dd/MM/yyyy", { locale: ptBR })}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => deleteEntry(editModal.id)}
+                className="px-3 py-2 rounded-xl border border-red-200 text-red-500 text-xs font-medium hover:bg-red-50 transition-colors">
+                Excluir
+              </button>
+              <button onClick={() => setEditModal(null)} className="flex-1 px-3 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">
+                Cancelar
+              </button>
+              <button onClick={saveEdit} disabled={saving}
+                className="flex-1 px-3 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {saving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
