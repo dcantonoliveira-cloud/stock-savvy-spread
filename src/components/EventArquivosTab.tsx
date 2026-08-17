@@ -430,11 +430,10 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     setFiles(prev => [...prev, newFile as EventFile]);
     toast.success('Arquivo enviado');
     setUploading(false);
-    if (clientPhone) {
-      const clientName = (event.clients as any)?.name ?? 'Cliente';
-      buildMessage('file', { clientName, eventName: event.event_name ?? '', fileName: file.name })
-        .then(text => setWaTrigger({ phone: clientPhone, clientName, message: text }));
-    }
+    const clientName = (event.clients as any)?.name ?? 'Cliente';
+    const phone = clientPhone ?? '';
+    buildMessage('file', { clientName, eventName: event.event_name ?? '', fileName: file.name })
+      .then(text => setWaTrigger({ phone, clientName, message: text }));
   };
 
   const deleteFile = async (id: string) => {
