@@ -726,7 +726,7 @@ export default function EmployeeDetailPage() {
 }
 
 // ── PontoTab ──────────────────────────────────────────────────────────────────
-interface TimeEntry { id: string; type: 'entry' | 'exit'; recorded_at: string; note: string | null; }
+interface TimeEntry { id: string; type: 'entry' | 'exit'; recorded_at: string; note: string | null; latitude: number | null; longitude: number | null; }
 
 function msToHHMM(ms: number) {
   if (ms <= 0) return '0h00';
@@ -763,7 +763,7 @@ function PontoTab({ employeeId }: { employeeId: string }) {
       setLoading(true);
       const { data } = await supabase
         .from('time_entries' as any)
-        .select('id, type, recorded_at, note')
+        .select('id, type, recorded_at, note, latitude, longitude')
         .eq('employee_id', employeeId)
         .gte('recorded_at', monthStart.toISOString())
         .lte('recorded_at', monthEnd.toISOString())
@@ -870,14 +870,32 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                     <span className="font-medium text-foreground capitalize text-xs">
                       {fmtDate(day, "EEE dd/MM", { locale: ptBR })}
                     </span>
-                    <button onClick={() => entryE && openEdit(entryE)}
-                      className="text-center text-xs text-emerald-600 font-medium hover:underline">
-                      {entryE ? fmtDate(parseISO(entryE.recorded_at), 'HH:mm') : '—'}
-                    </button>
-                    <button onClick={() => exitE && openEdit(exitE)}
-                      className="text-center text-xs text-rose-500 font-medium hover:underline">
-                      {exitE ? fmtDate(parseISO(exitE.recorded_at), 'HH:mm') : '—'}
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => entryE && openEdit(entryE)}
+                        className="text-xs text-emerald-600 font-medium hover:underline">
+                        {entryE ? fmtDate(parseISO(entryE.recorded_at), 'HH:mm') : '—'}
+                      </button>
+                      {entryE?.latitude && (
+                        <a href={`https://www.google.com/maps?q=${entryE.latitude},${entryE.longitude}`}
+                          target="_blank" rel="noreferrer"
+                          className="text-muted-foreground/40 hover:text-primary transition-colors" title="Ver localização">
+                          <MapPin className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => exitE && openEdit(exitE)}
+                        className="text-xs text-rose-500 font-medium hover:underline">
+                        {exitE ? fmtDate(parseISO(exitE.recorded_at), 'HH:mm') : '—'}
+                      </button>
+                      {exitE?.latitude && (
+                        <a href={`https://www.google.com/maps?q=${exitE.latitude},${exitE.longitude}`}
+                          target="_blank" rel="noreferrer"
+                          className="text-muted-foreground/40 hover:text-rose-400 transition-colors" title="Ver localização">
+                          <MapPin className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
                     <span className="text-center text-xs font-bold text-foreground">
                       {total > 0 ? msToHHMM(total) : <span className="text-muted-foreground/40">—</span>}
                     </span>

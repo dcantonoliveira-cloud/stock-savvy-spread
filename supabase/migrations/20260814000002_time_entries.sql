@@ -23,3 +23,7 @@ create policy "supervisor_all" on public.time_entries
   with check (company_id = public.my_company_id() and public.has_permission('access_administracao'));
 
 create index if not exists time_entries_employee_idx on public.time_entries(employee_id, recorded_at desc);
+
+alter table public.time_entries
+  add column if not exists latitude  double precision,
+  add column if not exists longitude double precision;

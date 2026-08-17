@@ -12,6 +12,8 @@ interface TimeEntry {
   type: 'entry' | 'exit';
   recorded_at: string;
   note: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 function diffHours(entry: string, exit: string) {
@@ -38,7 +40,7 @@ export default function PontoPage() {
     if (!user) return;
     const { data } = await supabase
       .from('time_entries' as any)
-      .select('id, type, recorded_at, note')
+      .select('id, type, recorded_at, note, latitude, longitude')
       .eq('employee_id', user.id)
       .order('recorded_at', { ascending: false })
       .limit(100);
@@ -51,13 +53,26 @@ export default function PontoPage() {
   const lastEntry = entries[0] ?? null;
   const nextType: 'entry' | 'exit' = lastEntry?.type === 'entry' ? 'exit' : 'entry';
 
+  const getCoords = (): Promise<{ latitude: number; longitude: number } | null> =>
+    new Promise(resolve => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+        () => resolve(null),
+        { timeout: 5000, maximumAge: 0 }
+      );
+    });
+
   const punch = async () => {
     if (!user || punching) return;
     setPunching(true);
+    const coords = await getCoords();
+    const payload: Record<string, unknown> = { employee_id: user.id, company_id: COMPANY_ID, type: nextType };
+    if (coords) { payload.latitude = coords.latitude; payload.longitude = coords.longitude; }
     const { data, error } = await supabase
       .from('time_entries' as any)
-      .insert({ employee_id: user.id, company_id: COMPANY_ID, type: nextType })
-      .select('id, type, recorded_at, note')
+      .insert(payload)
+      .select('id, type, recorded_at, note, latitude, longitude')
       .single();
     if (error) { toast.error('Erro ao registrar ponto'); setPunching(false); return; }
     setEntries(prev => [data as unknown as TimeEntry, ...prev]);
