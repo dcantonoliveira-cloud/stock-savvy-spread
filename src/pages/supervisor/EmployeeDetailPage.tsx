@@ -269,20 +269,10 @@ export default function EmployeeDetailPage() {
         body: { email: profile.email, redirectTo },
       });
       if (error || data?.error) {
-        toast.error(data?.error || 'Erro ao gerar link de redefinição');
+        toast.error(data?.error || 'Erro ao enviar e-mail de redefinição');
         return;
       }
-      const link = data.link as string;
-      const name = profile.display_name.split(' ')[0];
-      const msg = encodeURIComponent(
-        `Olá ${name}! 👋\n\nAqui está o seu link para redefinir a senha do sistema Rondello:\n\n${link}\n\n_Este link expira em 24 horas._`
-      );
-      const phone = profile.phone?.replace(/\D/g, '');
-      const waUrl = phone
-        ? `https://wa.me/55${phone}?text=${msg}`
-        : `https://wa.me/?text=${msg}`;
-      window.open(waUrl, '_blank');
-      toast.success('Link gerado! WhatsApp aberto.');
+      toast.success(`E-mail de redefinição enviado para ${profile.email}`);
     } finally {
       setSendingReset(false);
     }

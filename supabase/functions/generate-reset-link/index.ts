@@ -53,19 +53,17 @@ serve(async (req) => {
       });
     }
 
-    const { data, error } = await adminClient.auth.admin.generateLink({
-      type: 'recovery',
-      email,
-      options: { redirectTo: redirectTo ?? supabaseUrl.replace('supabase.co', 'vercel.app') },
+    const { error } = await adminClient.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo ?? `${supabaseUrl}/reset-password`,
     });
 
-    if (error || !data?.properties?.action_link) {
-      return new Response(JSON.stringify({ error: error?.message ?? 'Erro ao gerar link' }), {
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ link: data.properties.action_link }), {
+    return new Response(JSON.stringify({ ok: true }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
