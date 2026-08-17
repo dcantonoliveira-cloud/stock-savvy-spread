@@ -9,6 +9,8 @@ import {
   ArrowUpCircle, Trash2, FileText, ChevronRight, Settings2, Crown,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { startOfMonth, endOfMonth } from 'date-fns';
+import { DEFAULT_SCHEDULE, calcDayBalance, formatBalance, type WeekSchedule } from '@/lib/workSchedule';
 
 type Employee = {
   user_id: string;
@@ -22,6 +24,7 @@ type Employee = {
   is_admin: boolean;
   payslips_total: number;
   payslips_pending: number;
+  balance_min: number | null;
 };
 
 const ROLE_MAP: Record<string, { label: string; cls: string }> = {
@@ -44,22 +47,51 @@ export default function UsersPage() {
 
   const load = async () => {
     setLoading(true);
-    const [profRes, rolesRes, permsRes, psRes] = await Promise.all([
+    const now = new Date();
+    const monthStart = startOfMonth(now).toISOString();
+    const monthEnd   = endOfMonth(now).toISOString();
+
+    const [profRes, rolesRes, permsRes, psRes, teRes] = await Promise.all([
       supabase.from('profiles').select('user_id, display_name, email'),
       supabase.from('user_roles').select('user_id, role'),
-      supabase.from('employee_permissions').select('user_id, can_entry, can_output, access_stock, access_materials, is_admin'),
+      supabase.from('employee_permissions').select('user_id, can_entry, can_output, access_stock, access_materials, is_admin, work_schedule'),
       supabase.from('payslips' as any).select('employee_id, status'),
+      supabase.from('time_entries' as any)
+        .select('employee_id, type, recorded_at')
+        .gte('recorded_at', monthStart)
+        .lte('recorded_at', monthEnd),
     ]);
 
     const profiles = profRes.data ?? [];
     const roles    = rolesRes.data ?? [];
     const perms    = permsRes.data ?? [];
     const payslips = (psRes.data ?? []) as { employee_id: string; status: string }[];
+    const teAll    = ((teRes.data ?? []) as { employee_id: string; type: string; recorded_at: string }[]);
 
     const emps: Employee[] = profiles.map(p => {
       const role = roles.find(r => r.user_id === p.user_id);
       const perm = perms.find(pe => pe.user_id === p.user_id);
       const myPs = payslips.filter(ps => ps.employee_id === p.user_id);
+      const myTe = teAll.filter(e => e.employee_id === p.user_id);
+
+      // Calcular saldo mensal
+      let balance_min: number | null = null;
+      if (myTe.length > 0) {
+        const sched: WeekSchedule = (perm as any)?.work_schedule ?? DEFAULT_SCHEDULE;
+        // Agrupar por dia
+        const byDay: Record<string, typeof myTe> = {};
+        for (const e of myTe) {
+          const day = e.recorded_at.slice(0, 10);
+          if (!byDay[day]) byDay[day] = [];
+          byDay[day].push(e);
+        }
+        balance_min = 0;
+        for (const [dayStr, dayEntries] of Object.entries(byDay)) {
+          const day = new Date(dayStr + 'T12:00:00');
+          balance_min += calcDayBalance(dayEntries as any, sched, day);
+        }
+      }
+
       return {
         user_id: p.user_id,
         display_name: p.display_name,
@@ -72,6 +104,7 @@ export default function UsersPage() {
         is_admin:         (perm as any)?.is_admin         ?? false,
         payslips_total:   myPs.length,
         payslips_pending: myPs.filter(ps => ps.status === 'published').length,
+        balance_min,
       };
     });
 
@@ -237,7 +270,7 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{emp.email}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${roleInfo.cls}`}>
                         {roleInfo.label}
                       </span>
@@ -245,6 +278,13 @@ export default function UsersPage() {
                         <span title="Administrador do sistema" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                           <Crown className="w-3 h-3" />
                           ADM
+                        </span>
+                      )}
+                      {emp.role === 'employee' && emp.balance_min !== null && (
+                        <span title="Saldo de horas do mês" className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          emp.balance_min >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                        }`}>
+                          {formatBalance(emp.balance_min)}
                         </span>
                       )}
                     </div>

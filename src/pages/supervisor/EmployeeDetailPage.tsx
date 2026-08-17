@@ -8,9 +8,8 @@ import {
   FileText, Edit2, Save, X, Loader2,
   Eye, Download, Plus, ShieldCheck, Trash2, KeyRound, Timer, LogIn, LogOut, ChevronDown, ChevronUp,
 } from 'lucide-react';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, format as fmtDate } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { format } from 'date-fns';
+import { startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, format as fmtDate, format } from 'date-fns';
+import { DEFAULT_SCHEDULE, calcDayBalance, formatBalance, type WeekSchedule } from '@/lib/workSchedule';
 import { ptBR } from 'date-fns/locale';
 
 interface EmpPermissions {
@@ -747,6 +746,9 @@ function dayTotalMs(entries: TimeEntry[]) {
   return total;
 }
 
+const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const WORK_DAYS = [1, 2, 3, 4, 5];
+
 function PontoTab({ employeeId }: { employeeId: string }) {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -754,6 +756,9 @@ function PontoTab({ employeeId }: { employeeId: string }) {
   const [editModal, setEditModal] = useState<TimeEntry | null>(null);
   const [editTime, setEditTime] = useState('');
   const [saving, setSaving] = useState(false);
+  const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
+  const [savingSched, setSavingSched] = useState(false);
+  const [schedOpen, setSchedOpen] = useState(false);
 
   const monthStart = startOfMonth(viewDate);
   const monthEnd   = endOfMonth(viewDate);
@@ -761,14 +766,22 @@ function PontoTab({ employeeId }: { employeeId: string }) {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from('time_entries' as any)
-        .select('id, type, recorded_at, note, latitude, longitude')
-        .eq('employee_id', employeeId)
-        .gte('recorded_at', monthStart.toISOString())
-        .lte('recorded_at', monthEnd.toISOString())
-        .order('recorded_at', { ascending: true });
-      setEntries((data ?? []) as unknown as TimeEntry[]);
+      const [entriesRes, permRes] = await Promise.all([
+        supabase
+          .from('time_entries' as any)
+          .select('id, type, recorded_at, note, latitude, longitude')
+          .eq('employee_id', employeeId)
+          .gte('recorded_at', monthStart.toISOString())
+          .lte('recorded_at', monthEnd.toISOString())
+          .order('recorded_at', { ascending: true }),
+        supabase
+          .from('employee_permissions')
+          .select('work_schedule')
+          .eq('user_id', employeeId)
+          .maybeSingle(),
+      ]);
+      setEntries((entriesRes.data ?? []) as unknown as TimeEntry[]);
+      if ((permRes.data as any)?.work_schedule) setSchedule((permRes.data as any).work_schedule);
       setLoading(false);
     };
     load();
@@ -781,17 +794,27 @@ function PontoTab({ employeeId }: { employeeId: string }) {
     entries: entries.filter(e => isSameDay(parseISO(e.recorded_at), day)),
   })).filter(d => d.entries.length > 0);
 
-  // Semanas
-  const weekMap = new Map<string, { ms: number; days: typeof byDay }>();
+  // Semanas — agora com saldo (balance em minutos)
+  const weekMap = new Map<string, { ms: number; balanceMin: number; days: typeof byDay }>();
   byDay.forEach(d => {
     const ws = fmtDate(startOfWeek(d.day, { locale: ptBR }), 'yyyy-MM-dd');
-    if (!weekMap.has(ws)) weekMap.set(ws, { ms: 0, days: [] });
+    if (!weekMap.has(ws)) weekMap.set(ws, { ms: 0, balanceMin: 0, days: [] });
     const w = weekMap.get(ws)!;
     w.days.push(d);
     w.ms += dayTotalMs(d.entries);
+    w.balanceMin += calcDayBalance(d.entries, schedule, d.day);
   });
 
   const monthTotalMs = byDay.reduce((s, d) => s + dayTotalMs(d.entries), 0);
+  const monthBalanceMin = byDay.reduce((s, d) => s + calcDayBalance(d.entries, schedule, d.day), 0);
+
+  const saveSchedule = async () => {
+    setSavingSched(true);
+    await supabase.from('employee_permissions').update({ work_schedule: schedule } as any).eq('user_id', employeeId);
+    setSavingSched(false);
+    setSchedOpen(false);
+    toast.success('Jornada salva!');
+  };
 
   const openEdit = (e: TimeEntry) => {
     setEditModal(e);
@@ -820,7 +843,7 @@ function PontoTab({ employeeId }: { employeeId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Navegação mês */}
+      {/* Navegação mês + saldo */}
       <div className="bg-white border border-border rounded-2xl px-5 py-4 flex items-center justify-between">
         <button onClick={prevMonth} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
           <ChevronDown className="w-4 h-4 rotate-90" />
@@ -830,14 +853,80 @@ function PontoTab({ employeeId }: { employeeId: string }) {
             {fmtDate(viewDate, 'MMMM yyyy', { locale: ptBR })}
           </p>
           {!loading && (
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Total: <span className="font-bold text-foreground">{msToHHMM(monthTotalMs)}</span>
-            </p>
+            <div className="flex items-center justify-center gap-3 mt-1">
+              <span className="text-xs text-muted-foreground">
+                Trabalhado: <span className="font-bold text-foreground">{msToHHMM(monthTotalMs)}</span>
+              </span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                monthBalanceMin >= 0
+                  ? 'bg-emerald-50 text-emerald-600'
+                  : 'bg-red-50 text-red-600'
+              }`}>
+                {formatBalance(monthBalanceMin)}
+              </span>
+            </div>
           )}
         </div>
         <button onClick={nextMonth} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
           <ChevronUp className="w-4 h-4 rotate-90" />
         </button>
+      </div>
+
+      {/* Configurar jornada */}
+      <div className="bg-white border border-border rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setSchedOpen(o => !o)}
+          className="w-full flex items-center justify-between px-5 py-3 text-sm font-medium text-foreground hover:bg-muted/30 transition-colors">
+          <span className="flex items-center gap-2"><Timer className="w-4 h-4 text-muted-foreground" /> Jornada de trabalho</span>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${schedOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {schedOpen && (
+          <div className="border-t border-border px-5 py-4 space-y-3">
+            <p className="text-xs text-muted-foreground">Entrada antes do horário programado não gera banco positivo.</p>
+            <div className="grid grid-cols-[60px_1fr_1fr_80px] gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+              <span>Dia</span><span>Início</span><span>Esperado (h)</span><span></span>
+            </div>
+            {WORK_DAYS.map(dow => {
+              const day = schedule[dow];
+              return (
+                <div key={dow} className="grid grid-cols-[60px_1fr_1fr_80px] gap-2 items-center">
+                  <span className="text-sm font-medium text-foreground">{DAY_NAMES[dow]}</span>
+                  <input
+                    type="time"
+                    value={day?.start ?? '07:30'}
+                    onChange={e => setSchedule(s => ({ ...s, [dow]: { ...s[dow]!, start: e.target.value } }))}
+                    className="border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <input
+                    type="number"
+                    min={1} max={12} step={0.5}
+                    value={day ? day.expected_minutes / 60 : 8}
+                    onChange={e => setSchedule(s => ({ ...s, [dow]: { ...s[dow]!, expected_minutes: Math.round(parseFloat(e.target.value) * 60) } }))}
+                    className="border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <button
+                    onClick={() => setSchedule(s => {
+                      const n = { ...s };
+                      if (n[dow]) delete n[dow]; else n[dow] = { start: '07:30', expected_minutes: 8 * 60 };
+                      return n;
+                    })}
+                    className={`text-xs px-2 py-1.5 rounded-lg border transition-colors ${
+                      schedule[dow] ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-muted text-muted-foreground border-border'
+                    }`}>
+                    {schedule[dow] ? 'Ativo' : 'Folga'}
+                  </button>
+                </div>
+              );
+            })}
+            <div className="flex justify-end pt-1">
+              <button onClick={saveSchedule} disabled={savingSched}
+                className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                {savingSched ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Salvar jornada
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -847,11 +936,12 @@ function PontoTab({ employeeId }: { employeeId: string }) {
       ) : (
         <div className="bg-white border border-border rounded-2xl overflow-hidden">
           {/* Cabeçalho tabela */}
-          <div className="grid grid-cols-[1fr_80px_80px_70px_32px] gap-0 px-4 py-2 bg-muted/30 border-b border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+          <div className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-2 bg-muted/30 border-b border-border text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
             <span>Dia</span>
             <span className="text-center">Entrada</span>
             <span className="text-center">Saída</span>
             <span className="text-center">Total</span>
+            <span className="text-center">Saldo</span>
             <span />
           </div>
 
@@ -864,9 +954,11 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                 const exitE  = sorted.filter(e => e.type === 'exit').pop();
                 const total  = dayTotalMs(de);
                 const isWeekend = [0, 6].includes(day.getDay());
+                const dayBal = calcDayBalance(de, schedule, day);
+                const hasSched = schedule[day.getDay()] != null;
                 return (
                   <div key={day.toISOString()}
-                    className={`grid grid-cols-[1fr_80px_80px_70px_32px] gap-0 px-4 py-2.5 border-b border-border/40 text-sm ${isWeekend ? 'bg-muted/20' : ''}`}>
+                    className={`grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-2.5 border-b border-border/40 text-sm ${isWeekend ? 'bg-muted/20' : ''}`}>
                     <span className="font-medium text-foreground capitalize text-xs">
                       {fmtDate(day, "EEE dd/MM", { locale: ptBR })}
                     </span>
@@ -899,27 +991,39 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                     <span className="text-center text-xs font-bold text-foreground">
                       {total > 0 ? msToHHMM(total) : <span className="text-muted-foreground/40">—</span>}
                     </span>
+                    <span className={`text-center text-xs font-bold ${
+                      !hasSched || de.length === 0 ? 'text-muted-foreground/30' :
+                      dayBal >= 0 ? 'text-emerald-600' : 'text-red-500'
+                    }`}>
+                      {hasSched && de.length > 0 ? formatBalance(dayBal) : '—'}
+                    </span>
                     <span />
                   </div>
                 );
               })}
               {/* Subtotal semana */}
-              <div className="grid grid-cols-[1fr_80px_80px_70px_32px] gap-0 px-4 py-1.5 bg-primary/5 border-b border-border text-[11px]">
+              <div className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-1.5 bg-primary/5 border-b border-border text-[11px]">
                 <span className="text-muted-foreground font-medium">
                   Semana {fmtDate(parseISO(ws), 'dd/MM', { locale: ptBR })}
                 </span>
                 <span /><span />
                 <span className="text-center font-bold text-primary">{msToHHMM(week.ms)}</span>
+                <span className={`text-center font-bold ${week.balanceMin >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {formatBalance(week.balanceMin)}
+                </span>
                 <span />
               </div>
             </div>
           ))}
 
           {/* Total mês */}
-          <div className="grid grid-cols-[1fr_80px_80px_70px_32px] gap-0 px-4 py-3 bg-muted/40 text-sm font-bold">
+          <div className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-3 bg-muted/40 text-sm font-bold">
             <span className="text-foreground">Total do mês</span>
             <span /><span />
             <span className="text-center text-foreground">{msToHHMM(monthTotalMs)}</span>
+            <span className={`text-center font-bold ${monthBalanceMin >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              {formatBalance(monthBalanceMin)}
+            </span>
             <span />
           </div>
         </div>
