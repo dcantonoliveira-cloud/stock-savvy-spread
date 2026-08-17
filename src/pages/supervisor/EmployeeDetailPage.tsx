@@ -787,8 +787,8 @@ function PontoTab({ employeeId }: { employeeId: string }) {
     load();
   }, [employeeId, viewDate.getFullYear(), viewDate.getMonth()]);
 
-  // Agrupa por dia
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  // Agrupa por dia — mais recente primeiro
+  const days = eachDayOfInterval({ start: monthStart, end: monthEnd }).reverse();
   const byDay = days.map(day => ({
     day,
     entries: entries.filter(e => isSameDay(parseISO(e.recorded_at), day)),
