@@ -723,7 +723,7 @@ export default function EmployeeDetailPage() {
 }
 
 // ── PontoTab ──────────────────────────────────────────────────────────────────
-interface TimeEntry { id: string; type: 'entry' | 'exit'; recorded_at: string; note: string | null; latitude: number | null; longitude: number | null; }
+interface TimeEntry { id: string; type: 'entry' | 'exit' | 'adjustment'; recorded_at: string; note: string | null; latitude: number | null; longitude: number | null; adjustment_minutes?: number | null; }
 
 function msToHHMM(ms: number) {
   if (ms <= 0) return '0h00';
@@ -733,7 +733,7 @@ function msToHHMM(ms: number) {
 }
 
 function dayTotalMs(entries: TimeEntry[]) {
-  const sorted = [...entries].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+  const sorted = [...entries].filter(e => e.type !== 'adjustment').sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
   let total = 0;
   for (let i = 0; i < sorted.length - 1; i++) {
     if (sorted[i].type === 'entry' && sorted[i + 1].type === 'exit') {
@@ -757,6 +757,12 @@ function PontoTab({ employeeId }: { employeeId: string }) {
   const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_SCHEDULE);
   const [savingSched, setSavingSched] = useState(false);
   const [schedOpen, setSchedOpen] = useState(false);
+  const [adjModal, setAdjModal] = useState<{ date: string } | null>(null);
+  const [adjSign, setAdjSign] = useState<'+' | '-'>('+');
+  const [adjHours, setAdjHours] = useState('0');
+  const [adjMins, setAdjMins] = useState('0');
+  const [adjNote, setAdjNote] = useState('');
+  const [savingAdj, setSavingAdj] = useState(false);
 
   const monthStart = startOfMonth(viewDate);
   const monthEnd   = endOfMonth(viewDate);
@@ -767,7 +773,7 @@ function PontoTab({ employeeId }: { employeeId: string }) {
       const [entriesRes, permRes] = await Promise.all([
         supabase
           .from('time_entries' as any)
-          .select('id, type, recorded_at, note, latitude, longitude')
+          .select('id, type, recorded_at, note, latitude, longitude, adjustment_minutes')
           .eq('employee_id', employeeId)
           .gte('recorded_at', monthStart.toISOString())
           .lte('recorded_at', monthEnd.toISOString())
@@ -836,6 +842,26 @@ function PontoTab({ employeeId }: { employeeId: string }) {
     setEditModal(null);
   };
 
+  const openAdjModal = (date: string) => {
+    setAdjModal({ date });
+    setAdjSign('+'); setAdjHours('0'); setAdjMins('0'); setAdjNote('');
+  };
+
+  const saveAdjustment = async () => {
+    if (!adjModal || !adjNote.trim()) return;
+    setSavingAdj(true);
+    const minutes = (parseInt(adjHours) * 60 + parseInt(adjMins)) * (adjSign === '+' ? 1 : -1);
+    const recorded_at = new Date(`${adjModal.date}T12:00:00`).toISOString();
+    const { data, error } = await supabase.from('time_entries' as any)
+      .insert({ employee_id: employeeId, company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89', type: 'adjustment', recorded_at, note: adjNote.trim(), adjustment_minutes: minutes })
+      .select('id, type, recorded_at, note, latitude, longitude, adjustment_minutes').single();
+    if (error) { toast.error('Erro ao salvar ajuste'); setSavingAdj(false); return; }
+    setEntries(prev => [...prev, data as unknown as TimeEntry]);
+    setAdjModal(null);
+    setSavingAdj(false);
+    toast.success('Ajuste registrado');
+  };
+
   const prevMonth = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
   const nextMonth = () => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
 
@@ -867,6 +893,15 @@ function PontoTab({ employeeId }: { employeeId: string }) {
         </div>
         <button onClick={nextMonth} className="p-1.5 hover:bg-muted rounded-lg transition-colors">
           <ChevronUp className="w-4 h-4 rotate-90" />
+        </button>
+      </div>
+
+      {/* Ajuste manual */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => openAdjModal(fmtDate(new Date(), 'yyyy-MM-dd'))}
+          className="flex items-center gap-1.5 text-xs font-medium text-primary border border-primary/30 px-3 py-1.5 rounded-xl hover:bg-primary/5 transition-colors">
+          <Plus className="w-3.5 h-3.5" /> Ajuste manual de horas
         </button>
       </div>
 
@@ -997,7 +1032,19 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                     </span>
                     <span />
                   </div>
-                );
+                  {/* Linhas de ajuste do dia */}
+                  {de.filter(e => e.type === 'adjustment').map(adj => (
+                    <div key={adj.id} className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-1.5 border-b border-border/30 bg-amber-50/40 text-xs">
+                      <span className="text-amber-700 italic col-span-3 truncate pl-4">{adj.note}</span>
+                      <span />
+                      <span className={`text-center font-bold ${(adj.adjustment_minutes ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {formatBalance(adj.adjustment_minutes ?? 0)}
+                      </span>
+                      <button onClick={() => deleteEntry(adj.id)} className="flex items-center justify-center text-muted-foreground/30 hover:text-red-400 transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
               })}
               {/* Subtotal semana */}
               <div className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-1.5 bg-primary/5 border-b border-border text-[11px]">
@@ -1023,6 +1070,61 @@ function PontoTab({ employeeId }: { employeeId: string }) {
               {formatBalance(monthBalanceMin)}
             </span>
             <span />
+          </div>
+        </div>
+      )}
+
+      {/* Modal ajuste manual */}
+      {adjModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setAdjModal(null)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-foreground">Ajuste manual de horas</p>
+              <button onClick={() => setAdjModal(null)} className="p-1 hover:bg-muted rounded-lg"><X className="w-4 h-4" /></button>
+            </div>
+
+            {/* Data */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest block mb-1">Data</label>
+              <input type="date" value={adjModal.date}
+                onChange={e => setAdjModal({ date: e.target.value })}
+                className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div>
+
+            {/* Sinal + horas + minutos */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest block mb-1">Quantidade</label>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-xl border border-border overflow-hidden">
+                  <button onClick={() => setAdjSign('+')} className={`px-3 py-2 text-sm font-bold transition-colors ${adjSign === '+' ? 'bg-emerald-500 text-white' : 'text-muted-foreground hover:bg-muted'}`}>+</button>
+                  <button onClick={() => setAdjSign('-')} className={`px-3 py-2 text-sm font-bold transition-colors ${adjSign === '-' ? 'bg-red-500 text-white' : 'text-muted-foreground hover:bg-muted'}`}>−</button>
+                </div>
+                <input type="number" min={0} max={23} value={adjHours} onChange={e => setAdjHours(e.target.value)}
+                  className="w-16 border border-border rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <span className="text-sm text-muted-foreground">h</span>
+                <input type="number" min={0} max={59} value={adjMins} onChange={e => setAdjMins(e.target.value)}
+                  className="w-16 border border-border rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                <span className="text-sm text-muted-foreground">min</span>
+              </div>
+            </div>
+
+            {/* Motivo */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest block mb-1">Motivo <span className="text-red-400">*</span></label>
+              <input type="text" value={adjNote} onChange={e => setAdjNote(e.target.value)}
+                placeholder="Ex: Hora extra autorizada, Falta justificada…"
+                className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setAdjModal(null)} className="flex-1 py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">Cancelar</button>
+              <button onClick={saveAdjustment} disabled={savingAdj || !adjNote.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+                {savingAdj ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                Salvar ajuste
+              </button>
+            </div>
           </div>
         </div>
       )}

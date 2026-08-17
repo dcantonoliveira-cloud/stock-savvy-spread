@@ -19,26 +19,36 @@ function timeToMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
+export interface TimeEntryLike {
+  type: 'entry' | 'exit' | 'adjustment';
+  recorded_at: string;
+  adjustment_minutes?: number | null;
+}
+
 // Retorna saldo em minutos para um dia (positivo = banco a favor, negativo = débito)
 export function calcDayBalance(
-  entries: { type: 'entry' | 'exit'; recorded_at: string }[],
+  entries: TimeEntryLike[],
   schedule: WeekSchedule,
   day: Date,
 ): number {
   const dow = day.getDay();
   const sched = schedule[dow];
-  if (!sched) return 0; // dia não trabalhado
+
+  const adjustments = entries
+    .filter(e => e.type === 'adjustment')
+    .reduce((s, e) => s + (e.adjustment_minutes ?? 0), 0);
+
+  if (!sched) return adjustments;
 
   const sorted = [...entries].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
   const entry = sorted.find(e => e.type === 'entry');
   const exit  = sorted.filter(e => e.type === 'exit').pop();
-  if (!entry || !exit) return 0;
+  if (!entry || !exit) return adjustments;
 
   const schedStartMin = timeToMinutes(sched.start);
   const entryDate = new Date(entry.recorded_at);
   const exitDate  = new Date(exit.recorded_at);
 
-  // Minutos locais do dia
   const entryMin = entryDate.getHours() * 60 + entryDate.getMinutes();
   const exitMin  = exitDate.getHours()  * 60 + exitDate.getMinutes();
 
@@ -46,7 +56,7 @@ export function calcDayBalance(
   const effectiveEntry = Math.max(entryMin, schedStartMin);
   const workedMin = Math.max(0, exitMin - effectiveEntry);
 
-  return workedMin - sched.expected_minutes;
+  return workedMin - sched.expected_minutes + adjustments;
 }
 
 export function formatBalance(minutes: number): string {
