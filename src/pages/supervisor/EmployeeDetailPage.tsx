@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -990,61 +990,62 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                 const dayBal = calcDayBalance(de, schedule, day);
                 const hasSched = schedule[day.getDay()] != null;
                 return (
-                  <div key={day.toISOString()}
-                    className={`grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-2.5 border-b border-border/40 text-sm ${isWeekend ? 'bg-muted/20' : ''}`}>
-                    <span className="font-medium text-foreground capitalize text-xs">
-                      {fmtDate(day, "EEE dd/MM", { locale: ptBR })}
-                    </span>
-                    <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => entryE && openEdit(entryE)}
-                        className="text-xs text-emerald-600 font-medium hover:underline">
-                        {entryE ? fmtDate(parseISO(entryE.recorded_at), 'HH:mm') : '—'}
-                      </button>
-                      {entryE?.latitude && (
-                        <a href={`https://www.google.com/maps?q=${entryE.latitude},${entryE.longitude}`}
-                          target="_blank" rel="noreferrer"
-                          className="text-muted-foreground/40 hover:text-primary transition-colors" title="Ver localização">
-                          <MapPin className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => exitE && openEdit(exitE)}
-                        className="text-xs text-rose-500 font-medium hover:underline">
-                        {exitE ? fmtDate(parseISO(exitE.recorded_at), 'HH:mm') : '—'}
-                      </button>
-                      {exitE?.latitude && (
-                        <a href={`https://www.google.com/maps?q=${exitE.latitude},${exitE.longitude}`}
-                          target="_blank" rel="noreferrer"
-                          className="text-muted-foreground/40 hover:text-rose-400 transition-colors" title="Ver localização">
-                          <MapPin className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                    <span className="text-center text-xs font-bold text-foreground">
-                      {total > 0 ? msToHHMM(total) : <span className="text-muted-foreground/40">—</span>}
-                    </span>
-                    <span className={`text-center text-xs font-bold ${
-                      !hasSched || de.length === 0 ? 'text-muted-foreground/30' :
-                      dayBal >= 0 ? 'text-emerald-600' : 'text-red-500'
-                    }`}>
-                      {hasSched && de.length > 0 ? formatBalance(dayBal) : '—'}
-                    </span>
-                    <span />
-                  </div>
-                  {/* Linhas de ajuste do dia */}
-                  {de.filter(e => e.type === 'adjustment').map(adj => (
-                    <div key={adj.id} className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-1.5 border-b border-border/30 bg-amber-50/40 text-xs">
-                      <span className="text-amber-700 italic col-span-3 truncate pl-4">{adj.note}</span>
-                      <span />
-                      <span className={`text-center font-bold ${(adj.adjustment_minutes ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {formatBalance(adj.adjustment_minutes ?? 0)}
+                  <React.Fragment key={day.toISOString()}>
+                    <div className={`grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-2.5 border-b border-border/40 text-sm ${isWeekend ? 'bg-muted/20' : ''}`}>
+                      <span className="font-medium text-foreground capitalize text-xs">
+                        {fmtDate(day, "EEE dd/MM", { locale: ptBR })}
                       </span>
-                      <button onClick={() => deleteEntry(adj.id)} className="flex items-center justify-center text-muted-foreground/30 hover:text-red-400 transition-colors">
-                        <X className="w-3 h-3" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => entryE && openEdit(entryE)}
+                          className="text-xs text-emerald-600 font-medium hover:underline">
+                          {entryE ? fmtDate(parseISO(entryE.recorded_at), 'HH:mm') : '—'}
+                        </button>
+                        {entryE?.latitude && (
+                          <a href={`https://www.google.com/maps?q=${entryE.latitude},${entryE.longitude}`}
+                            target="_blank" rel="noreferrer"
+                            className="text-muted-foreground/40 hover:text-primary transition-colors" title="Ver localização">
+                            <MapPin className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => exitE && openEdit(exitE)}
+                          className="text-xs text-rose-500 font-medium hover:underline">
+                          {exitE ? fmtDate(parseISO(exitE.recorded_at), 'HH:mm') : '—'}
+                        </button>
+                        {exitE?.latitude && (
+                          <a href={`https://www.google.com/maps?q=${exitE.latitude},${exitE.longitude}`}
+                            target="_blank" rel="noreferrer"
+                            className="text-muted-foreground/40 hover:text-rose-400 transition-colors" title="Ver localização">
+                            <MapPin className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <span className="text-center text-xs font-bold text-foreground">
+                        {total > 0 ? msToHHMM(total) : <span className="text-muted-foreground/40">—</span>}
+                      </span>
+                      <span className={`text-center text-xs font-bold ${
+                        !hasSched || de.length === 0 ? 'text-muted-foreground/30' :
+                        dayBal >= 0 ? 'text-emerald-600' : 'text-red-500'
+                      }`}>
+                        {hasSched && de.length > 0 ? formatBalance(dayBal) : '—'}
+                      </span>
+                      <span />
                     </div>
-                  ))}
+                    {de.filter(e => e.type === 'adjustment').map(adj => (
+                      <div key={adj.id} className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-1.5 border-b border-border/30 bg-amber-50/40 text-xs">
+                        <span className="text-amber-700 italic col-span-3 truncate pl-4">{adj.note}</span>
+                        <span />
+                        <span className={`text-center font-bold ${(adj.adjustment_minutes ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {formatBalance(adj.adjustment_minutes ?? 0)}
+                        </span>
+                        <button onClick={() => deleteEntry(adj.id)} className="flex items-center justify-center text-muted-foreground/30 hover:text-red-400 transition-colors">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </React.Fragment>
+                );
               })}
               {/* Subtotal semana */}
               <div className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-1.5 bg-primary/5 border-b border-border text-[11px]">
