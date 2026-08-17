@@ -41,29 +41,75 @@ serve(async (req) => {
     const { data: callerRole } = await adminClient
       .from('user_roles').select('role').eq('user_id', caller.id).eq('role', 'supervisor').maybeSingle();
     if (!callerRole) {
-      return new Response(JSON.stringify({ error: 'Apenas supervisores podem gerar links de redefinição' }), {
+      return new Response(JSON.stringify({ error: 'Apenas supervisores podem redefinir senhas' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { email, redirectTo } = await req.json();
+    const { email, phone, name, redirectTo } = await req.json();
     if (!email) {
       return new Response(JSON.stringify({ error: 'Email obrigatório' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { error } = await adminClient.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectTo ?? `${supabaseUrl}/reset-password`,
+    // Gera link de redefinição
+    const { data, error } = await adminClient.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo: redirectTo ?? `${supabaseUrl}/reset-password` },
     });
 
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
+    if (error || !data?.properties?.action_link) {
+      return new Response(JSON.stringify({ error: error?.message ?? 'Erro ao gerar link' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    const link = data.properties.action_link;
+    const firstName = (name ?? 'você').split(' ')[0];
+
+    // Busca config ZApi
+    const { data: zapiRow } = await adminClient
+      .from('company_integrations' as any)
+      .select('api_key, enabled')
+      .eq('provider', 'zapi')
+      .maybeSingle();
+
+    if (!zapiRow?.enabled || !zapiRow?.api_key || !phone) {
+      // Sem ZApi ou sem telefone — retorna o link para o supervisor copiar
+      return new Response(JSON.stringify({ ok: true, link, sent_whatsapp: false }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    let zapiConfig: { instance_id: string; token: string; client_token?: string };
+    try { zapiConfig = JSON.parse(zapiRow.api_key); } catch {
+      return new Response(JSON.stringify({ ok: true, link, sent_whatsapp: false }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const message = `Olá, ${firstName}! 👋\n\nAqui está o seu link para redefinir a senha do sistema Rondello:\n\n${link}\n\n_Este link expira em 24 horas._\n\n— Rondello Buffet`;
+
+    const digits = phone.replace(/\D/g, '');
+    const formatted = digits.startsWith('55') ? digits : `55${digits}`;
+
+    const zapiRes = await fetch(
+      `https://api.z-api.io/instances/${zapiConfig.instance_id}/token/${zapiConfig.token}/send-text`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(zapiConfig.client_token ? { 'Client-Token': zapiConfig.client_token } : {}),
+        },
+        body: JSON.stringify({ phone: formatted, message }),
+      }
+    );
+
+    const sent = zapiRes.ok;
+
+    return new Response(JSON.stringify({ ok: true, sent_whatsapp: sent, link: sent ? undefined : link }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

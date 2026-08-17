@@ -266,13 +266,21 @@ export default function EmployeeDetailPage() {
     try {
       const redirectTo = `${window.location.origin}/reset-password`;
       const { data, error } = await supabase.functions.invoke('generate-reset-link', {
-        body: { email: profile.email, redirectTo },
+        body: { email: profile.email, phone: profile.phone, name: profile.display_name, redirectTo },
       });
       if (error || data?.error) {
-        toast.error(data?.error || 'Erro ao enviar e-mail de redefinição');
+        toast.error(data?.error || 'Erro ao redefinir senha');
         return;
       }
-      toast.success(`E-mail de redefinição enviado para ${profile.email}`);
+      if (data?.sent_whatsapp) {
+        toast.success(`Link enviado via WhatsApp para ${profile.display_name.split(' ')[0]}`);
+      } else if (data?.link) {
+        // ZApi não configurado ou sem telefone — copia o link
+        await navigator.clipboard.writeText(data.link).catch(() => {});
+        toast.success('Link copiado! Cole no WhatsApp manualmente.');
+      } else {
+        toast.success('Link gerado com sucesso');
+      }
     } finally {
       setSendingReset(false);
     }
