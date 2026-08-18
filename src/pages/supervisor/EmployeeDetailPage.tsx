@@ -725,6 +725,25 @@ export default function EmployeeDetailPage() {
 // ── PontoTab ──────────────────────────────────────────────────────────────────
 interface TimeEntry { id: string; type: 'entry' | 'exit' | 'adjustment'; recorded_at: string; note: string | null; latitude: number | null; longitude: number | null; adjustment_minutes?: number | null; }
 
+// Coordenadas da empresa — Rua Deputado Ranieri Mazzilli 55, Jd Elton Ville, Sorocaba SP
+const COMPANY_LAT = -23.5227;
+const COMPANY_LNG = -47.4723;
+const ALLOWED_RADIUS_M = 300;
+
+function haversineM(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const R = 6_371_000;
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function isOutside(lat: number | null, lng: number | null) {
+  if (lat == null || lng == null) return false;
+  return haversineM(lat, lng, COMPANY_LAT, COMPANY_LNG) > ALLOWED_RADIUS_M;
+}
+
 function msToHHMM(ms: number) {
   if (ms <= 0) return '0h00';
   const h = Math.floor(ms / 3_600_000);
@@ -1011,26 +1030,34 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                           className="text-xs text-emerald-600 font-medium hover:underline">
                           {entryE ? fmtDate(parseISO(entryE.recorded_at), 'HH:mm') : '—'}
                         </button>
-                        {entryE?.latitude && (
-                          <a href={`https://www.google.com/maps?q=${entryE.latitude},${entryE.longitude}`}
-                            target="_blank" rel="noreferrer"
-                            className="text-muted-foreground/40 hover:text-primary transition-colors" title="Ver localização">
-                            <MapPin className="w-3 h-3" />
-                          </a>
-                        )}
+                        {entryE?.latitude && (() => {
+                          const outside = isOutside(entryE.latitude, entryE.longitude);
+                          return (
+                            <a href={`https://www.google.com/maps?q=${entryE.latitude},${entryE.longitude}`}
+                              target="_blank" rel="noreferrer"
+                              title={outside ? '⚠️ Fora da empresa' : 'Ver localização'}
+                              className={outside ? 'text-orange-400 hover:text-orange-500' : 'text-muted-foreground/40 hover:text-primary'}>
+                              <MapPin className="w-3 h-3" />
+                            </a>
+                          );
+                        })()}
                       </div>
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => exitE && openEdit(exitE)}
                           className="text-xs text-rose-500 font-medium hover:underline">
                           {exitE ? fmtDate(parseISO(exitE.recorded_at), 'HH:mm') : '—'}
                         </button>
-                        {exitE?.latitude && (
-                          <a href={`https://www.google.com/maps?q=${exitE.latitude},${exitE.longitude}`}
-                            target="_blank" rel="noreferrer"
-                            className="text-muted-foreground/40 hover:text-rose-400 transition-colors" title="Ver localização">
-                            <MapPin className="w-3 h-3" />
-                          </a>
-                        )}
+                        {exitE?.latitude && (() => {
+                          const outside = isOutside(exitE.latitude, exitE.longitude);
+                          return (
+                            <a href={`https://www.google.com/maps?q=${exitE.latitude},${exitE.longitude}`}
+                              target="_blank" rel="noreferrer"
+                              title={outside ? '⚠️ Fora da empresa' : 'Ver localização'}
+                              className={outside ? 'text-orange-400 hover:text-orange-500' : 'text-muted-foreground/40 hover:text-rose-400'}>
+                              <MapPin className="w-3 h-3" />
+                            </a>
+                          );
+                        })()}
                       </div>
                       <span className="text-center text-xs font-bold text-foreground">
                         {total > 0 ? msToHHMM(total) : <span className="text-muted-foreground/40">—</span>}
