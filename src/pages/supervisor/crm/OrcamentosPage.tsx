@@ -74,6 +74,7 @@ export default function OrcamentosPage() {
         .in('status', [...PIPELINE_STATUSES, 'cancelled', 'lost'])
         .not('event_name', 'is', null)
         .neq('event_name', '')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('tasting_session_events' as any)
@@ -138,7 +139,7 @@ export default function OrcamentosPage() {
   const deleteRow = async (id: string) => {
     setRows(prev => prev.filter(r => r.id !== id));
     setConfirmDelete(null);
-    await supabase.from('events').delete().eq('id', id);
+    await supabase.from('events').update({ deleted_at: new Date().toISOString() } as any).eq('id', id);
   };
 
   const filtered = useMemo(() => {

@@ -409,7 +409,7 @@ export default function EventDetailPage() {
   const deleteEvent = async () => {
     if (!id) return;
     if (!confirm('Deletar permanentemente este evento? Esta ação não pode ser revertida.')) return;
-    const { error } = await supabase.from('events').delete().eq('id', id);
+    const { error } = await supabase.from('events').update({ deleted_at: new Date().toISOString() } as any).eq('id', id);
     if (error) { toast.error('Erro ao deletar: ' + error.message); return; }
     toast.success('Evento deletado');
     navigate('/events');
