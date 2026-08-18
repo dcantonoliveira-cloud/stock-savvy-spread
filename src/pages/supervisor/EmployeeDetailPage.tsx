@@ -732,7 +732,7 @@ function msToHHMM(ms: number) {
   return `${h}h${m.toString().padStart(2, '0')}`;
 }
 
-function dayTotalMs(entries: TimeEntry[]) {
+function dayTotalMs(entries: TimeEntry[], lunchMinutes = 0) {
   const sorted = [...entries].filter(e => e.type !== 'adjustment').sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
   let total = 0;
   for (let i = 0; i < sorted.length - 1; i++) {
@@ -741,7 +741,11 @@ function dayTotalMs(entries: TimeEntry[]) {
       i++;
     }
   }
-  return total;
+  total -= lunchMinutes * 60_000;
+  const adjMs = entries
+    .filter(e => e.type === 'adjustment')
+    .reduce((s, e) => s + (e.adjustment_minutes ?? 0) * 60_000, 0);
+  return Math.max(0, total) + adjMs;
 }
 
 const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -805,11 +809,11 @@ function PontoTab({ employeeId }: { employeeId: string }) {
     if (!weekMap.has(ws)) weekMap.set(ws, { ms: 0, balanceMin: 0, days: [] });
     const w = weekMap.get(ws)!;
     w.days.push(d);
-    w.ms += dayTotalMs(d.entries);
+    w.ms += dayTotalMs(d.entries, schedule[d.day.getDay()]?.lunch_minutes ?? 60);
     w.balanceMin += calcDayBalance(d.entries, schedule, d.day);
   });
 
-  const monthTotalMs = byDay.reduce((s, d) => s + dayTotalMs(d.entries), 0);
+  const monthTotalMs = byDay.reduce((s, d) => s + dayTotalMs(d.entries, schedule[d.day.getDay()]?.lunch_minutes ?? 60), 0);
   const monthBalanceMin = byDay.reduce((s, d) => s + calcDayBalance(d.entries, schedule, d.day), 0);
 
   const saveSchedule = async () => {
@@ -992,7 +996,7 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                 const sorted = [...de].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
                 const entryE = sorted.find(e => e.type === 'entry');
                 const exitE  = sorted.filter(e => e.type === 'exit').pop();
-                const total  = dayTotalMs(de);
+                const total  = dayTotalMs(de, schedule[day.getDay()]?.lunch_minutes ?? 60);
                 const isWeekend = [0, 6].includes(day.getDay());
                 const dayBal = calcDayBalance(de, schedule, day);
                 const hasSched = schedule[day.getDay()] != null;
