@@ -916,13 +916,13 @@ function PontoTab({ employeeId }: { employeeId: string }) {
         {schedOpen && (
           <div className="border-t border-border px-5 py-4 space-y-3">
             <p className="text-xs text-muted-foreground">Entrada antes do horário programado não gera banco positivo.</p>
-            <div className="grid grid-cols-[60px_1fr_1fr_80px] gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
-              <span>Dia</span><span>Início</span><span>Esperado (h)</span><span></span>
+            <div className="grid grid-cols-[60px_1fr_1fr_1fr_80px] gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
+              <span>Dia</span><span>Início</span><span>Esperado (h)</span><span>Almoço (min)</span><span></span>
             </div>
             {WORK_DAYS.map(dow => {
               const day = schedule[dow];
               return (
-                <div key={dow} className="grid grid-cols-[60px_1fr_1fr_80px] gap-2 items-center">
+                <div key={dow} className="grid grid-cols-[60px_1fr_1fr_1fr_80px] gap-2 items-center">
                   <span className="text-sm font-medium text-foreground">{DAY_NAMES[dow]}</span>
                   <input
                     type="time"
@@ -937,10 +937,17 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                     onChange={e => setSchedule(s => ({ ...s, [dow]: { ...s[dow]!, expected_minutes: Math.round(parseFloat(e.target.value) * 60) } }))}
                     className="border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
+                  <input
+                    type="number"
+                    min={0} max={120} step={15}
+                    value={day?.lunch_minutes ?? 60}
+                    onChange={e => setSchedule(s => ({ ...s, [dow]: { ...s[dow]!, lunch_minutes: parseInt(e.target.value) || 0 } }))}
+                    className="border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
                   <button
                     onClick={() => setSchedule(s => {
                       const n = { ...s };
-                      if (n[dow]) delete n[dow]; else n[dow] = { start: '07:30', expected_minutes: 8 * 60 };
+                      if (n[dow]) delete n[dow]; else n[dow] = { start: '07:30', expected_minutes: 8 * 60, lunch_minutes: 60 };
                       return n;
                     })}
                     className={`text-xs px-2 py-1.5 rounded-lg border transition-colors ${

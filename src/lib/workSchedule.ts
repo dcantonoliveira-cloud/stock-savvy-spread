@@ -1,17 +1,18 @@
 // day: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
 export interface DaySchedule {
-  start: string;        // "HH:MM"
+  start: string;           // "HH:MM"
   expected_minutes: number;
+  lunch_minutes: number;   // intervalo de almoço a descontar (padrão 60)
 }
 
 export type WeekSchedule = Partial<Record<number, DaySchedule>>;
 
 export const DEFAULT_SCHEDULE: WeekSchedule = {
-  1: { start: '07:30', expected_minutes: 8 * 60 },   // Seg 8h
-  2: { start: '07:30', expected_minutes: 9 * 60 },   // Ter 9h
-  3: { start: '07:30', expected_minutes: 9 * 60 },   // Qua 9h
-  4: { start: '07:30', expected_minutes: 9 * 60 },   // Qui 9h
-  5: { start: '07:30', expected_minutes: 9 * 60 },   // Sex 9h
+  1: { start: '07:30', expected_minutes: 8 * 60, lunch_minutes: 60 },
+  2: { start: '07:30', expected_minutes: 9 * 60, lunch_minutes: 60 },
+  3: { start: '07:30', expected_minutes: 9 * 60, lunch_minutes: 60 },
+  4: { start: '07:30', expected_minutes: 9 * 60, lunch_minutes: 60 },
+  5: { start: '07:30', expected_minutes: 9 * 60, lunch_minutes: 60 },
 };
 
 function timeToMinutes(hhmm: string): number {
@@ -54,7 +55,8 @@ export function calcDayBalance(
 
   // Entrada antes do horário não conta como extra
   const effectiveEntry = Math.max(entryMin, schedStartMin);
-  const workedMin = Math.max(0, exitMin - effectiveEntry);
+  const lunch = sched.lunch_minutes ?? 60;
+  const workedMin = Math.max(0, exitMin - effectiveEntry - lunch);
 
   return workedMin - sched.expected_minutes + adjustments;
 }
