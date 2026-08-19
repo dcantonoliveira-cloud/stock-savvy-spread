@@ -74,7 +74,7 @@ export default function PontoPage() {
       .insert(payload)
       .select('id, type, recorded_at, note, latitude, longitude')
       .single();
-    if (error) { toast.error('Erro ao registrar ponto'); setPunching(false); return; }
+    if (error) { console.error('punch error', error); toast.error('Erro ao registrar ponto: ' + error.message); setPunching(false); return; }
     setEntries(prev => [data as unknown as TimeEntry, ...prev]);
     toast.success(nextType === 'entry' ? 'Entrada registrada!' : 'Saída registrada!');
     setPunching(false);
