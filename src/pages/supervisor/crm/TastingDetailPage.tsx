@@ -8,6 +8,7 @@ import RichTextEditor from '@/components/RichTextEditor';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 import { buildMessage } from '@/lib/whatsapp';
 import { EVENT_STATUS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
+import { LostReasonModal } from '@/components/LostReasonModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Session {
@@ -83,6 +84,7 @@ export default function TastingDetailPage() {
   const stateFrom  = (location.state as any)?.from  ?? '/tastings';
   const stateLabel = (location.state as any)?.fromLabel ?? 'Degustações';
 
+  const [lostModal, setLostModal] = useState<{ eventId: string; onUpdate: (p: any) => void; ev: any } | null>(null);
   const [session,      setSession]      = useState<Session | null>(null);
   const [rows,         setRows]         = useState<SessionEvent[]>([]);
   const [loading,      setLoading]      = useState(true);
@@ -322,6 +324,11 @@ export default function TastingDetailPage() {
                       onNavigate={() => navigate(`/events/${row.event_id}`, {
                         state: { from: `/tastings/${session.id}`, fromLabel: `Degustação ${fmtDate(session.scheduled_date)}` }
                       })}
+                      onOpenLostModal={() => {
+                        const ev = row.events;
+                        if (!ev?.id) return;
+                        setLostModal({ eventId: ev.id, onUpdate: patch => updateRow(row.id, patch), ev });
+                      }}
                     />
                   ))}
                 </tbody>
@@ -405,18 +412,32 @@ export default function TastingDetailPage() {
           onAdded={() => { setAllocOpen(false); load(); }}
         />
       )}
+      {lostModal && (
+        <LostReasonModal
+          onCancel={() => setLostModal(null)}
+          onConfirm={async (reason) => {
+            const { ev } = lostModal;
+            lostModal.onUpdate({ events: ev ? { ...ev, status: 'lost', lost_reason: reason } : ev });
+            if (ev?.id) {
+              await supabase.from('events').update({ status: 'lost', lost_reason: reason, date_reserved: false }).eq('id', ev.id);
+            }
+            setLostModal(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
 // ── GuestRow ───────────────────────────────────────────────────────────────────
-function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: {
+function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate, onOpenLostModal }: {
   row: SessionEvent;
   isLast: boolean;
   sessionDate: string;
   onUpdate: (p: Partial<SessionEvent>) => void;
   onRemove: () => void;
   onNavigate: () => void;
+  onOpenLostModal: () => void;
 }) {
   const [paid,       setPaid]       = useState(row.paid_amount != null ? String(row.paid_amount) : '');
   const [guestCount, setGuestCount] = useState(row.guest_count != null ? String(row.guest_count) : '');
@@ -466,6 +487,7 @@ function GuestRow({ row, isLast, sessionDate, onUpdate, onRemove, onNavigate }: 
         <StatusSelect
           value={ev?.status ?? ''}
           onChange={async (next) => {
+            if (next === 'lost') { onOpenLostModal(); return; }
             onUpdate({ events: ev ? { ...ev, status: next } : ev });
             if (ev?.id) {
               const { error } = await supabase.from('events').update({ status: next }).eq('id', ev.id);
