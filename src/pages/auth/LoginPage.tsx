@@ -4,16 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { LogIn, UserPlus, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { LogIn, KeyRound, Eye, EyeOff } from 'lucide-react';
 import logoRondello from '@/assets/logo-rondello.png';
 
 export default function LoginPage() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -38,65 +36,20 @@ export default function LoginPage() {
     setLoading(false);
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password || !name.trim()) { toast.error('Preencha todos os campos'); return; }
-    if (password.length < 6) { toast.error('Senha deve ter no mínimo 6 caracteres'); return; }
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { display_name: name.trim() },
-        emailRedirectTo: window.location.origin,
-      },
-    });
-
-    if (error) {
-      if (error.message.includes('already registered') || error.message.includes('already been registered')) {
-        toast.error('Este email já está cadastrado. Faça login.');
-      } else {
-        toast.error(error.message);
-      }
-      setLoading(false);
-      return;
-    }
-
-    if (data.session) {
-      // Email confirmation disabled — user is logged in immediately
-      toast.success('Conta criada com sucesso!');
-    } else {
-      // Email confirmation required
-      toast.success('Verifique seu email para confirmar o cadastro e depois faça login.', { duration: 6000 });
-      setIsSignUp(false);
-    }
-    setLoading(false);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Decorative background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-1/4 -right-1/4 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute -bottom-1/4 -left-1/4 w-[500px] h-[500px] rounded-full bg-primary/3 blur-3xl" />
       </div>
 
       <div className="w-full max-w-sm space-y-8 relative z-10">
-        {/* Logo */}
         <div className="text-center space-y-3">
           <img src={logoRondello} alt="Rondello Buffet" className="h-20 mx-auto" />
           <p className="text-xs text-muted-foreground tracking-[0.2em] uppercase font-medium">Sistema de Gestão</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={isForgotPassword ? handleForgotPassword : isSignUp ? handleSignUp : handleLogin} className="glass-card rounded-2xl p-6 space-y-4 shadow-xl">
-          {isSignUp && (
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Nome</label>
-              <Input value={name} onChange={e => setName(e.target.value)} placeholder="Seu nome" className="h-11 rounded-xl" />
-            </div>
-          )}
+        <form onSubmit={isForgotPassword ? handleForgotPassword : handleLogin} className="glass-card rounded-2xl p-6 space-y-4 shadow-xl">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Email</label>
             <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" className="h-11 rounded-xl" />
@@ -113,29 +66,20 @@ export default function LoginPage() {
             </div>
           )}
           <Button type="submit" className="w-full h-11 rounded-xl font-semibold text-sm" disabled={loading}>
-            {isForgotPassword ? <KeyRound className="w-4 h-4 mr-2" /> : isSignUp ? <UserPlus className="w-4 h-4 mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
-            {loading ? 'Aguarde...' : isForgotPassword ? 'Enviar link de redefinição' : isSignUp ? 'Criar Conta' : 'Entrar'}
+            {isForgotPassword ? <KeyRound className="w-4 h-4 mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
+            {loading ? 'Aguarde...' : isForgotPassword ? 'Enviar link de redefinição' : 'Entrar'}
           </Button>
           {!isForgotPassword && (
-            <button
-              type="button"
-              className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setIsForgotPassword(true)}
-            >
+            <button type="button" className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors" onClick={() => setIsForgotPassword(true)}>
               Esqueci minha senha
             </button>
           )}
           {isForgotPassword && (
-            <button
-              type="button"
-              className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
-              onClick={() => setIsForgotPassword(false)}
-            >
+            <button type="button" className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors font-medium" onClick={() => setIsForgotPassword(false)}>
               Voltar ao login
             </button>
           )}
         </form>
-
       </div>
     </div>
   );
