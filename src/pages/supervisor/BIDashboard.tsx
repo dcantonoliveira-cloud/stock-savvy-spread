@@ -147,6 +147,7 @@ interface EventBI {
   organizer: string | null;
   organizer_id: string | null;
   lost_reason: string | null;
+  price_per_person: number | null;
 }
 
 type TabKey = 'geral' | 'fechados' | 'aberto' | 'nfechou' | 'clientes' | 'parceiros' | 'kpis';
@@ -203,7 +204,7 @@ export default function BIDashboard() {
     const [evRes, clRes, locRes] = await Promise.all([
       supabase
         .from('events' as any)
-        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, contract_signed_date, created_at, client_id, organizer, organizer_id, lost_reason')
+        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, price_per_person, contract_signed_date, created_at, client_id, organizer, organizer_id, lost_reason')
         .order('event_date', { ascending: false }),
       supabase.from('clients' as any).select('id, name, zip_code, source'),
       supabase.from('event_locations' as any).select('id, name'),
@@ -386,18 +387,17 @@ function TabGeral({ ev, fc, ab, all, locName, ticketMedio }: {
 
   // Evolução do ticket médio por ano
   const ticketPorAno = (() => {
-    const byYear: Record<number, { valores: number[]; convidados: number[] }> = {};
+    const byYear: Record<number, { valores: number[]; pax: number[] }> = {};
     all.filter(e => isFechado(e.status) && e.event_date).forEach(e => {
       const a = yearOf(e.event_date!);
-      if (!byYear[a]) byYear[a] = { valores: [], convidados: [] };
+      if (!byYear[a]) byYear[a] = { valores: [], pax: [] };
       if ((e.total_value ?? 0) > 500) byYear[a].valores.push(e.total_value!);
-      const g = (e.guest_count ?? 0);
-      if (g > 0 && (e.total_value ?? 0) > 500) byYear[a].convidados.push((e.total_value!) / g);
+      if ((e.price_per_person ?? 0) > 0) byYear[a].pax.push(e.price_per_person!);
     });
     return Object.entries(byYear).sort(([a], [b]) => Number(a) - Number(b)).map(([ano, d]) => ({
       ano,
-      ticketEvento:    d.valores.length    ? Math.round(avg(d.valores))    : null,
-      ticketConvidado: d.convidados.length ? Math.round(avg(d.convidados)) : null,
+      ticketEvento:    d.valores.length ? Math.round(avg(d.valores)) : null,
+      ticketConvidado: d.pax.length     ? Math.round(avg(d.pax))     : null,
     }));
   })();
 
