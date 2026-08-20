@@ -5,6 +5,7 @@ import {
   Tooltip, ResponsiveContainer, Cell, Legend, PieChart, Pie, FunnelChart, Funnel, LabelList,
 } from 'recharts';
 import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { LOST_REASONS, getLostReasonLabel } from '@/lib/lostReasons';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const COLORS = ['#B8922A','#2E4A7A','#3D5C38','#D4AA50','#8C7B6A','#7A2C1E','#1E5C5A','#7A6240','#5C3D8A','#2C5C7A','#4A7A3D','#7A4A2C'];
@@ -145,6 +146,7 @@ interface EventBI {
   clients: ClientBI | null;
   organizer: string | null;
   organizer_id: string | null;
+  lost_reason: string | null;
 }
 
 type TabKey = 'geral' | 'fechados' | 'aberto' | 'nfechou' | 'clientes' | 'parceiros' | 'kpis';
@@ -201,7 +203,7 @@ export default function BIDashboard() {
     const [evRes, clRes, locRes] = await Promise.all([
       supabase
         .from('events' as any)
-        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, contract_signed_date, created_at, client_id, organizer, organizer_id')
+        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, contract_signed_date, created_at, client_id, organizer, organizer_id, lost_reason')
         .order('event_date', { ascending: false }),
       supabase.from('clients' as any).select('id, name, zip_code, source'),
       supabase.from('event_locations' as any).select('id, name'),
@@ -900,6 +902,18 @@ function TabNFechou({ nf, ev }: { nf: EventBI[]; ev: EventBI[] }) {
   nf.forEach(e => { const t = e.event_type || 'N/D'; if (!porTipo[t]) porTipo[t] = { q: 0, v: 0 }; porTipo[t].q++; porTipo[t].v += e.total_value ?? 0; });
   const tipoArr = Object.entries(porTipo).sort((a, b) => b[1].q - a[1].q).slice(0, 8);
 
+  // Motivos
+  const comMotivo = nf.filter(e => e.lost_reason);
+  const semMotivo = nf.length - comMotivo.length;
+  const porMotivo = LOST_REASONS.map(r => {
+    const matches = nf.filter(e => e.lost_reason === r.key);
+    return { key: r.key, label: r.label, q: matches.length, v: sum(matches.map(e => e.total_value ?? 0)) };
+  }).filter(r => r.q > 0).sort((a, b) => b.q - a.q);
+  const motivoData = [
+    ...porMotivo,
+    ...(semMotivo > 0 ? [{ key: 'sem_motivo', label: 'Sem motivo registrado', q: semMotivo, v: 0 }] : []),
+  ];
+
   const porAno: Record<number, { q: number; v: number }> = {};
   nf.forEach(e => {
     if (e.event_date) { const a = yearOf(e.event_date); if (!porAno[a]) porAno[a] = { q: 0, v: 0 }; porAno[a].q++; porAno[a].v += e.total_value ?? 0; }
@@ -967,6 +981,64 @@ function TabNFechou({ nf, ev }: { nf: EventBI[]; ev: EventBI[] }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* ── Motivos ── */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Gráfico de barras horizontal */}
+        <div className="bg-white border border-border rounded-xl p-5">
+          <SH>Por motivo</SH>
+          <div className="mt-4 space-y-3">
+            {motivoData.map(r => {
+              const barPct = nf.length ? Math.round(r.q / nf.length * 100) : 0;
+              const isSem = r.key === 'sem_motivo';
+              return (
+                <div key={r.key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs ${isSem ? 'text-muted-foreground/60 italic' : 'text-foreground'}`}>{r.label}</span>
+                    <span className="text-xs font-semibold text-foreground tabular-nums">{r.q} <span className="text-muted-foreground font-normal">({barPct}%)</span></span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${isSem ? 'bg-muted-foreground/30' : 'bg-[#7A2C1E]'}`}
+                      style={{ width: `${barPct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-muted-foreground/50 mt-4">
+            {comMotivo.length} de {nf.length} com motivo registrado ({nf.length ? pct(comMotivo.length, nf.length) : '—'})
+          </p>
+        </div>
+
+        {/* Tabela detalhada */}
+        <div className="bg-white border border-border rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <SH>Detalhamento por motivo</SH>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/30 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                <th className="text-left px-4 py-2.5">Motivo</th>
+                <th className="text-right px-4 py-2.5">Qtd</th>
+                <th className="text-right px-4 py-2.5">Receita perdida</th>
+                <th className="text-right px-4 py-2.5">% do total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {motivoData.map(r => (
+                <tr key={r.key} className="hover:bg-muted/20">
+                  <td className={`px-4 py-2.5 ${r.key === 'sem_motivo' ? 'text-muted-foreground/60 italic' : 'text-foreground'}`}>{r.label}</td>
+                  <td className="px-4 py-2.5 text-right text-muted-foreground tabular-nums">{r.q}</td>
+                  <td className="px-4 py-2.5 text-right text-muted-foreground">{r.v > 500 ? fmFull(r.v) : '—'}</td>
+                  <td className="px-4 py-2.5 text-right text-muted-foreground">{pct(r.q, nf.length)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
