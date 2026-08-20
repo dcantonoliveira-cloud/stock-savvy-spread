@@ -263,6 +263,16 @@ export default function EstatisticasPage() {
     faturamento: tableRows.reduce((s, r) => s + r.faturamento, 0),
   }), [tableRows]);
 
+  // Faturamento por mês do evento (event_date) — para o gráfico break-even
+  // Inclui eventos confirmados, concluídos e com contrato assinado (mesmo futuros)
+  const fatPorMesEvento = useMemo(() => MONTHS.map((_, i) => {
+    const mes = events.filter(e =>
+      e.event_date && monthOf(e.event_date) === i &&
+      (e.status === 'confirmed' || e.status === 'completed' || e.contract_signed)
+    );
+    return Math.round(mes.reduce((s, e) => s + (e.total_value ?? 0), 0));
+  }), [events]);
+
   // Degustações section
   const now = new Date();
   const getTastingDate = (t: any) => {
@@ -527,27 +537,19 @@ export default function EstatisticasPage() {
               </div>
             )}
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={tableRows.map((r, i) => ({ name: MONTHS[i], fat: Math.round(r.faturamento) }))} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <BarChart data={MONTHS.map((m, i) => ({ name: m, fat: fatPorMesEvento[i] }))} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
                 <YAxis tick={{ fontSize: 11, fill: '#888' }} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v: any) => [fmtBRL(v), 'Faturamento']} />
-                <Bar dataKey="fat" name="Faturamento" fill="#B8922A" radius={[3,3,0,0]}
-                  label={false}
-                  // color acima/abaixo do ponto
-                  {...(breakEven ? {
-                    children: tableRows.map((r, i) => (
-                      <rect key={i} fill={r.faturamento >= (breakEven ?? 0) ? '#22c55e' : '#B8922A'} />
-                    ))
-                  } : {})}
-                />
+                <Tooltip formatter={(v: any) => [fmtBRL(v), 'Faturamento previsto']} />
+                <Bar dataKey="fat" name="Faturamento" fill="#B8922A" radius={[3,3,0,0]} />
                 {breakEven && <ReferenceLine y={breakEven} stroke="#ef4444" strokeDasharray="6 3" strokeWidth={2} label={{ value: `PE R$${(breakEven/1000).toFixed(0)}K`, position: 'right', fontSize: 10, fill: '#ef4444' }} />}
               </BarChart>
             </ResponsiveContainer>
             {breakEven && (() => {
-              const mesesAbaixo = tableRows.filter(r => r.faturamento > 0 && r.faturamento < breakEven!).length;
-              const mesesAcima  = tableRows.filter(r => r.faturamento >= breakEven!).length;
-              const fatTotal = tableRows.reduce((s, r) => s + r.faturamento, 0);
+              const mesesAbaixo = fatPorMesEvento.filter(v => v > 0 && v < breakEven!).length;
+              const mesesAcima  = fatPorMesEvento.filter(v => v >= breakEven!).length;
+              const fatTotal    = fatPorMesEvento.reduce((s, v) => s + v, 0);
               const beAnual  = breakEven * 12;
               return (
                 <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
