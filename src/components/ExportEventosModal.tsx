@@ -44,6 +44,20 @@ const FIELD_GROUPS = [
     ],
   },
   {
+    group: 'Detalhes do evento',
+    fields: [
+      { key: 'duration_hours',        label: 'Tempo de festa (h)' },
+      { key: 'start_time',            label: 'Horário início' },
+      { key: 'end_time',              label: 'Horário término' },
+      { key: 'product_name',          label: 'Produto' },
+      { key: 'professional_count',    label: 'Staff (nº profissionais)' },
+      { key: 'rechaud',               label: 'Rechaud' },
+      { key: 'tablecloth',            label: 'Toalha' },
+      { key: 'table_count',           label: 'Nº de mesas' },
+      { key: 'guests_per_table',      label: 'Pessoas por mesa' },
+    ],
+  },
+  {
     group: 'Cardápio',
     fields: [
       { key: 'menu_mode',  label: 'Modo do cardápio' },
