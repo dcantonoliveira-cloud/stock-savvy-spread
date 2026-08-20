@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Plus, ChevronDown, Info, Trash2, ChevronsUpDown, ChevronUp } from 'lucide-react';
+import { Search, Plus, ChevronDown, Info, Trash2, ChevronsUpDown, ChevronUp, FileDown } from 'lucide-react';
 import { LostReasonModal } from '@/components/LostReasonModal';
+import { ExportEventosModal } from '@/components/ExportEventosModal';
 import { getLostReasonLabel } from '@/lib/lostReasons';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ export default function OrcamentosPage() {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [iframeToken, setIframeToken] = useState<string | null>(null);
   const [iframeUser,  setIframeUser]  = useState<string>('');
+  const [exportOpen, setExportOpen]   = useState(false);
   const [sortAsc, setSortAsc] = useState(true);
   const [lostModal, setLostModal] = useState<{ id: string } | null>(null);
 
@@ -283,13 +285,22 @@ export default function OrcamentosPage() {
           />
         </div>
 
-        <button
-          onClick={() => navigate('/events', { state: { openNew: true, backTo: '/orcamentos' } })}
-          className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Novo orçamento
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setExportOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            Excel
+          </button>
+          <button
+            onClick={() => navigate('/events', { state: { openNew: true, backTo: '/orcamentos' } })}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Novo orçamento
+          </button>
+        </div>
       </div>
 
       {/* ── Tabela ── */}
@@ -413,6 +424,12 @@ export default function OrcamentosPage() {
         <LostReasonModal
           onConfirm={reason => { applyStatus(lostModal.id, 'lost', reason); setLostModal(null); }}
           onCancel={() => setLostModal(null)}
+        />
+      )}
+      {exportOpen && (
+        <ExportEventosModal
+          onClose={() => setExportOpen(false)}
+          currentFilter={filter}
         />
       )}
     </div>
