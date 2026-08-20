@@ -13,7 +13,7 @@ import {
   Download, SlidersHorizontal, CalendarX,
   MapPin, Users, DollarSign, FileText, X,
   Phone, Mail, Edit2, Trash2, ClipboardCheck, Filter,
-  FileCheck2, FileClock, Loader2, UtensilsCrossed,
+  FileCheck2, FileClock, Loader2, UtensilsCrossed, FileDown,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import LinkedField from '@/components/LinkedField';
@@ -50,6 +50,7 @@ type Client = { id: string; name: string; phone: string | null; email: string | 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 import { STATUS_LABELS, STATUS_CLS, ALL_STATUS_KEYS } from '@/lib/eventStatus';
+import { ExportEventosModal } from '@/components/ExportEventosModal';
 const STATUS_CLASSES: Record<string,string> = Object.fromEntries(ALL_STATUS_KEYS.map(k => [k, STATUS_CLS(k)]));
 const EVENT_TYPES = ['Aniversário','Batizado','Casamento','Confraternização','Corporativo','Debutante','Formatura','Outro'];
 const EMPTY_FORM = {
@@ -132,6 +133,7 @@ export default function EventsPage() {
   // Carrega degustações toda vez que o form de criação abre
   useEffect(() => { if (newOpen) loadTastingSessions(); }, [newOpen]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState<EventRow | null>(null);
   const [editMode, setEditMode] = useState(false);
 
@@ -939,6 +941,11 @@ export default function EventsPage() {
               </>
             )}
           </div>
+          <button onClick={() => setExportOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors shrink-0">
+            <FileDown className="w-4 h-4" />
+            Excel
+          </button>
           <Button onClick={() => { setForm({...EMPTY_FORM}); setClientQuery(''); setLocationQuery(''); setNewOpen(true); loadClients(); loadTastingSessions(); }}
             className="gap-1.5 shrink-0 rounded-lg h-9 px-4">
             <Plus className="w-4 h-4" />
@@ -1371,6 +1378,12 @@ export default function EventsPage() {
           </div>
         </div>,
         document.body,
+      )}
+      {exportOpen && (
+        <ExportEventosModal
+          onClose={() => setExportOpen(false)}
+          currentFilter="all"
+        />
       )}
     </div>
   );

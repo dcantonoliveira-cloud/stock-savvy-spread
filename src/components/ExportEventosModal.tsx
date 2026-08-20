@@ -14,9 +14,6 @@ const FIELD_GROUPS = [
       { key: 'status',              label: 'Status' },
       { key: 'event_date',          label: 'Data do evento' },
       { key: 'location_text',       label: 'Local' },
-      { key: 'guest_count',         label: 'Nº de convidados' },
-      { key: 'price_per_person',    label: 'Valor por pessoa (R$)' },
-      { key: 'total_value',         label: 'Valor total estimado (R$)' },
       { key: 'date_reserved',       label: 'Data reservada?' },
       { key: 'contract_signed',     label: 'Contrato assinado?' },
       { key: 'contract_signed_date',label: 'Data assinatura do contrato' },
@@ -24,11 +21,33 @@ const FIELD_GROUPS = [
     ],
   },
   {
+    group: 'Financeiro',
+    fields: [
+      { key: 'guest_count',         label: 'Nº de convidados' },
+      { key: 'children_50_pct',     label: 'Crianças (50%)' },
+      { key: 'price_per_person',    label: 'Valor por pessoa (R$)' },
+      { key: 'total_value',         label: 'Valor total estimado (R$)' },
+      { key: 'additional_hours',    label: 'Horas extras' },
+      { key: 'extra_hour_price',    label: 'Valor hora extra (R$)' },
+      { key: 'total_extra',         label: 'Total horas extras (R$)' },
+    ],
+  },
+  {
     group: 'Cliente',
     fields: [
-      { key: 'client_name',  label: 'Nome do cliente' },
-      { key: 'client_phone', label: 'Telefone do cliente' },
-      { key: 'client_email', label: 'E-mail do cliente' },
+      { key: 'client_name',         label: 'Nome do cliente' },
+      { key: 'client_phone',        label: 'Telefone do cliente' },
+      { key: 'client_email',        label: 'E-mail do cliente' },
+      { key: 'contratante_cpf',     label: 'CPF' },
+      { key: 'contratante_address', label: 'Endereço do cliente' },
+      { key: 'source',              label: 'Origem do lead' },
+    ],
+  },
+  {
+    group: 'Cardápio',
+    fields: [
+      { key: 'menu_mode',  label: 'Modo do cardápio' },
+      { key: 'menu_text',  label: 'Cardápio (texto)' },
     ],
   },
   {
@@ -40,7 +59,7 @@ const FIELD_GROUPS = [
   {
     group: 'Informações internas',
     fields: [
-      { key: 'organizer',   label: 'Responsável' },
+      { key: 'organizer',   label: 'Responsável / Assessoria' },
       { key: 'notes',       label: 'Observações' },
     ],
   },
@@ -114,7 +133,7 @@ export function ExportEventosModal({ onClose, currentFilter }: {
     try {
       let q = supabase
         .from('events')
-        .select('*, clients(name, phone, email)')
+        .select('*, clients(name, phone, email, cpf, address, source)')
         .is('deleted_at', null)
         .order('event_date', { ascending: false });
 
@@ -150,10 +169,19 @@ export function ExportEventosModal({ onClose, currentFilter }: {
             case 'client_name':         row[labelMap[key]] = ev.clients?.name ?? ev.contratante_name ?? ''; break;
             case 'client_phone':        row[labelMap[key]] = ev.clients?.phone ?? ev.contratante_phone ?? ''; break;
             case 'client_email':        row[labelMap[key]] = ev.clients?.email ?? ev.contratante_email ?? ''; break;
+            case 'contratante_cpf':     row[labelMap[key]] = ev.clients?.cpf ?? ev.contratante_cpf ?? ''; break;
+            case 'contratante_address': row[labelMap[key]] = ev.clients?.address ?? ev.contratante_address ?? ''; break;
+            case 'source':              row[labelMap[key]] = ev.clients?.source ?? ''; break;
             case 'total_value': {
               const g = ev.guest_count ?? 0;
               const p = ev.price_per_person ?? 0;
               row[labelMap[key]] = g && p ? g * p : '';
+              break;
+            }
+            case 'total_extra': {
+              const h = ev.additional_hours ?? 0;
+              const hp = ev.extra_hour_price ?? 0;
+              row[labelMap[key]] = h && hp ? h * hp : '';
               break;
             }
             default: row[labelMap[key]] = ev[key] ?? '';

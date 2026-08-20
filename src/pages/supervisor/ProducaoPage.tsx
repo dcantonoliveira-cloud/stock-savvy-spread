@@ -2,13 +2,14 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil, List, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { toast } from 'sonner';
+import { ProducaoMateriaisTab } from './ProducaoMateriaisTab';
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
 
 type Status = 'pending' | 'in_progress' | 'done';
-type FilterType = Status | 'financeiro';
+type FilterType = Status | 'financeiro' | 'materiais';
 
 interface Order {
   id: string;
@@ -564,12 +565,14 @@ export default function SupervisorProducaoPage() {
           </div>
         )}
         <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-          {(['pending', 'in_progress', 'done', ...(canFinanceiro ? ['financeiro' as const] : [])] as const).map(f => (
+          {(['pending', 'in_progress', 'done', ...(canFinanceiro ? ['financeiro' as const] : []), 'materiais' as const] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filter === f ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}>
-              {f === 'financeiro' ? <><TrendingUp className="w-3 h-3" />Financeiro</> : STATUS_CFG[f].label}
+              {f === 'financeiro' ? <><TrendingUp className="w-3 h-3" />Financeiro</>
+               : f === 'materiais' ? <><Package className="w-3 h-3" />Materiais</>
+               : STATUS_CFG[f as Status].label}
             </button>
           ))}
         </div>
@@ -582,8 +585,13 @@ export default function SupervisorProducaoPage() {
           : <FinanceiroView orders={orders} />
       )}
 
+      {/* Materiais view */}
+      {filter === 'materiais' && (
+        <ProducaoMateriaisTab orders={orders.map(o => ({ id: o.id, title: o.title }))} />
+      )}
+
       {/* Calendar view */}
-      {filter !== 'financeiro' && viewMode === 'calendar' && (
+      {filter !== 'financeiro' && filter !== 'materiais' && viewMode === 'calendar' && (
         loading
           ? <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
           : <CalendarView
@@ -596,7 +604,7 @@ export default function SupervisorProducaoPage() {
       )}
 
       {/* Orders table */}
-      {filter !== 'financeiro' && viewMode === 'list' && (
+      {filter !== 'financeiro' && filter !== 'materiais' && viewMode === 'list' && (
         loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
         ) : filtered.length === 0 ? (
