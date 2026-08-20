@@ -384,6 +384,23 @@ function TabGeral({ ev, fc, ab, all, locName, ticketMedio }: {
     .filter(d => d >= 0);
   const avgDias = diasArr.length ? Math.round(avg(diasArr)) : null;
 
+  // Evolução do ticket médio por ano
+  const ticketPorAno = (() => {
+    const byYear: Record<number, { valores: number[]; convidados: number[] }> = {};
+    all.filter(e => isFechado(e.status) && e.event_date).forEach(e => {
+      const a = yearOf(e.event_date!);
+      if (!byYear[a]) byYear[a] = { valores: [], convidados: [] };
+      if ((e.total_value ?? 0) > 500) byYear[a].valores.push(e.total_value!);
+      const g = (e.guest_count ?? 0);
+      if (g > 0 && (e.total_value ?? 0) > 500) byYear[a].convidados.push((e.total_value!) / g);
+    });
+    return Object.entries(byYear).sort(([a], [b]) => Number(a) - Number(b)).map(([ano, d]) => ({
+      ano,
+      ticketEvento:    d.valores.length    ? Math.round(avg(d.valores))    : null,
+      ticketConvidado: d.convidados.length ? Math.round(avg(d.convidados)) : null,
+    }));
+  })();
+
   return (
     <div className="space-y-6">
       {/* KPIs topo */}
@@ -466,6 +483,27 @@ function TabGeral({ ev, fc, ab, all, locName, ticketMedio }: {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Evolução do Ticket Médio por Ano */}
+      {ticketPorAno.length >= 2 && (
+        <div className="bg-white border border-border rounded-xl p-5">
+          <SH>Evolução do Ticket Médio por Ano</SH>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={ticketPorAno} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="ano" tick={{ fontSize: 11, fill: '#888' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#888' }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}K`} />
+              <Tooltip formatter={(v: any, n: string) => [fmBRL(v), n]} />
+              <Line type="monotone" dataKey="ticketEvento" name="Ticket do Evento" stroke="#B8922A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
+              <Line type="monotone" dataKey="ticketConvidado" name="Ticket por Convidado" stroke="#2E4A7A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex gap-6 mt-2 justify-center">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="w-3 h-0.5 bg-[#B8922A] inline-block" />Ticket médio do evento</div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="w-3 h-0.5 bg-[#2E4A7A] inline-block" />Ticket médio por convidado</div>
+          </div>
+        </div>
+      )}
 
       {avgDias != null && (
         <div className="bg-amber-50 border border-amber-100 rounded-xl px-5 py-3 text-sm text-amber-800 flex items-center gap-2">

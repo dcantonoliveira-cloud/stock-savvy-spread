@@ -1,13 +1,14 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight, Users, BarChart3, DollarSign, ExternalLink, CheckCircle2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, BarChart3, DollarSign, ExternalLink, CheckCircle2, X, Pencil, Save, Target } from 'lucide-react';
 import BIDashboard from './BIDashboard';
 import { getStatus } from '@/lib/eventStatus';
 import {
-  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
+  LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
+import { toast } from 'sonner';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -85,6 +86,58 @@ export default function EstatisticasPage() {
   const [tastingRange, setTastingRange] = useState<'3m' | '1a' | 'all'>('1a');
   const [activeCell, setActiveCell] = useState<{ key: string; month: number } | null>(null);
 
+  // ── Break-even & Metas ──────────────────────────────────────────────────────
+  const [breakEven, setBreakEven] = useState<number | null>(null);
+  const [breakEvenInput, setBreakEvenInput] = useState('');
+  const [editingBE, setEditingBE] = useState(false);
+  const [savingBE, setSavingBE] = useState(false);
+
+  interface Metas { eventos: number | null; faturamento: number | null; ticket: number | null }
+  const [metas, setMetas] = useState<Metas>({ eventos: null, faturamento: null, ticket: null });
+  const [metasInput, setMetasInput] = useState<Metas>({ eventos: null, faturamento: null, ticket: null });
+  const [editingMetas, setEditingMetas] = useState(false);
+  const [savingMetas, setSavingMetas] = useState(false);
+
+  const loadSettings = useCallback(async () => {
+    const { data } = await supabase.from('company_settings').select('key, value').in('key', ['break_even', 'metas']);
+    data?.forEach((row: any) => {
+      if (row.key === 'break_even') {
+        const v = Number(row.value?.monthly ?? row.value);
+        setBreakEven(isNaN(v) ? null : v);
+        setBreakEvenInput(isNaN(v) ? '' : String(v));
+      }
+      if (row.key === 'metas') {
+        const m = row.value as Metas;
+        setMetas(m);
+        setMetasInput({ ...m });
+      }
+    });
+  }, []);
+
+  const saveBE = async () => {
+    const val = Number(breakEvenInput.replace(/\D/g, ''));
+    if (!val || val <= 0) { toast.error('Digite um valor válido'); return; }
+    setSavingBE(true);
+    const { error } = await supabase.from('company_settings').upsert(
+      { key: 'break_even', value: { monthly: val } },
+      { onConflict: 'company_id,key' }
+    );
+    if (error) { toast.error('Erro ao salvar: ' + error.message); }
+    else { setBreakEven(val); setEditingBE(false); toast.success('Ponto de equilíbrio salvo'); }
+    setSavingBE(false);
+  };
+
+  const saveMetas = async () => {
+    setSavingMetas(true);
+    const { error } = await supabase.from('company_settings').upsert(
+      { key: 'metas', value: metasInput },
+      { onConflict: 'company_id,key' }
+    );
+    if (error) { toast.error('Erro ao salvar: ' + error.message); }
+    else { setMetas({ ...metasInput }); setEditingMetas(false); toast.success('Metas salvas'); }
+    setSavingMetas(false);
+  };
+
   // ── Load data ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
@@ -111,10 +164,11 @@ export default function EstatisticasPage() {
       setEvents((evtRes.data ?? []) as EventRow[]);
       setContratos((contratosRes.data ?? []) as ContratoRow[]);
       setTastings((tastRes.data ?? []) as any[]);
+      await loadSettings();
       setLoading(false);
     };
     load();
-  }, [year]);
+  }, [year, loadSettings]);
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const completed = useMemo(() => events.filter(e => e.status === 'completed' || e.status === 'confirmed'), [events]);
@@ -437,7 +491,168 @@ export default function EstatisticasPage() {
             }}
           />}
 
-          {/* ── Seção 4: Degustações ── */}
+          {/* ── Seção 4: Ponto de Equilíbrio ── */}
+          <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-foreground">Ponto de Equilíbrio Mensal</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Compare o faturamento mensal com seu ponto de equilíbrio</p>
+              </div>
+              {!editingBE ? (
+                <button onClick={() => { setEditingBE(true); setBreakEvenInput(breakEven ? String(breakEven) : ''); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                  {breakEven ? 'Editar' : 'Definir ponto'}
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">R$</span>
+                  <input
+                    type="number" value={breakEvenInput} onChange={e => setBreakEvenInput(e.target.value)}
+                    placeholder="Ex: 50000"
+                    className="w-32 text-sm border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <button onClick={saveBE} disabled={savingBE}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs rounded-lg hover:bg-primary/90 disabled:opacity-40">
+                    <Save className="w-3.5 h-3.5" />{savingBE ? 'Salvando…' : 'Salvar'}
+                  </button>
+                  <button onClick={() => setEditingBE(false)} className="text-xs text-muted-foreground hover:text-foreground px-2">Cancelar</button>
+                </div>
+              )}
+            </div>
+            {breakEven && (
+              <div className="flex gap-4 text-xs text-muted-foreground mb-2">
+                <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-[#B8922A] inline-block"/>Faturamento mensal</div>
+                <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-red-500 border-dashed inline-block" style={{borderTop:'2px dashed #ef4444',height:0}}/>Ponto de equilíbrio</div>
+              </div>
+            )}
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={tableRows.map((r, i) => ({ name: MONTHS[i], fat: Math.round(r.faturamento) }))} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#888' }} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
+                <Tooltip formatter={(v: any) => [fmtBRL(v), 'Faturamento']} />
+                <Bar dataKey="fat" name="Faturamento" fill="#B8922A" radius={[3,3,0,0]}
+                  label={false}
+                  // color acima/abaixo do ponto
+                  {...(breakEven ? {
+                    children: tableRows.map((r, i) => (
+                      <rect key={i} fill={r.faturamento >= (breakEven ?? 0) ? '#22c55e' : '#B8922A'} />
+                    ))
+                  } : {})}
+                />
+                {breakEven && <ReferenceLine y={breakEven} stroke="#ef4444" strokeDasharray="6 3" strokeWidth={2} label={{ value: `PE R$${(breakEven/1000).toFixed(0)}K`, position: 'right', fontSize: 10, fill: '#ef4444' }} />}
+              </BarChart>
+            </ResponsiveContainer>
+            {breakEven && (() => {
+              const mesesAbaixo = tableRows.filter(r => r.faturamento > 0 && r.faturamento < breakEven!).length;
+              const mesesAcima  = tableRows.filter(r => r.faturamento >= breakEven!).length;
+              const fatTotal = tableRows.reduce((s, r) => s + r.faturamento, 0);
+              const beAnual  = breakEven * 12;
+              return (
+                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
+                  <div className="rounded-xl border border-border p-3 text-center">
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-widest">Meses acima do PE</p>
+                    <p className="text-2xl font-bold text-emerald-600 mt-1">{mesesAcima}</p>
+                  </div>
+                  <div className="rounded-xl border border-border p-3 text-center">
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-widest">Meses abaixo do PE</p>
+                    <p className="text-2xl font-bold text-red-500 mt-1">{mesesAbaixo}</p>
+                  </div>
+                  <div className="rounded-xl border border-border p-3 text-center">
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-widest">Fat. vs meta anual</p>
+                    <p className={`text-2xl font-bold mt-1 ${fatTotal >= beAnual ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {Math.round(fatTotal / beAnual * 100)}%
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+            {!breakEven && (
+              <p className="text-center text-sm text-muted-foreground py-4">Defina seu ponto de equilíbrio mensal para ver a comparação.</p>
+            )}
+          </div>
+
+          {/* ── Seção 5: Metas ── */}
+          <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-foreground flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Metas do Ano</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Defina suas metas e acompanhe o progresso</p>
+              </div>
+              {!editingMetas ? (
+                <button onClick={() => { setEditingMetas(true); setMetasInput({ ...metas }); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />Editar metas
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button onClick={saveMetas} disabled={savingMetas}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs rounded-lg hover:bg-primary/90 disabled:opacity-40">
+                    <Save className="w-3.5 h-3.5" />{savingMetas ? 'Salvando…' : 'Salvar'}
+                  </button>
+                  <button onClick={() => setEditingMetas(false)} className="text-xs text-muted-foreground hover:text-foreground px-2">Cancelar</button>
+                </div>
+              )}
+            </div>
+            {editingMetas ? (
+              <div className="grid grid-cols-3 gap-4">
+                {([
+                  { key: 'eventos',     label: 'Eventos realizados', prefix: '', suffix: 'eventos' },
+                  { key: 'faturamento', label: 'Faturamento anual',  prefix: 'R$', suffix: '' },
+                  { key: 'ticket',      label: 'Ticket médio/convidado', prefix: 'R$', suffix: '' },
+                ] as const).map(({ key, label, prefix }) => (
+                  <div key={key} className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">{label}</label>
+                    <div className="flex items-center gap-1.5">
+                      {prefix && <span className="text-xs text-muted-foreground">{prefix}</span>}
+                      <input
+                        type="number" value={metasInput[key] ?? ''}
+                        onChange={e => setMetasInput(prev => ({ ...prev, [key]: e.target.value ? Number(e.target.value) : null }))}
+                        placeholder="—"
+                        className="w-full text-sm border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { label: 'Eventos realizados', meta: metas.eventos,     atual: totalEvents,  suffix: '', fmt: (v: number) => String(v) },
+                  { label: 'Faturamento anual',  meta: metas.faturamento, atual: totals.faturamento, suffix: '', fmt: fmtBRL },
+                  { label: 'Ticket / convidado', meta: metas.ticket,      atual: ticketMedio,  suffix: '', fmt: fmtBRL },
+                ].map(({ label, meta, atual, fmt }) => {
+                  const pct = meta && meta > 0 ? Math.min(Math.round(atual / meta * 100), 100) : null;
+                  const over = meta && meta > 0 ? atual > meta : false;
+                  return (
+                    <div key={label} className="rounded-xl border border-border p-4 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">{label}</p>
+                      <div className="flex items-end gap-1">
+                        <p className={`text-xl font-bold ${over ? 'text-emerald-600' : 'text-foreground'}`}>{fmt(atual)}</p>
+                        {meta && <p className="text-xs text-muted-foreground mb-0.5">/ {fmt(meta)}</p>}
+                      </div>
+                      {pct !== null ? (
+                        <>
+                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all ${over ? 'bg-emerald-500' : pct >= 80 ? 'bg-amber-500' : 'bg-primary'}`}
+                              style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className={`text-xs font-semibold ${over ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                            {pct}%{over ? ' ✓ Meta atingida!' : ' da meta'}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Meta não definida</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Seção 6: Degustações ── */}
           <div className="bg-white border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
