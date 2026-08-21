@@ -516,6 +516,56 @@ function TabGeral({ ev, fc, ab, all, locName, ticketMedio }: {
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="w-3 h-0.5 bg-[#B8922A] inline-block" />Ticket médio do evento <span className="opacity-50">(eixo esq.)</span></div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="w-3 h-0.5 bg-[#2E4A7A] inline-block" />Ticket por convidado <span className="opacity-50">(eixo dir.)</span></div>
           </div>
+
+          {/* KPIs de evolução */}
+          {(() => {
+            const last  = ticketPorAno[ticketPorAno.length - 1];
+            const prev  = ticketPorAno[ticketPorAno.length - 2];
+            const best  = [...ticketPorAno].sort((a, b) => (b.ticketEvento ?? 0) - (a.ticketEvento ?? 0))[0];
+            const bestP = [...ticketPorAno].sort((a, b) => (b.ticketConvidado ?? 0) - (a.ticketConvidado ?? 0))[0];
+
+            const diffEvento = (last?.ticketEvento && prev?.ticketEvento)
+              ? ((last.ticketEvento - prev.ticketEvento) / prev.ticketEvento * 100)
+              : null;
+            const diffPax = (last?.ticketConvidado && prev?.ticketConvidado)
+              ? ((last.ticketConvidado - prev.ticketConvidado) / prev.ticketConvidado * 100)
+              : null;
+
+            const Pill = ({ v }: { v: number | null }) => {
+              if (v == null) return null;
+              const up = v >= 0;
+              return (
+                <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${up ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                  {up ? '▲' : '▼'} {Math.abs(v).toFixed(1)}%
+                </span>
+              );
+            };
+
+            return (
+              <div className="grid grid-cols-4 gap-3 mt-4 pt-4 border-t border-border">
+                <div className="rounded-xl border border-border p-3 space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">TM Evento — {last?.ano}</p>
+                  <p className="text-xl font-bold text-[#B8922A]">{last?.ticketEvento ? fmBRL(last.ticketEvento) : '—'}</p>
+                  <Pill v={diffEvento} />
+                </div>
+                <div className="rounded-xl border border-border p-3 space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">TM/Convidado — {last?.ano}</p>
+                  <p className="text-xl font-bold text-[#2E4A7A]">{last?.ticketConvidado ? fmBRL(last.ticketConvidado) : '—'}</p>
+                  <Pill v={diffPax} />
+                </div>
+                <div className="rounded-xl border border-border p-3 space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Melhor TM Evento</p>
+                  <p className="text-xl font-bold text-foreground">{best?.ticketEvento ? fmBRL(best.ticketEvento) : '—'}</p>
+                  <p className="text-[11px] text-muted-foreground">{best?.ano}</p>
+                </div>
+                <div className="rounded-xl border border-border p-3 space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Melhor TM/Convidado</p>
+                  <p className="text-xl font-bold text-foreground">{bestP?.ticketConvidado ? fmBRL(bestP.ticketConvidado) : '—'}</p>
+                  <p className="text-[11px] text-muted-foreground">{bestP?.ano}</p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
