@@ -810,6 +810,13 @@ export default function EstatisticasPage() {
                   const pct = meta && meta > 0 ? Math.min(Math.round(atual / meta * 100), 100) : null;
                   const over = meta && meta > 0 ? atual > meta : false;
 
+                  // Festas necessárias ao TM atual (só para o card de faturamento)
+                  const isFat = label === 'Faturamento anual';
+                  const faltaFat = isFat && meta && meta > atual ? meta - atual : 0;
+                  const festasNecessarias = isFat && faltaFat > 0 && ticketMedio > 0
+                    ? Math.ceil(faltaFat / ticketMedio)
+                    : null;
+
                   // TM necessário nos eventos restantes (só para o card de ticket)
                   const isTicket = label === 'Ticket / convidado';
                   const metaEventos = metas.eventos;
@@ -837,6 +844,11 @@ export default function EstatisticasPage() {
                         </>
                       ) : (
                         <p className="text-xs text-muted-foreground">Meta não definida</p>
+                      )}
+                      {festasNecessarias != null && (
+                        <p className="text-[11px] text-muted-foreground border-t border-border/50 pt-1.5 mt-1">
+                          Faltam <span className="font-semibold text-foreground">{festasNecessarias} festas</span> ao TM atual ({fmtBRL(Math.round(ticketMedio))})
+                        </p>
                       )}
                       {tmNecessario != null && tmNecessario > 0 && (
                         <p className="text-[11px] text-muted-foreground border-t border-border/50 pt-1.5 mt-1">
