@@ -687,7 +687,7 @@ export default function EstatisticasPage() {
               <div className="grid grid-cols-3 gap-4">
                 {[
                   { label: 'Eventos realizados', meta: metas.eventos,     atual: totalEvents,  suffix: '', fmt: (v: number) => String(v) },
-                  { label: 'Faturamento anual',  meta: metas.faturamento, atual: totals.faturamento, suffix: '', fmt: fmtBRL },
+                  { label: 'Faturamento anual',  meta: metas.faturamento, atual: fatPorMesEvento.reduce((s, v) => s + v, 0), suffix: '', fmt: fmtBRL },
                   { label: 'Ticket / convidado', meta: metas.ticket,      atual: ticketMedio,  suffix: '', fmt: fmtBRL },
                 ].map(({ label, meta, atual, fmt }) => {
                   const pct = meta && meta > 0 ? Math.min(Math.round(atual / meta * 100), 100) : null;
