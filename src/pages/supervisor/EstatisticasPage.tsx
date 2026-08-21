@@ -721,6 +721,32 @@ export default function EstatisticasPage() {
                       );
                     })}
                   </tbody>
+                  <tfoot>
+                    {(() => {
+                      const comFesta = ticketMedioMensal.filter(m => m.porFesta != null);
+                      const comConv  = ticketMedioMensal.filter(m => m.porConv != null);
+                      const totalQtd = ticketMedioMensal.reduce((s, m) => s + m.qtd, 0);
+                      const tmFesta  = comFesta.length ? Math.round(comFesta.reduce((s, m) => s + (m.porFesta ?? 0), 0) / comFesta.length) : null;
+                      const tmConv   = comConv.length  ? Math.round(comConv.reduce((s, m) => s + (m.porConv ?? 0), 0) / comConv.length)  : null;
+                      const peAnual  = breakEven.some(v => v !== null) ? breakEven.reduce((s, v) => s + (v ?? 0), 0) : null;
+                      const fatAnual = fatPorMesEvento.reduce((s, v) => s + v, 0);
+                      const pctAnual = peAnual && peAnual > 0 ? Math.round(fatAnual / peAnual * 100) : null;
+                      return (
+                        <tr className="border-t-2 border-border font-bold">
+                          <td className="pt-3 pb-1 text-foreground text-xs uppercase tracking-wide">Anual</td>
+                          <td className="pt-3 pb-1 text-right text-foreground">{totalQtd}</td>
+                          <td className="pt-3 pb-1 text-right text-foreground">{tmFesta != null ? fmtBRL(tmFesta) : '—'}</td>
+                          <td className="pt-3 pb-1 text-right text-[#2E4A7A]">{tmConv != null ? fmtBRL(tmConv) : '—'}</td>
+                          {breakEven.some(v => v !== null) && <td className="pt-3 pb-1 text-right text-muted-foreground">{peAnual != null ? fmtBRL(peAnual) : '—'}</td>}
+                          {breakEven.some(v => v !== null) && (
+                            <td className={`pt-3 pb-1 text-right ${pctAnual == null ? 'text-muted-foreground' : pctAnual >= 100 ? 'text-emerald-600' : 'text-red-500'}`}>
+                              {pctAnual != null ? `${pctAnual}%` : '—'}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })()}
+                  </tfoot>
                 </table>
               </div>
             )}
