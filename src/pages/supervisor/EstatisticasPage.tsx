@@ -324,6 +324,21 @@ export default function EstatisticasPage() {
     faturamento: tableRows.reduce((s, r) => s + r.faturamento, 0),
   }), [tableRows]);
 
+  // Ticket médio mensal (por event_date) — para tabela abaixo do break-even
+  const ticketMedioMensal = useMemo(() => MONTHS.map((_, i) => {
+    const mes = events.filter(e =>
+      e.event_date && monthOf(e.event_date) === i &&
+      (e.status === 'confirmed' || e.status === 'completed' || e.contract_signed)
+    );
+    const ticketFesta = mes.filter(e => (e.total_value ?? 0) > 0);
+    const ticketConv  = mes.filter(e => (e as any).price_per_person != null);
+    return {
+      qtd: mes.length,
+      porFesta: ticketFesta.length ? Math.round(ticketFesta.reduce((s, e) => s + (e.total_value ?? 0), 0) / ticketFesta.length) : null,
+      porConv:  ticketConv.length  ? Math.round((ticketConv as any[]).reduce((s, e) => s + e.price_per_person, 0) / ticketConv.length) : null,
+    };
+  }), [events]);
+
   // Faturamento por mês do evento (event_date) — para o gráfico break-even
   // Inclui eventos confirmados, concluídos e com contrato assinado (mesmo futuros)
   const fatPorMesEvento = useMemo(() => MONTHS.map((_, i) => {
@@ -658,6 +673,56 @@ export default function EstatisticasPage() {
 
             {!editingBE && !breakEven.some(v => v !== null) && (
               <p className="text-center text-sm text-muted-foreground py-4">Defina os pontos de equilíbrio mensais para ver a comparação.</p>
+            )}
+
+            {/* Tabela de ticket médio por mês */}
+            {!editingBE && ticketMedioMensal.some(m => m.qtd > 0) && (
+              <div className="pt-2 border-t border-border overflow-x-auto">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 mb-3">Ticket médio por mês</p>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
+                      <th className="text-left pb-2 font-semibold w-16">Mês</th>
+                      <th className="text-right pb-2 font-semibold">Eventos</th>
+                      <th className="text-right pb-2 font-semibold">TM por Festa</th>
+                      <th className="text-right pb-2 font-semibold">TM por Convidado</th>
+                      {breakEven.some(v => v !== null) && <th className="text-right pb-2 font-semibold">PE</th>}
+                      {breakEven.some(v => v !== null) && <th className="text-right pb-2 font-semibold">% do PE</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {MONTHS.map((m, i) => {
+                      const row = ticketMedioMensal[i];
+                      const pe  = breakEven[i];
+                      const fat = fatPorMesEvento[i];
+                      const pct = pe && pe > 0 ? Math.round(fat / pe * 100) : null;
+                      const acima = pct != null && pct >= 100;
+                      return (
+                        <tr key={m} className={row.qtd === 0 ? 'opacity-35' : ''}>
+                          <td className="py-2 font-medium text-foreground">{m}</td>
+                          <td className="py-2 text-right text-muted-foreground">{row.qtd || '—'}</td>
+                          <td className="py-2 text-right font-semibold text-foreground">
+                            {row.porFesta != null ? fmtBRL(row.porFesta) : '—'}
+                          </td>
+                          <td className="py-2 text-right font-semibold text-[#2E4A7A]">
+                            {row.porConv != null ? fmtBRL(row.porConv) : '—'}
+                          </td>
+                          {breakEven.some(v => v !== null) && (
+                            <td className="py-2 text-right text-muted-foreground">
+                              {pe != null ? fmtBRL(pe) : '—'}
+                            </td>
+                          )}
+                          {breakEven.some(v => v !== null) && (
+                            <td className={`py-2 text-right font-semibold ${pct == null ? 'text-muted-foreground' : acima ? 'text-emerald-600' : 'text-red-500'}`}>
+                              {pct != null ? `${pct}%` : '—'}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
