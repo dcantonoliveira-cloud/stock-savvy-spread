@@ -488,19 +488,20 @@ function TabGeral({ ev, fc, ab, all, locName, ticketMedio }: {
       {ticketPorAno.length >= 2 && (
         <div className="bg-white border border-border rounded-xl p-5">
           <SH>Evolução do Ticket Médio por Ano</SH>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={ticketPorAno} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={ticketPorAno} margin={{ top: 10, right: 70, left: 10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="ano" tick={{ fontSize: 11, fill: '#888' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#888' }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v: any, n: string) => [fmBRL(v), n]} />
-              <Line type="monotone" dataKey="ticketEvento" name="Ticket do Evento" stroke="#B8922A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
-              <Line type="monotone" dataKey="ticketConvidado" name="Ticket por Convidado" stroke="#2E4A7A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
+              <YAxis yAxisId="evento" orientation="left"  tick={{ fontSize: 11, fill: '#B8922A' }} tickFormatter={v => `R$${(v/1000).toFixed(0)}K`} width={58} />
+              <YAxis yAxisId="pax"    orientation="right" tick={{ fontSize: 11, fill: '#2E4A7A' }} tickFormatter={v => `R$${v}`}                  width={60} />
+              <Tooltip formatter={(v: any, n: string) => [fmBRL(Number(v)), n]} />
+              <Line yAxisId="evento" type="monotone" dataKey="ticketEvento"    name="Ticket do Evento"     stroke="#B8922A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
+              <Line yAxisId="pax"    type="monotone" dataKey="ticketConvidado" name="Ticket/Convidado"     stroke="#2E4A7A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
             </LineChart>
           </ResponsiveContainer>
           <div className="flex gap-6 mt-2 justify-center">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="w-3 h-0.5 bg-[#B8922A] inline-block" />Ticket médio do evento</div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="w-3 h-0.5 bg-[#2E4A7A] inline-block" />Ticket médio por convidado</div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="w-3 h-0.5 bg-[#B8922A] inline-block" />Ticket médio do evento <span className="opacity-50">(eixo esq.)</span></div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><span className="w-3 h-0.5 bg-[#2E4A7A] inline-block" />Ticket por convidado <span className="opacity-50">(eixo dir.)</span></div>
           </div>
         </div>
       )}

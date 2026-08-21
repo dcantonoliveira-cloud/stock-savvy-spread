@@ -87,10 +87,17 @@ export default function EstatisticasPage() {
   const [activeCell, setActiveCell] = useState<{ key: string; month: number } | null>(null);
 
   // ── Break-even & Metas ──────────────────────────────────────────────────────
-  const [breakEven, setBreakEven] = useState<number | null>(null);
-  const [breakEvenInput, setBreakEvenInput] = useState('');
+  // break-even: por ano → 12 meses. { "2025": [v0..v11], "2026": [...] }
+  type BEMonths = (number | null)[];
+  type BEData   = Record<string, BEMonths>;
+  const emptyMonths = (): BEMonths => Array(12).fill(null);
+  const [breakEvenAll, setBreakEvenAll] = useState<BEData>({});
+  const [breakEvenInput, setBreakEvenInput] = useState<string[]>(Array(12).fill(''));
   const [editingBE, setEditingBE] = useState(false);
   const [savingBE, setSavingBE] = useState(false);
+
+  // valores do ano atual
+  const breakEven: BEMonths = breakEvenAll[String(year)] ?? emptyMonths();
 
   interface Metas { eventos: number | null; faturamento: number | null; ticket: number | null }
   const [metas, setMetas] = useState<Metas>({ eventos: null, faturamento: null, ticket: null });
@@ -102,9 +109,29 @@ export default function EstatisticasPage() {
     const { data } = await supabase.from('company_settings').select('key, value').in('key', ['break_even', 'metas']);
     data?.forEach((row: any) => {
       if (row.key === 'break_even') {
-        const v = Number(row.value?.monthly ?? row.value);
-        setBreakEven(isNaN(v) ? null : v);
-        setBreakEvenInput(isNaN(v) ? '' : String(v));
+        let beData: BEData = {};
+        const v = row.value;
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          // formato novo: { "2025": [...], "2026": [...] } ou legado { monthly: N } ou { months: [...] }
+          if (v.monthly) {
+            // legado global: aplica a todos os anos que existirem
+            const n = Number(v.monthly);
+            if (!isNaN(n)) beData = Object.fromEntries(
+              [String(new Date().getFullYear())].map(y => [y, Array(12).fill(n)])
+            );
+          } else if (v.months && Array.isArray(v.months)) {
+            // legado sem ano: atribui ao ano atual
+            beData = { [String(new Date().getFullYear())]: v.months };
+          } else {
+            // novo formato: chaves são anos
+            Object.entries(v).forEach(([yr, arr]) => {
+              if (Array.isArray(arr)) {
+                beData[yr] = (arr as any[]).map(x => (x != null && !isNaN(Number(x)) ? Number(x) : null));
+              }
+            });
+          }
+        }
+        setBreakEvenAll(beData);
       }
       if (row.key === 'metas') {
         const m = row.value as Metas;
@@ -114,16 +141,26 @@ export default function EstatisticasPage() {
     });
   }, []);
 
+  // Quando o ano muda, sincroniza os inputs com os valores do novo ano
+  useEffect(() => {
+    const months = breakEvenAll[String(year)] ?? emptyMonths();
+    setBreakEvenInput(months.map(v => (v != null ? String(v) : '')));
+    setEditingBE(false);
+  }, [year, breakEvenAll]);
+
   const saveBE = async () => {
-    const val = Number(breakEvenInput.replace(/\D/g, ''));
-    if (!val || val <= 0) { toast.error('Digite um valor válido'); return; }
+    const arr: BEMonths = breakEvenInput.map(s => {
+      const n = Number(s.replace(/[^\d]/g, ''));
+      return s.trim() && n > 0 ? n : null;
+    });
+    const next: BEData = { ...breakEvenAll, [String(year)]: arr };
     setSavingBE(true);
     const { error } = await supabase.from('company_settings').upsert(
-      { key: 'break_even', value: { monthly: val } },
+      { key: 'break_even', value: next },
       { onConflict: 'company_id,key' }
     );
     if (error) { toast.error('Erro ao salvar: ' + error.message); }
-    else { setBreakEven(val); setEditingBE(false); toast.success('Ponto de equilíbrio salvo'); }
+    else { setBreakEvenAll(next); setEditingBE(false); toast.success('Pontos de equilíbrio salvos'); }
     setSavingBE(false);
   };
 
@@ -505,52 +542,76 @@ export default function EstatisticasPage() {
           <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold text-foreground">Ponto de Equilíbrio Mensal</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Compare o faturamento mensal com seu ponto de equilíbrio</p>
+                <p className="font-semibold text-foreground">Ponto de Equilíbrio — {year}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Compare o faturamento mensal com seu ponto de equilíbrio (valores por mês)</p>
               </div>
               {!editingBE ? (
-                <button onClick={() => { setEditingBE(true); setBreakEvenInput(breakEven ? String(breakEven) : ''); }}
+                <button onClick={() => setEditingBE(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted transition-colors">
                   <Pencil className="w-3.5 h-3.5" />
-                  {breakEven ? 'Editar' : 'Definir ponto'}
+                  {breakEven.some(v => v !== null) ? 'Editar' : 'Definir pontos'}
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">R$</span>
-                  <input
-                    type="number" value={breakEvenInput} onChange={e => setBreakEvenInput(e.target.value)}
-                    placeholder="Ex: 50000"
-                    className="w-32 text-sm border border-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
                   <button onClick={saveBE} disabled={savingBE}
                     className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs rounded-lg hover:bg-primary/90 disabled:opacity-40">
                     <Save className="w-3.5 h-3.5" />{savingBE ? 'Salvando…' : 'Salvar'}
                   </button>
-                  <button onClick={() => setEditingBE(false)} className="text-xs text-muted-foreground hover:text-foreground px-2">Cancelar</button>
+                  <button onClick={() => { setEditingBE(false); setBreakEvenInput(breakEven.map(v => v != null ? String(v) : '')); }}
+                    className="text-xs text-muted-foreground hover:text-foreground px-2">Cancelar</button>
                 </div>
               )}
             </div>
-            {breakEven && (
-              <div className="flex gap-4 text-xs text-muted-foreground mb-2">
-                <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-[#B8922A] inline-block"/>Faturamento mensal</div>
-                <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-red-500 border-dashed inline-block" style={{borderTop:'2px dashed #ef4444',height:0}}/>Ponto de equilíbrio</div>
+
+            {/* Grid de inputs mensais */}
+            {editingBE && (
+              <div className="grid grid-cols-6 gap-2">
+                {MONTHS.map((m, i) => (
+                  <div key={m} className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">{m}</label>
+                    <input
+                      type="number"
+                      value={breakEvenInput[i]}
+                      onChange={e => setBreakEvenInput(prev => { const n = [...prev]; n[i] = e.target.value; return n; })}
+                      placeholder="—"
+                      className="w-full text-xs border border-border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                ))}
               </div>
             )}
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={MONTHS.map((m, i) => ({ name: m, fat: fatPorMesEvento[i] }))} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#888' }} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
-                <Tooltip formatter={(v: any) => [fmtBRL(v), 'Faturamento previsto']} />
-                <Bar dataKey="fat" name="Faturamento" fill="#B8922A" radius={[3,3,0,0]} />
-                {breakEven && <ReferenceLine y={breakEven} stroke="#ef4444" strokeDasharray="6 3" strokeWidth={2} label={{ value: `PE R$${(breakEven/1000).toFixed(0)}K`, position: 'right', fontSize: 10, fill: '#ef4444' }} />}
-              </BarChart>
-            </ResponsiveContainer>
-            {breakEven && (() => {
-              const mesesAbaixo = fatPorMesEvento.filter(v => v > 0 && v < breakEven!).length;
-              const mesesAcima  = fatPorMesEvento.filter(v => v >= breakEven!).length;
+
+            {/* Legenda */}
+            {!editingBE && (
+              <div className="flex gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 bg-[#B8922A] inline-block"/>Faturamento previsto</div>
+                <div className="flex items-center gap-1.5"><span className="w-3 h-0.5 inline-block" style={{borderTop:'2px dashed #ef4444'}}/>Ponto de equilíbrio</div>
+              </div>
+            )}
+
+            {/* Gráfico — uma ReferenceLine por mês */}
+            {!editingBE && (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={MONTHS.map((m, i) => ({ name: m, fat: fatPorMesEvento[i], pe: breakEven[i] ?? undefined }))}
+                  margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#888' }} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
+                  <Tooltip formatter={(v: any, n: string) => [fmtBRL(v), n === 'fat' ? 'Faturamento' : 'PE']} />
+                  <Bar dataKey="fat" name="fat" fill="#B8922A" radius={[3,3,0,0]} />
+                  <Bar dataKey="pe"  name="pe"  fill="transparent" stroke="#ef4444" strokeDasharray="4 2" radius={[3,3,0,0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+
+            {/* Cards resumo */}
+            {!editingBE && breakEven.some(v => v !== null) && (() => {
+              const mesesAbaixo = fatPorMesEvento.filter((v, i) => breakEven[i] != null && v > 0 && v < breakEven[i]!).length;
+              const mesesAcima  = fatPorMesEvento.filter((v, i) => breakEven[i] != null && v >= breakEven[i]!).length;
               const fatTotal    = fatPorMesEvento.reduce((s, v) => s + v, 0);
-              const beAnual  = breakEven * 12;
+              const beAnual     = breakEven.reduce((s, v) => s + (v ?? 0), 0);
               return (
                 <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
                   <div className="rounded-xl border border-border p-3 text-center">
@@ -562,16 +623,17 @@ export default function EstatisticasPage() {
                     <p className="text-2xl font-bold text-red-500 mt-1">{mesesAbaixo}</p>
                   </div>
                   <div className="rounded-xl border border-border p-3 text-center">
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-widest">Fat. vs meta anual</p>
-                    <p className={`text-2xl font-bold mt-1 ${fatTotal >= beAnual ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {Math.round(fatTotal / beAnual * 100)}%
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-widest">Fat. vs PE anual</p>
+                    <p className={`text-2xl font-bold mt-1 ${beAnual > 0 && fatTotal >= beAnual ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {beAnual > 0 ? `${Math.round(fatTotal / beAnual * 100)}%` : '—'}
                     </p>
                   </div>
                 </div>
               );
             })()}
-            {!breakEven && (
-              <p className="text-center text-sm text-muted-foreground py-4">Defina seu ponto de equilíbrio mensal para ver a comparação.</p>
+
+            {!editingBE && !breakEven.some(v => v !== null) && (
+              <p className="text-center text-sm text-muted-foreground py-4">Defina os pontos de equilíbrio mensais para ver a comparação.</p>
             )}
           </div>
 
