@@ -207,7 +207,7 @@ export default function EstatisticasPage() {
         // Eventos do ano: para orçamentos, gráficos e KPIs (por event_date)
         supabase
           .from('events')
-          .select('id, event_name, status, event_date, event_type, guest_count, professional_count, total_value, contract_signed, contract_signed_date, product_name, created_at')
+          .select('id, event_name, status, event_date, event_type, guest_count, professional_count, total_value, price_per_person, contract_signed, contract_signed_date, product_name, created_at')
           .gte('event_date', `${year}-01-01`)
           .lte('event_date', `${year}-12-31`),
         // Contratos fechados no ano: filtrado por contract_signed_date (independente do event_date)
@@ -331,11 +331,11 @@ export default function EstatisticasPage() {
       (e.status === 'confirmed' || e.status === 'completed' || e.contract_signed)
     );
     const ticketFesta = mes.filter(e => (e.total_value ?? 0) > 0);
-    const ticketConv  = mes.filter(e => (e as any).price_per_person != null);
+    const ticketConv  = mes.filter(e => e.price_per_person != null);
     return {
       qtd: mes.length,
       porFesta: ticketFesta.length ? Math.round(ticketFesta.reduce((s, e) => s + (e.total_value ?? 0), 0) / ticketFesta.length) : null,
-      porConv:  ticketConv.length  ? Math.round((ticketConv as any[]).reduce((s, e) => s + e.price_per_person, 0) / ticketConv.length) : null,
+      porConv:  ticketConv.length  ? Math.round(ticketConv.reduce((s, e) => s + (e.price_per_person ?? 0), 0) / ticketConv.length) : null,
     };
   }), [events]);
 
