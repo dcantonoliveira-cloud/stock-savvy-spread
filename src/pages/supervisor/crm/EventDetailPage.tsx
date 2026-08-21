@@ -487,6 +487,7 @@ export default function EventDetailPage() {
       form.event_name ?? event?.clients?.name ?? 'Evento',
       form.event_date ?? null,
       form.guest_count ?? null,
+      form.location_text ?? null,
       menuHtml,
       company as any,
     );
