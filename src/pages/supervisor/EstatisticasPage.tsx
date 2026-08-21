@@ -727,10 +727,12 @@ export default function EstatisticasPage() {
                   <tfoot>
                     {(() => {
                       const comFesta = ticketMedioMensal.filter(m => m.porFesta != null);
-                      const comConv  = ticketMedioMensal.filter(m => m.porConv != null);
+                      const comConv  = ticketMedioMensal.filter(m => m.porConv != null && m.qtd > 0);
                       const totalQtd = ticketMedioMensal.reduce((s, m) => s + m.qtd, 0);
                       const tmFesta  = comFesta.length ? Math.round(comFesta.reduce((s, m) => s + (m.porFesta ?? 0), 0) / comFesta.length) : null;
-                      const tmConv   = comConv.length  ? Math.round(comConv.reduce((s, m) => s + (m.porConv ?? 0), 0) / comConv.length)  : null;
+                      // Média ponderada: soma(qtd_mes * tm_mes) / total_festas
+                      const pesoConv = comConv.reduce((s, m) => s + m.qtd, 0);
+                      const tmConv   = pesoConv > 0 ? Math.round(comConv.reduce((s, m) => s + m.qtd * (m.porConv ?? 0), 0) / pesoConv) : null;
                       const peAnual  = breakEven.some(v => v !== null) ? breakEven.reduce((s, v) => s + (v ?? 0), 0) : null;
                       const fatAnual = fatPorMesEvento.reduce((s, v) => s + v, 0);
                       const pctAnual = peAnual && peAnual > 0 ? Math.round(fatAnual / peAnual * 100) : null;
