@@ -18,6 +18,7 @@ import EventOutrosTab from '@/components/EventOutrosTab';
 import WhatsAppConfirmModal, { WhatsAppTrigger } from '@/components/WhatsAppConfirmModal';
 import { printFechamento } from '@/utils/printFechamento';
 import { printFichaTecnica } from '@/utils/printFichaTecnica';
+import { printCardapio } from '@/utils/printCardapio';
 import { getCompany } from '@/lib/companyCache';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -473,6 +474,22 @@ export default function EventDetailPage() {
     const merged = { ...event, ...form, notes: obsModal.text } as any;
     printFichaTecnica(merged, obsModal.customFields, obsModal.company);
     setObsModal(null);
+  };
+
+  const handleCardapioPDF = async () => {
+    const menuHtml = form.menu_text ?? '';
+    if (!menuHtml.replace(/<[^>]*>/g, '').trim()) {
+      toast.error('Nenhum cardápio em texto livre para exportar');
+      return;
+    }
+    const company = await getCompany();
+    printCardapio(
+      form.event_name ?? event?.clients?.name ?? 'Evento',
+      form.event_date ?? null,
+      form.guest_count ?? null,
+      menuHtml,
+      company as any,
+    );
   };
 
   const handleFechamento = async () => {
@@ -960,6 +977,15 @@ export default function EventDetailPage() {
             <div className="flex items-center gap-3 mb-5">
               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Cardápio do Evento</span>
               <div className="flex-1 h-px bg-border" />
+              {(form.menu_mode ?? 'text') === 'text' && (
+                <button
+                  onClick={handleCardapioPDF}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  PDF
+                </button>
+              )}
               <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
                 <button
                   onClick={() => setF('menu_mode', 'text')}
