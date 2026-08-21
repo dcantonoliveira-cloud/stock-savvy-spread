@@ -495,8 +495,21 @@ function TabGeral({ ev, fc, ab, all, locName, ticketMedio }: {
               <YAxis yAxisId="evento" orientation="left"  tick={{ fontSize: 11, fill: '#B8922A' }} tickFormatter={v => `R$${(v/1000).toFixed(0)}K`} width={58} />
               <YAxis yAxisId="pax"    orientation="right" tick={{ fontSize: 11, fill: '#2E4A7A' }} tickFormatter={v => `R$${v}`}                  width={60} />
               <Tooltip formatter={(v: any, n: string) => [fmBRL(Number(v)), n]} />
-              <Line yAxisId="evento" type="monotone" dataKey="ticketEvento"    name="Ticket do Evento"     stroke="#B8922A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
-              <Line yAxisId="pax"    type="monotone" dataKey="ticketConvidado" name="Ticket/Convidado"     stroke="#2E4A7A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
+              <Line yAxisId="evento" type="monotone" dataKey="ticketEvento"    name="Ticket do Evento"  stroke="#B8922A" strokeWidth={2} dot={{ r: 4 }} connectNulls />
+              <Line yAxisId="pax"    type="monotone" dataKey="ticketConvidado" name="Ticket/Convidado"  stroke="#2E4A7A" strokeWidth={2} connectNulls
+                dot={(props: any) => {
+                  const { cx, cy, value } = props;
+                  if (value == null) return <g key={props.key} />;
+                  return (
+                    <g key={props.key}>
+                      <circle cx={cx} cy={cy} r={4} fill="#2E4A7A" stroke="#fff" strokeWidth={2} />
+                      <text x={cx} y={cy - 10} textAnchor="middle" fontSize={10} fontWeight={600} fill="#2E4A7A">
+                        R${value}
+                      </text>
+                    </g>
+                  );
+                }}
+              />
             </LineChart>
           </ResponsiveContainer>
           <div className="flex gap-6 mt-2 justify-center">

@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, ChevronRight, Users, BarChart3, DollarSign, ExternalLink, CheckCircle2, X, Pencil, Save, Target } from 'lucide-react';
 import BIDashboard from './BIDashboard';
 import { getStatus } from '@/lib/eventStatus';
+import { getCompany } from '@/lib/companyCache';
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
@@ -155,8 +156,9 @@ export default function EstatisticasPage() {
     });
     const next: BEData = { ...breakEvenAll, [String(year)]: arr };
     setSavingBE(true);
+    const company = await getCompany();
     const { error } = await supabase.from('company_settings').upsert(
-      { key: 'break_even', value: next },
+      { key: 'break_even', value: next, company_id: company?.id },
       { onConflict: 'company_id,key' }
     );
     if (error) { toast.error('Erro ao salvar: ' + error.message); }
@@ -166,8 +168,9 @@ export default function EstatisticasPage() {
 
   const saveMetas = async () => {
     setSavingMetas(true);
+    const company = await getCompany();
     const { error } = await supabase.from('company_settings').upsert(
-      { key: 'metas', value: metasInput },
+      { key: 'metas', value: metasInput, company_id: company?.id },
       { onConflict: 'company_id,key' }
     );
     if (error) { toast.error('Erro ao salvar: ' + error.message); }
