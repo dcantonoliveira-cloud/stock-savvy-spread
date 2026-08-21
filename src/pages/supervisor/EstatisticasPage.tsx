@@ -255,7 +255,10 @@ export default function EstatisticasPage() {
   const totalGuests = completed.reduce((s, e) => s + (e.guest_count ?? 0), 0);
   const totalStaff  = completed.reduce((s, e) => s + (e.professional_count ?? 0), 0);
   const totalRev    = completed.reduce((s, e) => s + (e.total_value ?? 0), 0);
-  const ticketMedio = totalGuests ? totalRev / totalGuests : 0;
+  const completedComPax = completed.filter(e => (e.price_per_person ?? 0) > 0);
+  const ticketMedio = completedComPax.length
+    ? completedComPax.reduce((s, e) => s + (e.price_per_person ?? 0), 0) / completedComPax.length
+    : 0;
 
   // Mapa de sessões distintas (session_id → {date, type})
   const sessionMap = useMemo(() => {
