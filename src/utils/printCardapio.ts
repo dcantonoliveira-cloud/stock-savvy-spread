@@ -88,7 +88,7 @@ function bodyHtml(eventName: string, menuHtml: string): string {
       color:#6B6B6B; margin-top:12px; margin-bottom:3px; padding:0;
     }
     .menu-content p {
-      font-size:12.5px; color:#2B2B2B; margin:0; padding:1px 0; line-height:1.65;
+      font-size:12.5px; color:#2B2B2B; margin:0; padding:0; line-height:1.65; min-height:1.1em;
     }
     .menu-content ul, .menu-content ol { margin:4px 0; padding-left:18px; }
     .menu-content li { font-size:12.5px; color:#2B2B2B; line-height:1.65; margin:0; }
