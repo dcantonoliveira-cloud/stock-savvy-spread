@@ -30,6 +30,7 @@ const FIELD_GROUPS = [
       { key: 'additional_hours',    label: 'Horas extras' },
       { key: 'extra_hour_price',    label: 'Valor hora extra (R$)' },
       { key: 'total_extra',         label: 'Total horas extras (R$)' },
+      { key: 'total_festa',         label: 'Valor total da festa (R$)' },
     ],
   },
   {
@@ -196,6 +197,16 @@ export function ExportEventosModal({ onClose, currentFilter }: {
               const h = ev.additional_hours ?? 0;
               const hp = ev.extra_hour_price ?? 0;
               row[labelMap[key]] = h && hp ? h * hp : '';
+              break;
+            }
+            case 'total_festa': {
+              const g2 = ev.guest_count ?? 0;
+              const p2 = ev.price_per_person ?? 0;
+              const base = g2 && p2 ? g2 * p2 : 0;
+              const h2 = ev.additional_hours ?? 0;
+              const hp2 = ev.extra_hour_price ?? 0;
+              const extra = h2 && hp2 ? h2 * hp2 : 0;
+              row[labelMap[key]] = base + extra || '';
               break;
             }
             default: row[labelMap[key]] = ev[key] ?? '';
