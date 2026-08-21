@@ -331,7 +331,7 @@ export default function EstatisticasPage() {
   const ticketMedioMensal = useMemo(() => MONTHS.map((_, i) => {
     const mes = events.filter(e =>
       e.event_date && monthOf(e.event_date) === i &&
-      (e.status === 'confirmed' || e.status === 'completed' || e.contract_signed_date != null)
+      (e.status === 'confirmed' || e.status === 'completed')
     );
     const ticketFesta = mes.filter(e => (e.total_value ?? 0) > 0);
     const ticketConv  = mes.filter(e => e.price_per_person != null);
@@ -347,7 +347,7 @@ export default function EstatisticasPage() {
   const fatPorMesEvento = useMemo(() => MONTHS.map((_, i) => {
     const mes = events.filter(e =>
       e.event_date && monthOf(e.event_date) === i &&
-      (e.status === 'confirmed' || e.status === 'completed' || e.contract_signed_date != null)
+      (e.status === 'confirmed' || e.status === 'completed')
     );
     return Math.round(mes.reduce((s, e) => s + (e.total_value ?? 0), 0));
   }), [events]);
