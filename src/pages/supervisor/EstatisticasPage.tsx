@@ -6,7 +6,7 @@ import BIDashboard from './BIDashboard';
 import { getStatus } from '@/lib/eventStatus';
 import { getCompany } from '@/lib/companyCache';
 import {
-  LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, BarChart, Bar, ComposedChart, AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { toast } from 'sonner';
@@ -592,26 +592,26 @@ export default function EstatisticasPage() {
               </div>
             )}
 
-            {/* Gráfico — uma ReferenceLine por mês */}
+            {/* Gráfico */}
             {!editingBE && (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={MONTHS.map((m, i) => ({ name: m, fat: fatPorMesEvento[i], pe: breakEven[i] ?? undefined }))}
+                <ComposedChart
+                  data={MONTHS.map((m, i) => ({ name: m, fat: fatPorMesEvento[i], pe: breakEven[i] ?? null }))}
                   margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} />
                   <YAxis tick={{ fontSize: 11, fill: '#888' }} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
-                  <Tooltip formatter={(v: any, n: string) => [fmtBRL(v), n === 'fat' ? 'Faturamento' : 'PE']} />
-                  <Bar dataKey="fat" name="fat" fill="#B8922A" radius={[3,3,0,0]} />
-                  <Bar dataKey="pe"  name="pe"  fill="transparent" stroke="#ef4444" strokeDasharray="4 2" radius={[3,3,0,0]} />
-                </BarChart>
+                  <Tooltip formatter={(v: any, n: string) => [fmtBRL(v), n === 'fat' ? 'Faturamento previsto' : 'Ponto de equilíbrio']} />
+                  <Bar  dataKey="fat" name="fat" fill="#B8922A" radius={[3,3,0,0]} />
+                  <Line dataKey="pe"  name="pe"  stroke="#ef4444" strokeWidth={2} dot={false} connectNulls />
+                </ComposedChart>
               </ResponsiveContainer>
             )}
 
             {/* Cards resumo */}
             {!editingBE && breakEven.some(v => v !== null) && (() => {
-              const mesesAbaixo = fatPorMesEvento.filter((v, i) => breakEven[i] != null && v > 0 && v < breakEven[i]!).length;
+              const mesesAbaixo = fatPorMesEvento.filter((v, i) => breakEven[i] != null && v < breakEven[i]!).length;
               const mesesAcima  = fatPorMesEvento.filter((v, i) => breakEven[i] != null && v >= breakEven[i]!).length;
               const fatTotal    = fatPorMesEvento.reduce((s, v) => s + v, 0);
               const beAnual     = breakEven.reduce((s, v) => s + (v ?? 0), 0);
