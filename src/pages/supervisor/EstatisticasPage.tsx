@@ -101,10 +101,15 @@ export default function EstatisticasPage() {
   const breakEven: BEMonths = breakEvenAll[String(year)] ?? emptyMonths();
 
   interface Metas { eventos: number | null; faturamento: number | null; ticket: number | null }
-  const [metas, setMetas] = useState<Metas>({ eventos: null, faturamento: null, ticket: null });
-  const [metasInput, setMetasInput] = useState<Metas>({ eventos: null, faturamento: null, ticket: null });
+  type MetasData = Record<string, Metas>;
+  const emptyMetas = (): Metas => ({ eventos: null, faturamento: null, ticket: null });
+  const [metasAll, setMetasAll] = useState<MetasData>({});
+  const [metasInput, setMetasInput] = useState<Metas>(emptyMetas());
   const [editingMetas, setEditingMetas] = useState(false);
   const [savingMetas, setSavingMetas] = useState(false);
+
+  // metas do ano atual
+  const metas: Metas = metasAll[String(year)] ?? emptyMetas();
 
   const loadSettings = useCallback(async () => {
     const { data } = await supabase.from('company_settings').select('key, value').in('key', ['break_even', 'metas']);
@@ -135,19 +140,34 @@ export default function EstatisticasPage() {
         setBreakEvenAll(beData);
       }
       if (row.key === 'metas') {
-        const m = row.value as Metas;
-        setMetas(m);
-        setMetasInput({ ...m });
+        const v = row.value;
+        let md: MetasData = {};
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          // novo formato: chaves são anos ("2026": {...})
+          const looksLikeYearKeyed = Object.keys(v).every(k => /^\d{4}$/.test(k));
+          if (looksLikeYearKeyed) {
+            md = v as MetasData;
+          } else {
+            // legado: objeto plano de metas sem ano → atribui ao ano atual
+            md = { [String(new Date().getFullYear())]: v as Metas };
+          }
+        }
+        setMetasAll(md);
       }
     });
   }, []);
 
-  // Quando o ano muda, sincroniza os inputs com os valores do novo ano
+  // Quando o ano muda, sincroniza inputs de break-even e metas
   useEffect(() => {
     const months = breakEvenAll[String(year)] ?? emptyMonths();
     setBreakEvenInput(months.map(v => (v != null ? String(v) : '')));
     setEditingBE(false);
   }, [year, breakEvenAll]);
+
+  useEffect(() => {
+    setMetasInput({ ...(metasAll[String(year)] ?? emptyMetas()) });
+    setEditingMetas(false);
+  }, [year, metasAll]);
 
   const saveBE = async () => {
     const arr: BEMonths = breakEvenInput.map(s => {
@@ -168,13 +188,14 @@ export default function EstatisticasPage() {
 
   const saveMetas = async () => {
     setSavingMetas(true);
+    const next: MetasData = { ...metasAll, [String(year)]: metasInput };
     const company = await getCompany();
     const { error } = await supabase.from('company_settings').upsert(
-      { key: 'metas', value: metasInput, company_id: company?.id },
+      { key: 'metas', value: next, company_id: company?.id },
       { onConflict: 'company_id,key' }
     );
     if (error) { toast.error('Erro ao salvar: ' + error.message); }
-    else { setMetas({ ...metasInput }); setEditingMetas(false); toast.success('Metas salvas'); }
+    else { setMetasAll(next); setEditingMetas(false); toast.success('Metas salvas'); }
     setSavingMetas(false);
   };
 
@@ -644,7 +665,7 @@ export default function EstatisticasPage() {
           <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold text-foreground flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Metas do Ano</p>
+                <p className="font-semibold text-foreground flex items-center gap-2"><Target className="w-4 h-4 text-primary" />Metas — {year}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Defina suas metas e acompanhe o progresso</p>
               </div>
               {!editingMetas ? (
