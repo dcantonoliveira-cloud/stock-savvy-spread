@@ -813,8 +813,9 @@ export default function EstatisticasPage() {
                   // Festas necessárias ao TM atual (só para o card de faturamento)
                   const isFat = label === 'Faturamento anual';
                   const faltaFat = isFat && meta && meta > atual ? meta - atual : 0;
-                  const festasNecessarias = isFat && faltaFat > 0 && ticketMedio > 0
-                    ? Math.ceil(faltaFat / ticketMedio)
+                  const tmFesta = totalEvents > 0 ? totalRev / totalEvents : 0;
+                  const festasNecessarias = isFat && faltaFat > 0 && tmFesta > 0
+                    ? Math.ceil(faltaFat / tmFesta)
                     : null;
 
                   // TM necessário nos eventos restantes (só para o card de ticket)
@@ -847,7 +848,7 @@ export default function EstatisticasPage() {
                       )}
                       {festasNecessarias != null && (
                         <p className="text-[11px] text-muted-foreground border-t border-border/50 pt-1.5 mt-1">
-                          Faltam <span className="font-semibold text-foreground">{festasNecessarias} festas</span> ao TM atual ({fmtBRL(Math.round(ticketMedio))})
+                          Faltam <span className="font-semibold text-foreground">{festasNecessarias} festas</span> ao TM atual ({fmtBRL(Math.round(tmFesta))})
                         </p>
                       )}
                       {tmNecessario != null && tmNecessario > 0 && (
