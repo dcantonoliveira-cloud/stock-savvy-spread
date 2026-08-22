@@ -82,6 +82,7 @@ export default function EstatisticasPage() {
   const [tab, setTab] = useState<'originais' | 'bi'>('originais');
   const [events, setEvents] = useState<EventRow[]>([]);
   const [contratos, setContratos] = useState<ContratoRow[]>([]);
+  const [fatProducao, setFatProducao] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tastings, setTastings] = useState<any[]>([]);
   const [tastingRange, setTastingRange] = useState<'3m' | '1a' | 'all'>('1a');
@@ -203,7 +204,7 @@ export default function EstatisticasPage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [evtRes, contratosRes, tastRes] = await Promise.all([
+      const [evtRes, contratosRes, tastRes, prodRes] = await Promise.all([
         // Eventos do ano: para orçamentos, gráficos e KPIs (por event_date)
         supabase
           .from('events')
@@ -221,10 +222,18 @@ export default function EstatisticasPage() {
         supabase
           .from('tasting_session_events' as any)
           .select('event_id, session_id, situation_snapshot, tasting_sessions!session_id(scheduled_date, type)'),
+        (supabase as any)
+          .from('production_orders')
+          .select('extra_value, delivery_date')
+          .gte('delivery_date', `${year}-01-01`)
+          .lte('delivery_date', `${year}-12-31`)
+          .gt('extra_value', 0),
       ]);
       setEvents((evtRes.data ?? []) as EventRow[]);
       setContratos((contratosRes.data ?? []) as ContratoRow[]);
       setTastings((tastRes.data ?? []) as any[]);
+      const prod = (prodRes.data ?? []) as { extra_value: number }[];
+      setFatProducao(prod.reduce((s: number, o: { extra_value: number }) => s + (o.extra_value ?? 0), 0));
       await loadSettings();
       setLoading(false);
     };
@@ -804,7 +813,7 @@ export default function EstatisticasPage() {
               <div className="grid grid-cols-3 gap-4">
                 {[
                   { label: 'Eventos realizados', meta: metas.eventos,     atual: totalEvents,  suffix: '', fmt: (v: number) => String(v) },
-                  { label: 'Faturamento anual',  meta: metas.faturamento, atual: fatPorMesEvento.reduce((s, v) => s + v, 0), suffix: '', fmt: fmtBRL },
+                  { label: 'Faturamento anual',  meta: metas.faturamento, atual: fatPorMesEvento.reduce((s, v) => s + v, 0) + fatProducao, suffix: '', fmt: fmtBRL },
                   { label: 'Ticket / convidado', meta: metas.ticket,      atual: ticketMedio,  suffix: '', fmt: fmtBRL },
                 ].map(({ label, meta, atual, fmt }) => {
                   const pct = meta && meta > 0 ? Math.min(Math.round(atual / meta * 100), 100) : null;
