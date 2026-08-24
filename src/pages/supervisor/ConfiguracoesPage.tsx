@@ -826,12 +826,17 @@ export default function ConfiguracoesPage() {
       supabase.from('companies').select('*').limit(1).single(),
       supabase.from('profiles').select('*').limit(1).single(),
       supabase.from('company_integrations' as any).select('*'),
-      supabase.from('profiles' as any).select('user_id, display_name').order('display_name'),
-    ]).then(([co, pr, intg, users]) => {
-      if (co.data)    setCompany(co.data as any);
-      if (pr.data)    setProfile(pr.data as any);
-      if (intg.data)  setIntegrations(intg.data as Integration[]);
-      if (users.data) setSystemUsers(users.data as any);
+      supabase.from('user_roles' as any).select('user_id').eq('role', 'supervisor'),
+    ]).then(async ([co, pr, intg, roles]) => {
+      if (co.data)   setCompany(co.data as any);
+      if (pr.data)   setProfile(pr.data as any);
+      if (intg.data) setIntegrations(intg.data as Integration[]);
+      if (roles.data && (roles.data as any[]).length > 0) {
+        const ids = (roles.data as any[]).map((r: any) => r.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles' as any).select('user_id, display_name').in('user_id', ids).order('display_name');
+        if (profilesData) setSystemUsers(profilesData as any);
+      }
     });
   }, []);
 
