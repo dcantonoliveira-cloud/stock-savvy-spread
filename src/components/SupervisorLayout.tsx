@@ -100,26 +100,26 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
   }, [user]);
 
   useEffect(() => {
-    const email = (user?.email ?? profile?.email ?? '').toLowerCase().trim();
-    if (!email) return;
+    if (!user?.id) return;
     const load = async () => {
-      const { data, error } = await supabase
-        .from('events' as any)
-        .select('id, event_name, event_date, zapsign_data')
-        .not('zapsign_data', 'is', null)
-        .neq('contract_signed', true);
+      const [{ data: co }, { data: events }] = await Promise.all([
+        (supabase as any).from('companies').select('signer_user_id, signer_email, witness_1_user_id, witness_1_email').limit(1).single(),
+        (supabase as any).from('events').select('id, event_name, event_date, zapsign_data').not('zapsign_data', 'is', null).neq('contract_signed', true),
+      ]);
 
-      if (error) { console.error('[PendingContracts]', error); return; }
-      console.log('[PendingContracts] email usado:', email, '| eventos com zapsign:', (data ?? []).length);
-      (data ?? []).forEach((e: any) => {
-        const signers: any[] = e.zapsign_data?.signers ?? [];
-        console.log('[PendingContracts] evento:', e.event_name, '| signers:', signers.map((s: any) => `${s.email}/${s.status}`));
-      });
+      // Build the list of ZapSign emails that belong to the current user
+      const myEmails: string[] = [];
+      if (co?.signer_user_id === user.id && co?.signer_email)     myEmails.push(co.signer_email.toLowerCase().trim());
+      if (co?.witness_1_user_id === user.id && co?.witness_1_email) myEmails.push(co.witness_1_email.toLowerCase().trim());
+      // Fallback: also try auth email in case it matches directly
+      if (user.email) myEmails.push(user.email.toLowerCase().trim());
 
-      const pending = ((data ?? []) as any[]).flatMap((e: any) => {
+      if (myEmails.length === 0) { setPendingContracts([]); return; }
+
+      const pending = ((events ?? []) as any[]).flatMap((e: any) => {
         const signers: any[] = e.zapsign_data?.signers ?? [];
         const match = signers.find(
-          (s: any) => s.email?.toLowerCase().trim() === email && s.status === 'pending'
+          (s: any) => myEmails.includes(s.email?.toLowerCase().trim() ?? '') && s.status === 'pending'
         );
         if (!match) return [];
         return [{ id: e.id, event_name: e.event_name, event_date: e.event_date, sign_url: match.sign_url }];
@@ -130,9 +130,10 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     const ch = (supabase as any)
       .channel('pending-contracts-layout')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events' }, load)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'companies' }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user?.email, profile?.email]);
+  }, [user?.id]);
 
   const pageTitle = Object.entries(PAGE_TITLES)
     .sort((a, b) => b[0].length - a[0].length)

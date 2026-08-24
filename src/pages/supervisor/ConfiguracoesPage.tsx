@@ -812,6 +812,7 @@ export default function ConfiguracoesPage() {
   const [company,         setCompany]       = useState<Company | null>(null);
   const [profile,         setProfile]       = useState<Profile | null>(null);
   const [integrations,    setIntegrations]  = useState<Integration[]>([]);
+  const [systemUsers,     setSystemUsers]   = useState<{ user_id: string; display_name: string }[]>([]);
   const [logoUploading,   setLogoUploading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [newPassword,     setNewPassword]   = useState('');
@@ -825,10 +826,12 @@ export default function ConfiguracoesPage() {
       supabase.from('companies').select('*').limit(1).single(),
       supabase.from('profiles').select('*').limit(1).single(),
       supabase.from('company_integrations' as any).select('*'),
-    ]).then(([co, pr, intg]) => {
-      if (co.data)   setCompany(co.data as any);
-      if (pr.data)   setProfile(pr.data as any);
-      if (intg.data) setIntegrations(intg.data as Integration[]);
+      supabase.from('profiles' as any).select('user_id, display_name').order('display_name'),
+    ]).then(([co, pr, intg, users]) => {
+      if (co.data)    setCompany(co.data as any);
+      if (pr.data)    setProfile(pr.data as any);
+      if (intg.data)  setIntegrations(intg.data as Integration[]);
+      if (users.data) setSystemUsers(users.data as any);
     });
   }, []);
 
@@ -1047,6 +1050,23 @@ export default function ConfiguracoesPage() {
                   </Field>
                 </div>
               </div>
+              <div>
+                <Field label="Usuário no sistema">
+                  <select
+                    className={inputCls}
+                    value={(company as any).signer_user_id ?? ''}
+                    onChange={e => saveCompany('signer_user_id', e.target.value || null)}
+                  >
+                    <option value="">— Nenhum —</option>
+                    {systemUsers.map(u => (
+                      <option key={u.user_id} value={u.user_id}>{u.display_name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <p className="text-xs text-muted-foreground/60 mt-1">
+                  Vincula este assinante a um usuário para que ele receba notificações de contratos pendentes.
+                </p>
+              </div>
             </div>
 
             <div className="bg-white border border-border rounded-2xl p-6 space-y-4">
@@ -1067,6 +1087,23 @@ export default function ConfiguracoesPage() {
                     <input className={inputCls} type="email" value={(company as any).witness_1_email ?? ''} onChange={e => saveCompany('witness_1_email', e.target.value)} placeholder="testemunha@empresa.com" />
                   </Field>
                 </div>
+              </div>
+              <div>
+                <Field label="Usuário no sistema">
+                  <select
+                    className={inputCls}
+                    value={(company as any).witness_1_user_id ?? ''}
+                    onChange={e => saveCompany('witness_1_user_id', e.target.value || null)}
+                  >
+                    <option value="">— Nenhum —</option>
+                    {systemUsers.map(u => (
+                      <option key={u.user_id} value={u.user_id}>{u.display_name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <p className="text-xs text-muted-foreground/60 mt-1">
+                  Vincula esta testemunha a um usuário para que ela receba notificações de contratos pendentes.
+                </p>
               </div>
               <p className="text-xs text-muted-foreground/60">
                 Tags nos modelos: <code className="bg-muted px-1 rounded">[NOME DA TESTEMUNHA 1]</code> e <code className="bg-muted px-1 rounded">[CPF DA TESTEMUNHA 1]</code>
