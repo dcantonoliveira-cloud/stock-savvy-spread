@@ -826,12 +826,17 @@ export default function ConfiguracoesPage() {
       supabase.from('companies').select('*').limit(1).single(),
       supabase.from('profiles').select('*').limit(1).single(),
       supabase.from('company_integrations' as any).select('*'),
-      supabase.from('profiles' as any).select('user_id, display_name').order('display_name'),
+      supabase.from('user_roles' as any).select('user_id, profiles(display_name)').eq('role', 'supervisor'),
     ]).then(([co, pr, intg, users]) => {
       if (co.data)    setCompany(co.data as any);
       if (pr.data)    setProfile(pr.data as any);
       if (intg.data)  setIntegrations(intg.data as Integration[]);
-      if (users.data) setSystemUsers(users.data as any);
+      if (users.data) {
+        const mapped = (users.data as any[])
+          .map((u: any) => ({ user_id: u.user_id, display_name: u.profiles?.display_name ?? u.user_id }))
+          .sort((a: any, b: any) => a.display_name.localeCompare(b.display_name, 'pt-BR'));
+        setSystemUsers(mapped);
+      }
     });
   }, []);
 
