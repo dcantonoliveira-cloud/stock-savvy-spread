@@ -2,7 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SupervisorSidebar from './SupervisorSidebar';
 import { supabase } from '@/integrations/supabase/client';
-import { Bell, Search, Receipt, LogOut, ChevronDown, Settings, AlertTriangle } from 'lucide-react';
+import { Bell, Search, Receipt, LogOut, ChevronDown, Settings, AlertTriangle, FileSignature, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const PAGE_TITLES: Record<string, string> = {
@@ -52,8 +52,11 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
   const [urgentAlerts, setUrgentAlerts] = useState(0);
   const [topUrgent, setTopUrgent] = useState<string | null>(null);
   const [pendingPayslips, setPendingPayslips] = useState(0);
+  const [pendingContracts, setPendingContracts] = useState<{ id: string; event_name: string | null; event_date: string | null; sign_url: string }[]>([]);
+  const [contractsOpen, setContractsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const contractsRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { profile, signOut, user, permissions } = useAuth();
@@ -62,6 +65,9 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
+      }
+      if (contractsRef.current && !contractsRef.current.contains(e.target as Node)) {
+        setContractsOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -92,6 +98,34 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     };
     load();
   }, [user]);
+
+  useEffect(() => {
+    if (!profile?.email) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from('events' as any)
+        .select('id, event_name, event_date, zapsign_data')
+        .not('zapsign_data', 'is', null)
+        .neq('contract_signed', true);
+
+      const email = profile.email!.toLowerCase();
+      const pending = ((data ?? []) as any[]).flatMap((e: any) => {
+        const signers: any[] = e.zapsign_data?.signers ?? [];
+        const match = signers.find(
+          (s: any) => s.email?.toLowerCase() === email && s.status === 'pending'
+        );
+        if (!match) return [];
+        return [{ id: e.id, event_name: e.event_name, event_date: e.event_date, sign_url: match.sign_url }];
+      });
+      setPendingContracts(pending);
+    };
+    load();
+    const ch = (supabase as any)
+      .channel('pending-contracts-layout')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events' }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [profile?.email]);
 
   const pageTitle = Object.entries(PAGE_TITLES)
     .sort((a, b) => b[0].length - a[0].length)
@@ -177,6 +211,71 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
                 </span>
               ) : null}
             </Link>
+
+            <div className="relative" ref={contractsRef}>
+              <button
+                onClick={() => setContractsOpen(v => !v)}
+                className="relative p-2 rounded-lg transition-colors hover:bg-accent"
+                title="Contratos para assinar"
+              >
+                <FileSignature
+                  style={{ width: 18, height: 18 }}
+                  className={pendingContracts.length > 0 ? 'text-amber-500' : 'text-muted-foreground'}
+                />
+                {pendingContracts.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                    {pendingContracts.length > 9 ? '9+' : pendingContracts.length}
+                  </span>
+                )}
+              </button>
+
+              {contractsOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-80 bg-card border border-border rounded-xl shadow-lg py-1.5 z-50">
+                  <div className="px-3 py-1.5 border-b border-border">
+                    <p className="text-xs font-semibold text-foreground">Contratos para assinar</p>
+                  </div>
+                  {pendingContracts.length === 0 ? (
+                    <p className="px-3 py-3 text-xs text-muted-foreground">Nenhum contrato pendente.</p>
+                  ) : (
+                    <div className="max-h-72 overflow-y-auto">
+                      {pendingContracts.map(c => (
+                        <div key={c.id} className="px-3 py-2.5 flex items-start justify-between gap-3 hover:bg-muted/50 transition-colors">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground truncate">{c.event_name || 'Evento'}</p>
+                            {c.event_date && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {new Date(c.event_date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {c.sign_url && (
+                              <a
+                                href={c.sign_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-[11px] text-primary font-medium hover:underline"
+                                onClick={() => setContractsOpen(false)}
+                              >
+                                Assinar
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                            <span className="text-border">·</span>
+                            <button
+                              onClick={() => { setContractsOpen(false); navigate(`/events/${c.id}`); }}
+                              className="text-[11px] text-muted-foreground hover:text-foreground font-medium transition-colors"
+                            >
+                              Ver evento
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="relative pl-2 border-l border-border ml-1" ref={menuRef}>
               <button
