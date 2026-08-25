@@ -813,10 +813,11 @@ function PontoTab({ employeeId }: { employeeId: string }) {
 
   // Agrupa por dia — mais recente primeiro
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd }).reverse();
+  const today = new Date(); today.setHours(23, 59, 59, 999);
   const byDay = days.map(day => ({
     day,
     entries: entries.filter(e => isSameDay(parseISO(e.recorded_at), day)),
-  })).filter(d => d.entries.length > 0);
+  })).filter(d => d.entries.length > 0 || (schedule[d.day.getDay()] != null && d.day <= today));
 
   // Semanas — agora com saldo (balance em minutos)
   const weekMap = new Map<string, { ms: number; balanceMin: number; days: typeof byDay }>();
