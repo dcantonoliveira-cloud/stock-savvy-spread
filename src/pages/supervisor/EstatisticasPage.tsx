@@ -85,6 +85,7 @@ export default function EstatisticasPage() {
   const [fatProducao, setFatProducao] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tastings, setTastings] = useState<any[]>([]);
+  const [sessionStats, setSessionStats] = useState<Record<string, { novos: number; fechados: number }>>({});
   const [tastingRange, setTastingRange] = useState<'3m' | '1a' | 'all'>('1a');
   const [activeCell, setActiveCell] = useState<{ key: string; month: number } | null>(null);
 
@@ -204,7 +205,7 @@ export default function EstatisticasPage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [evtRes, contratosRes, tastRes, prodRes] = await Promise.all([
+      const [evtRes, contratosRes, tastRes, prodRes, sessStatsRes] = await Promise.all([
         // Eventos do ano: para orçamentos, gráficos e KPIs (por event_date)
         supabase
           .from('events')
@@ -228,12 +229,16 @@ export default function EstatisticasPage() {
           .gte('delivery_date', `${year}-01-01`)
           .lte('delivery_date', `${year}-12-31`)
           .gt('extra_value', 0),
+        supabase.from('tasting_session_stats' as any).select('session_id, novos, fechados'),
       ]);
       setEvents((evtRes.data ?? []) as EventRow[]);
       setContratos((contratosRes.data ?? []) as ContratoRow[]);
       setTastings((tastRes.data ?? []) as any[]);
       const prod = (prodRes.data ?? []) as { extra_value: number }[];
       setFatProducao(prod.reduce((s: number, o: { extra_value: number }) => s + (o.extra_value ?? 0), 0));
+      const statsMap: Record<string, { novos: number; fechados: number }> = {};
+      for (const r of (sessStatsRes.data ?? []) as any[]) statsMap[r.session_id] = { novos: r.novos ?? 0, fechados: r.fechados ?? 0 };
+      setSessionStats(statsMap);
       await loadSettings();
       setLoading(false);
     };
@@ -320,14 +325,11 @@ export default function EstatisticasPage() {
       // Faturamento: soma dos contratos fechados no mês
       const faturamento = contratosList.reduce((s, e) => s + (e.total_value ?? 0), 0);
 
-      // Conversão de degustações: novos que fecharam / total novos
-      const newClientIds = [...new Set(tastingEventsList.map((t: any) => t.event_id as string))];
-      const closedNewClients = newClientIds.filter(id => {
-        const st = eventStatusMap[id];
-        return st === 'confirmed' || st === 'completed';
-      }).length;
-      const conv_deg: number | null = newClientIds.length > 0
-        ? Math.round((closedNewClients / newClientIds.length) * 100)
+      // Conversão de degustações: soma novos/fechados via tasting_session_stats (mesma fonte do Histórico)
+      const novosTotal    = sessionsList.reduce((s, ss) => s + (sessionStats[ss.id]?.novos    ?? 0), 0);
+      const fechadosTotal = sessionsList.reduce((s, ss) => s + (sessionStats[ss.id]?.fechados ?? 0), 0);
+      const conv_deg: number | null = novosTotal > 0
+        ? Math.round((fechadosTotal / novosTotal) * 100)
         : null;
 
       return {
@@ -343,24 +345,19 @@ export default function EstatisticasPage() {
         _tastingEventsList: tastingEventsList,
       };
     });
-  }, [events, contratos, year, sessionMap, tastings, eventStatusMap]);
+  }, [events, contratos, year, sessionMap, tastings, sessionStats]);
 
   const totals = useMemo(() => {
-    const yearNewIds = [...new Set(
-      tastings
-        .filter((t: any) => {
-          if (t.situation_snapshot !== 'new') return false;
-          const s = Array.isArray(t.tasting_sessions) ? t.tasting_sessions[0] : t.tasting_sessions;
-          return s?.scheduled_date?.startsWith(`${year}`);
-        })
-        .map((t: any) => t.event_id as string)
-    )];
-    const yearClosed = yearNewIds.filter(id => {
-      const st = eventStatusMap[id];
-      return st === 'confirmed' || st === 'completed';
-    }).length;
-    const conv_deg: number | null = yearNewIds.length > 0
-      ? Math.round((yearClosed / yearNewIds.length) * 100)
+    // Soma novos/fechados de todas as sessões do ano via tasting_session_stats
+    let yearNovos = 0, yearFechados = 0;
+    for (const [sid, sd] of sessionMap) {
+      if (sd.date.startsWith(`${year}`)) {
+        yearNovos    += sessionStats[sid]?.novos    ?? 0;
+        yearFechados += sessionStats[sid]?.fechados ?? 0;
+      }
+    }
+    const conv_deg: number | null = yearNovos > 0
+      ? Math.round((yearFechados / yearNovos) * 100)
       : null;
 
     return {
@@ -371,7 +368,7 @@ export default function EstatisticasPage() {
       faturamento: tableRows.reduce((s, r) => s + r.faturamento, 0),
       conv_deg,
     };
-  }, [tableRows, tastings, year, eventStatusMap]);
+  }, [tableRows, sessionMap, sessionStats, year]);
 
   // Ticket médio mensal (por event_date) — para tabela abaixo do break-even
   const ticketMedioMensal = useMemo(() => MONTHS.map((_, i) => {
