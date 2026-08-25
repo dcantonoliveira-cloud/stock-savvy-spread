@@ -831,11 +831,14 @@ function PontoTab({ employeeId }: { employeeId: string }) {
 
       const allEntries = (data ?? []) as unknown as TimeEntry[];
       const allDays = eachDayOfInterval({ start: startDate, end: todayEnd });
+      const todayDate = new Date();
 
       const cum = allDays.reduce((s, d) => {
         const hasSched = schedule[d.getDay()] != null;
         const dayEntries = allEntries.filter(e => isSameDay(parseISO(e.recorded_at), d));
         if (!hasSched && dayEntries.length === 0) return s;
+        // Hoje sem saída ainda → não penalizar
+        if (isSameDay(d, todayDate) && !dayEntries.some(e => e.type === 'exit')) return s;
         return s + calcDayBalance(dayEntries, schedule, d);
       }, 0);
 
@@ -1063,6 +1066,8 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                 const exitE  = sorted.filter(e => e.type === 'exit').pop();
                 const total  = dayTotalMs(de, schedule[day.getDay()]?.lunch_minutes ?? 60);
                 const isWeekend = [0, 6].includes(day.getDay());
+                const isToday = isSameDay(day, new Date());
+                const isDayIncomplete = isToday && !exitE;
                 const dayBal = calcDayBalance(de, schedule, day);
                 const hasSched = schedule[day.getDay()] != null;
                 return (
@@ -1109,10 +1114,10 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                         {total > 0 ? msToHHMM(total) : <span className="text-muted-foreground/40">—</span>}
                       </span>
                       <span className={`text-center text-xs font-bold ${
-                        !hasSched ? 'text-muted-foreground/30' :
+                        !hasSched || isDayIncomplete ? 'text-muted-foreground/30' :
                         dayBal >= 0 ? 'text-emerald-600' : 'text-red-500'
                       }`}>
-                        {hasSched ? formatBalance(dayBal) : '—'}
+                        {hasSched && !isDayIncomplete ? formatBalance(dayBal) : '—'}
                       </span>
                       <span />
                     </div>
