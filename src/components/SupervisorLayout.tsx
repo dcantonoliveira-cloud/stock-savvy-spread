@@ -125,7 +125,8 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     if (!user?.id) return;
     loadPendingContracts();
     window.addEventListener('focus', loadPendingContracts);
-    const interval = setInterval(loadPendingContracts, 60_000);
+    window.addEventListener('zapsign-status-changed', loadPendingContracts);
+    const interval = setInterval(loadPendingContracts, 15_000);
     const ch = (supabase as any)
       .channel('pending-contracts-layout')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events' }, loadPendingContracts)
@@ -136,6 +137,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
       .subscribe();
     return () => {
       window.removeEventListener('focus', loadPendingContracts);
+      window.removeEventListener('zapsign-status-changed', loadPendingContracts);
       clearInterval(interval);
       supabase.removeChannel(ch);
     };

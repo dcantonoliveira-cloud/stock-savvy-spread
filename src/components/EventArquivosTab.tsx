@@ -539,6 +539,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       const dbUpdates: any = { zapsign_data: updated };
       if (allSigned) dbUpdates.contract_signed = true;
       await supabase.from('events').update(dbUpdates).eq('id', eventId);
+      if (newlySigned.length > 0 || allSigned) {
+        window.dispatchEvent(new CustomEvent('zapsign-status-changed'));
+      }
       // Inserir notificação normal para cada novo assinante
       for (const signer of newlySigned) {
         const eventName = event.event_name ?? 'Evento';
