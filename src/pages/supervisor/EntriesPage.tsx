@@ -103,6 +103,7 @@ export default function EntriesPage() {
   const [filterDate, setFilterDate] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const PAGE_SIZE = 50;
 
   const [itemId, setItemId] = useState('');
@@ -141,17 +142,35 @@ export default function EntriesPage() {
 
   const defaultKitchen = kitchens.find(k => k.is_default);
 
-  const load = async () => {
+  const load = async (date?: string) => {
+    let entriesQuery = supabase
+      .from('stock_entries')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (date) {
+      entriesQuery = entriesQuery.eq('date', date);
+    } else {
+      entriesQuery = entriesQuery.limit(500);
+    }
+
     const [itemsRes, entriesRes, kitchensRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, current_stock, barcode').order('name').range(0, 9999),
-      supabase.from('stock_entries').select('*').order('created_at', { ascending: false }),
+      entriesQuery,
       supabase.from('kitchens').select('id, name, is_default').order('name'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data as Item[]);
     if (entriesRes.data) setEntries(entriesRes.data);
+    setTotalCount(entriesRes.count ?? null);
     if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(filterDate || undefined); }, []);
+
+  const handleFilterDate = (date: string) => {
+    setFilterDate(date);
+    setPage(0);
+    load(date || undefined);
+  };
 
   // When item changes, load its locations and set default allocation
   const handleItemSelect = async (id: string) => {
@@ -256,13 +275,13 @@ export default function EntriesPage() {
     toast.success('Entrada registrada!');
     resetForm();
     setDialogOpen(false);
-    load();
+    load(filterDate || undefined);
   };
 
   const handleDelete = async (id: string) => {
     await supabase.from('stock_entries').delete().eq('id', id);
     toast.success('Entrada removida!');
-    load();
+    load(filterDate || undefined);
   };
 
   const handleFixConfirm = async () => {
@@ -295,7 +314,7 @@ export default function EntriesPage() {
       await supabase.from('stock_entries').update({ item_id: itemId } as any).eq('id', fixEntry.id);
       toast.success('Entrada corrigida!');
       setFixEntry(null);
-      load();
+      load(filterDate || undefined);
     } catch (e: any) {
       toast.error('Erro ao corrigir entrada');
       console.error(e);
@@ -573,7 +592,7 @@ export default function EntriesPage() {
       toast.success(`${validItems.length} entrada(s) registrada(s) via ${importLabel}!`);
       setParsedInvoice(null);
       setNfDialogOpen(false);
-      load();
+      load(filterDate || undefined);
     } catch (e: any) {
       toast.error('Erro ao registrar entradas');
       console.error(e);
@@ -1005,8 +1024,14 @@ export default function EntriesPage() {
         </div>
       </div>
 
+      {!filterDate && totalCount !== null && totalCount > 500 && (
+        <p className="text-xs text-muted-foreground mb-3">
+          Exibindo as 500 entradas mais recentes de {totalCount} no total. Use o filtro de data para ver registros específicos.
+        </p>
+      )}
+
       <div className="mb-6 flex items-center gap-2 flex-wrap">
-        <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-48" />
+        <Input type="date" value={filterDate} onChange={e => handleFilterDate(e.target.value)} className="w-48" />
         <Input
           type="text"
           placeholder="Buscar por item ou fornecedor..."
@@ -1014,7 +1039,7 @@ export default function EntriesPage() {
           onChange={e => setSearch(e.target.value)}
           className="w-64"
         />
-        {filterDate && <Button variant="ghost" size="sm" onClick={() => setFilterDate('')}>Limpar</Button>}
+        {filterDate && <Button variant="ghost" size="sm" onClick={() => handleFilterDate('')}>Limpar</Button>}
         <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={filtered.length === 0}>
           <Download className="w-4 h-4 mr-2" />Exportar CSV
         </Button>
