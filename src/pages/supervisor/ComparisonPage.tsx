@@ -23,18 +23,22 @@ export default function SupervisorComparisonPage() {
       const [itemsRes, sheetsRes, outputsRes] = await Promise.all([
         supabase.from('stock_items').select('id, name, unit'),
         supabase.from('technical_sheets').select('*'),
-        supabase.from('stock_outputs').select('item_id, quantity, date'),
+        supabase.from('stock_outputs').select('item_id, quantity, date').limit(500),
       ]);
       if (itemsRes.data) setItems(itemsRes.data);
       if (outputsRes.data) setOutputs(outputsRes.data);
       if (sheetsRes.data) {
-        const withItems = await Promise.all(
-          sheetsRes.data.map(async s => {
-            const { data: si } = await supabase.from('technical_sheet_items').select('item_id, quantity').eq('sheet_id', s.id);
-            return { ...s, items: si || [] };
-          })
-        );
-        setSheets(withItems);
+        const sheetIds = sheetsRes.data.map(s => s.id);
+        const { data: allSheetItems } = await supabase
+          .from('technical_sheet_items')
+          .select('sheet_id, item_id, quantity')
+          .in('sheet_id', sheetIds);
+        const itemsBySheet: Record<string, { item_id: string; quantity: number }[]> = {};
+        for (const si of (allSheetItems ?? [])) {
+          if (!itemsBySheet[si.sheet_id]) itemsBySheet[si.sheet_id] = [];
+          itemsBySheet[si.sheet_id].push({ item_id: si.item_id, quantity: si.quantity });
+        }
+        setSheets(sheetsRes.data.map(s => ({ ...s, items: itemsBySheet[s.id] ?? [] })));
       }
       setLoading(false);
     };

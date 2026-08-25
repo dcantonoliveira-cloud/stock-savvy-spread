@@ -192,7 +192,8 @@ export default function BIDashboard() {
   const [all, setAll] = useState<EventBI[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>('geral');
-  const [filterYear, setFilterYear] = useState('');
+  const currentYear = new Date().getFullYear();
+  const [filterYear, setFilterYear] = useState(String(currentYear));
   const [filterMonth, setFilterMonth] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterLocal, setFilterLocal] = useState('');
@@ -201,10 +202,12 @@ export default function BIDashboard() {
   const load = async () => {
     setLoading(true);
 
+    const windowStart = `${new Date().getFullYear() - 3}-01-01`;
     const [evRes, clRes, locRes] = await Promise.all([
       supabase
         .from('events' as any)
         .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, price_per_person, contract_signed_date, created_at, client_id, organizer, organizer_id, lost_reason')
+        .gte('event_date', windowStart)
         .order('event_date', { ascending: false }),
       supabase.from('clients' as any).select('id, name, zip_code, source'),
       supabase.from('event_locations' as any).select('id, name'),
