@@ -373,14 +373,18 @@ export default function EstatisticasPage() {
       const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 3);
       return tastings.filter((t: any) => {
         const d = getTastingDate(t);
-        return d && new Date(d) >= cutoff;
+        if (!d) return false;
+        const date = new Date(d);
+        return date >= cutoff && date <= now;
       });
     }
     if (tastingRange === '1a') {
       const cutoff = new Date(now); cutoff.setFullYear(cutoff.getFullYear() - 1);
       return tastings.filter((t: any) => {
         const d = getTastingDate(t);
-        return d && new Date(d) >= cutoff;
+        if (!d) return false;
+        const date = new Date(d);
+        return date >= cutoff && date <= now;
       });
     }
     return tastings;
