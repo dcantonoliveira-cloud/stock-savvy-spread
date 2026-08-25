@@ -592,17 +592,20 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     if (!zapData) return;
     setCancelingZap(true);
     try {
+      // Tenta cancelar no ZapSign (pode falhar por CORS/API — não bloqueia o fluxo)
       if (zapToken) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
-        await fetch(`${proxyBase}?path=/api/v1/docs/${zapData.doc_token}/`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-            'x-zapsign-token': zapToken,
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        });
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+          await fetch(`${proxyBase}?path=/api/v1/docs/${zapData.doc_token}/`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token}`,
+              'x-zapsign-token': zapToken,
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+          });
+        } catch { /* ignora erro do ZapSign */ }
       }
       await supabase.from('events').update({ zapsign_data: null, contract_signed: false } as any).eq('id', eventId);
       setZapData(null);
