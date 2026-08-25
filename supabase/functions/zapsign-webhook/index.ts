@@ -15,13 +15,8 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-
-    // ZapSign webhook payload:
-    // event_type: 'sign' | 'doc_signed' | 'doc_refused'
-    // document: { token, name, ... }
-    // signer (only on 'sign'): { token, name, email, status }
     const eventType: string = payload.event_type ?? payload.type ?? '';
-    const docToken: string  = payload.document?.token ?? payload.doc_token ?? '';
+    const docToken: string  = payload.document?.token ?? payload.token ?? payload.doc_token ?? '';
 
     if (!docToken) return new Response('Missing doc_token', { status: 400 });
 
@@ -43,13 +38,46 @@ serve(async (req) => {
     const eventName: string = match.event_name ?? 'Evento';
     const zapData: any      = match.zapsign_data ?? {};
 
-    // doc_signed fires on every individual signature (status = "pending" until all sign, then "signed")
     if (eventType === 'doc_signed') {
-      const payloadSigners: any[] = payload.document?.signers ?? payload.signers ?? [];
-      const allSigned = (payload.document?.status ?? payload.status) === 'signed';
+      // Fetch fresh status directly from ZapSign API (more reliable than parsing payload)
+      const { data: integration } = await supabase
+        .from('company_integrations')
+        .select('api_key')
+        .eq('provider', 'zapsign')
+        .eq('company_id', COMPANY_ID)
+        .maybeSingle();
 
-      // Merge payload signer statuses into stored signers (match by token)
-      const updatedSigners = (zapData.signers ?? []).map((s: any) => {
+      let freshSigners: any[] | null = null;
+      let freshDocStatus: string | null = null;
+
+      if (integration?.api_key) {
+        let apiKey: string | null = null;
+        try { apiKey = JSON.parse(integration.api_key)?.token ?? integration.api_key; } catch { apiKey = integration.api_key; }
+
+        if (apiKey) {
+          const zapRes = await fetch(`https://api.zapsign.com.br/api/v1/docs/${docToken}/`, {
+            headers: { 'Authorization': `Bearer ${apiKey}` },
+          });
+          if (zapRes.ok) {
+            const zapDoc = await zapRes.json();
+            freshSigners   = zapDoc.signers ?? null;
+            freshDocStatus = zapDoc.status ?? null;
+          }
+        }
+      }
+
+      // Fallback: parse from webhook payload if ZapSign API call failed
+      const payloadSigners: any[] = freshSigners
+        ?? payload.document?.signers
+        ?? payload.signers
+        ?? [];
+
+      const allSigned = freshDocStatus === 'signed'
+        || (payload.document?.status ?? payload.status) === 'signed';
+
+      const prevSigners: any[] = zapData.signers ?? [];
+
+      const updatedSigners = prevSigners.map((s: any) => {
         const fresh = payloadSigners.find((p: any) => p.token === s.token);
         return fresh ? { ...s, status: fresh.status ?? s.status } : s;
       });
@@ -59,9 +87,9 @@ serve(async (req) => {
 
       await supabase.from('events').update(dbUpdate).eq('id', eventId);
 
-      // Find who just signed (was not signed before, now is)
+      // Detect who just signed
       const newlySigned = updatedSigners.filter((u: any) => {
-        const prev = (zapData.signers ?? []).find((s: any) => s.token === u.token);
+        const prev = prevSigners.find((s: any) => s.token === u.token);
         return u.status === 'signed' && prev?.status !== 'signed';
       });
 
