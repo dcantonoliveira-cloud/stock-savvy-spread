@@ -783,6 +783,7 @@ function PontoTab({ employeeId }: { employeeId: string }) {
   const [adjMins, setAdjMins] = useState('0');
   const [adjNote, setAdjNote] = useState('');
   const [savingAdj, setSavingAdj] = useState(false);
+  const [cumulativeBalanceMin, setCumulativeBalanceMin] = useState<number | null>(null);
 
   const monthStart = startOfMonth(viewDate);
   const monthEnd   = endOfMonth(viewDate);
@@ -810,6 +811,39 @@ function PontoTab({ employeeId }: { employeeId: string }) {
     };
     load();
   }, [employeeId, viewDate.getFullYear(), viewDate.getMonth()]);
+
+  // Saldo acumulado desde a data de início
+  useEffect(() => {
+    const startDate = (schedule as any).start_date ? parseISO((schedule as any).start_date) : null;
+    if (!startDate) { setCumulativeBalanceMin(null); return; }
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const load = async () => {
+      const { data } = await supabase
+        .from('time_entries' as any)
+        .select('type, recorded_at, adjustment_minutes')
+        .eq('employee_id', employeeId)
+        .gte('recorded_at', startDate.toISOString())
+        .lte('recorded_at', todayEnd.toISOString())
+        .order('recorded_at', { ascending: true });
+
+      const allEntries = (data ?? []) as unknown as TimeEntry[];
+      const allDays = eachDayOfInterval({ start: startDate, end: todayEnd });
+
+      const cum = allDays.reduce((s, d) => {
+        const hasSched = schedule[d.getDay()] != null;
+        const dayEntries = allEntries.filter(e => isSameDay(parseISO(e.recorded_at), d));
+        if (!hasSched && dayEntries.length === 0) return s;
+        return s + calcDayBalance(dayEntries, schedule, d);
+      }, 0);
+
+      setCumulativeBalanceMin(cum);
+    };
+
+    load();
+  }, [employeeId, (schedule as any).start_date, entries]);
 
   // Agrupa por dia — mais recente primeiro
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd }).reverse();
@@ -1033,7 +1067,7 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                 const hasSched = schedule[day.getDay()] != null;
                 return (
                   <React.Fragment key={day.toISOString()}>
-                    <div className={`grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-2.5 border-b border-border/40 text-sm ${isWeekend ? 'bg-muted/20' : ''}`}>
+                    <div className={`grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-2.5 border-b border-border/40 text-sm transition-colors ${isWeekend ? 'bg-muted/20 hover:bg-muted/40' : 'hover:bg-muted/20'}`}>
                       <span className="font-medium text-foreground capitalize text-xs">
                         {fmtDate(day, "EEE dd/MM", { locale: ptBR })}
                       </span>
@@ -1113,7 +1147,7 @@ function PontoTab({ employeeId }: { employeeId: string }) {
           ))}
 
           {/* Total mês */}
-          <div className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-3 bg-muted/40 text-sm font-bold">
+          <div className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-3 bg-muted/40 text-sm font-bold border-t border-border">
             <span className="text-foreground">Total do mês</span>
             <span /><span />
             <span className="text-center text-foreground">{msToHHMM(monthTotalMs)}</span>
@@ -1122,6 +1156,18 @@ function PontoTab({ employeeId }: { employeeId: string }) {
             </span>
             <span />
           </div>
+
+          {/* Saldo acumulado */}
+          {cumulativeBalanceMin !== null && (
+            <div className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-2.5 bg-primary/5 border-t border-primary/10 text-sm font-bold">
+              <span className="text-primary/80 text-xs font-semibold">Saldo acumulado</span>
+              <span /><span /><span />
+              <span className={`text-center font-bold text-sm ${cumulativeBalanceMin >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {formatBalance(cumulativeBalanceMin)}
+              </span>
+              <span />
+            </div>
+          )}
         </div>
       )}
 
