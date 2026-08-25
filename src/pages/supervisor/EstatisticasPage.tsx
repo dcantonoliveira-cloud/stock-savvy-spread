@@ -325,9 +325,11 @@ export default function EstatisticasPage() {
       // Faturamento: soma dos contratos fechados no mês
       const faturamento = contratosList.reduce((s, e) => s + (e.total_value ?? 0), 0);
 
-      // Conversão de degustações: soma novos/fechados via tasting_session_stats (mesma fonte do Histórico)
-      const novosTotal    = sessionsList.reduce((s, ss) => s + (sessionStats[ss.id]?.novos    ?? 0), 0);
-      const fechadosTotal = sessionsList.reduce((s, ss) => s + (sessionStats[ss.id]?.fechados ?? 0), 0);
+      // Conversão de degustações: só sessões que já aconteceram (data < hoje)
+      const todayStr = new Date().toISOString().split('T')[0];
+      const pastSessions = sessionsList.filter(ss => ss.date.split('T')[0] < todayStr);
+      const novosTotal    = pastSessions.reduce((s, ss) => s + (sessionStats[ss.id]?.novos    ?? 0), 0);
+      const fechadosTotal = pastSessions.reduce((s, ss) => s + (sessionStats[ss.id]?.fechados ?? 0), 0);
       const conv_deg: number | null = novosTotal > 0
         ? Math.round((fechadosTotal / novosTotal) * 100)
         : null;
@@ -348,10 +350,11 @@ export default function EstatisticasPage() {
   }, [events, contratos, year, sessionMap, tastings, sessionStats]);
 
   const totals = useMemo(() => {
-    // Soma novos/fechados de todas as sessões do ano via tasting_session_stats
+    // Soma novos/fechados de sessões passadas do ano via tasting_session_stats
+    const todayStr = new Date().toISOString().split('T')[0];
     let yearNovos = 0, yearFechados = 0;
     for (const [sid, sd] of sessionMap) {
-      if (sd.date.startsWith(`${year}`)) {
+      if (sd.date.startsWith(`${year}`) && sd.date.split('T')[0] < todayStr) {
         yearNovos    += sessionStats[sid]?.novos    ?? 0;
         yearFechados += sessionStats[sid]?.fechados ?? 0;
       }
