@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SupervisorSidebar from './SupervisorSidebar';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,53 +99,47 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     load();
   }, [user]);
 
+  const loadPendingContracts = useCallback(async () => {
+    if (!user?.id) return;
+    const [{ data: co }, { data: events }] = await Promise.all([
+      (supabase as any).from('companies').select('signer_user_id, signer_email, witness_1_user_id, witness_1_email').limit(1).single(),
+      (supabase as any).from('events').select('id, event_name, event_date, zapsign_data').not('zapsign_data', 'is', null),
+    ]);
+    const myEmails: string[] = [];
+    if (co?.signer_user_id === user.id && co?.signer_email)      myEmails.push(co.signer_email.toLowerCase().trim());
+    if (co?.witness_1_user_id === user.id && co?.witness_1_email) myEmails.push(co.witness_1_email.toLowerCase().trim());
+    if (user.email) myEmails.push(user.email.toLowerCase().trim());
+    if (myEmails.length === 0) { setPendingContracts([]); return; }
+    const pending = ((events ?? []) as any[]).flatMap((e: any) => {
+      const signers: any[] = e.zapsign_data?.signers ?? [];
+      const match = signers.find(
+        (s: any) => myEmails.includes(s.email?.toLowerCase().trim() ?? '') && (s.status === 'pending' || s.status === 'new')
+      );
+      if (!match) return [];
+      return [{ id: e.id, event_name: e.event_name, event_date: e.event_date, sign_url: match.sign_url }];
+    });
+    setPendingContracts(pending);
+  }, [user?.id, user?.email]);
+
   useEffect(() => {
     if (!user?.id) return;
-    const load = async () => {
-      const [{ data: co }, { data: events }] = await Promise.all([
-        (supabase as any).from('companies').select('signer_user_id, signer_email, witness_1_user_id, witness_1_email').limit(1).single(),
-        (supabase as any).from('events').select('id, event_name, event_date, zapsign_data').not('zapsign_data', 'is', null),
-      ]);
-
-      // Build the list of ZapSign emails that belong to the current user
-      const myEmails: string[] = [];
-      if (co?.signer_user_id === user.id && co?.signer_email)      myEmails.push(co.signer_email.toLowerCase().trim());
-      if (co?.witness_1_user_id === user.id && co?.witness_1_email) myEmails.push(co.witness_1_email.toLowerCase().trim());
-      // Fallback: also try auth email in case it matches directly
-      if (user.email) myEmails.push(user.email.toLowerCase().trim());
-
-if (myEmails.length === 0) { setPendingContracts([]); return; }
-
-      const pending = ((events ?? []) as any[]).flatMap((e: any) => {
-        const signers: any[] = e.zapsign_data?.signers ?? [];
-        const match = signers.find(
-          (s: any) => myEmails.includes(s.email?.toLowerCase().trim() ?? '') && (s.status === 'pending' || s.status === 'new')
-        );
-        if (!match) return [];
-        return [{ id: e.id, event_name: e.event_name, event_date: e.event_date, sign_url: match.sign_url }];
-      });
-      setPendingContracts(pending);
-    };
-    load();
-
-    // Refresh when user returns to this tab (e.g. after signing in another tab)
-    window.addEventListener('focus', load);
-
+    loadPendingContracts();
+    window.addEventListener('focus', loadPendingContracts);
+    const interval = setInterval(loadPendingContracts, 60_000);
     const ch = (supabase as any)
       .channel('pending-contracts-layout')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events' }, load)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'companies' }, load)
-      // app_notifications is more likely to have realtime enabled — webhook inserts here on each signature
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events' }, loadPendingContracts)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'companies' }, loadPendingContracts)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_notifications' }, (payload: any) => {
-        if (payload.new?.type === 'zapsign_assinatura') load();
+        if (payload.new?.type === 'zapsign_assinatura') loadPendingContracts();
       })
       .subscribe();
-
     return () => {
-      window.removeEventListener('focus', load);
+      window.removeEventListener('focus', loadPendingContracts);
+      clearInterval(interval);
       supabase.removeChannel(ch);
     };
-  }, [user?.id]);
+  }, [user?.id, loadPendingContracts]);
 
   const pageTitle = Object.entries(PAGE_TITLES)
     .sort((a, b) => b[0].length - a[0].length)
@@ -251,8 +245,15 @@ if (myEmails.length === 0) { setPendingContracts([]); return; }
 
               {contractsOpen && (
                 <div className="absolute right-0 top-full mt-1.5 w-80 bg-card border border-border rounded-xl shadow-lg py-1.5 z-50">
-                  <div className="px-3 py-1.5 border-b border-border">
+                  <div className="px-3 py-1.5 border-b border-border flex items-center justify-between">
                     <p className="text-xs font-semibold text-foreground">Contratos para assinar</p>
+                    <button
+                      onClick={() => loadPendingContracts()}
+                      className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                      title="Atualizar"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    </button>
                   </div>
                   {pendingContracts.length === 0 ? (
                     <p className="px-3 py-3 text-xs text-muted-foreground">Nenhum contrato pendente.</p>

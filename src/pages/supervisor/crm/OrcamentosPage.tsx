@@ -223,7 +223,7 @@ export default function OrcamentosPage() {
         <iframe
           src={iframeToken ? `/orcamento.html?token=${iframeToken}&usuario=${encodeURIComponent(iframeUser)}` : '/orcamento.html'}
           className="w-full rounded-2xl border border-border"
-          style={{ height: 'calc(100vh - 160px)' }}
+          style={{ height: 'calc(100vh - 80px)' }}
           title="Gerador de Orçamentos"
         />
       )}
