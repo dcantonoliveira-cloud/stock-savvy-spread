@@ -283,6 +283,12 @@ export default function EstatisticasPage() {
   // Mapa event_id → event_name para lookup no popup
   const eventNameMap = useMemo(() => new Map(events.map(e => [e.id, e.event_name ?? e.id])), [events]);
 
+  const eventStatusMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    events.forEach(e => { map[e.id] = e.status; });
+    return map;
+  }, [events]);
+
   // Tabela mensal com listas detalhadas para popup
   const tableRows = useMemo(() => {
     return MONTHS.map((_, i) => {
@@ -420,12 +426,6 @@ export default function EstatisticasPage() {
     }
     return tastings;
   }, [tastings, tastingRange]);
-
-  const eventStatusMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    events.forEach(e => { map[e.id] = e.status; });
-    return map;
-  }, [events]);
 
   const tastingQtd   = tastingFiltered.length;
   const newClients   = new Set(tastingFiltered.map((t: any) => t.event_id)).size;
