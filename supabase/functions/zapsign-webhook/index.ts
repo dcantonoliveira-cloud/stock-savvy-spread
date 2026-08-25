@@ -45,8 +45,8 @@ serve(async (req) => {
 
     // doc_signed fires on every individual signature (status = "pending" until all sign, then "signed")
     if (eventType === 'doc_signed') {
-      const payloadSigners: any[] = payload.signers ?? [];
-      const allSigned = (payload.status ?? payload.document?.status) === 'signed';
+      const payloadSigners: any[] = payload.document?.signers ?? payload.signers ?? [];
+      const allSigned = (payload.document?.status ?? payload.status) === 'signed';
 
       // Merge payload signer statuses into stored signers (match by token)
       const updatedSigners = (zapData.signers ?? []).map((s: any) => {
