@@ -44,7 +44,8 @@ export function calcDayBalance(
   const sorted = [...entries].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
   const entry = sorted.find(e => e.type === 'entry');
   const exit  = sorted.filter(e => e.type === 'exit').pop();
-  if (!entry || !exit) return adjustments;
+  // Dia agendado mas sem batida = falta: desconta as horas esperadas
+  if (!entry || !exit) return -sched.expected_minutes + adjustments;
 
   const schedStartMin = timeToMinutes(sched.start);
   const entryDate = new Date(entry.recorded_at);

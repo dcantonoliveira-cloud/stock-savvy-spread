@@ -761,10 +761,7 @@ function dayTotalMs(entries: TimeEntry[], lunchMinutes = 0) {
     }
   }
   total -= lunchMinutes * 60_000;
-  const adjMs = entries
-    .filter(e => e.type === 'adjustment')
-    .reduce((s, e) => s + (e.adjustment_minutes ?? 0) * 60_000, 0);
-  return Math.max(0, total) + adjMs;
+  return Math.max(0, total);
 }
 
 const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
