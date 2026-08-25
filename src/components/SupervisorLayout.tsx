@@ -104,7 +104,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     const load = async () => {
       const [{ data: co }, { data: events }] = await Promise.all([
         (supabase as any).from('companies').select('signer_user_id, signer_email, witness_1_user_id, witness_1_email').limit(1).single(),
-        (supabase as any).from('events').select('id, event_name, event_date, zapsign_data').not('zapsign_data', 'is', null).neq('contract_signed', true),
+        (supabase as any).from('events').select('id, event_name, event_date, zapsign_data').not('zapsign_data', 'is', null),
       ]);
 
       // Build the list of ZapSign emails that belong to the current user
