@@ -114,21 +114,12 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
       // Fallback: also try auth email in case it matches directly
       if (user.email) myEmails.push(user.email.toLowerCase().trim());
 
-      console.log('[Contratos] user.id:', user.id);
-      console.log('[Contratos] co:', co);
-      console.log('[Contratos] myEmails:', myEmails);
-      console.log('[Contratos] eventos com zapsign:', (events ?? []).length);
-      (events ?? []).forEach((e: any) => {
-        const signers: any[] = e.zapsign_data?.signers ?? [];
-        console.log('[Contratos] evento:', e.event_name, '| signers:', signers.map((s: any) => `${s.email}/${s.status}`));
-      });
-
-      if (myEmails.length === 0) { setPendingContracts([]); return; }
+if (myEmails.length === 0) { setPendingContracts([]); return; }
 
       const pending = ((events ?? []) as any[]).flatMap((e: any) => {
         const signers: any[] = e.zapsign_data?.signers ?? [];
         const match = signers.find(
-          (s: any) => myEmails.includes(s.email?.toLowerCase().trim() ?? '') && s.status === 'pending'
+          (s: any) => myEmails.includes(s.email?.toLowerCase().trim() ?? '') && (s.status === 'pending' || s.status === 'new')
         );
         if (!match) return [];
         return [{ id: e.id, event_name: e.event_name, event_date: e.event_date, sign_url: match.sign_url }];
