@@ -67,7 +67,8 @@ export default function ContasPagarPage() {
     const { data } = await supabase
       .from('bills_payable' as any)
       .select('*')
-      .order('due_date', { ascending: true });
+      .order('due_date', { ascending: true })
+      .limit(500);
     setBills((data ?? []) as Bill[]);
     setLoading(false);
   };

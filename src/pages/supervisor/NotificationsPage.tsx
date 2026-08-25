@@ -63,7 +63,7 @@ export default function NotificationsPage() {
       (supabase as any).from('smart_alerts').select('*')
         .order('severity', { ascending: true })
         .order('created_at', { ascending: false }).limit(300),
-      (supabase as any).from('smart_alert_acks').select('alert_id'),
+      (supabase as any).from('smart_alert_acks').select('alert_id').limit(1000),
     ]);
     setAlerts((alertsData ?? []) as SmartAlert[]);
     setAckedIds(new Set((acksData ?? []).map((a: any) => a.alert_id)));

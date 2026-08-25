@@ -81,7 +81,7 @@ export default function EmprestimosPage() {
   const load = async () => {
     setLoading(true);
     const [loansRes, itemsRes] = await Promise.all([
-      supabase.from('material_loans' as any).select('*').order('date_out', { ascending: false }),
+      supabase.from('material_loans' as any).select('*').order('date_out', { ascending: false }).limit(300),
       supabase.from('material_items' as any)
         .select('id, name, category, unit, available_qty, total_qty, damaged_qty, image_url')
         .order('category').order('name'),

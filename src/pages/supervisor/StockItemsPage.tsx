@@ -107,7 +107,7 @@ function SupplierDialog({ item, open, onClose, initialSuppliers = [] }: { item: 
       .order('is_preferred', { ascending: false })
       .then(({ data }) => { if (data) setSuppliers(data as Supplier[]); });
     // Load distinct supplier names for autocomplete
-    supabase.from('item_suppliers').select('supplier_name')
+    supabase.from('item_suppliers').select('supplier_name').limit(500)
       .then(({ data }) => {
         const names = Array.from(new Set((data || []).map((r: any) => r.supplier_name as string))).sort();
         setExistingNames(names);

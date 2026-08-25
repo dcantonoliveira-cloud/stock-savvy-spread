@@ -73,8 +73,8 @@ export default function StockItemDetailPage() {
     setLoading(true);
     const [itemRes, entriesRes, outputsRes, suppliersRes, sheetItemsRes] = await Promise.all([
       supabase.from('stock_items').select('*').eq('id', id!).single(),
-      supabase.from('stock_entries').select('*').eq('item_id', id!).order('created_at', { ascending: false }),
-      supabase.from('stock_outputs').select('*').eq('item_id', id!).order('created_at', { ascending: false }),
+      supabase.from('stock_entries').select('*').eq('item_id', id!).order('created_at', { ascending: false }).limit(200),
+      supabase.from('stock_outputs').select('*').eq('item_id', id!).order('created_at', { ascending: false }).limit(200),
       supabase.from('item_suppliers').select('*').eq('item_id', id!).order('is_preferred', { ascending: false }),
       supabase.from('technical_sheet_items').select('sheet_id, quantity, unit_cost, section, technical_sheets(name)').eq('item_id', id!),
     ]);

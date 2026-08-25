@@ -222,7 +222,8 @@ export default function EstatisticasPage() {
           .order('contract_signed_date'),
         supabase
           .from('tasting_session_events' as any)
-          .select('event_id, session_id, situation_snapshot, tasting_sessions!session_id(scheduled_date, type)'),
+          .select('event_id, session_id, situation_snapshot, tasting_sessions!session_id(scheduled_date, type)')
+          .limit(500),
         (supabase as any)
           .from('production_orders')
           .select('extra_value, delivery_date')

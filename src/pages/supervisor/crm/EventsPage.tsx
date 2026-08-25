@@ -225,11 +225,13 @@ export default function EventsPage() {
         supabase.from('events')
           .select(`${sel}, clients(id, name, phone, email)`)
           .or(`event_name.ilike.${q},location_text.ilike.${q},organizer.ilike.${q}`)
-          .order('event_date', { ascending: false }),
+          .order('event_date', { ascending: false })
+          .limit(100),
         supabase.from('events')
           .select(`${sel}, clients!inner(id, name, phone, email)`)
           .or(`name.ilike.${q},phone.ilike.${q},email.ilike.${q}`, { foreignTable: 'clients' })
-          .order('event_date', { ascending: false }),
+          .order('event_date', { ascending: false })
+          .limit(100),
       ]);
 
       // Merge sem duplicatas, mantendo order do byEvent primeiro
@@ -364,15 +366,18 @@ export default function EventsPage() {
     return result;
   }, [events, searchResults, year, month, search, statusFilter, sortBy, filterUnsignedOnly]);
 
-  const confirmedFiltered = filtered.filter(e => e.status === 'confirmed');
-  const statsValue = confirmedFiltered.reduce((s,e) => s + (e.total_value ?? 0), 0);
-  const statsReceivable = confirmedFiltered.reduce((s,e) => {
-    const balance = (e.total_value ?? 0) - (e.paid_value ?? 0);
-    return s + (balance > 0 ? balance : 0);
-  }, 0);
-  const totalGuests = confirmedFiltered.reduce((s,e) => s + (e.guest_count ?? 0), 0);
-  const avgPerGuest = totalGuests > 0 ? statsValue / totalGuests : 0;
-  const avgPerEvent = confirmedFiltered.length > 0 ? statsValue / confirmedFiltered.length : 0;
+  const { confirmedFiltered, statsValue, statsReceivable, totalGuests, avgPerGuest, avgPerEvent } = useMemo(() => {
+    const confirmedFiltered = filtered.filter(e => e.status === 'confirmed');
+    const statsValue = confirmedFiltered.reduce((s,e) => s + (e.total_value ?? 0), 0);
+    const statsReceivable = confirmedFiltered.reduce((s,e) => {
+      const balance = (e.total_value ?? 0) - (e.paid_value ?? 0);
+      return s + (balance > 0 ? balance : 0);
+    }, 0);
+    const totalGuests = confirmedFiltered.reduce((s,e) => s + (e.guest_count ?? 0), 0);
+    const avgPerGuest = totalGuests > 0 ? statsValue / totalGuests : 0;
+    const avgPerEvent = confirmedFiltered.length > 0 ? statsValue / confirmedFiltered.length : 0;
+    return { confirmedFiltered, statsValue, statsReceivable, totalGuests, avgPerGuest, avgPerEvent };
+  }, [filtered]);
 
   // ── Form helpers ──────────────────────────────────────────────────
   const setF = (key: string, val: any) => setForm(f => ({ ...f, [key]: val }));
