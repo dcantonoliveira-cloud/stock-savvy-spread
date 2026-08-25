@@ -32,6 +32,7 @@ export default function SupervisorOutputsPage() {
   const [filterDate, setFilterDate] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const PAGE_SIZE = 50;
   const [loading, setLoading] = useState(true);
 
@@ -44,19 +45,37 @@ export default function SupervisorOutputsPage() {
   const [itemLocations, setItemLocations] = useState<ItemLocation[]>([]);
   const [allocationKitchenId, setAllocationKitchenId] = useState('');
 
-  const load = async () => {
+  const load = async (date?: string) => {
     setLoading(true);
+    let outputsQuery = supabase
+      .from('stock_outputs')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (date) {
+      outputsQuery = outputsQuery.eq('date', date);
+    } else {
+      outputsQuery = outputsQuery.limit(500);
+    }
+
     const [itemsRes, outputsRes, kitchensRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, current_stock').order('name').range(0, 9999),
-      supabase.from('stock_outputs').select('*').order('created_at', { ascending: false }),
+      outputsQuery,
       supabase.from('kitchens').select('id, name, is_default').order('name'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data);
     if (outputsRes.data) setOutputs(outputsRes.data);
+    setTotalCount(outputsRes.count ?? null);
     if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(filterDate || undefined); }, []);
+
+  const handleFilterDate = (date: string) => {
+    setFilterDate(date);
+    setPage(0);
+    load(date || undefined);
+  };
 
   const handleItemSelect = async (id: string) => {
     setItemId(id);
@@ -122,13 +141,13 @@ export default function SupervisorOutputsPage() {
     toast.success('Saída registrada!');
     resetForm();
     setDialogOpen(false);
-    load();
+    load(filterDate || undefined);
   };
 
   const handleDelete = async (id: string) => {
     await supabase.from('stock_outputs').delete().eq('id', id);
     toast.success('Saída removida!');
-    load();
+    load(filterDate || undefined);
   };
 
   const handleExportCsv = () => {
@@ -229,8 +248,14 @@ export default function SupervisorOutputsPage() {
         </Dialog>
       </div>
 
+      {!filterDate && totalCount !== null && totalCount > 500 && (
+        <p className="text-xs text-muted-foreground mb-3">
+          Exibindo as 500 saídas mais recentes de {totalCount} no total. Use o filtro de data para ver registros específicos.
+        </p>
+      )}
+
       <div className="mb-6 flex items-center gap-2 flex-wrap">
-        <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-48" />
+        <Input type="date" value={filterDate} onChange={e => handleFilterDate(e.target.value)} className="w-48" />
         <Input
           type="text"
           placeholder="Buscar por item, funcionário ou evento..."
@@ -238,7 +263,7 @@ export default function SupervisorOutputsPage() {
           onChange={e => setSearch(e.target.value)}
           className="w-64"
         />
-        {filterDate && <Button variant="ghost" size="sm" onClick={() => setFilterDate('')}>Limpar</Button>}
+        {filterDate && <Button variant="ghost" size="sm" onClick={() => handleFilterDate('')}>Limpar</Button>}
         <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={filtered.length === 0}>
           <Download className="w-4 h-4 mr-2" />Exportar CSV
         </Button>
