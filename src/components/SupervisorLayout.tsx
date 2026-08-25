@@ -109,10 +109,19 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
 
       // Build the list of ZapSign emails that belong to the current user
       const myEmails: string[] = [];
-      if (co?.signer_user_id === user.id && co?.signer_email)     myEmails.push(co.signer_email.toLowerCase().trim());
+      if (co?.signer_user_id === user.id && co?.signer_email)      myEmails.push(co.signer_email.toLowerCase().trim());
       if (co?.witness_1_user_id === user.id && co?.witness_1_email) myEmails.push(co.witness_1_email.toLowerCase().trim());
       // Fallback: also try auth email in case it matches directly
       if (user.email) myEmails.push(user.email.toLowerCase().trim());
+
+      console.log('[Contratos] user.id:', user.id);
+      console.log('[Contratos] co:', co);
+      console.log('[Contratos] myEmails:', myEmails);
+      console.log('[Contratos] eventos com zapsign:', (events ?? []).length);
+      (events ?? []).forEach((e: any) => {
+        const signers: any[] = e.zapsign_data?.signers ?? [];
+        console.log('[Contratos] evento:', e.event_name, '| signers:', signers.map((s: any) => `${s.email}/${s.status}`));
+      });
 
       if (myEmails.length === 0) { setPendingContracts([]); return; }
 
