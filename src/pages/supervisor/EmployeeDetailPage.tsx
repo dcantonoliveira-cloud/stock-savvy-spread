@@ -728,7 +728,7 @@ interface TimeEntry { id: string; type: 'entry' | 'exit' | 'adjustment'; recorde
 // Coordenadas da empresa — Rua Deputado Ranieri Mazzilli 55, Jd Elton Ville, Sorocaba SP
 const COMPANY_LAT = -23.5227;
 const COMPANY_LNG = -47.4723;
-const ALLOWED_RADIUS_M = 300;
+const ALLOWED_RADIUS_M = 1000;
 
 function haversineM(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6_371_000;
