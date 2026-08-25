@@ -566,12 +566,22 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
       });
-      const data = await res.json();
-      const url = data.signed_file ?? zapData.signed_file;
-      if (url) window.open(url, '_blank');
-      else toast.error('URL do contrato assinado não encontrada');
+      const docData = await res.json();
+      const url = docData.signed_file ?? zapData.signed_file;
+      if (!url) { toast.error('URL do contrato assinado não encontrada'); return; }
+      const fileName = `CONTRATO RONDELLO BUFFET - ${(event.event_name ?? 'Evento').trim().toUpperCase()} - assinado.pdf`;
+      const fileRes = await fetch(url);
+      const blob = await fileRes.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
     } catch {
-      toast.error('Erro ao buscar contrato assinado');
+      toast.error('Erro ao baixar contrato assinado');
     } finally {
       setFetchingSignedFile(false);
     }
