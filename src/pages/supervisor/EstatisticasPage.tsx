@@ -314,27 +314,58 @@ export default function EstatisticasPage() {
       // Faturamento: soma dos contratos fechados no mês
       const faturamento = contratosList.reduce((s, e) => s + (e.total_value ?? 0), 0);
 
+      // Conversão de degustações: novos que fecharam / total novos
+      const newClientIds = [...new Set(tastingEventsList.map((t: any) => t.event_id as string))];
+      const closedNewClients = newClientIds.filter(id => {
+        const st = eventStatusMap[id];
+        return st === 'confirmed' || st === 'completed';
+      }).length;
+      const conv_deg: number | null = newClientIds.length > 0
+        ? Math.round((closedNewClients / newClientIds.length) * 100)
+        : null;
+
       return {
         orcamentos:   orcList.length,
         contratos:    contratosList.length,
         degustacoes:  sessionsList.length,
         eventos_deg:  tastingEventsList.length,
         faturamento,
+        conv_deg,
         _orcList:     orcList,
         _contratosList: contratosList,
         _sessionsList: sessionsList,
         _tastingEventsList: tastingEventsList,
       };
     });
-  }, [events, contratos, year, sessionMap, tastings]);
+  }, [events, contratos, year, sessionMap, tastings, eventStatusMap]);
 
-  const totals = useMemo(() => ({
-    orcamentos:  tableRows.reduce((s, r) => s + r.orcamentos, 0),
-    contratos:   tableRows.reduce((s, r) => s + r.contratos, 0),
-    degustacoes: tableRows.reduce((s, r) => s + r.degustacoes, 0),
-    eventos_deg: tableRows.reduce((s, r) => s + r.eventos_deg, 0),
-    faturamento: tableRows.reduce((s, r) => s + r.faturamento, 0),
-  }), [tableRows]);
+  const totals = useMemo(() => {
+    const yearNewIds = [...new Set(
+      tastings
+        .filter((t: any) => {
+          if (t.situation_snapshot !== 'new') return false;
+          const s = Array.isArray(t.tasting_sessions) ? t.tasting_sessions[0] : t.tasting_sessions;
+          return s?.scheduled_date?.startsWith(`${year}`);
+        })
+        .map((t: any) => t.event_id as string)
+    )];
+    const yearClosed = yearNewIds.filter(id => {
+      const st = eventStatusMap[id];
+      return st === 'confirmed' || st === 'completed';
+    }).length;
+    const conv_deg: number | null = yearNewIds.length > 0
+      ? Math.round((yearClosed / yearNewIds.length) * 100)
+      : null;
+
+    return {
+      orcamentos:  tableRows.reduce((s, r) => s + r.orcamentos, 0),
+      contratos:   tableRows.reduce((s, r) => s + r.contratos, 0),
+      degustacoes: tableRows.reduce((s, r) => s + r.degustacoes, 0),
+      eventos_deg: tableRows.reduce((s, r) => s + r.eventos_deg, 0),
+      faturamento: tableRows.reduce((s, r) => s + r.faturamento, 0),
+      conv_deg,
+    };
+  }, [tableRows, tastings, year, eventStatusMap]);
 
   // Ticket médio mensal (por event_date) — para tabela abaixo do break-even
   const ticketMedioMensal = useMemo(() => MONTHS.map((_, i) => {
@@ -574,6 +605,26 @@ export default function EstatisticasPage() {
                       </td>
                     </tr>
                   ))}
+                  {/* Conversão de degustações */}
+                  <tr className="hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-3 font-medium text-foreground sticky left-0 bg-white z-10">Conversão de degustações</td>
+                    {tableRows.map((row, i) => (
+                      <td key={i} className="px-3 py-3 text-center text-muted-foreground">
+                        {row.conv_deg !== null ? (
+                          <span className={`font-medium ${row.conv_deg >= 50 ? 'text-emerald-600' : 'text-orange-500'}`}>
+                            {row.conv_deg}%
+                          </span>
+                        ) : '—'}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 text-center font-bold sticky right-0 bg-slate-50 border-l border-border">
+                      {totals.conv_deg !== null ? (
+                        <span className={totals.conv_deg >= 50 ? 'text-emerald-600' : 'text-orange-500'}>
+                          {totals.conv_deg}%
+                        </span>
+                      ) : '—'}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
