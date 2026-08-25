@@ -569,7 +569,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       const docData = await res.json();
       const url = docData.signed_file ?? zapData.signed_file;
       if (!url) { toast.error('URL do contrato assinado não encontrada'); return; }
-      const fileName = `CONTRATO RONDELLO BUFFET - ${(event.event_name ?? 'Evento').trim().toUpperCase()} - assinado.pdf`;
+      const fileName = `CONTRATO RONDELLO BUFFET - ${(event.event_name ?? 'Evento').trim()} - assinado.pdf`;
       const fileRes = await fetch(url);
       const blob = await fileRes.blob();
       const blobUrl = URL.createObjectURL(blob);
