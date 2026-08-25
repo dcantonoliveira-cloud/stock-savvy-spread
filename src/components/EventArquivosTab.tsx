@@ -543,16 +543,6 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       if (newlySigned.length > 0 || allSigned) {
         window.dispatchEvent(new CustomEvent('zapsign-status-changed'));
       }
-      // Inserir notificação normal para cada novo assinante
-      for (const signer of newlySigned) {
-        const eventName = event.event_name ?? 'Evento';
-        await (supabase as any).from('app_notifications').insert({
-          type: 'zapsign_signed',
-          title: `${signer.name} assinou o contrato`,
-          message: eventName,
-          data: { entity_type: 'event', entity_id: eventId },
-        });
-      }
       if (!silent) toast.success('Status atualizado');
     } catch {
       if (!silent) toast.error('Erro ao atualizar status');

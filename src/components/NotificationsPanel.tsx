@@ -79,6 +79,7 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
       await supabase.from('app_notifications').update({ read: true } as any).eq('id', n.id);
     }
     if (n.data?.link) navigate(n.data.link);
+    else if (n.data?.entity_type === 'event' && n.data?.entity_id) navigate(`/events/${n.data.entity_id}`);
   };
 
   const unread = notifs.filter(n => !n.read).length;
