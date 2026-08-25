@@ -287,6 +287,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [showZapForm, setShowZapForm]         = useState(false);
   const [sendingZap, setSendingZap]           = useState(false);
   const [refreshingZap, setRefreshingZap]     = useState(false);
+  const [cancelingZap, setCancelingZap]       = useState(false);
   const [showAllocTasting, setShowAllocTasting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -561,6 +562,34 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   };
   const refreshZapStatus = () => fetchZapStatus(false);
 
+  const cancelZapSign = async () => {
+    if (!window.confirm('Cancelar o fluxo de assinaturas? Os links enviados deixarão de funcionar.')) return;
+    if (!zapData) return;
+    setCancelingZap(true);
+    try {
+      if (zapToken) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+        await fetch(`${proxyBase}?path=/api/v1/docs/${zapData.doc_token}/`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'x-zapsign-token': zapToken,
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        });
+      }
+      await supabase.from('events').update({ zapsign_data: null, contract_signed: false } as any).eq('id', eventId);
+      setZapData(null);
+      window.dispatchEvent(new CustomEvent('zapsign-status-changed'));
+      toast.success('Fluxo de assinaturas cancelado');
+    } catch {
+      toast.error('Erro ao cancelar o fluxo de assinaturas');
+    } finally {
+      setCancelingZap(false);
+    }
+  };
+
   // Busca status imediato ao carregar se há documento pendente
   useEffect(() => {
     if (zapData && zapData.signers.some(s => s.status !== 'signed')) {
@@ -749,6 +778,12 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                       className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50">
                       <RefreshCw className={`w-3.5 h-3.5 ${refreshingZap?'animate-spin':''}`} />
                     </button>
+                    {!zapData.signers.every(s => s.status === 'signed') && (
+                      <button onClick={cancelZapSign} disabled={cancelingZap} title="Cancelar fluxo de assinaturas"
+                        className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50">
+                        {cancelingZap ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">
