@@ -127,12 +127,24 @@ if (myEmails.length === 0) { setPendingContracts([]); return; }
       setPendingContracts(pending);
     };
     load();
+
+    // Refresh when user returns to this tab (e.g. after signing in another tab)
+    window.addEventListener('focus', load);
+
     const ch = (supabase as any)
       .channel('pending-contracts-layout')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events' }, load)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'companies' }, load)
+      // app_notifications is more likely to have realtime enabled — webhook inserts here on each signature
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_notifications' }, (payload: any) => {
+        if (payload.new?.type === 'zapsign_assinatura') load();
+      })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    return () => {
+      window.removeEventListener('focus', load);
+      supabase.removeChannel(ch);
+    };
   }, [user?.id]);
 
   const pageTitle = Object.entries(PAGE_TITLES)
