@@ -288,6 +288,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [sendingZap, setSendingZap]           = useState(false);
   const [refreshingZap, setRefreshingZap]     = useState(false);
   const [cancelingZap, setCancelingZap]       = useState(false);
+  const [fetchingSignedFile, setFetchingSignedFile] = useState(false);
   const [showAllocTasting, setShowAllocTasting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -552,6 +553,30 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   };
   const refreshZapStatus = () => fetchZapStatus(false);
 
+  const openSignedFile = async () => {
+    if (!zapData || !zapToken) return;
+    setFetchingSignedFile(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+      const res = await fetch(`${proxyBase}?path=/api/v1/docs/${zapData.doc_token}/`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'x-zapsign-token': zapToken,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      const data = await res.json();
+      const url = data.signed_file ?? zapData.signed_file;
+      if (url) window.open(url, '_blank');
+      else toast.error('URL do contrato assinado não encontrada');
+    } catch {
+      toast.error('Erro ao buscar contrato assinado');
+    } finally {
+      setFetchingSignedFile(false);
+    }
+  };
+
   const cancelZapSign = async () => {
     if (!window.confirm('Cancelar o fluxo de assinaturas? Os links enviados deixarão de funcionar.')) return;
     if (!zapData) return;
@@ -807,10 +832,11 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                         <Check className="w-3.5 h-3.5" />Todos assinaram!
                       </p>
                       {zapData.signed_file && (
-                        <a href={zapData.signed_file} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                          <Download className="w-3.5 h-3.5" />Ver contrato assinado
-                        </a>
+                        <button onClick={openSignedFile} disabled={fetchingSignedFile}
+                          className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50">
+                          {fetchingSignedFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                          Ver contrato assinado
+                        </button>
                       )}
                     </div>
                   )}
