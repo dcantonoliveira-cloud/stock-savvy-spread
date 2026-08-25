@@ -814,10 +814,14 @@ function PontoTab({ employeeId }: { employeeId: string }) {
   // Agrupa por dia — mais recente primeiro
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd }).reverse();
   const today = new Date(); today.setHours(23, 59, 59, 999);
+  const schedStartDate = (schedule as any).start_date ? parseISO((schedule as any).start_date) : null;
   const byDay = days.map(day => ({
     day,
     entries: entries.filter(e => isSameDay(parseISO(e.recorded_at), day)),
-  })).filter(d => d.entries.length > 0 || (schedule[d.day.getDay()] != null && d.day <= today));
+  })).filter(d => {
+    if (schedStartDate && d.day < schedStartDate) return false;
+    return d.entries.length > 0 || (schedule[d.day.getDay()] != null && d.day <= today);
+  });
 
   // Semanas — agora com saldo (balance em minutos)
   const weekMap = new Map<string, { ms: number; balanceMin: number; days: typeof byDay }>();
@@ -937,6 +941,16 @@ function PontoTab({ employeeId }: { employeeId: string }) {
         {schedOpen && (
           <div className="border-t border-border px-5 py-4 space-y-3">
             <p className="text-xs text-muted-foreground">Entrada antes do horário programado não gera banco positivo.</p>
+            <div className="flex items-center gap-3 pb-1">
+              <label className="text-xs font-semibold text-muted-foreground/70 whitespace-nowrap">Data de início</label>
+              <input
+                type="date"
+                value={(schedule as any).start_date ?? ''}
+                onChange={e => setSchedule(s => ({ ...s, start_date: e.target.value } as any))}
+                className="border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <span className="text-[11px] text-muted-foreground">Dias anteriores não são contabilizados</span>
+            </div>
             <div className="grid grid-cols-[60px_1fr_1fr_1fr_80px] gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 px-1">
               <span>Dia</span><span>Início</span><span>Esperado (h)</span><span>Almoço (min)</span><span></span>
             </div>
@@ -1061,10 +1075,10 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                         {total > 0 ? msToHHMM(total) : <span className="text-muted-foreground/40">—</span>}
                       </span>
                       <span className={`text-center text-xs font-bold ${
-                        !hasSched || de.length === 0 ? 'text-muted-foreground/30' :
+                        !hasSched ? 'text-muted-foreground/30' :
                         dayBal >= 0 ? 'text-emerald-600' : 'text-red-500'
                       }`}>
-                        {hasSched && de.length > 0 ? formatBalance(dayBal) : '—'}
+                        {hasSched ? formatBalance(dayBal) : '—'}
                       </span>
                       <span />
                     </div>
