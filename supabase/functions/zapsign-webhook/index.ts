@@ -43,40 +43,40 @@ serve(async (req) => {
     const eventName: string = match.event_name ?? 'Evento';
     const zapData: any      = match.zapsign_data ?? {};
 
-    // Update signer status in stored zapsign_data
-    if (eventType === 'sign' && payload.signer) {
-      const signer = payload.signer;
-      const updatedSigners = (zapData.signers ?? []).map((s: any) =>
-        s.token === signer.token ? { ...s, status: 'signed' } : s
-      );
-      const updatedZap = { ...zapData, signers: updatedSigners };
-
-      await supabase.from('events').update({ zapsign_data: updatedZap }).eq('id', eventId);
-
-      await supabase.from('app_notifications').insert({
-        company_id: COMPANY_ID,
-        type: 'zapsign_assinatura',
-        title: `${signer.name} assinou o contrato`,
-        message: eventName,
-        actor_name: signer.name,
-        data: { link: `/events/${eventId}` },
-        read: false,
-      });
-    }
-
+    // doc_signed fires on every individual signature (status = "pending" until all sign, then "signed")
     if (eventType === 'doc_signed') {
-      const updatedSigners = (zapData.signers ?? []).map((s: any) => ({ ...s, status: 'signed' }));
-      await supabase.from('events').update({
-        zapsign_data: { ...zapData, signers: updatedSigners },
-        contract_signed: true,
-      }).eq('id', eventId);
+      const payloadSigners: any[] = payload.signers ?? [];
+      const allSigned = (payload.status ?? payload.document?.status) === 'signed';
+
+      // Merge payload signer statuses into stored signers (match by token)
+      const updatedSigners = (zapData.signers ?? []).map((s: any) => {
+        const fresh = payloadSigners.find((p: any) => p.token === s.token);
+        return fresh ? { ...s, status: fresh.status ?? s.status } : s;
+      });
+
+      const dbUpdate: any = { zapsign_data: { ...zapData, signers: updatedSigners } };
+      if (allSigned) dbUpdate.contract_signed = true;
+
+      await supabase.from('events').update(dbUpdate).eq('id', eventId);
+
+      // Find who just signed (was not signed before, now is)
+      const newlySigned = updatedSigners.filter((u: any) => {
+        const prev = (zapData.signers ?? []).find((s: any) => s.token === u.token);
+        return u.status === 'signed' && prev?.status !== 'signed';
+      });
+
+      const notifTitle = allSigned
+        ? 'Contrato totalmente assinado'
+        : newlySigned.length > 0
+          ? `${newlySigned[0].name} assinou o contrato`
+          : 'Assinatura atualizada';
 
       await supabase.from('app_notifications').insert({
         company_id: COMPANY_ID,
         type: 'zapsign_assinatura',
-        title: 'Contrato totalmente assinado',
+        title: notifTitle,
         message: eventName,
-        actor_name: null,
+        actor_name: newlySigned[0]?.name ?? null,
         data: { link: `/events/${eventId}` },
         read: false,
       });
