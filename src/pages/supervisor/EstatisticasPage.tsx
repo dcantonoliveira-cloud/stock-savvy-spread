@@ -102,9 +102,9 @@ export default function EstatisticasPage() {
   // valores do ano atual
   const breakEven: BEMonths = breakEvenAll[String(year)] ?? emptyMonths();
 
-  interface Metas { eventos: number | null; faturamento: number | null; ticket: number | null }
+  interface Metas { eventos: number | null; faturamento: number | null; ticket: number | null; convidados: number | null }
   type MetasData = Record<string, Metas>;
-  const emptyMetas = (): Metas => ({ eventos: null, faturamento: null, ticket: null });
+  const emptyMetas = (): Metas => ({ eventos: null, faturamento: null, ticket: null, convidados: null });
   const [metasAll, setMetasAll] = useState<MetasData>({});
   const [metasInput, setMetasInput] = useState<Metas>(emptyMetas());
   const [editingMetas, setEditingMetas] = useState(false);
@@ -270,6 +270,12 @@ export default function EstatisticasPage() {
   const totalGuests = completed.reduce((s, e) => s + (e.guest_count ?? 0), 0);
   const totalStaff  = completed.reduce((s, e) => s + (e.professional_count ?? 0), 0);
   const totalRev    = completed.reduce((s, e) => s + (e.total_value ?? 0), 0);
+  // Média de convidados — exclui eventos com "JABS" no nome
+  const completedSemJabs = completed.filter(e => !e.event_name?.toUpperCase().includes('JABS'));
+  const mediaConvidados = completedSemJabs.length
+    ? Math.round(completedSemJabs.reduce((s, e) => s + (e.guest_count ?? 0), 0) / completedSemJabs.length)
+    : 0;
+
   const completedComPax = completed.filter(e => (e.price_per_person ?? 0) > 0);
   const ticketMedio = completedComPax.length
     ? completedComPax.reduce((s, e) => s + (e.price_per_person ?? 0), 0) / completedComPax.length
@@ -845,11 +851,12 @@ export default function EstatisticasPage() {
               )}
             </div>
             {editingMetas ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 {([
-                  { key: 'eventos',     label: 'Eventos realizados', prefix: '', suffix: 'eventos' },
-                  { key: 'faturamento', label: 'Faturamento anual',  prefix: 'R$', suffix: '' },
+                  { key: 'eventos',     label: 'Eventos realizados',     prefix: '', suffix: 'eventos' },
+                  { key: 'faturamento', label: 'Faturamento anual',      prefix: 'R$', suffix: '' },
                   { key: 'ticket',      label: 'Ticket médio/convidado', prefix: 'R$', suffix: '' },
+                  { key: 'convidados',  label: 'Média convidados/evento', prefix: '', suffix: '' },
                 ] as const).map(({ key, label, prefix }) => (
                   <div key={key} className="space-y-1.5">
                     <label className="text-xs font-medium text-muted-foreground">{label}</label>
@@ -866,12 +873,13 @@ export default function EstatisticasPage() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 {[
-                  { label: 'Eventos realizados', meta: metas.eventos,     atual: totalEvents,  suffix: '', fmt: (v: number) => String(v) },
-                  { label: 'Faturamento anual',  meta: metas.faturamento, atual: fatPorMesEvento.reduce((s, v) => s + v, 0) + fatProducao, suffix: '', fmt: fmtBRL },
-                  { label: 'Ticket / convidado', meta: metas.ticket,      atual: ticketMedio,  suffix: '', fmt: fmtBRL },
-                ].map(({ label, meta, atual, fmt }) => {
+                  { label: 'Eventos realizados',    meta: metas.eventos,     atual: totalEvents,  fmt: (v: number) => String(v) },
+                  { label: 'Faturamento anual',     meta: metas.faturamento, atual: fatPorMesEvento.reduce((s, v) => s + v, 0) + fatProducao, fmt: fmtBRL },
+                  { label: 'Ticket / convidado',    meta: metas.ticket,      atual: ticketMedio,  fmt: fmtBRL },
+                  { label: 'Média convidados',      meta: metas.convidados,  atual: mediaConvidados, fmt: (v: number) => String(Math.round(v)) },
+                ].map(({ label, meta, atual, fmt }: { label: string; meta: number | null | undefined; atual: number; fmt: (v: number) => string }) => {
                   const pct = meta && meta > 0 ? Math.min(Math.round(atual / meta * 100), 100) : null;
                   const over = meta && meta > 0 ? atual > meta : false;
 
@@ -920,6 +928,9 @@ export default function EstatisticasPage() {
                         <p className="text-[11px] text-muted-foreground border-t border-border/50 pt-1.5 mt-1">
                           Precisa <span className="font-semibold text-foreground">{fmtBRL(Math.round(tmNecessario))}/PAX</span> nas {restante} festas restantes
                         </p>
+                      )}
+                      {label === 'Média convidados' && (
+                        <p className="text-[11px] text-muted-foreground/60 border-t border-border/50 pt-1.5 mt-1">Exclui eventos JABS</p>
                       )}
                     </div>
                   );
