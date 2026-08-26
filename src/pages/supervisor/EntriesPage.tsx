@@ -458,7 +458,7 @@ export default function EntriesPage() {
         const { data, error } = await supabase.functions.invoke('parse-invoice', {
           body: { base64, mimeType },
         });
-        if (error) throw new Error('Serviço de IA indisponível. Para PDF e fotos, o sistema precisa da Edge Function implantada no Supabase. Para XML, use o arquivo .xml diretamente.');
+        if (error) throw new Error(`Erro ao processar documento: ${error.message || JSON.stringify(error)}`);
         const matched = matchItems(data.items || []);
         setParsedInvoice({ supplier: data.supplier || '', invoice_number: data.invoice_number || '', items: matched });
       }
