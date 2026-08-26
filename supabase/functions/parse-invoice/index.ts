@@ -25,7 +25,17 @@ serve(async (req) => {
       const body = await req.json();
 
       if (body.base64 && body.mimeType) {
-        const invoiceData = await parseWithClaude(body.base64, body.mimeType);
+        // Normalize MIME type — phones often send image/jpg or image/heic
+        let mimeType: string = body.mimeType;
+        if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
+        const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+        if (!SUPPORTED.includes(mimeType)) {
+          return new Response(JSON.stringify({ error: `Formato não suportado: ${mimeType}. Use JPG, PNG, WebP ou PDF.` }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const invoiceData = await parseWithClaude(body.base64, mimeType);
         return new Response(JSON.stringify(invoiceData), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

@@ -447,18 +447,32 @@ export default function EntriesPage() {
         setParsedInvoice({ supplier: data.supplier || '', invoice_number: data.invoice_number || '', items: matched });
       } else {
         // PDF or image — send to edge function (AI)
+        // Detect MIME type: some browsers omit file.type for drag-drop or certain formats
+        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+        const extMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', pdf: 'application/pdf' };
+        let mimeType = file.type || extMap[ext] || 'application/pdf';
+        if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
+
+        // HEIC/HEIF (iPhone default) is not supported — ask user to convert
+        if (mimeType === 'image/heic' || mimeType === 'image/heif' || ext === 'heic' || ext === 'heif') {
+          throw new Error('Formato HEIC (iPhone) não é suportado. Tire a foto e compartilhe como JPG, ou abra a foto no iPhone e use "Exportar" → JPG.');
+        }
+
         const buffer = await file.arrayBuffer();
-        // btoa safe for large files
-        let binary = '';
         const bytes = new Uint8Array(buffer);
-        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        // Use chunk-based conversion to avoid stack overflow on large files
+        const chunkSize = 8192;
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
         const base64 = btoa(binary);
-        const mimeType = file.type || 'application/pdf';
 
         const { data, error } = await supabase.functions.invoke('parse-invoice', {
           body: { base64, mimeType },
         });
         if (error) throw new Error(`Erro ao processar documento: ${error.message || JSON.stringify(error)}`);
+        if (data?.error) throw new Error(data.error);
         const matched = matchItems(data.items || []);
         setParsedInvoice({ supplier: data.supplier || '', invoice_number: data.invoice_number || '', items: matched });
       }
