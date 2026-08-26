@@ -57,7 +57,7 @@ export default function UsersPage() {
       supabase.from('employee_permissions').select('user_id, can_entry, can_output, access_stock, access_materials, is_admin, work_schedule'),
       supabase.from('payslips' as any).select('employee_id, status'),
       supabase.from('time_entries' as any)
-        .select('employee_id, type, recorded_at')
+        .select('employee_id, type, recorded_at, adjustment_minutes')
         .gte('recorded_at', monthStart)
         .lte('recorded_at', monthEnd),
     ]);
@@ -86,8 +86,11 @@ export default function UsersPage() {
           byDay[day].push(e);
         }
         balance_min = 0;
+        const todayUtcStr = new Date().toISOString().slice(0, 10);
         for (const [dayStr, dayEntries] of Object.entries(byDay)) {
           const day = new Date(dayStr + 'T12:00:00');
+          const incompleteToday = dayStr === todayUtcStr && !(dayEntries as any[]).some((e: any) => e.type === 'exit');
+          if (incompleteToday) continue;
           balance_min += calcDayBalance(dayEntries as any, sched, day);
         }
       }
