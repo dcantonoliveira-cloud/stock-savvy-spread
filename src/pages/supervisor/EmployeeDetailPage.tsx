@@ -1147,7 +1147,7 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                       <div key={adj.id} className="grid grid-cols-[1fr_72px_72px_64px_64px_28px] gap-0 px-4 py-1.5 border-b border-border/30 bg-amber-50/40 text-xs">
                         <span className="text-amber-700 italic col-span-3 truncate pl-4">{adj.note}</span>
                         <span />
-                        <span className={`text-center font-bold ${(adj.adjustment_minutes ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        <span className="text-center font-medium text-amber-700">
                           {formatBalance(adj.adjustment_minutes ?? 0)}
                         </span>
                         <button onClick={() => deleteEntry(adj.id)} className="flex items-center justify-center text-muted-foreground/30 hover:text-red-400 transition-colors">
