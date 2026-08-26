@@ -777,6 +777,8 @@ function PontoTab({ employeeId }: { employeeId: string }) {
   const [adjModal, setAdjModal] = useState<{ date: string } | null>(null);
   const [newExitModal, setNewExitModal] = useState<{ date: string } | null>(null);
   const [newExitTime, setNewExitTime] = useState('');
+  const [newEntryModal, setNewEntryModal] = useState<{ date: string } | null>(null);
+  const [newEntryTime, setNewEntryTime] = useState('');
   const [adjSign, setAdjSign] = useState<'+' | '-'>('+');
   const [adjHours, setAdjHours] = useState('0');
   const [adjMins, setAdjMins] = useState('0');
@@ -904,6 +906,25 @@ function PontoTab({ employeeId }: { employeeId: string }) {
     await supabase.from('time_entries' as any).delete().eq('id', id);
     setEntries(prev => prev.filter(e => e.id !== id));
     setEditModal(null);
+  };
+
+  const openNewEntryModal = (date: string) => {
+    setNewEntryModal({ date });
+    setNewEntryTime('07:30');
+  };
+
+  const saveNewEntry = async () => {
+    if (!newEntryModal) return;
+    setSaving(true);
+    const recorded_at = new Date(`${newEntryModal.date}T${newEntryTime}:00`).toISOString();
+    const { data, error } = await supabase.from('time_entries' as any)
+      .insert({ employee_id: employeeId, company_id: 'c56c2ccd-2c35-4ebb-b868-e153727e5d89', type: 'entry', recorded_at })
+      .select('id, type, recorded_at, note, latitude, longitude, adjustment_minutes').single();
+    if (error) { toast.error('Erro ao salvar entrada'); setSaving(false); return; }
+    setEntries(prev => [...prev, data as unknown as TimeEntry]);
+    setNewEntryModal(null);
+    setSaving(false);
+    toast.success('Entrada registrada!');
   };
 
   const openNewExitModal = (date: string) => {
@@ -1098,8 +1119,9 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                         {fmtDate(day, "EEE dd/MM", { locale: ptBR })}
                       </span>
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => entryE && openEdit(entryE)}
-                          className="text-xs text-emerald-600 font-medium hover:underline">
+                        <button
+                          onClick={() => entryE ? openEdit(entryE) : openNewEntryModal(fmtDate(day, 'yyyy-MM-dd'))}
+                          className={`text-xs font-medium hover:underline ${entryE ? 'text-emerald-600' : 'text-muted-foreground/40 hover:text-emerald-500'}`}>
                           {entryE ? fmtDate(parseISO(entryE.recorded_at), 'HH:mm') : '—'}
                         </button>
                         {entryE?.latitude && (() => {
@@ -1247,6 +1269,40 @@ function PontoTab({ employeeId }: { employeeId: string }) {
                 className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
                 {savingAdj ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                 Salvar ajuste
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal nova entrada */}
+      {newEntryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setNewEntryModal(null)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xs p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-foreground">Registrar entrada</p>
+              <button onClick={() => setNewEntryModal(null)} className="p-1 hover:bg-muted rounded-lg"><X className="w-4 h-4" /></button>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest block mb-1">Horário de entrada</label>
+              <input
+                type="time"
+                value={newEntryTime}
+                onChange={e => setNewEntryTime(e.target.value)}
+                className="w-full border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Dia: {fmtDate(parseISO(newEntryModal.date), "dd/MM/yyyy", { locale: ptBR })}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setNewEntryModal(null)} className="flex-1 px-3 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">
+                Cancelar
+              </button>
+              <button onClick={saveNewEntry} disabled={saving}
+                className="flex-1 px-3 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {saving ? 'Salvando...' : 'Salvar entrada'}
               </button>
             </div>
           </div>
