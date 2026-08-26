@@ -752,15 +752,12 @@ function msToHHMM(ms: number) {
 }
 
 function dayTotalMs(entries: TimeEntry[], lunchMinutes = 0) {
-  const sorted = [...entries].filter(e => e.type !== 'adjustment').sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
-  let total = 0;
-  for (let i = 0; i < sorted.length - 1; i++) {
-    if (sorted[i].type === 'entry' && sorted[i + 1].type === 'exit') {
-      total += new Date(sorted[i + 1].recorded_at).getTime() - new Date(sorted[i].recorded_at).getTime();
-      i++;
-    }
-  }
-  total -= lunchMinutes * 60_000;
+  const nonAdj = entries.filter(e => e.type !== 'adjustment');
+  const sorted = [...nonAdj].sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+  const entry = sorted.find(e => e.type === 'entry');
+  const exit  = [...sorted].reverse().find(e => e.type === 'exit');
+  if (!entry || !exit) return 0;
+  const total = new Date(exit.recorded_at).getTime() - new Date(entry.recorded_at).getTime() - lunchMinutes * 60_000;
   return Math.max(0, total);
 }
 
@@ -862,17 +859,20 @@ function PontoTab({ employeeId }: { employeeId: string }) {
 
   // Semanas — agora com saldo (balance em minutos)
   const weekMap = new Map<string, { ms: number; balanceMin: number; days: typeof byDay }>();
+  const isDayIncomplete = (d: { day: Date; entries: TimeEntry[] }) =>
+    isSameDay(d.day, new Date()) && !d.entries.some(e => e.type === 'exit');
+
   byDay.forEach(d => {
     const ws = fmtDate(startOfWeek(d.day, { locale: ptBR }), 'yyyy-MM-dd');
     if (!weekMap.has(ws)) weekMap.set(ws, { ms: 0, balanceMin: 0, days: [] });
     const w = weekMap.get(ws)!;
     w.days.push(d);
     w.ms += dayTotalMs(d.entries, schedule[d.day.getDay()]?.lunch_minutes ?? 60);
-    w.balanceMin += calcDayBalance(d.entries, schedule, d.day);
+    if (!isDayIncomplete(d)) w.balanceMin += calcDayBalance(d.entries, schedule, d.day);
   });
 
   const monthTotalMs = byDay.reduce((s, d) => s + dayTotalMs(d.entries, schedule[d.day.getDay()]?.lunch_minutes ?? 60), 0);
-  const monthBalanceMin = byDay.reduce((s, d) => s + calcDayBalance(d.entries, schedule, d.day), 0);
+  const monthBalanceMin = byDay.reduce((s, d) => isDayIncomplete(d) ? s : s + calcDayBalance(d.entries, schedule, d.day), 0);
 
   const saveSchedule = async () => {
     setSavingSched(true);
