@@ -271,7 +271,9 @@ export default function EstatisticasPage() {
   const totalStaff  = completed.reduce((s, e) => s + (e.professional_count ?? 0), 0);
   const totalRev    = completed.reduce((s, e) => s + (e.total_value ?? 0), 0);
   // Média de convidados — exclui eventos com "JABS" no nome
-  const completedSemJabs = completed.filter(e => !e.event_name?.toUpperCase().includes('JABS'));
+  const completedSemJabs = year === 2027
+    ? completed.filter(e => !e.event_name?.toUpperCase().includes('JABS'))
+    : completed;
   const mediaConvidados = completedSemJabs.length
     ? Math.round(completedSemJabs.reduce((s, e) => s + (e.guest_count ?? 0), 0) / completedSemJabs.length)
     : 0;
