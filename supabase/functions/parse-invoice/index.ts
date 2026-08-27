@@ -72,25 +72,25 @@ Retorne APENAS o JSON no formato abaixo, sem markdown, sem explicação:
   "invoice_number": "número da nota ou cupom",
   "items": [
     {
-      "name": "nome do produto como está no documento",
-      "quantity": 1.0,
-      "unit_cost": 10.50,
-      "unit": "un",
+      "name": "nome do produto",
+      "quantity": 10.0,
+      "unit": "kg",
+      "unit_cost": 24.90,
       "barcode": null
     }
   ]
 }
 
-Regras CRÍTICAS:
-- Em notas DANFE, a tabela de itens tem colunas: Código | Descrição | NCM | CST | CFOP | UN | Qtde | Preço un | Preço total | ...
-- "quantity" = coluna "Qtde" (quantidade real do item, ex: 10,00 ou 28,00). NUNCA coloque 1 se o documento tiver outro valor.
-- "unit_cost" = coluna "Preço un" (preço unitário). NÃO use o preço total.
-- "unit_cost" como número decimal com ponto (ex: 24.90, não "R$ 24,90")
-- Se a unidade for KG e a quantidade for 10, coloque quantity=10 e unit="kg"
-- Unidades normalizadas: KG→kg, G→g, LT→L, ML→ml, UN/UND/UNID→un, CX→cx, PCT→pct
+Os 4 campos mais importantes de cada item são, nesta ordem de prioridade:
+1. "name" — descrição do produto exatamente como aparece no documento
+2. "quantity" — quantidade do item (coluna Qtde ou Quantidade). LEIA O NÚMERO REAL. Se estiver 10,00 coloque 10. Se estiver 28,00 coloque 28. NUNCA assuma 1 se houver outro valor.
+3. "unit" — unidade de medida (coluna UN). Normalizar: KG→kg, G→g, LT→L, ML→ml, UN/UND/UNID→un, CX→cx, PCT→pct
+4. "unit_cost" — preço UNITÁRIO (coluna "Preço un" ou "Vl. Unit."). NÃO use o preço total. Número decimal com ponto (ex: 24.90).
+
+Demais regras:
+- Vírgula é separador decimal no Brasil: 10,00 = 10.0 e 24,90 = 24.90
 - Se um campo não existir, use null
-- Inclua TODOS os produtos listados no documento
-- Leia os números com atenção: vírgula é separador decimal no Brasil (10,00 = 10.00)`;
+- Inclua TODOS os produtos listados`;
 
   // Claude supports image types: image/jpeg, image/png, image/gif, image/webp
   // For PDFs, use document type
