@@ -610,6 +610,11 @@ export default function EventDetailPage() {
                   <Users className="w-3 h-3" />{form.guest_count ?? event.guest_count} convidados
                 </span>
               ) : null}
+              {(form.price_per_person ?? event.price_per_person) ? (
+                <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
+                  R$ {(form.price_per_person ?? event.price_per_person)?.toLocaleString('pt-BR')}/PAX
+                </span>
+              ) : null}
             </div>
           </div>
 
