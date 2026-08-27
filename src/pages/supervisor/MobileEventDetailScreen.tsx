@@ -182,7 +182,7 @@ function FichaTab({ ev, eventId }: { ev: EventDetail; eventId: string }) {
     });
   }, [eventId]);
 
-  const isPerPax = ev.pricing_mode === 'per_pax' || (!ev.pricing_mode && ev.price_per_person != null);
+  const isPerPax = ev.pricing_mode === 'per_pax' || ev.pricing_mode === 'per_person' || (!ev.pricing_mode && ev.price_per_person != null);
 
   const team = [
     ev.organizer          && { label: 'Organizadora',        value: ev.organizer },
