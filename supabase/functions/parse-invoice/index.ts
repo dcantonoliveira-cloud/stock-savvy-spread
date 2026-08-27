@@ -81,6 +81,10 @@ Retorne APENAS o JSON no formato abaixo, sem markdown, sem explicação:
   ]
 }
 
+Para o cabeçalho do documento:
+- "supplier" — nome do emitente/fornecedor (empresa que emitiu a nota, NÃO o destinatário). Em DANFE fica no topo esquerdo, antes do destinatário.
+- "invoice_number" — número da nota fiscal (campo Nº ou Número NF)
+
 Os 4 campos mais importantes de cada item são, nesta ordem de prioridade:
 1. "name" — descrição do produto exatamente como aparece no documento
 2. "quantity" — quantidade do item (coluna Qtde ou Quantidade). LEIA O NÚMERO REAL. Se estiver 10,00 coloque 10. Se estiver 28,00 coloque 28. NUNCA assuma 1 se houver outro valor.
