@@ -64,7 +64,7 @@ async function parseWithClaude(base64: string, mimeType: string) {
   const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
   if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY não configurada nos Secrets da função");
 
-  const prompt = `Leia este documento fiscal (Nota Fiscal, Cupom Fiscal ou Recibo) e extraia os dados em JSON.
+  const prompt = `Leia este documento fiscal (Nota Fiscal DANFE, Cupom Fiscal ou Recibo) e extraia os dados em JSON.
 
 Retorne APENAS o JSON no formato abaixo, sem markdown, sem explicação:
 {
@@ -81,11 +81,16 @@ Retorne APENAS o JSON no formato abaixo, sem markdown, sem explicação:
   ]
 }
 
-Regras:
-- Valores monetários como número (ex: 74.90, não "R$ 74,90")
+Regras CRÍTICAS:
+- Em notas DANFE, a tabela de itens tem colunas: Código | Descrição | NCM | CST | CFOP | UN | Qtde | Preço un | Preço total | ...
+- "quantity" = coluna "Qtde" (quantidade real do item, ex: 10,00 ou 28,00). NUNCA coloque 1 se o documento tiver outro valor.
+- "unit_cost" = coluna "Preço un" (preço unitário). NÃO use o preço total.
+- "unit_cost" como número decimal com ponto (ex: 24.90, não "R$ 24,90")
+- Se a unidade for KG e a quantidade for 10, coloque quantity=10 e unit="kg"
 - Unidades normalizadas: KG→kg, G→g, LT→L, ML→ml, UN/UND/UNID→un, CX→cx, PCT→pct
 - Se um campo não existir, use null
-- Inclua TODOS os produtos listados no documento`;
+- Inclua TODOS os produtos listados no documento
+- Leia os números com atenção: vírgula é separador decimal no Brasil (10,00 = 10.00)`;
 
   // Claude supports image types: image/jpeg, image/png, image/gif, image/webp
   // For PDFs, use document type
