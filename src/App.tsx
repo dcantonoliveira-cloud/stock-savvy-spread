@@ -318,6 +318,7 @@ function AppRoutes() {
             <Route path="/comparison" element={<SupervisorComparisonPage />} />
             <Route path="/transfers" element={<TransfersPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/inventario" element={<EmployeeInventoryPage />} />
             <Route path="/kitchens" element={<KitchensPage />} />
             <Route path="/kitchens/:id" element={<KitchenDetailPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
