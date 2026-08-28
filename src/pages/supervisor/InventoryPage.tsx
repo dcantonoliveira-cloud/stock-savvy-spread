@@ -55,23 +55,28 @@ export default function InventoryPage() {
 
   const load = async () => {
     setLoading(true);
-    const [histRes, empRes, groupsRes] = await Promise.all([
+    const [histRes, empRes, groupsRes, membersRes] = await Promise.all([
       supabase.from('inventory_counts' as any).select('*').order('created_at', { ascending: false }).limit(50),
       supabase.from('profiles').select('user_id, display_name').order('display_name'),
-      (supabase as any).from('inventory_groups').select('id, name, inventory_group_members(user_id, profiles(user_id, display_name))').order('name'),
+      (supabase as any).from('inventory_groups').select('id, name').order('name'),
+      (supabase as any).from('inventory_group_members').select('group_id, user_id'),
     ]);
 
-    if (empRes.data) setEmployees(empRes.data as Employee[]);
+    const empList: Employee[] = empRes.data ?? [];
+    if (empRes.data) setEmployees(empList);
 
     if (groupsRes.data) {
+      const empMap = Object.fromEntries(empList.map((e: Employee) => [e.user_id, e.display_name]));
+      const membersByGroup: Record<string, Employee[]> = {};
+      for (const m of (membersRes.data ?? []) as any[]) {
+        if (!membersByGroup[m.group_id]) membersByGroup[m.group_id] = [];
+        membersByGroup[m.group_id].push({ user_id: m.user_id, display_name: empMap[m.user_id] ?? 'Desconhecido' });
+      }
       const g: InventoryGroup[] = (groupsRes.data as any[]).map((row: any) => ({
         id: row.id,
         name: row.name,
-        member_count: row.inventory_group_members?.length ?? 0,
-        members: (row.inventory_group_members || []).map((m: any) => ({
-          user_id: m.profiles?.user_id ?? m.user_id,
-          display_name: m.profiles?.display_name ?? 'Desconhecido',
-        })),
+        member_count: membersByGroup[row.id]?.length ?? 0,
+        members: membersByGroup[row.id] ?? [],
       }));
       setGroups(g);
     }
