@@ -95,13 +95,14 @@ export default function InventoryPage() {
   };
 
   const openNewCount = async () => {
-    // Simple query - no joins, use already-loaded employees/groups for labels
-    const { data: items } = await (supabase as any)
-      .from('stock_items')
-      .select('id, counter_user_id, counter_group_id');
+    const [{ data: items }, { data: empData }, { data: grpData }] = await Promise.all([
+      (supabase as any).from('stock_items').select('id, counter_user_id, counter_group_id'),
+      supabase.from('profiles').select('user_id, display_name'),
+      (supabase as any).from('inventory_groups').select('id, name'),
+    ]);
 
-    const empMap = Object.fromEntries(employees.map(e => [e.user_id, e.display_name]));
-    const grpLabelMap = Object.fromEntries(groups.map(g => [g.id, g.name]));
+    const empMap = Object.fromEntries(((empData ?? []) as Employee[]).map(e => [e.user_id, e.display_name]));
+    const grpLabelMap = Object.fromEntries(((grpData ?? []) as any[]).map(g => [g.id, g.name]));
 
     const userMap: Record<string, { label: string; count: number }> = {};
     const grpMap: Record<string, { label: string; count: number }> = {};
