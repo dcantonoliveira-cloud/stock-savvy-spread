@@ -438,14 +438,40 @@ export default function EmployeeInventoryPage() {
         return;
       }
 
-      // Load ALL items assigned to this user in active counts
-      const { data } = await (supabase as any)
+      // Get user's group memberships
+      const { data: memberRows } = await (supabase as any)
+        .from('inventory_group_members')
+        .select('group_id')
+        .eq('user_id', user.id);
+      const groupIds: string[] = (memberRows || []).map((m: any) => m.group_id);
+
+      // Load items assigned directly to user
+      const { data: directData } = await (supabase as any)
         .from('inventory_count_items')
         .select('id, count_id, item_id, system_stock, counted_stock, stock_items(name, unit, category), inventory_counts(id, created_at)')
         .eq('assigned_user_id', user.id)
         .in('count_id', [...activeIds]);
 
-      const all = ((data || []) as InventoryCountItem[]).filter(i => activeIds.has(i.count_id));
+      // Load items assigned to user's groups
+      let groupData: any[] = [];
+      if (groupIds.length > 0) {
+        const { data: gd } = await (supabase as any)
+          .from('inventory_count_items')
+          .select('id, count_id, item_id, system_stock, counted_stock, stock_items(name, unit, category), inventory_counts(id, created_at)')
+          .in('assigned_group_id', groupIds)
+          .in('count_id', [...activeIds]);
+        groupData = gd || [];
+      }
+
+      const seen = new Set<string>();
+      const all: InventoryCountItem[] = [];
+      for (const item of [...(directData || []), ...groupData]) {
+        if (!seen.has(item.id) && activeIds.has(item.count_id)) {
+          seen.add(item.id);
+          all.push(item as InventoryCountItem);
+        }
+      }
+
       const pending = all.filter(i => i.counted_stock === null);
       const counted = all.filter(i => i.counted_stock !== null);
 
