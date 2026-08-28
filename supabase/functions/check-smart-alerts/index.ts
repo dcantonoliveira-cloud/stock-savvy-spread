@@ -55,6 +55,17 @@ Deno.serve(async (req) => {
 
   const companyId = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89'
 
+  // Auto-resolve alertas de menu_change cujo evento já passou
+  await sql(`
+    UPDATE smart_alerts sa
+    SET resolved_at = NOW()
+    FROM events e
+    WHERE sa.type = 'menu_change'
+      AND sa.resolved_at IS NULL
+      AND sa.entity_id = e.id::text
+      AND e.event_date < '${todayStr}'
+  `)
+
   // Alertas existentes não resolvidos OU resolvidos nos últimos 3 dias (exceto menu_change, que pode reabrir a cada nova alteração)
   const existingRows = await sql(`
     SELECT entity_id, type FROM smart_alerts
