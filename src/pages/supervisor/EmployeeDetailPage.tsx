@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, Mail, MapPin, Briefcase,
   FileText, Edit2, Save, X, Loader2,
-  Eye, Download, Plus, ShieldCheck, Trash2, KeyRound, Timer, LogIn, LogOut, ChevronDown, ChevronUp,
+  Eye, Download, Plus, ShieldCheck, Trash2, KeyRound, Timer, LogIn, LogOut, ChevronDown, ChevronUp, CheckCircle2,
 } from 'lucide-react';
 import { startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, format as fmtDate, format } from 'date-fns';
 import { DEFAULT_SCHEDULE, calcDayBalance, formatBalance, type WeekSchedule } from '@/lib/workSchedule';
@@ -137,10 +137,50 @@ export default function EmployeeDetailPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
-  const [tab, setTab] = useState<'info' | 'holerites' | 'permissoes' | 'ponto'>('info');
+  const [tab, setTab] = useState<'info' | 'holerites' | 'permissoes' | 'ponto' | 'inventario'>('info');
+  const [inventarioItems, setInventarioItems] = useState<any[]>([]);
+  const [loadingInventario, setLoadingInventario] = useState(false);
   const [form, setForm] = useState<Partial<Profile>>({});
 
   useEffect(() => { if (id) load(); }, [id]);
+
+  const loadInventario = async () => {
+    if (!id) return;
+    setLoadingInventario(true);
+    const { data: activeCounts } = await (supabase as any)
+      .from('inventory_counts').select('id').eq('status', 'in_progress');
+    const activeIds = (activeCounts || []).map((c: any) => c.id);
+    if (!activeIds.length) { setInventarioItems([]); setLoadingInventario(false); return; }
+
+    // Items assigned directly to user
+    const { data: direct } = await (supabase as any)
+      .from('inventory_count_items')
+      .select('id, counted_stock, system_stock, stock_items:item_id(name, unit, category)')
+      .eq('assigned_user_id', id)
+      .in('count_id', activeIds);
+
+    // User's groups
+    const { data: memberRows } = await (supabase as any)
+      .from('inventory_group_members').select('group_id').eq('user_id', id);
+    const groupIds = (memberRows || []).map((m: any) => m.group_id);
+    let groupItems: any[] = [];
+    if (groupIds.length > 0) {
+      const { data: gd } = await (supabase as any)
+        .from('inventory_count_items')
+        .select('id, counted_stock, system_stock, stock_items:item_id(name, unit, category)')
+        .in('assigned_group_id', groupIds)
+        .in('count_id', activeIds);
+      groupItems = gd || [];
+    }
+
+    const seen = new Set<string>();
+    const all: any[] = [];
+    for (const item of [...(direct || []), ...groupItems]) {
+      if (!seen.has(item.id)) { seen.add(item.id); all.push(item); }
+    }
+    setInventarioItems(all);
+    setLoadingInventario(false);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -423,6 +463,13 @@ export default function EmployeeDetailPage() {
           <Timer className="w-3.5 h-3.5" />
           Ponto
         </button>
+        <button onClick={() => { setTab('inventario'); loadInventario(); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            tab === 'inventario' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}>
+          <Eye className="w-3.5 h-3.5" />
+          Inventário
+        </button>
         {myPerms.is_admin && (
           <button onClick={() => setTab('permissoes')}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -650,6 +697,53 @@ export default function EmployeeDetailPage() {
 
       {/* ── Tab: Ponto ── */}
       {tab === 'ponto' && id && <PontoTab employeeId={id} />}
+
+      {/* ── Tab: Inventário ── */}
+      {tab === 'inventario' && (
+        <div className="bg-white rounded-2xl border border-border overflow-hidden">
+          {loadingInventario ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : inventarioItems.length === 0 ? (
+            <div className="py-16 text-center text-muted-foreground text-sm">
+              <Eye className="w-10 h-10 mx-auto mb-3 opacity-25" />
+              <p>Nenhuma contagem ativa ou sem itens atribuídos.</p>
+            </div>
+          ) : (
+            <>
+              <div className="px-5 py-3 border-b border-border flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground text-sm">Contagem ativa</span>
+                <span className="ml-auto">
+                  {inventarioItems.filter(i => i.counted_stock !== null).length}/{inventarioItems.length} contados
+                </span>
+              </div>
+              <div className="divide-y divide-border/50">
+                {inventarioItems.map(item => {
+                  const counted = item.counted_stock !== null;
+                  return (
+                    <div key={item.id} className="flex items-center gap-3 px-5 py-3">
+                      {counted
+                        ? <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+                        : <div className="w-4 h-4 rounded-full border-2 border-border flex-shrink-0" />
+                      }
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{item.stock_items?.name}</p>
+                        <p className="text-xs text-muted-foreground">{item.stock_items?.category} · {item.stock_items?.unit}</p>
+                      </div>
+                      {counted ? (
+                        <span className="text-sm font-bold text-success">{item.counted_stock} {item.stock_items?.unit}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">pendente</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Tab: Permissões ── */}
       {tab === 'permissoes' && myPerms.is_admin && (<div className="space-y-4">
