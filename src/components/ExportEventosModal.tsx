@@ -148,7 +148,7 @@ export function ExportEventosModal({ onClose, currentFilter }: {
     try {
       let q = supabase
         .from('events')
-        .select('*, clients(name, phone, email, cpf, address, source)')
+        .select('*, clients(name, phone, email, cpf, address, source), event_products(name)')
         .is('deleted_at', null)
         .order('event_date', { ascending: false });
 
@@ -187,6 +187,7 @@ export function ExportEventosModal({ onClose, currentFilter }: {
             case 'contratante_cpf':     row[labelMap[key]] = ev.clients?.cpf ?? ev.contratante_cpf ?? ''; break;
             case 'contratante_address': row[labelMap[key]] = ev.clients?.address ?? ev.contratante_address ?? ''; break;
             case 'source':              row[labelMap[key]] = ev.clients?.source ?? ''; break;
+            case 'product_name':        row[labelMap[key]] = ev.product_name ?? ev.event_products?.name ?? ''; break;
             case 'total_value': {
               const g = ev.guest_count ?? 0;
               const p = ev.price_per_person ?? 0;
