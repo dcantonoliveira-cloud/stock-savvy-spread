@@ -237,6 +237,22 @@ function AppRoutes() {
     );
   }
 
+  if ((role === 'supervisor' || role === 'admin') && window.location.pathname.startsWith('/employee-preview')) {
+    const previewUserId = new URLSearchParams(window.location.search).get('uid') ?? undefined;
+    return (
+      <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <EmployeeLayout>
+          <Routes>
+            <Route path="/employee-preview" element={<EmployeeInventoryPage previewUserId={previewUserId} />} />
+            <Route path="*" element={<Navigate to="/employee-preview" replace />} />
+          </Routes>
+        </EmployeeLayout>
+      </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
   if (role === 'supervisor' && window.location.pathname.startsWith('/assessora')) {
     return (
       <ErrorBoundary>

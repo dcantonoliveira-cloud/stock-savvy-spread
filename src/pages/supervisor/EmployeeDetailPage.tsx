@@ -398,6 +398,14 @@ export default function EmployeeDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {!editing && profile?.user_id && (
+            <button
+              onClick={() => window.open(`/employee-preview?uid=${profile.user_id}`, '_blank')}
+              className="flex items-center gap-2 px-3 py-2 border border-amber-200 rounded-xl text-sm text-amber-700 hover:bg-amber-50 transition-colors">
+              <LogIn className="w-3.5 h-3.5" />
+              Visualizar app
+            </button>
+          )}
           {myPerms.is_admin && !editing && (
             <>
               <button

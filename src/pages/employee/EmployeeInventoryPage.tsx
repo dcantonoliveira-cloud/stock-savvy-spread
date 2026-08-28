@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  ClipboardList, Send, Plus, Search, Loader2, CheckCircle2, AlertTriangle, X, Check,
+  ClipboardList, Send, Plus, Search, Loader2, CheckCircle2, AlertTriangle, X, Check, Eye,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { CATEGORIES } from '@/types/inventory';
 
@@ -400,7 +401,9 @@ function FreeCountDialog({
 
 export default function EmployeeInventoryPage({ previewUserId }: { previewUserId?: string } = {}) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const effectiveUserId = previewUserId ?? user?.id;
+  const isPreview = !!previewUserId;
 
   // Assigned items (pending + counted)
   const [pendingItems, setPendingItems] = useState<InventoryCountItem[]>([]);
@@ -546,9 +549,21 @@ export default function EmployeeInventoryPage({ previewUserId }: { previewUserId
 
   return (
     <div className="pb-8">
-      <div className="mb-5">
+      {isPreview && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-sm font-medium flex items-center justify-center gap-3 py-2.5 px-4">
+          <Eye className="w-4 h-4 flex-shrink-0" />
+          <span>Modo visualização — você está vendo o app como o funcionário</span>
+          <button
+            onClick={() => navigate(-1)}
+            className="ml-4 underline underline-offset-2 hover:no-underline font-semibold"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
+      <div className={`mb-5 ${isPreview ? 'mt-12' : ''}`}>
         <h2 className="text-xl font-display font-bold text-foreground">Inventário</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">Contagem de itens atribuídos a você</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{isPreview ? 'Visão do funcionário (somente leitura)' : 'Contagem de itens atribuídos a você'}</p>
       </div>
 
       {loading ? (
