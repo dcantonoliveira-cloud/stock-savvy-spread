@@ -398,8 +398,9 @@ function FreeCountDialog({
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-export default function EmployeeInventoryPage() {
+export default function EmployeeInventoryPage({ previewUserId }: { previewUserId?: string } = {}) {
   const { user } = useAuth();
+  const effectiveUserId = previewUserId ?? user?.id;
 
   // Assigned items (pending + counted)
   const [pendingItems, setPendingItems] = useState<InventoryCountItem[]>([]);
@@ -416,14 +417,14 @@ export default function EmployeeInventoryPage() {
   const [showFreeCount, setShowFreeCount] = useState(false);
 
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId) {
       load();
       loadExtras();
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   const load = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
     setLoading(true);
     try {
       // Get active counts
@@ -442,14 +443,14 @@ export default function EmployeeInventoryPage() {
       const { data: memberRows } = await (supabase as any)
         .from('inventory_group_members')
         .select('group_id')
-        .eq('user_id', user.id);
+        .eq('user_id', effectiveUserId);
       const groupIds: string[] = (memberRows || []).map((m: any) => m.group_id);
 
       // Load items assigned directly to user
       const { data: directData } = await (supabase as any)
         .from('inventory_count_items')
         .select('id, count_id, item_id, system_stock, counted_stock, stock_items(name, unit, category), inventory_counts(id, created_at)')
-        .eq('assigned_user_id', user.id)
+        .eq('assigned_user_id', effectiveUserId)
         .in('count_id', [...activeIds]);
 
       // Load items assigned to user's groups

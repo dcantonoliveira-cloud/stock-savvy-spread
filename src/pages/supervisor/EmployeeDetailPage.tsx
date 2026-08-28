@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+
+const EmployeeInventoryPage = lazy(() => import('@/pages/employee/EmployeeInventoryPage'));
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -699,49 +701,17 @@ export default function EmployeeDetailPage() {
       {tab === 'ponto' && id && <PontoTab employeeId={id} />}
 
       {/* ── Tab: Inventário ── */}
-      {tab === 'inventario' && (
-        <div className="bg-white rounded-2xl border border-border overflow-hidden">
-          {loadingInventario ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : inventarioItems.length === 0 ? (
-            <div className="py-16 text-center text-muted-foreground text-sm">
-              <Eye className="w-10 h-10 mx-auto mb-3 opacity-25" />
-              <p>Nenhuma contagem ativa ou sem itens atribuídos.</p>
-            </div>
-          ) : (
-            <>
-              <div className="px-5 py-3 border-b border-border flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground text-sm">Contagem ativa</span>
-                <span className="ml-auto">
-                  {inventarioItems.filter(i => i.counted_stock !== null).length}/{inventarioItems.length} contados
-                </span>
-              </div>
-              <div className="divide-y divide-border/50">
-                {inventarioItems.map(item => {
-                  const counted = item.counted_stock !== null;
-                  return (
-                    <div key={item.id} className="flex items-center gap-3 px-5 py-3">
-                      {counted
-                        ? <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
-                        : <div className="w-4 h-4 rounded-full border-2 border-border flex-shrink-0" />
-                      }
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{item.stock_items?.name}</p>
-                        <p className="text-xs text-muted-foreground">{item.stock_items?.category} · {item.stock_items?.unit}</p>
-                      </div>
-                      {counted ? (
-                        <span className="text-sm font-bold text-success">{item.counted_stock} {item.stock_items?.unit}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">pendente</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
+      {tab === 'inventario' && id && (
+        <div className="bg-muted/30 rounded-2xl border border-border overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-border bg-white flex items-center gap-2 text-xs text-muted-foreground">
+            <Eye className="w-3.5 h-3.5" />
+            <span>Visualizando como <strong className="text-foreground">{profile?.display_name}</strong> — somente leitura</span>
+          </div>
+          <div className="p-4">
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>}>
+              <EmployeeInventoryPage previewUserId={id} />
+            </Suspense>
+          </div>
         </div>
       )}
 
