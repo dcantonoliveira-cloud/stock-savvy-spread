@@ -95,10 +95,13 @@ export default function InventoryPage() {
   };
 
   const openNewCount = async () => {
-    // Build assignee rows from stock_items counter fields
+    // Simple query - no joins, use already-loaded employees/groups for labels
     const { data: items } = await (supabase as any)
       .from('stock_items')
-      .select('id, counter_user_id, counter_group_id, profiles:counter_user_id(user_id, display_name), inventory_groups:counter_group_id(id, name)');
+      .select('id, counter_user_id, counter_group_id');
+
+    const empMap = Object.fromEntries(employees.map(e => [e.user_id, e.display_name]));
+    const grpLabelMap = Object.fromEntries(groups.map(g => [g.id, g.name]));
 
     const userMap: Record<string, { label: string; count: number }> = {};
     const grpMap: Record<string, { label: string; count: number }> = {};
@@ -107,11 +110,11 @@ export default function InventoryPage() {
     for (const item of (items || []) as any[]) {
       if (item.counter_user_id) {
         const uid = item.counter_user_id;
-        if (!userMap[uid]) userMap[uid] = { label: item.profiles?.display_name ?? uid, count: 0 };
+        if (!userMap[uid]) userMap[uid] = { label: empMap[uid] ?? uid, count: 0 };
         userMap[uid].count++;
       } else if (item.counter_group_id) {
         const gid = item.counter_group_id;
-        if (!grpMap[gid]) grpMap[gid] = { label: item.inventory_groups?.name ?? gid, count: 0 };
+        if (!grpMap[gid]) grpMap[gid] = { label: grpLabelMap[gid] ?? gid, count: 0 };
         grpMap[gid].count++;
       } else {
         unassigned++;
