@@ -50,6 +50,7 @@ function UnassignedDialog({ userId, onClose, onDone }: { userId: string; onClose
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => { loadUnassigned(); }, []);
 
@@ -65,7 +66,9 @@ function UnassignedDialog({ userId, onClose, onDone }: { userId: string; onClose
       .in('count_id', ids)
       .is('assigned_user_id', null)
       .is('counted_stock', null);
-    const rows = (data || []) as InventoryCountItem[];
+    const rows = ((data || []) as InventoryCountItem[]).sort((a, b) =>
+      (a.stock_items?.name ?? '').localeCompare(b.stock_items?.name ?? '', 'pt-BR')
+    );
     setItems(rows);
     const init: Record<string, string> = {};
     for (const i of rows) init[i.id] = '';
@@ -102,6 +105,21 @@ function UnassignedDialog({ userId, onClose, onDone }: { userId: string; onClose
           <p className="text-xs text-muted-foreground mt-0.5">
             Estes itens não têm responsável — qualquer um pode contar.
           </p>
+          <div className="relative mt-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar item..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 h-9 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto">
           {loading ? (
@@ -112,7 +130,7 @@ function UnassignedDialog({ userId, onClose, onDone }: { userId: string; onClose
             <p className="text-center text-muted-foreground py-12 text-sm">Nenhum item livre no momento.</p>
           ) : (
             <div className="divide-y divide-border/50">
-              {items.map(item => (
+              {items.filter(i => !search.trim() || i.stock_items?.name?.toLowerCase().includes(search.toLowerCase())).map(item => (
                 <div key={item.id} className="flex items-center gap-3 px-5 py-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{item.stock_items?.name}</p>
