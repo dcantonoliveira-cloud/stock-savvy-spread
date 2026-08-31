@@ -1476,7 +1476,7 @@ export default function StockItemsPage() {
                     <td className="px-3 py-2 whitespace-nowrap">
                       <Badge variant="outline" className="text-[10px] font-normal">{item.category || '—'}</Badge>
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
                       {editingCell?.id === item.id && editingCell.field === 'current_stock' ? (
                         <input ref={cellInputRef} type="number" value={editingValue}
                           onChange={e => setEditingValue(e.target.value)} onBlur={commitEdit}
@@ -1491,7 +1491,7 @@ export default function StockItemsPage() {
                       )}
                     </td>
 
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
                       {editingCell?.id === item.id && editingCell.field === 'min_stock' ? (
                         <input ref={cellInputRef} type="number" value={editingValue}
                           onChange={e => setEditingValue(e.target.value)} onBlur={commitEdit}
@@ -1505,7 +1505,7 @@ export default function StockItemsPage() {
                       )}
                     </td>
 
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
                       {editingCell?.id === item.id && editingCell.field === 'unit_cost' ? (
                         <input ref={cellInputRef} type="number" step="0.01" value={editingValue}
                           onChange={e => setEditingValue(e.target.value)} onBlur={commitEdit}
