@@ -305,52 +305,100 @@ function NfScreen({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const updateItem = (idx: number, field: keyof ParsedItem, value: any) => {
+    if (!parsed) return;
+    const updated = [...parsed.items];
+    (updated[idx] as any)[field] = value;
+    setParsed({ ...parsed, items: updated });
+  };
+
+  const removeItem = (idx: number) => {
+    if (!parsed) return;
+    setParsed({ ...parsed, items: parsed.items.filter((_, i) => i !== idx) });
+  };
+
   if (parsed) {
     const matched = parsed.items.filter(i => i.matched_item_id).length;
     return (
       <>
-        <Hero title="Revisar NF" sub={`${parsed.items.length} itens encontrados`} onBack={() => setParsed(null)} />
+        <Hero title="Revisar NF" sub={`${parsed.items.length} itens`} onBack={() => setParsed(null)} />
         <div className="p-4 space-y-3 pb-32">
           {parsed.supplier && (
-            <div className="rounded-2xl border-2 border-gray-100 bg-white p-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-0.5">Fornecedor</p>
-              <p className="font-semibold text-gray-800">{parsed.supplier}</p>
+            <div className="rounded-2xl border-2 border-gray-100 bg-white px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Fornecedor</p>
+              <p className="font-semibold text-gray-800 mt-0.5">{parsed.supplier}</p>
               {parsed.invoice_number && <p className="text-xs text-gray-400">NF {parsed.invoice_number}</p>}
             </div>
           )}
+
           <div className="flex gap-2">
             <div className="flex-1 rounded-2xl border-2 border-emerald-100 bg-emerald-50 p-3 text-center">
               <p className="text-2xl font-bold text-emerald-700">{matched}</p>
-              <p className="text-xs text-emerald-600">vinculados</p>
+              <p className="text-[11px] text-emerald-600 font-medium">vinculados</p>
             </div>
             <div className="flex-1 rounded-2xl border-2 border-amber-100 bg-amber-50 p-3 text-center">
               <p className="text-2xl font-bold text-amber-700">{parsed.items.length - matched}</p>
-              <p className="text-xs text-amber-600">novos</p>
+              <p className="text-[11px] text-amber-600 font-medium">novos</p>
             </div>
           </div>
+
           {parsed.items.map((item, idx) => (
-            <div key={idx} className={`rounded-2xl border-2 p-4 ${item.matched_item_id ? 'border-emerald-100 bg-white' : 'border-amber-100 bg-amber-50/50'}`}>
-              <div className="flex items-start gap-2">
+            <div key={idx} className={`rounded-2xl border-2 bg-white overflow-hidden ${item.matched_item_id ? 'border-gray-100' : 'border-amber-200'}`}>
+              {/* Header do item */}
+              <div className={`flex items-center gap-2 px-4 py-3 ${item.matched_item_id ? 'bg-gray-50' : 'bg-amber-50'}`}>
                 {item.matched_item_id
-                  ? <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                  : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />}
+                  ? <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-800 text-sm">{item.matched_item_name || item.name}</p>
+                  <p className="font-semibold text-gray-800 text-sm leading-tight truncate">
+                    {item.matched_item_name || item.name}
+                  </p>
                   {item.matched_item_name && item.matched_item_name !== item.name && (
-                    <p className="text-xs text-gray-400">NF: {item.name}</p>
+                    <p className="text-[11px] text-gray-400 truncate">NF: {item.name}</p>
                   )}
-                  {!item.matched_item_id && <p className="text-xs text-amber-600">Será criado como novo insumo</p>}
+                  {!item.matched_item_id && (
+                    <p className="text-[11px] text-amber-600 font-medium">Será criado como novo insumo</p>
+                  )}
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-bold text-gray-800">{item.quantity} <span className="font-normal text-xs text-gray-400">{item.unit}</span></p>
-                  {item.unit_cost > 0 && <p className="text-xs text-gray-400">R$ {item.unit_cost.toFixed(2)}</p>}
+                <button onClick={() => removeItem(idx)} className="p-1 text-gray-300 hover:text-red-400 flex-shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Campos editáveis */}
+              <div className="flex gap-0 divide-x divide-gray-100">
+                <div className="flex-1 px-3 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Qtd</p>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="w-full h-10 text-center text-lg font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 bg-white"
+                    value={item.quantity}
+                    onChange={e => updateItem(idx, 'quantity', e.target.value.replace(',', '.'))}
+                  />
+                  <p className="text-[10px] text-gray-400 text-center mt-1">{item.unit}</p>
+                </div>
+                <div className="flex-1 px-3 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Preço unit.</p>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">R$</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className="w-full h-10 pl-7 text-right text-sm font-semibold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 bg-white"
+                      value={item.unit_cost || ''}
+                      placeholder="0,00"
+                      onChange={e => updateItem(idx, 'unit_cost', parseFloat(e.target.value.replace(',', '.')) || 0)}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           ))}
         </div>
+
         <div className="fixed bottom-20 left-4 right-4 z-40">
-          <button onClick={confirm} disabled={submitting}
+          <button onClick={confirm} disabled={submitting || parsed.items.length === 0}
             className="w-full h-14 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl"
             style={{ background: `linear-gradient(135deg, ${RON_950}, ${RON_900})` }}>
             {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
