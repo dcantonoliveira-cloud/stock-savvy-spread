@@ -916,10 +916,10 @@ export default function StockItemsPage() {
 
   const loadTotalValue = async () => {
     const { data } = await (supabase.from('stock_items') as any)
-      .select('current_stock, unit_cost')
+      .select('current_stock, unit_cost, purchase_qty')
       .neq('category', '_sistema_')
       .range(0, 9999);
-    const v = (data || []).reduce((s: number, i: any) => s + (i.current_stock || 0) * (i.unit_cost || 0), 0);
+    const v = (data || []).reduce((s: number, i: any) => s + (i.current_stock || 0) * ((i.unit_cost || 0) / Math.max(1, i.purchase_qty || 1)), 0);
     setTotalStockValue(v);
   };
 
@@ -1523,7 +1523,7 @@ export default function StockItemsPage() {
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {item.current_stock > 0 && item.unit_cost > 0 ? (
                         <span className="font-semibold text-foreground">
-                          {(item.current_stock * item.unit_cost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {(item.current_stock * (item.unit_cost / Math.max(1, (item as any).purchase_qty || 1))).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
