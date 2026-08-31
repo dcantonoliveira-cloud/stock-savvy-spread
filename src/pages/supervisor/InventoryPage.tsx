@@ -55,6 +55,7 @@ export default function InventoryPage() {
   const [detailItems, setDetailItems] = useState<any[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [zeroUncounted, setZeroUncounted] = useState(false);
   const detailCount = history.find(h => h.id === detailCountId);
 
   useEffect(() => { load(); }, []);
@@ -256,25 +257,45 @@ export default function InventoryPage() {
     if (!detailCountId) return;
     setApplying(true);
     try {
-      const { data } = await supabase
+      // Fetch all items in this count
+      const { data: allRows } = await supabase
         .from('inventory_count_items' as any)
         .select('item_id, counted_stock')
-        .eq('count_id', detailCountId)
-        .not('counted_stock', 'is', null);
+        .eq('count_id', detailCountId);
 
-      if (!data || (data as any[]).length === 0) {
+      if (!allRows || (allRows as any[]).length === 0) {
         toast.error('Nenhum item foi contado ainda');
         setApplying(false);
         return;
       }
 
+      const counted = (allRows as any[]).filter(r => r.counted_stock !== null);
+      if (counted.length === 0) {
+        toast.error('Nenhum item foi contado ainda');
+        setApplying(false);
+        return;
+      }
+
+      // Build map of counted items (summed)
       const grouped: Record<string, number> = {};
-      for (const row of data as any[]) {
+      for (const row of counted) {
         grouped[row.item_id] = (grouped[row.item_id] || 0) + (row.counted_stock ?? 0);
       }
 
+      // Apply counted items
       for (const [itemId, total] of Object.entries(grouped)) {
         await supabase.from('stock_items').update({ current_stock: total } as any).eq('id', itemId);
+      }
+
+      // Zero out uncounted items if option is enabled
+      if (zeroUncounted) {
+        const uncounted = (allRows as any[]).filter(r => r.counted_stock === null);
+        const uncountedIds = [...new Set(uncounted.map((r: any) => r.item_id))];
+        for (const itemId of uncountedIds) {
+          if (!grouped[itemId]) {
+            await supabase.from('stock_items').update({ current_stock: 0 } as any).eq('id', itemId);
+          }
+        }
       }
 
       await supabase
@@ -282,7 +303,11 @@ export default function InventoryPage() {
         .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', detailCountId);
 
-      toast.success(`Estoque atualizado para ${Object.keys(grouped).length} insumos!`);
+      const uncountedCount = (allRows as any[]).filter(r => r.counted_stock === null).length;
+      toast.success(
+        `Estoque atualizado para ${Object.keys(grouped).length} insumos!` +
+        (zeroUncounted && uncountedCount > 0 ? ` ${uncountedCount} itens não contados zerados.` : '')
+      );
       setDetailCountId(null);
       setDetailItems([]);
       load();
@@ -736,11 +761,31 @@ export default function InventoryPage() {
               </div>
               {detailCount?.status !== 'completed' && (
                 <div className="border-t border-border pt-4 mt-2">
+                  {/* Toggle: zerar não contados */}
+                  <button
+                    onClick={() => setZeroUncounted(v => !v)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border mb-3 transition-colors text-sm ${
+                      zeroUncounted
+                        ? 'bg-red-50 border-red-200 text-red-800'
+                        : 'bg-muted/40 border-border text-muted-foreground'
+                    }`}
+                  >
+                    <span className="font-medium">Zerar itens não contados</span>
+                    <div className={`w-10 h-5 rounded-full transition-colors relative flex-shrink-0 ${zeroUncounted ? 'bg-red-500' : 'bg-border'}`}>
+                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${zeroUncounted ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </div>
+                  </button>
+
                   <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 mb-3 text-xs text-amber-800">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
                     <div>
                       <p className="font-semibold">Atenção: esta ação é irreversível</p>
-                      <p className="mt-0.5">O estoque será substituído pela quantidade contada. Se mais de uma pessoa contou o mesmo item, os valores são somados.</p>
+                      <p className="mt-0.5">
+                        {zeroUncounted
+                          ? 'Os itens contados terão o estoque substituído. Os itens não contados serão zerados.'
+                          : 'Os itens contados terão o estoque substituído. Os itens não contados serão mantidos como estão.'}
+                        {' '}Se mais de uma pessoa contou o mesmo item, os valores são somados.
+                      </p>
                     </div>
                   </div>
                   <Button className="w-full h-11 gap-2" onClick={handleApplyToStock} disabled={applying}>
