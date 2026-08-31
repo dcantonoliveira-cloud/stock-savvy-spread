@@ -278,11 +278,22 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
           supabase.from('stock_entries').update({ item_id: group.canonical.id } as any).in('item_id', dupIds as any),
           supabase.from('stock_outputs').update({ item_id: group.canonical.id } as any).in('item_id', dupIds as any),
         ]);
-        // Sum stock from all dups and add to canonical
+        // Sum stock from all dups and merge best values from duplicates into canonical
         const totalDupStock = group.duplicates.reduce((s, d) => s + (d.current_stock || 0), 0);
-        if (totalDupStock > 0) {
-          await supabase.from('stock_items').update({ current_stock: group.canonical.current_stock + totalDupStock } as any).eq('id', group.canonical.id as any);
-        }
+        const allItems = [group.canonical, ...group.duplicates];
+        const bestUnitCost   = allItems.map(i => (i as any).unit_cost   || 0).find(v => v > 0) ?? 0;
+        const bestPurchaseQty = allItems.map(i => (i as any).purchase_qty || 1).find(v => v > 1) ?? ((group.canonical as any).purchase_qty || 1);
+        const bestMinStock   = allItems.map(i => (i as any).min_stock   || 0).find(v => v > 0) ?? 0;
+        const bestBarcode    = allItems.map(i => (i as any).barcode).find(v => v)   ?? (group.canonical as any).barcode   ?? null;
+        const bestImageUrl   = allItems.map(i => (i as any).image_url).find(v => v) ?? (group.canonical as any).image_url ?? null;
+        await supabase.from('stock_items').update({
+          current_stock: group.canonical.current_stock + totalDupStock,
+          unit_cost:    bestUnitCost,
+          purchase_qty: bestPurchaseQty,
+          min_stock:    bestMinStock,
+          barcode:      bestBarcode,
+          image_url:    bestImageUrl,
+        } as any).eq('id', group.canonical.id as any);
         // Remove FK-dependent rows first, then delete dups
         await Promise.all([
           supabase.from('item_suppliers').delete().in('item_id', dupIds as any),
