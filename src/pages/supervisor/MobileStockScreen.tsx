@@ -8,6 +8,26 @@ import {
   FileImage,
 } from 'lucide-react';
 
+async function resizeImageToBase64(file: File, maxPx: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.88).split(',')[1]);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 const RON_950 = '#0e1f4a';
 const RON_900 = '#152d6b';
 const GOLD_400 = '#C4973A';
@@ -253,13 +273,21 @@ function NfScreen({ onBack }: { onBack: () => void }) {
         return;
       }
       const extMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', pdf: 'application/pdf' };
-      const mimeType = file.type || extMap[ext] || 'application/pdf';
-      const buffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      const chunk = 8192;
-      for (let i = 0; i < bytes.byteLength; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-      const base64 = btoa(binary);
+      let mimeType = file.type || extMap[ext] || 'application/pdf';
+      if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
+
+      let base64: string;
+      if (mimeType.startsWith('image/')) {
+        base64 = await resizeImageToBase64(file, 1500);
+        mimeType = 'image/jpeg';
+      } else {
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunk = 8192;
+        for (let i = 0; i < bytes.byteLength; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        base64 = btoa(binary);
+      }
       const { data, error } = await supabase.functions.invoke('parse-invoice', { body: { base64, mimeType } });
       if (error || data?.error) throw new Error(error?.message || data?.error || 'Erro ao processar');
       setParsed({ supplier: data.supplier || '', invoice_number: data.invoice_number || '', items: matchItems(data.items || []) });

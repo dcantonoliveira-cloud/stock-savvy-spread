@@ -48,6 +48,27 @@ const exportCsv = (rows: string[][], filename: string) => {
 };
 
 // ─── Searchable item combobox ───
+async function resizeImageToBase64(file: File, maxPx: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      resolve(dataUrl.split(',')[1]);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 function ItemSearchCombobox({ items, value, onChange }: {
   items: { id: string; name: string; unit: string }[];
   value: string | null;
@@ -458,15 +479,23 @@ export default function EntriesPage() {
           throw new Error('Formato HEIC (iPhone) não é suportado. Tire a foto e compartilhe como JPG, ou abra a foto no iPhone e use "Exportar" → JPG.');
         }
 
-        const buffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        // Use chunk-based conversion to avoid stack overflow on large files
-        const chunkSize = 8192;
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i += chunkSize) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        let base64: string;
+        const isImage = mimeType.startsWith('image/');
+
+        if (isImage) {
+          // Resize image to max 1500px — reduces AI tokens by ~70-80% for high-res photos
+          base64 = await resizeImageToBase64(file, 1500);
+          mimeType = 'image/jpeg'; // canvas always outputs JPEG
+        } else {
+          const buffer = await file.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          const chunkSize = 8192;
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+          }
+          base64 = btoa(binary);
         }
-        const base64 = btoa(binary);
 
         const { data, error } = await supabase.functions.invoke('parse-invoice', {
           body: { base64, mimeType },
