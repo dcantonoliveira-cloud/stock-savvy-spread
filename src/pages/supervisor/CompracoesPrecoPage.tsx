@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, Star, TrendingUp, TrendingDown, Minus, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Star, TrendingUp, TrendingDown, Minus, AlertTriangle, ChevronDown, ChevronUp, LayoutList, Table2 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
@@ -36,6 +36,7 @@ export default function ComparacaoPrecoPage() {
   const [categorias, setCategorias] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   useEffect(() => { load(); }, []);
 
@@ -293,6 +294,83 @@ export default function ComparacaoPrecoPage() {
     );
   };
 
+  // ── Planilha view ──────────────────────────────────────────────────────────
+  const PlanilhaView = () => {
+    // Collect all unique supplier names across filtered items
+    const allSuppliers = Array.from(
+      new Set(filtered.flatMap(i => i.suppliers.map(s => s.fornecedor_nome)))
+    ).sort();
+
+    return (
+      <div className="overflow-x-auto rounded-xl border border-border bg-white">
+        <table className="text-xs border-collapse" style={{ minWidth: `${220 + allSuppliers.length * 120}px` }}>
+          <thead>
+            <tr style={{ background: 'hsl(40 30% 97%)' }}>
+              {/* Frozen-style first cols */}
+              <th className="sticky left-0 z-10 bg-amber-50 border-b border-r border-border px-3 py-2.5 text-left font-semibold text-muted-foreground whitespace-nowrap min-w-[220px]">
+                INSUMO
+              </th>
+              <th className="border-b border-r border-border px-3 py-2.5 text-left font-semibold text-muted-foreground whitespace-nowrap bg-red-50 min-w-[130px]">
+                MELHOR PREÇO
+              </th>
+              {allSuppliers.map(nome => (
+                <th key={nome} className="border-b border-r border-border px-3 py-2.5 text-center font-semibold text-muted-foreground whitespace-nowrap min-w-[110px]">
+                  {nome}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((item, rowIdx) => {
+              const active = item.suppliers.filter(s => s.ativo && s.unit_price > 0);
+              const best = active.length ? Math.min(...active.map(s => s.unit_price)) : null;
+              const bestSupName = best != null ? active.find(s => s.unit_price === best)?.fornecedor_nome : null;
+              const priceMap: Record<string, number> = {};
+              item.suppliers.forEach(s => { if (s.unit_price > 0) priceMap[s.fornecedor_nome] = s.unit_price; });
+
+              return (
+                <tr key={item.id} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                  {/* Item name — sticky */}
+                  <td className="sticky left-0 z-10 border-b border-r border-border px-3 py-2 font-medium text-foreground whitespace-nowrap"
+                    style={{ background: rowIdx % 2 === 0 ? 'white' : 'hsl(210 40% 98%)' }}>
+                    <div>{item.name}</div>
+                    <div className="text-[10px] text-muted-foreground">{item.category} · {item.unit}</div>
+                  </td>
+                  {/* Best price col */}
+                  <td className="border-b border-r border-border px-3 py-2 bg-red-50/60 whitespace-nowrap">
+                    {best != null ? (
+                      <div>
+                        <span className="font-bold text-red-600">{fmtCur(best)}</span>
+                        <div className="text-[10px] text-red-500 font-medium">{bestSupName}</div>
+                      </div>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  {/* One col per supplier */}
+                  {allSuppliers.map(nome => {
+                    const price = priceMap[nome];
+                    const isBest = price != null && price === best;
+                    return (
+                      <td key={nome} className={`border-b border-r border-border px-3 py-2 text-center whitespace-nowrap
+                        ${isBest ? 'bg-emerald-50' : ''}`}>
+                        {price != null ? (
+                          <span className={`font-semibold ${isBest ? 'text-emerald-700' : 'text-foreground'}`}>
+                            {fmtCur(price)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/30">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div>
       <div className="mb-5">
@@ -302,7 +380,7 @@ export default function ComparacaoPrecoPage() {
         </p>
       </div>
 
-      {/* Filtros */}
+      {/* Filtros + toggle */}
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -314,6 +392,21 @@ export default function ComparacaoPrecoPage() {
           <option value="">Todas as categorias</option>
           {categorias.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+        {/* View toggle */}
+        <div className="flex items-center gap-0.5 border border-border rounded-lg p-0.5 bg-white ml-auto">
+          <button onClick={() => setViewMode('list')}
+            title="Vista lista"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+              ${viewMode === 'list' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}>
+            <LayoutList className="w-4 h-4" />Lista
+          </button>
+          <button onClick={() => setViewMode('grid')}
+            title="Vista planilha"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+              ${viewMode === 'grid' ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}>
+            <Table2 className="w-4 h-4" />Planilha
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -326,6 +419,8 @@ export default function ComparacaoPrecoPage() {
         <div className="bg-white rounded-xl border border-border p-16 text-center text-muted-foreground text-sm">
           Nenhum insumo encontrado.
         </div>
+      ) : viewMode === 'grid' ? (
+        <PlanilhaView />
       ) : (
         <div className="space-y-2">
           {/* Itens com ≥2 fornecedores primeiro */}
