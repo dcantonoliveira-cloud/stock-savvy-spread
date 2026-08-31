@@ -15,6 +15,7 @@ type TastingRow = {
   scheduled_date: string;
   type: string | null;
   max_couples: number | null;
+  current_count: number;
 };
 
 type EventRow = {
@@ -107,7 +108,7 @@ export default function CalendarPage() {
           .select('id, scheduled_date, type, max_couples')
           .gte('scheduled_date', first)
           .lte('scheduled_date', last)
-          .order('scheduled_date'),
+          .order('scheduled_date') as any,
         supabase
           .from('appointments' as any)
           .select('id, title, date, time, location, notes, invited_emails')
@@ -133,7 +134,21 @@ export default function CalendarPage() {
         });
       }
       setEvents(visible as EventRow[]);
-      setTastings((tsData ?? []) as TastingRow[]);
+
+      // Count couples booked per tasting session
+      const tsIds = ((tsData ?? []) as any[]).map((t: any) => t.id);
+      let countMap: Record<string, number> = {};
+      if (tsIds.length > 0) {
+        const { data: tseRows } = await (supabase as any)
+          .from('tasting_session_events')
+          .select('session_id')
+          .in('session_id', tsIds);
+        for (const row of (tseRows ?? []) as any[]) {
+          countMap[row.session_id] = (countMap[row.session_id] ?? 0) + 1;
+        }
+      }
+      setTastings(((tsData ?? []) as any[]).map((t: any) => ({ ...t, current_count: countMap[t.id] ?? 0 })) as TastingRow[]);
+
       setAppointments((apptData ?? []) as AppointmentRow[]);
       setLoading(false);
     };
@@ -329,14 +344,23 @@ export default function CalendarPage() {
                         );
                       })}
                       {/* Tastings */}
-                      {tsgs.slice(0, Math.max(0, 3 - evs.length)).map(t => (
-                        <div key={t.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-50 min-w-0">
-                          <UtensilsCrossed className="w-2.5 h-2.5 shrink-0 text-violet-500" />
-                          <span className="text-[10px] font-medium truncate leading-tight text-violet-700">
-                            Deg. {t.type ?? ''}
-                          </span>
-                        </div>
-                      ))}
+                      {tsgs.slice(0, Math.max(0, 3 - evs.length)).map(t => {
+                        const vagas = t.max_couples != null ? t.max_couples - t.current_count : null;
+                        const cheio = vagas != null && vagas <= 0;
+                        return (
+                          <div key={t.id} className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md min-w-0 ${cheio ? 'bg-violet-100' : 'bg-violet-50'}`}>
+                            <UtensilsCrossed className="w-2.5 h-2.5 shrink-0 text-violet-500 flex-shrink-0" />
+                            <span className="text-[10px] font-medium truncate leading-tight text-violet-700">
+                              Deg. {t.type ?? ''}
+                            </span>
+                            {t.max_couples != null && (
+                              <span className={`text-[9px] font-bold ml-auto flex-shrink-0 ${cheio ? 'text-red-500' : 'text-violet-400'}`}>
+                                {t.current_count}/{t.max_couples}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                       {/* Appointments */}
                       {apts.slice(0, Math.max(0, 3 - evs.length - tsgs.length)).map(a => (
                         <div key={a.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 min-w-0">
@@ -420,7 +444,24 @@ export default function CalendarPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-foreground">Degustação — {t.type ?? 'Sem tipo'}</p>
-                          {t.max_couples && <p className="text-xs text-muted-foreground mt-0.5">Até {t.max_couples} casais</p>}
+                          {t.max_couples != null ? (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-xs text-muted-foreground">
+                                {t.current_count}/{t.max_couples} casais
+                              </span>
+                              {t.max_couples - t.current_count > 0 ? (
+                                <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-full px-1.5 py-0">
+                                  {t.max_couples - t.current_count} vaga{t.max_couples - t.current_count !== 1 ? 's' : ''}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-100 rounded-full px-1.5 py-0">
+                                  Lotado
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-0.5">{t.current_count} casal{t.current_count !== 1 ? 'is' : ''} inscrito{t.current_count !== 1 ? 's' : ''}</p>
+                          )}
                         </div>
                         <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover/card:opacity-100 shrink-0 transition-opacity" />
                       </div>
