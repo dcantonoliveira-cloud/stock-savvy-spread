@@ -200,21 +200,22 @@ export default function StockItemDetailPage() {
   const isLow = item.current_stock > 0 && item.current_stock < item.min_stock && item.min_stock > 0;
   const totalEntries = entries.reduce((s, e) => s + e.quantity, 0);
   const totalOutputs = outputs.reduce((s, o) => s + o.quantity, 0);
-  const avgCost = entries.length > 0
-    ? entries.reduce((s, e) => s + e.unit_cost * e.quantity, 0) / entries.reduce((s, e) => s + e.quantity, 0)
+  const pricedEntries = entries.filter(e => e.unit_cost > 0);
+  const avgCost = pricedEntries.length > 0
+    ? pricedEntries.reduce((s, e) => s + e.unit_cost * e.quantity, 0) / pricedEntries.reduce((s, e) => s + e.quantity, 0)
     : item.unit_cost;
 
   // All movements merged
   const allMovements = [
-    ...entries.map(e => ({ id: e.id, type: 'entrada' as const, date: e.created_at, qty: e.quantity, cost: e.unit_cost, who: e.supplier, ref: e.invoice_number, notes: e.notes })),
+    ...entries.map(e => ({ id: e.id, type: 'entrada' as const, date: e.created_at, qty: e.quantity, cost: e.unit_cost || null, who: e.supplier, ref: e.invoice_number, notes: e.notes })),
     ...outputs.map(o => ({ id: o.id, type: 'saida' as const, date: o.created_at, qty: o.quantity, cost: null, who: o.employee_name, ref: o.event_name, notes: o.notes })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const totalMovPages = Math.ceil(allMovements.length / PAGE_SIZE);
   const pagedMovements = allMovements.slice(movPage * PAGE_SIZE, (movPage + 1) * PAGE_SIZE);
 
-  // Price history from entries
-  const priceHistory = [...entries].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  // Price history — only entries with actual purchase price
+  const priceHistory = [...pricedEntries].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   // Lowest price supplier
   const lowestPrice = suppliers.length > 1
@@ -257,26 +258,31 @@ export default function StockItemDetailPage() {
           <p className={`text-xl font-bold ${isLow ? 'text-destructive' : 'text-success'}`}>{fmtNum(item.current_stock)} {item.unit}</p>
           <p className="text-[10px] text-muted-foreground/50 mt-0.5 group-hover:text-primary/60 transition-colors">clique para ajustar</p>
         </div>
-        {[
-          { label: 'Custo Médio', value: fmtCur(avgCost), icon: DollarSign, color: 'text-amber-600' },
-          { label: 'Total Entradas', value: `${fmtNum(totalEntries)} ${item.unit}`, icon: TrendingUp, color: 'text-success' },
-          { label: 'Total Saídas', value: `${fmtNum(totalOutputs)} ${item.unit}`, icon: TrendingDown, color: 'text-destructive' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white rounded-xl border border-border shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Icon className={`w-4 h-4 ${color}`} />
-              <span className="text-xs text-muted-foreground">{label}</span>
+        {(() => {
+          const lastPriced = [...pricedEntries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+          const stockValue = item.current_stock * (avgCost || 0);
+          const preferredSupplier = suppliers.find(s => s.is_preferred) ?? suppliers[0];
+          return [
+            { label: 'Custo Médio', value: fmtCur(avgCost), icon: DollarSign, color: 'text-amber-600' },
+            { label: 'Valor em Estoque', value: stockValue > 0 ? fmtCur(stockValue) : '—', icon: Package, color: 'text-primary' },
+            { label: 'Último Preço Pago', value: lastPriced ? fmtCur(lastPriced.unit_cost) : preferredSupplier ? fmtCur(preferredSupplier.unit_price) : '—', icon: TrendingUp, color: 'text-success' },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="bg-white rounded-xl border border-border shadow-sm p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Icon className={`w-4 h-4 ${color}`} />
+                <span className="text-xs text-muted-foreground">{label}</span>
+              </div>
+              <p className={`text-xl font-bold ${color}`}>{value}</p>
             </div>
-            <p className={`text-xl font-bold ${color}`}>{value}</p>
-          </div>
-        ))}
+          ));
+        })()}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-white rounded-xl border border-border p-1 w-fit">
         {([
           ['movimentos', `Movimentações (${allMovements.length})`, History],
-          ['precos', `Histórico de Preços (${entries.length})`, DollarSign],
+          ['precos', `Histórico de Preços (${pricedEntries.length})`, DollarSign],
           ['fornecedores', `Fornecedores (${suppliers.length})`, Store],
           ['pratos', `Pratos que usam (${sheetUsages.length})`, Utensils],
         ] as const).map(([tab, label, Icon]) => (
