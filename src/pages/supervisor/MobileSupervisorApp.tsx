@@ -10,7 +10,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import MobileEventDetailScreen from './MobileEventDetailScreen';
 import MobileSheetsScreen from './MobileSheetsScreen';
-const EntriesPage = lazy(() => import('./EntriesPage'));
+import MobileStockScreen from './MobileStockScreen';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Event = {
@@ -1101,13 +1101,7 @@ export default function MobileSupervisorApp() {
           {tab === 'agenda'   && <AgendaScreen   events={events} sessions={sessions} loading={loading} onSelect={setSelectedEventId} />}
           {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} onTasting={setSelectedTastingId} />}
           {tab === 'sheets'   && <MobileSheetsScreen />}
-          {tab === 'stock'    && (
-            <div className="pb-28 overflow-y-auto">
-              <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>}>
-                <EntriesPage />
-              </Suspense>
-            </div>
-          )}
+          {tab === 'stock'    && <MobileStockScreen />}
           <BottomNav tab={tab} setTab={setTab} />
         </>
       )}

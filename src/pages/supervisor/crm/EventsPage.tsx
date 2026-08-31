@@ -152,7 +152,7 @@ export default function EventsPage() {
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [locationQuery, setLocationQuery] = useState('');
   const [locationDropOpen, setLocationDropOpen] = useState(false);
-  const [tastingSessions, setTastingSessions] = useState<{ id: string; scheduled_date: string }[]>([]);
+  const [tastingSessions, setTastingSessions] = useState<{ id: string; scheduled_date: string; type: string | null }[]>([]);
 
   // ── Load data ────────────────────────────────────────────────────
   const EVENT_SELECT = 'id, event_name, event_type, status, event_date, location_text, location_id, guest_count, children_50_pct, non_paying_guests, price_per_person, total_value, paid_value, is_paid_in_full, contract_signed, contract_signed_date, contract_signed_url, zapsign_data, notes, client_id, clients(id, name, phone, email)';
@@ -194,7 +194,7 @@ export default function EventsPage() {
   const loadTastingSessions = async () => {
     const today = new Date().toISOString().slice(0, 10);
     const { data: sessData } = await (supabase.from as any)('tasting_sessions')
-      .select('id, scheduled_date, max_couples')
+      .select('id, scheduled_date, max_couples, type')
       .gte('scheduled_date', today)
       .order('scheduled_date');
     if (!sessData) return;
@@ -210,7 +210,7 @@ export default function EventsPage() {
     const available = sessData
       .map((s: any) => ({ ...s, current: countMap[s.id] ?? 0 }))
       .filter((s: any) => s.max_couples == null || s.current < s.max_couples);
-    setTastingSessions(available as { id: string; scheduled_date: string }[]);
+    setTastingSessions(available as { id: string; scheduled_date: string; type: string | null }[]);
   };
 
   // Busca global server-side — sem limite arbitrário, busca em todos os campos relevantes
@@ -714,11 +714,15 @@ export default function EventsPage() {
             className="w-full h-9 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           >
             <option value="">Sem degustação</option>
-            {tastingSessions.map(s => (
-              <option key={s.id} value={s.id}>
-                {new Date(s.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })}
-              </option>
-            ))}
+            {tastingSessions.map(s => {
+              const label = new Date(s.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' });
+              const tipo = s.type === 'Almoço' ? '☀️ Almoço' : s.type === 'Jantar' ? '🌙 Jantar' : s.type ?? '';
+              return (
+                <option key={s.id} value={s.id}>
+                  {label}{tipo ? ` — ${tipo}` : ''}
+                </option>
+              );
+            })}
           </select>
           {form.tasting_session_id && form.client_phone && (
             <p className="text-[11px] text-emerald-600 mt-1.5 flex items-center gap-1">
