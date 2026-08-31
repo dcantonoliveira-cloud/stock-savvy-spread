@@ -1435,6 +1435,7 @@ export default function StockItemsPage() {
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('unit_cost')}>
                   <div className="flex items-center justify-end gap-1">PREÇO <SortIcon field="unit_cost" /></div>
                 </th>
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">VALOR TOTAL</th>
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs min-w-[140px]">FORNECEDOR</th>
                 <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs w-20">AÇÕES</th>
               </tr>
@@ -1516,6 +1517,16 @@ export default function StockItemsPage() {
                           onClick={() => startEdit(item.id, 'unit_cost', item.unit_cost)} title="Clique para editar">
                           {item.unit_cost === 0 ? '—' : `R$ ${fmtNum(item.unit_cost)}`}
                         </span>
+                      )}
+                    </td>
+
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {item.current_stock > 0 && item.unit_cost > 0 ? (
+                        <span className="font-semibold text-foreground">
+                          {(item.current_stock * item.unit_cost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
 
