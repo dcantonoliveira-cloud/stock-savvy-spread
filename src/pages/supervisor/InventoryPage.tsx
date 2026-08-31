@@ -741,15 +741,15 @@ export default function InventoryPage() {
                             <span className="text-muted-foreground text-xs ml-1">({d.stock_items?.unit})</span>
                           </td>
                           <td className="px-3 py-2.5 text-muted-foreground text-xs">{d.stock_items?.category}</td>
-                          <td className="px-3 py-2.5 text-right text-muted-foreground">{d.system_stock}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold">{d.counted_stock}</td>
+                          <td className="px-3 py-2.5 text-right text-muted-foreground">{Number(d.system_stock).toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold">{Number(d.counted_stock).toFixed(2)}</td>
                           <td className="px-4 py-2.5 text-right">
                             {ok ? (
                               <span className="text-success text-xs">✓ ok</span>
                             ) : (
                               <span className={`font-semibold text-xs flex items-center gap-1 justify-end ${diff > 0 ? 'text-success' : 'text-destructive'}`}>
                                 <TrendingDown className={`w-3 h-3 ${diff > 0 ? 'rotate-180' : ''}`} />
-                                {diff > 0 ? '+' : ''}{diff}
+                                {diff > 0 ? '+' : ''}{diff.toFixed(2)}
                               </span>
                             )}
                           </td>
