@@ -38,6 +38,7 @@ export default function ContasReceberPage() {
   const [confirmEvent, setConfirmEvent] = useState<EventBalance | null>(null);
   const [receiveDate, setReceiveDate]   = useState(today);
   const [marking, setMarking]           = useState<string | null>(null);
+  const [totalRecebidoGlobal, setTotalRecebidoGlobal] = useState(0);
 
   const load = async () => {
     setLoading(true);
@@ -53,17 +54,23 @@ export default function ContasReceberPage() {
 
     if (!eventsData || eventsData.length === 0) { setLoading(false); return; }
 
-    // Busca todos os pagamentos confirmados desses eventos
     const eventIds = (eventsData as any[]).map((e: any) => e.id);
+
+    // Busca TODOS os pagamentos confirmados — incluindo eventos 100% quitados
     const { data: paymentsData } = await supabase
       .from('event_payments' as any)
       .select('event_id, value')
       .in('event_id', eventIds)
       .eq('is_confirmed', true);
 
+    const allPayments = (paymentsData ?? []) as any[];
+
+    // Total global recebido (independente de saldo devedor)
+    setTotalRecebidoGlobal(allPayments.reduce((s: number, p: any) => s + p.value, 0));
+
     // Agrupa pagamentos por evento
     const paidByEvent: Record<string, number> = {};
-    ((paymentsData ?? []) as any[]).forEach((p: any) => {
+    allPayments.forEach((p: any) => {
       paidByEvent[p.event_id] = (paidByEvent[p.event_id] ?? 0) + p.value;
     });
 
@@ -139,7 +146,6 @@ export default function ContasReceberPage() {
 
   const totalAberto  = events.filter(e => !isPastEvent(e)).reduce((s, e) => s + e.outstanding, 0);
   const totalVencido = events.filter(e => isPastEvent(e)).reduce((s, e) => s + e.outstanding, 0);
-  const totalRecebido = events.reduce((s, e) => s + e.paid, 0);
 
   const TAB = [
     { key: 'aberto',  label: 'Em aberto',  count: events.filter(e => !isPastEvent(e)).length },
@@ -177,8 +183,8 @@ export default function ContasReceberPage() {
             <TrendingUp className="w-4 h-4 text-emerald-600" />
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Já recebido</p>
           </div>
-          <p className="text-2xl font-bold tabular-nums text-emerald-600">{fmtBRL(totalRecebido)}</p>
-          <p className="text-xs text-muted-foreground mt-1">De {events.length} eventos com saldo aberto</p>
+          <p className="text-2xl font-bold tabular-nums text-emerald-600">{fmtBRL(totalRecebidoGlobal)}</p>
+          <p className="text-xs text-muted-foreground mt-1">Total confirmado nos eventos</p>
         </div>
       </div>
 
@@ -258,14 +264,14 @@ export default function ContasReceberPage() {
                             </div>
                             <span className="text-sm tabular-nums text-right text-muted-foreground">{fmtBRL(e.total_value)}</span>
                             <span className="text-sm tabular-nums text-right text-emerald-600">+{fmtBRL(e.paid)}</span>
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-sm font-bold tabular-nums text-amber-600">{fmtBRL(e.outstanding)}</span>
+                            <div className="flex items-center justify-end gap-2 overflow-hidden">
                               <button
                                 onClick={() => { setConfirmEvent(e); setReceiveDate(today); }}
                                 disabled={marking === e.id}
-                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 whitespace-nowrap">
+                                className="opacity-0 group-hover:opacity-100 flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50 whitespace-nowrap">
                                 <CheckCircle2 className="w-3 h-3" />Receber
                               </button>
+                              <span className="text-sm font-bold tabular-nums text-amber-600 flex-shrink-0">{fmtBRL(e.outstanding)}</span>
                             </div>
                           </div>
                         );
