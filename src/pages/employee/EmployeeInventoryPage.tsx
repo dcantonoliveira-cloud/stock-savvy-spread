@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  ClipboardList, Send, Plus, Search, Loader2, CheckCircle2, AlertTriangle, X, Check, Eye,
+  ClipboardList, Send, Plus, Search, Loader2, CheckCircle2, AlertTriangle, X, Check, Eye, ArrowDownAZ, Filter,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -537,9 +537,38 @@ export default function EmployeeInventoryPage({ previewUserId }: { previewUserId
     setSaving(false);
   };
 
+  const [search, setSearch] = useState('');
+  const [sortAlpha, setSortAlpha] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+
+  const allCategories = Array.from(
+    new Set([...pendingItems, ...countedItems].map(i => i.stock_items?.category).filter(Boolean))
+  ).sort() as string[];
+
+  const applyFilters = (items: InventoryCountItem[]) => {
+    let result = items;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(i => i.stock_items?.name?.toLowerCase().includes(q));
+    }
+    if (filterCategory) {
+      result = result.filter(i => i.stock_items?.category === filterCategory);
+    }
+    if (sortAlpha) {
+      result = [...result].sort((a, b) =>
+        (a.stock_items?.name ?? '').localeCompare(b.stock_items?.name ?? '', 'pt-BR')
+      );
+    }
+    return result;
+  };
+
+  const filteredPending = applyFilters(pendingItems);
+  const filteredCounted = applyFilters(countedItems);
+
   // Group pending items by count session
   const pendingGroups: Record<string, InventoryCountItem[]> = {};
-  for (const item of pendingItems) {
+  for (const item of filteredPending) {
     if (!pendingGroups[item.count_id]) pendingGroups[item.count_id] = [];
     pendingGroups[item.count_id].push(item);
   }
@@ -597,6 +626,71 @@ export default function EmployeeInventoryPage({ previewUserId }: { previewUserId
             </div>
           )}
 
+          {/* Search / sort / filter bar */}
+          {total > 0 && (
+            <div className="flex items-center gap-2 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Buscar item..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 h-10 rounded-xl border border-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => setSortAlpha(v => !v)}
+                title="Ordenar A→Z"
+                className={`h-10 w-10 flex items-center justify-center rounded-xl border transition-colors ${
+                  sortAlpha ? 'bg-primary text-primary-foreground border-primary' : 'bg-white border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ArrowDownAZ className="w-4 h-4" />
+              </button>
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowCategoryPicker(v => !v)}
+                  title="Filtrar por categoria"
+                  className={`h-10 px-3 flex items-center gap-1.5 rounded-xl border transition-colors text-sm font-medium ${
+                    filterCategory ? 'bg-primary text-primary-foreground border-primary' : 'bg-white border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Filter className="w-4 h-4" />
+                  {filterCategory ? <span className="max-w-[80px] truncate">{filterCategory}</span> : null}
+                </button>
+
+                {showCategoryPicker && (
+                  <div className="absolute right-0 top-12 z-30 bg-white border border-border rounded-2xl shadow-lg py-1.5 min-w-[160px]">
+                    <button
+                      onClick={() => { setFilterCategory(null); setShowCategoryPicker(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors ${!filterCategory ? 'font-semibold text-primary' : ''}`}
+                    >
+                      Todas as categorias
+                    </button>
+                    <div className="border-t border-border/50 my-1" />
+                    {allCategories.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => { setFilterCategory(cat); setShowCategoryPicker(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors ${filterCategory === cat ? 'font-semibold text-primary' : ''}`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Pending items grouped by session */}
           {Object.entries(pendingGroups).map(([countId, groupItems]) => {
             const countDate = groupItems[0]?.inventory_counts?.created_at
@@ -646,17 +740,17 @@ export default function EmployeeInventoryPage({ previewUserId }: { previewUserId
           })}
 
           {/* Already counted items */}
-          {countedItems.length > 0 && (
+          {filteredCounted.length > 0 && (
             <div className="rounded-2xl border border-border bg-white overflow-hidden mb-4">
               <div className="bg-success/5 border-b border-success/15 px-4 py-2.5 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-success" />
                 <p className="text-sm font-semibold text-foreground">Já contados</p>
                 <Badge className="ml-auto text-[10px] bg-success/10 text-success border-success/20">
-                  {countedItems.length}
+                  {filteredCounted.length}
                 </Badge>
               </div>
               <div className="divide-y divide-border/50">
-                {countedItems.map(item => (
+                {filteredCounted.map(item => (
                   <div key={item.id} className="flex items-center gap-3 px-4 py-3">
                     <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
                     <div className="flex-1 min-w-0">
