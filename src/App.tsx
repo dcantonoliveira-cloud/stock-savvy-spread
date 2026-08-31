@@ -375,7 +375,7 @@ function AppRoutes() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={permissions.access_stock ? <EmployeeDashboard /> : <Navigate to="/materiais" replace />} />
-          <Route path="/inventario" element={permissions.access_stock ? <EmployeeInventoryPage /> : <Navigate to="/materiais" replace />} />
+          <Route path="/inventario" element={permissions.access_inventory || permissions.access_stock ? <EmployeeInventoryPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/eventos" element={permissions.access_stock ? <EmployeeEventsPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/materiais" element={permissions.access_materials ? <EmployeeMateriaisPage /> : <Navigate to="/" replace />} />
           <Route path="/producao" element={<ProducaoPage />} />

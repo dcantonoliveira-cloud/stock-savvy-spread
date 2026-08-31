@@ -20,6 +20,7 @@ interface EmpPermissions {
   access_comercial: boolean; access_financeiro: boolean;
   access_estoque: boolean; access_cadastros: boolean;
   access_estatisticas: boolean; access_administracao: boolean; access_producao: boolean;
+  access_inventory: boolean;
   is_admin: boolean;
 }
 
@@ -29,6 +30,7 @@ const DEFAULT_PERMS: EmpPermissions = {
   access_comercial: false, access_financeiro: false,
   access_estoque: false, access_cadastros: false,
   access_estatisticas: false, access_administracao: false, access_producao: false,
+  access_inventory: false,
   is_admin: false,
 };
 
@@ -44,6 +46,10 @@ const PERM_GROUPS = [
   {
     label: 'Estoque & Operações', key: 'access_estoque' as keyof EmpPermissions,
     desc: 'Entradas, saídas, fichas técnicas, inventário e compras',
+  },
+  {
+    label: 'Contagem de Estoque', key: 'access_inventory' as keyof EmpPermissions,
+    desc: 'Tela de contagem de inventário do funcionário',
   },
   {
     label: 'Materiais', key: 'access_materials' as keyof EmpPermissions,
@@ -217,6 +223,7 @@ export default function EmployeeDetailPage() {
         access_estatisticas: d.access_estatisticas ?? false,
         access_administracao: d.access_administracao ?? false,
         access_producao: d.access_producao ?? false,
+        access_inventory: d.access_inventory ?? false,
         is_admin: d.is_admin ?? false,
       });
     }

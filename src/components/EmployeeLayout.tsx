@@ -18,8 +18,10 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
   const tabs = [
     ...(permissions.access_stock ? [
       { to: '/', label: 'Estoque', icon: Home },
-      { to: '/inventario', label: 'Inventário', icon: ClipboardList },
       { to: '/eventos', label: 'Eventos', icon: CalendarDays },
+    ] : []),
+    ...((permissions.access_inventory || permissions.access_stock) ? [
+      { to: '/inventario', label: 'Inventário', icon: ClipboardList },
     ] : []),
     ...(permissions.access_materials ? [{ to: '/materiais', label: 'Materiais', icon: Warehouse }] : []),
     ...(permissions.access_producao ? [{ to: '/producao', label: 'Produção', icon: UtensilsCrossed }] : []),

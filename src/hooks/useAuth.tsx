@@ -19,6 +19,7 @@ export interface Permissions {
   access_estatisticas: boolean;
   access_administracao: boolean;
   access_producao: boolean;
+  access_inventory: boolean;
   // admin flag — can manage other users' permissions
   is_admin: boolean;
 }
@@ -36,6 +37,7 @@ const SUPERVISOR_DEFAULTS: Permissions = {
   access_estatisticas: true,
   access_administracao: true,
   access_producao: true,
+  access_inventory: true,
   is_admin: true,
 };
 
@@ -51,6 +53,7 @@ const EMPLOYEE_DEFAULTS: Permissions = {
   access_estatisticas: false,
   access_administracao: false,
   access_producao: false,
+  access_inventory: false,
   is_admin: false,
 };
 
@@ -112,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         access_estatisticas:   p.access_estatisticas ?? false,
         access_administracao:  p.access_administracao ?? false,
         access_producao:       (p as any).access_producao ?? false,
+        access_inventory:      (p as any).access_inventory ?? false,
         is_admin:              p.is_admin             ?? false,
       });
     } else {
