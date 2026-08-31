@@ -35,7 +35,21 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        const invoiceData = await parseWithClaude(body.base64, mimeType);
+        const { invoiceData, inputTokens, outputTokens, costUsd, model } = await parseWithClaude(body.base64, mimeType);
+
+        // Log usage — fire and forget, don't block the response
+        const adminClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const { data: profile } = await adminClient.from('profiles').select('company_id').eq('user_id', user.id).single();
+        adminClient.from('ai_usage_log').insert({
+          company_id: (profile as any)?.company_id ?? null,
+          user_id: user.id,
+          function_name: 'parse-invoice',
+          model,
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          cost_usd: costUsd,
+        }).then(() => {});
+
         return new Response(JSON.stringify(invoiceData), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -59,6 +73,10 @@ serve(async (req) => {
     });
   }
 });
+
+// Haiku 4.5 pricing (per million tokens)
+const PRICE_INPUT_PER_M  = 0.80;
+const PRICE_OUTPUT_PER_M = 4.00;
 
 async function parseWithClaude(base64: string, mimeType: string) {
   const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -135,6 +153,11 @@ Demais regras:
   }
 
   const data = await response.json();
+  const inputTokens  = data.usage?.input_tokens  ?? 0;
+  const outputTokens = data.usage?.output_tokens ?? 0;
+  const costUsd = (inputTokens / 1_000_000) * PRICE_INPUT_PER_M + (outputTokens / 1_000_000) * PRICE_OUTPUT_PER_M;
+  const model = data.model ?? "claude-haiku-4-5-20251001";
+
   let jsonStr = (data.content?.[0]?.text || "").trim();
 
   // Remove markdown code blocks if present
@@ -143,7 +166,7 @@ Demais regras:
   }
 
   try {
-    return JSON.parse(jsonStr);
+    return { invoiceData: JSON.parse(jsonStr), inputTokens, outputTokens, costUsd, model };
   } catch {
     console.error("Failed to parse Claude response:", jsonStr);
     throw new Error("Não foi possível interpretar a resposta da IA");

@@ -5,12 +5,134 @@ import { invalidateCompanyCache } from '@/lib/companyCache';
 import {
   Upload, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle,
   User, Building2, Plug, Camera, Lock, MessageCircle, Save, ChevronDown, ChevronUp,
-  HardDrive, RefreshCw, CalendarClock, Mail,
+  HardDrive, RefreshCw, CalendarClock, Mail, Sparkles, TrendingUp, DollarSign, FileText,
 } from 'lucide-react';
 import {
   DEFAULT_TEMPLATES, TEMPLATE_LABELS, TEMPLATE_VARS,
   MessageTemplateKey, MessageTemplates, invalidateTemplateCache,
 } from '@/lib/whatsapp';
+
+// ─── AI Usage Card ───────────────────────────────────────────────────────────
+function AIUsageCard() {
+  const [period, setPeriod] = useState<'7' | '30' | '90'>('30');
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const since = new Date();
+    since.setDate(since.getDate() - parseInt(period));
+    (supabase as any).from('ai_usage_log')
+      .select('input_tokens, output_tokens, cost_usd, created_at, model')
+      .gte('created_at', since.toISOString())
+      .order('created_at', { ascending: false })
+      .then(({ data }: any) => { setRows(data ?? []); setLoading(false); });
+  }, [period]);
+
+  const totalCost   = rows.reduce((s, r) => s + Number(r.cost_usd), 0);
+  const totalIn     = rows.reduce((s, r) => s + (r.input_tokens ?? 0), 0);
+  const totalOut    = rows.reduce((s, r) => s + (r.output_tokens ?? 0), 0);
+  const totalCalls  = rows.length;
+
+  const fmt = (n: number) => n.toLocaleString('pt-BR');
+  const fmtUSD = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4 });
+  const fmtBRL = (n: number) => (n * 5.7).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+
+  // Group by day for mini chart
+  const byDay: Record<string, number> = {};
+  for (const r of rows) {
+    const day = r.created_at?.slice(0, 10);
+    if (day) byDay[day] = (byDay[day] || 0) + Number(r.cost_usd);
+  }
+  const days = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).slice(-14);
+  const maxCost = Math.max(...days.map(([, v]) => v), 0.0001);
+
+  return (
+    <div className="border border-border rounded-2xl overflow-hidden">
+      <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border-b border-border px-5 py-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm text-foreground">Uso de IA (Claude)</p>
+            <p className="text-xs text-muted-foreground">Leitura de notas fiscais via IA</p>
+          </div>
+        </div>
+        <div className="flex gap-1">
+          {(['7', '30', '90'] as const).map(p => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${period === p ? 'bg-violet-600 text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'}`}>
+              {p}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-muted/40 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <FileText className="w-3.5 h-3.5 text-violet-500" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">NFs processadas</p>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{fmt(totalCalls)}</p>
+              </div>
+              <div className="bg-muted/40 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-violet-500" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tokens usados</p>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{fmt(totalIn + totalOut)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{fmt(totalIn)} entrada · {fmt(totalOut)} saída</p>
+              </div>
+              <div className="bg-violet-50 border border-violet-100 rounded-xl p-3 col-span-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <DollarSign className="w-3.5 h-3.5 text-violet-600" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-600">Custo estimado (últimos {period} dias)</p>
+                </div>
+                <div className="flex items-baseline gap-3">
+                  <p className="text-2xl font-bold text-violet-700">{fmtUSD(totalCost)}</p>
+                  <p className="text-sm text-muted-foreground">≈ {fmtBRL(totalCost)}</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">Preço: $0.80/M tokens entrada · $4.00/M tokens saída (Claude Haiku)</p>
+              </div>
+            </div>
+
+            {/* Mini bar chart */}
+            {days.length > 1 && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Custo por dia</p>
+                <div className="flex items-end gap-1 h-16">
+                  {days.map(([day, cost]) => (
+                    <div key={day} className="flex-1 flex flex-col items-center gap-1" title={`${day}: ${fmtUSD(cost)}`}>
+                      <div
+                        className="w-full rounded-t-sm bg-violet-400 min-h-[2px]"
+                        style={{ height: `${Math.round((cost / maxCost) * 52)}px` }}
+                      />
+                      <p className="text-[8px] text-muted-foreground" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', lineHeight: 1 }}>
+                        {day.slice(5)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {totalCalls === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma NF processada nos últimos {period} dias.</p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Company {
@@ -1142,6 +1264,8 @@ export default function ConfiguracoesPage() {
               integration={integrations.find(i => i.provider === 'drive_backup') ?? null}
               onSave={(key, enabled) => saveIntegration('drive_backup', key, enabled)}
             />
+
+            <AIUsageCard />
 
             <div className="border border-border rounded-2xl p-5 bg-muted/20">
               <p className="text-xs text-muted-foreground">
