@@ -763,58 +763,44 @@ export default function InventoryPage() {
               <div className="flex-1 overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-xs sticky top-0 bg-white" style={{ background: 'hsl(40 30% 97%)' }}>
-                      <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">INSUMO</th>
-                      <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground">CATEGORIA</th>
-                      <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground">QUEM CONTOU</th>
-                      <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground">SISTEMA</th>
-                      <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground">CONTADO</th>
-                      <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground">VALOR</th>
-                      <th className="text-right px-4 py-2.5 font-semibold text-muted-foreground">DIFERENÇA</th>
+                    <tr className="border-b border-border text-xs sticky top-0" style={{ background: 'hsl(40 30% 97%)' }}>
+                      <th className="text-left px-3 py-2 font-semibold text-muted-foreground">INSUMO</th>
+                      <th className="text-left px-2 py-2 font-semibold text-muted-foreground">QUEM CONTOU</th>
+                      <th className="text-right px-2 py-2 font-semibold text-muted-foreground">SISTEMA</th>
+                      <th className="text-right px-2 py-2 font-semibold text-muted-foreground">CONTADO</th>
+                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground">DIFERENÇA</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {detailItems.map(d => {
                       const diff = (d.counted_stock ?? 0) - d.system_stock;
                       const ok = diff === 0;
+                      const uc = d.stock_items?.unit_cost ?? 0;
+                      const pq = Math.max(1, d.stock_items?.purchase_qty ?? 1);
+                      const val = Number(d.counted_stock) * (uc / pq);
                       return (
                         <tr key={d.id} className={!ok ? 'bg-red-50/40' : ''}>
-                          <td className="px-4 py-2.5 font-medium text-foreground">
-                            {d.stock_items?.name || '—'}
-                            <span className="text-muted-foreground text-xs ml-1">({d.stock_items?.unit})</span>
+                          <td className="px-3 py-1.5">
+                            <p className="font-medium text-foreground text-xs leading-tight">{d.stock_items?.name || '—'} <span className="text-muted-foreground font-normal">({d.stock_items?.unit})</span></p>
+                            <p className="text-[10px] text-muted-foreground/70">{d.stock_items?.category}</p>
                           </td>
-                          <td className="px-3 py-2.5 text-muted-foreground text-xs">{d.stock_items?.category}</td>
-                          <td className="px-3 py-2.5 text-xs">
-                            {d.counters && d.counters.length > 0 ? (
-                              <div className="flex flex-col gap-0.5">
-                                {d.counters.map((c: any, i: number) => (
-                                  <span key={i} className="text-foreground">
-                                    {c.name}
-                                    {d.counters.length > 1 && (
-                                      <span className="text-muted-foreground ml-1">({Number(c.qty).toFixed(2)})</span>
-                                    )}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                          <td className="px-2 py-1.5 text-xs text-foreground">
+                            {d.counters && d.counters.length > 0 ? d.counters.map((c: any, i: number) => (
+                              <span key={i} className="block leading-tight">
+                                {c.name.split(' ')[0]}{d.counters.length > 1 && <span className="text-muted-foreground"> ({Number(c.qty).toFixed(1)})</span>}
+                              </span>
+                            )) : <span className="text-muted-foreground">—</span>}
                           </td>
-                          <td className="px-3 py-2.5 text-right text-muted-foreground">{Number(d.system_stock).toFixed(2)}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold">{Number(d.counted_stock).toFixed(2)}</td>
-                          <td className="px-3 py-2.5 text-right text-xs text-muted-foreground">
-                            {(() => {
-                              const uc = d.stock_items?.unit_cost ?? 0;
-                              const pq = Math.max(1, d.stock_items?.purchase_qty ?? 1);
-                              const val = Number(d.counted_stock) * (uc / pq);
-                              return val > 0 ? val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
-                            })()}
+                          <td className="px-2 py-1.5 text-right text-xs text-muted-foreground">{Number(d.system_stock).toFixed(2)}</td>
+                          <td className="px-2 py-1.5 text-right">
+                            <p className="font-semibold text-xs">{Number(d.counted_stock).toFixed(2)}</p>
+                            {val > 0 && <p className="text-[10px] text-muted-foreground/70">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
                           </td>
-                          <td className="px-4 py-2.5 text-right">
+                          <td className="px-3 py-1.5 text-right">
                             {ok ? (
                               <span className="text-success text-xs">✓ ok</span>
                             ) : (
-                              <span className={`font-semibold text-xs flex items-center gap-1 justify-end ${diff > 0 ? 'text-success' : 'text-destructive'}`}>
+                              <span className={`font-semibold text-xs flex items-center gap-0.5 justify-end ${diff > 0 ? 'text-success' : 'text-destructive'}`}>
                                 <TrendingDown className={`w-3 h-3 ${diff > 0 ? 'rotate-180' : ''}`} />
                                 {diff > 0 ? '+' : ''}{diff.toFixed(2)}
                               </span>
