@@ -23,6 +23,7 @@ type InventoryCount = {
   id: string; status: string; notes: string | null;
   created_at: string; completed_at: string | null;
   total_items: number; counted_items: number;
+  inventory_value: number;
 };
 
 export default function InventoryPage() {
@@ -91,9 +92,17 @@ export default function InventoryPage() {
     if (histRes.data) {
       const counts = histRes.data as any[];
       const enriched = await Promise.all(counts.map(async c => {
-        const { count: total } = await supabase.from('inventory_count_items' as any).select('*', { count: 'exact', head: true }).eq('count_id', c.id);
-        const { count: counted } = await supabase.from('inventory_count_items' as any).select('*', { count: 'exact', head: true }).eq('count_id', c.id).not('counted_stock', 'is', null);
-        return { ...c, total_items: total || 0, counted_items: counted || 0 };
+        const [{ count: total }, { count: counted }, { data: valueRows }] = await Promise.all([
+          (supabase.from('inventory_count_items' as any) as any).select('*', { count: 'exact', head: true }).eq('count_id', c.id),
+          (supabase.from('inventory_count_items' as any) as any).select('*', { count: 'exact', head: true }).eq('count_id', c.id).not('counted_stock', 'is', null),
+          (supabase as any).from('inventory_count_items').select('counted_stock, stock_items:item_id(unit_cost, purchase_qty)').eq('count_id', c.id).not('counted_stock', 'is', null),
+        ]);
+        const inventory_value = ((valueRows || []) as any[]).reduce((s: number, r: any) => {
+          const uc = r.stock_items?.unit_cost ?? 0;
+          const pq = Math.max(1, r.stock_items?.purchase_qty ?? 1);
+          return s + Number(r.counted_stock) * (uc / pq);
+        }, 0);
+        return { ...c, total_items: total || 0, counted_items: counted || 0, inventory_value };
       }));
       setHistory(enriched as InventoryCount[]);
     }
@@ -243,13 +252,35 @@ export default function InventoryPage() {
   const openDetail = async (countId: string) => {
     setDetailCountId(countId);
     setLoadingDetail(true);
-    const { data } = await supabase
-      .from('inventory_count_items' as any)
-      .select('*, stock_items:item_id(name, unit, category)' as any)
-      .eq('count_id', countId)
-      .not('counted_stock', 'is', null)
-      .order('counted_stock', { ascending: false });
-    setDetailItems((data as any[]) || []);
+
+    const [{ data: items }, { data: entries }, { data: profiles }] = await Promise.all([
+      (supabase as any)
+        .from('inventory_count_items')
+        .select('*, stock_items:item_id(name, unit, category, unit_cost, purchase_qty)')
+        .eq('count_id', countId)
+        .not('counted_stock', 'is', null)
+        .order('counted_stock', { ascending: false }),
+      (supabase as any)
+        .from('inventory_count_entries')
+        .select('count_item_id, user_id, quantity'),
+      supabase.from('profiles').select('user_id, display_name'),
+    ]);
+
+    const profileMap: Record<string, string> = Object.fromEntries(
+      ((profiles || []) as any[]).map((p: any) => [p.user_id, p.display_name])
+    );
+    // group entries by count_item_id
+    const entriesByItem: Record<string, { name: string; qty: number }[]> = {};
+    for (const e of (entries || []) as any[]) {
+      if (!entriesByItem[e.count_item_id]) entriesByItem[e.count_item_id] = [];
+      entriesByItem[e.count_item_id].push({ name: profileMap[e.user_id] ?? 'Desconhecido', qty: Number(e.quantity) });
+    }
+
+    const enriched = ((items || []) as any[]).map((item: any) => ({
+      ...item,
+      counters: entriesByItem[item.id] ?? [],
+    }));
+    setDetailItems(enriched);
     setLoadingDetail(false);
   };
 
@@ -396,6 +427,7 @@ export default function InventoryPage() {
               <th className="text-left px-5 py-3 font-semibold text-muted-foreground">DATA</th>
               <th className="text-right px-4 py-3 font-semibold text-muted-foreground">ITENS</th>
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground">PROGRESSO</th>
+              <th className="text-right px-4 py-3 font-semibold text-muted-foreground">VALOR</th>
               <th className="text-left px-4 py-3 font-semibold text-muted-foreground">STATUS</th>
               <th className="w-10 px-4 py-3"></th>
             </tr>
@@ -413,7 +445,7 @@ export default function InventoryPage() {
               ))
             ) : history.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-16 text-center text-muted-foreground">
+                <td colSpan={6} className="px-5 py-16 text-center text-muted-foreground">
                   <ClipboardCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p>Nenhuma contagem realizada ainda.</p>
                 </td>
@@ -449,6 +481,15 @@ export default function InventoryPage() {
                       </div>
                       <span className="text-xs text-muted-foreground w-8">{pct}%</span>
                     </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-right">
+                    {h.inventory_value > 0 ? (
+                      <span className="text-sm font-semibold text-amber-700">
+                        {h.inventory_value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3.5">
                     {isComplete ? (
@@ -725,8 +766,10 @@ export default function InventoryPage() {
                     <tr className="border-b border-border text-xs sticky top-0 bg-white" style={{ background: 'hsl(40 30% 97%)' }}>
                       <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">INSUMO</th>
                       <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground">CATEGORIA</th>
+                      <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground">QUEM CONTOU</th>
                       <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground">SISTEMA</th>
                       <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground">CONTADO</th>
+                      <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground">VALOR</th>
                       <th className="text-right px-4 py-2.5 font-semibold text-muted-foreground">DIFERENÇA</th>
                     </tr>
                   </thead>
@@ -741,8 +784,32 @@ export default function InventoryPage() {
                             <span className="text-muted-foreground text-xs ml-1">({d.stock_items?.unit})</span>
                           </td>
                           <td className="px-3 py-2.5 text-muted-foreground text-xs">{d.stock_items?.category}</td>
+                          <td className="px-3 py-2.5 text-xs">
+                            {d.counters && d.counters.length > 0 ? (
+                              <div className="flex flex-col gap-0.5">
+                                {d.counters.map((c: any, i: number) => (
+                                  <span key={i} className="text-foreground">
+                                    {c.name}
+                                    {d.counters.length > 1 && (
+                                      <span className="text-muted-foreground ml-1">({Number(c.qty).toFixed(2)})</span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2.5 text-right text-muted-foreground">{Number(d.system_stock).toFixed(2)}</td>
                           <td className="px-3 py-2.5 text-right font-semibold">{Number(d.counted_stock).toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right text-xs text-muted-foreground">
+                            {(() => {
+                              const uc = d.stock_items?.unit_cost ?? 0;
+                              const pq = Math.max(1, d.stock_items?.purchase_qty ?? 1);
+                              const val = Number(d.counted_stock) * (uc / pq);
+                              return val > 0 ? val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
+                            })()}
+                          </td>
                           <td className="px-4 py-2.5 text-right">
                             {ok ? (
                               <span className="text-success text-xs">✓ ok</span>
@@ -759,6 +826,22 @@ export default function InventoryPage() {
                   </tbody>
                 </table>
               </div>
+              {/* Total valor inventariado */}
+              {detailItems.length > 0 && (() => {
+                const total = detailItems.reduce((s, d) => {
+                  const uc = d.stock_items?.unit_cost ?? 0;
+                  const pq = Math.max(1, d.stock_items?.purchase_qty ?? 1);
+                  return s + Number(d.counted_stock) * (uc / pq);
+                }, 0);
+                return total > 0 ? (
+                  <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-muted/20">
+                    <span className="text-sm font-semibold text-foreground">Valor total inventariado</span>
+                    <span className="text-base font-bold text-amber-700">
+                      {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  </div>
+                ) : null;
+              })()}
               {detailCount?.status !== 'completed' && (
                 <div className="border-t border-border pt-4 mt-2">
                   {/* Toggle: zerar não contados */}
