@@ -49,7 +49,7 @@ function AIUsageCard() {
 
   return (
     <div className="border border-border rounded-2xl overflow-hidden">
-      <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border-b border-border px-5 py-4 flex items-center justify-between gap-3">
+      <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border-b border-border px-5 py-4 flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-white" />
@@ -59,7 +59,16 @@ function AIUsageCard() {
             <p className="text-xs text-muted-foreground">Leitura de notas fiscais via IA</p>
           </div>
         </div>
-        <div className="flex gap-1">
+        <a
+          href="https://console.anthropic.com/settings/billing"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-violet-200 bg-white text-violet-700 text-xs font-semibold hover:bg-violet-50 transition-colors flex-shrink-0"
+        >
+          <DollarSign className="w-3.5 h-3.5" />
+          Ver cobrança real
+        </a>
+        <div className="flex gap-1 ml-auto">
           {(['7', '30', '90'] as const).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
               className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${period === p ? 'bg-violet-600 text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'}`}>
