@@ -976,6 +976,17 @@ export default function StockItemsPage() {
   // Load metadata once on mount
   useEffect(() => { loadMeta(); }, []);
 
+  // Realtime: recalcula valor total sempre que qualquer item de estoque mudar
+  useEffect(() => {
+    const channel = supabase
+      .channel('stock-items-value-watch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_items' }, () => {
+        loadTotalValue();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // Reload items whenever query params change
   useEffect(() => {
     doLoad(searchQuery, filterCategory, filterSubcategory, sortField, sortDir, page);
