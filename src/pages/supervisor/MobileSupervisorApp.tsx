@@ -1,15 +1,16 @@
-import { useEffect, useState, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Home, List, FileText, CalendarDays, Utensils, BookOpen,
   ChevronRight, ChevronLeft, LogOut, ArrowRight,
-  MapPin, Users, Search, X, QrCode,
+  MapPin, Users, Search, X, QrCode, PackagePlus,
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import MobileEventDetailScreen from './MobileEventDetailScreen';
 import MobileSheetsScreen from './MobileSheetsScreen';
+const EntriesPage = lazy(() => import('./EntriesPage'));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Event = {
@@ -43,7 +44,7 @@ type LinkedEvent = {
   guest_count: number | null;
 };
 
-type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings' | 'sheets';
+type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings' | 'sheets' | 'stock';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const RON_950 = '#0e1f4a';
@@ -141,6 +142,7 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
     { id: 'agenda',   label: 'Agenda',   Icon: CalendarDays },
     { id: 'tastings', label: 'Degust.',  Icon: Utensils },
     { id: 'sheets',   label: 'Fichas',   Icon: BookOpen },
+    { id: 'stock',    label: 'Estoque',  Icon: PackagePlus },
   ];
 
   return (
@@ -1099,6 +1101,13 @@ export default function MobileSupervisorApp() {
           {tab === 'agenda'   && <AgendaScreen   events={events} sessions={sessions} loading={loading} onSelect={setSelectedEventId} />}
           {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} onTasting={setSelectedTastingId} />}
           {tab === 'sheets'   && <MobileSheetsScreen />}
+          {tab === 'stock'    && (
+            <div className="pb-28 overflow-y-auto">
+              <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>}>
+                <EntriesPage />
+              </Suspense>
+            </div>
+          )}
           <BottomNav tab={tab} setTab={setTab} />
         </>
       )}
