@@ -523,9 +523,25 @@ export default function EmployeeInventoryPage({ previewUserId }: { previewUserId
       for (const item of filled) {
         const val = parseFloat(quantities[item.id]);
         if (isNaN(val) || val < 0) continue;
+
+        // 1. Upsert this user's entry
+        await (supabase as any)
+          .from('inventory_count_entries')
+          .upsert(
+            { count_item_id: item.id, user_id: effectiveUserId, quantity: val, updated_at: new Date().toISOString() },
+            { onConflict: 'count_item_id,user_id' }
+          );
+
+        // 2. Recalculate sum of all users' entries and update counted_stock
+        const { data: entries } = await (supabase as any)
+          .from('inventory_count_entries')
+          .select('quantity')
+          .eq('count_item_id', item.id);
+        const total = (entries ?? []).reduce((s: number, e: any) => s + Number(e.quantity), 0);
+
         await (supabase as any)
           .from('inventory_count_items')
-          .update({ counted_stock: val })
+          .update({ counted_stock: total })
           .eq('id', item.id);
       }
       toast.success(`✅ ${filled.length} item(s) registrado(s)`);
