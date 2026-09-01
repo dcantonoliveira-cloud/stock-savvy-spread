@@ -738,7 +738,7 @@ export default function InventoryPage() {
 
       {/* ── Detail Dialog ────────────────────────────────────────────────────── */}
       <Dialog open={detailCountId !== null} onOpenChange={o => { if (!o) { setDetailCountId(null); setDetailItems([]); } }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Resultado da Contagem</DialogTitle>
           </DialogHeader>
