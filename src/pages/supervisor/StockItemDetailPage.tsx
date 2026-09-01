@@ -259,22 +259,94 @@ export default function StockItemDetailPage() {
           <p className="text-[10px] text-muted-foreground/50 mt-0.5 group-hover:text-primary/60 transition-colors">clique para ajustar</p>
         </div>
         {(() => {
-          const lastPriced = [...pricedEntries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-          const stockValue = item.current_stock * (avgCost || 0);
+          const stockValue = item.current_stock * (item.unit_cost > 0 ? item.unit_cost : avgCost);
           const preferredSupplier = suppliers.find(s => s.is_preferred) ?? suppliers[0];
-          return [
-            { label: 'Custo Médio', value: fmtCur(avgCost), icon: DollarSign, color: 'text-amber-600' },
-            { label: 'Valor em Estoque', value: stockValue > 0 ? fmtCur(stockValue) : '—', icon: Package, color: 'text-primary' },
-            { label: 'Último Preço Pago', value: lastPriced ? fmtCur(lastPriced.unit_cost) : preferredSupplier ? fmtCur(preferredSupplier.unit_price) : '—', icon: TrendingUp, color: 'text-success' },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white rounded-xl border border-border shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Icon className={`w-4 h-4 ${color}`} />
-                <span className="text-xs text-muted-foreground">{label}</span>
+          const otherSuppliers = suppliers.filter(s => s !== preferredSupplier);
+          const currentPrice = preferredSupplier?.unit_price ?? item.unit_cost;
+          const secondPrice = otherSuppliers.length > 0
+            ? Math.min(...otherSuppliers.map(s => s.unit_price).filter(p => p > 0))
+            : null;
+          const priceDiff = secondPrice != null && currentPrice > 0
+            ? ((currentPrice - secondPrice) / secondPrice) * 100
+            : null;
+
+          // Sparkline data from priceHistory
+          const sparkPrices = priceHistory.map(e => e.unit_cost).filter(p => p > 0);
+
+          return (
+            <>
+              {/* Card: Preço Atual */}
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs text-muted-foreground">Preço Atual</span>
+                </div>
+                <p className="text-xl font-bold text-amber-600">
+                  {currentPrice > 0 ? fmtCur(currentPrice) : '—'}
+                </p>
+                {priceDiff != null && (
+                  <p className={`text-[11px] mt-1 ${priceDiff > 0 ? 'text-destructive' : 'text-success'}`}>
+                    {priceDiff > 0 ? `+${priceDiff.toFixed(1)}% vs ${otherSuppliers[0]?.supplier_name ?? '2º fornecedor'}` : `${priceDiff.toFixed(1)}% vs ${otherSuppliers[0]?.supplier_name ?? '2º fornecedor'}`}
+                  </p>
+                )}
+                {!priceDiff && preferredSupplier && (
+                  <p className="text-[11px] mt-1 text-muted-foreground/60">{preferredSupplier.supplier_name}</p>
+                )}
               </div>
-              <p className={`text-xl font-bold ${color}`}>{value}</p>
-            </div>
-          ));
+
+              {/* Card: Valor em Estoque */}
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Package className="w-4 h-4 text-primary" />
+                  <span className="text-xs text-muted-foreground">Valor em Estoque</span>
+                </div>
+                <p className="text-xl font-bold text-primary">{stockValue > 0 ? fmtCur(stockValue) : '—'}</p>
+              </div>
+
+              {/* Card: Evolução do Preço (sparkline) */}
+              <div className="bg-white rounded-xl border border-border shadow-sm p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-4 h-4 text-success" />
+                  <span className="text-xs text-muted-foreground">Evolução do Preço</span>
+                </div>
+                {sparkPrices.length >= 2 ? (() => {
+                  const min = Math.min(...sparkPrices);
+                  const max = Math.max(...sparkPrices);
+                  const range = max - min || 1;
+                  const W = 120, H = 36, pad = 3;
+                  const pts = sparkPrices.map((p, i) => {
+                    const x = pad + (i / (sparkPrices.length - 1)) * (W - pad * 2);
+                    const y = H - pad - ((p - min) / range) * (H - pad * 2);
+                    return `${x},${y}`;
+                  }).join(' ');
+                  const last = sparkPrices[sparkPrices.length - 1];
+                  const trend = last >= sparkPrices[0];
+                  return (
+                    <div className="flex items-end gap-3">
+                      <svg width={W} height={H} className="overflow-visible">
+                        <polyline points={pts} fill="none" stroke={trend ? '#16a34a' : '#dc2626'} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                        {sparkPrices.map((p, i) => {
+                          const x = pad + (i / (sparkPrices.length - 1)) * (W - pad * 2);
+                          const y = H - pad - ((p - min) / range) * (H - pad * 2);
+                          return i === sparkPrices.length - 1
+                            ? <circle key={i} cx={x} cy={y} r="3" fill={trend ? '#16a34a' : '#dc2626'} />
+                            : null;
+                        })}
+                      </svg>
+                      <div>
+                        <p className={`text-lg font-bold leading-none ${trend ? 'text-success' : 'text-destructive'}`}>{fmtCur(last)}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{sparkPrices.length} registros</p>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <p className="text-xl font-bold text-success">
+                    {sparkPrices.length === 1 ? fmtCur(sparkPrices[0]) : '—'}
+                  </p>
+                )}
+              </div>
+            </>
+          );
         })()}
       </div>
 
