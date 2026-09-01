@@ -69,14 +69,14 @@ export default function RichTextEditor({ content, onChange, onBlur, placeholder 
     onBlur: ({ editor }) => onBlur?.(editor.getHTML()),
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] px-4 py-3 text-sm text-foreground',
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] px-4 py-3 text-sm text-foreground [&_p]:my-2 [&_p:empty]:my-1 [&_p:empty]:h-4',
       },
       handlePaste: (view, event) => {
-        const text = event.clipboardData?.getData('text/plain');
         const html = event.clipboardData?.getData('text/html');
-        // HTML estruturado (listas, títulos) → processa normalmente
-        if (html && /<(ul|ol|li|h[1-6]|br)/i.test(html)) return false;
-        // Texto com quebras de linha → cada linha vira um parágrafo
+        // HTML com formatação real → deixa o Tiptap processar normalmente
+        if (html && html.trim()) return false;
+        const text = event.clipboardData?.getData('text/plain');
+        // Texto puro com quebras de linha → cada linha vira um parágrafo (linhas vazias = espaço)
         if (text && text.includes('\n')) {
           event.preventDefault();
           const { schema, selection } = view.state;
