@@ -989,19 +989,11 @@ export default function StockItemsPage() {
   // Load metadata once on mount
   useEffect(() => { loadMeta(); }, []);
 
-  // Ref so realtime callback always calls the latest loadTotalValue (no stale closure)
-  const loadTotalValueRef = useRef(loadTotalValue);
-  useEffect(() => { loadTotalValueRef.current = loadTotalValue; });
-
-  // Realtime: recalcula valor total sempre que qualquer item de estoque mudar
+  // Valor total atualiza ao entrar na página (mount) e ao voltar pra aba
   useEffect(() => {
-    const channel = supabase
-      .channel('stock-items-value-watch')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_items' }, () => {
-        loadTotalValueRef.current();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const onFocus = () => loadTotalValue();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   // Reload items whenever query params change

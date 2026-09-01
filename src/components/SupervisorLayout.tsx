@@ -126,20 +126,9 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
     loadPendingContracts();
     window.addEventListener('focus', loadPendingContracts);
     window.addEventListener('zapsign-status-changed', loadPendingContracts);
-    const interval = setInterval(loadPendingContracts, 15_000);
-    const ch = (supabase as any)
-      .channel('pending-contracts-layout')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events' }, loadPendingContracts)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'companies' }, loadPendingContracts)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'app_notifications' }, (payload: any) => {
-        if (payload.new?.type === 'zapsign_assinatura') loadPendingContracts();
-      })
-      .subscribe();
     return () => {
       window.removeEventListener('focus', loadPendingContracts);
       window.removeEventListener('zapsign-status-changed', loadPendingContracts);
-      clearInterval(interval);
-      supabase.removeChannel(ch);
     };
   }, [user?.id, loadPendingContracts]);
 
@@ -167,13 +156,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
       setTopUrgent(urgentList[0]?.title ?? null);
     };
     load();
-    const ch = (supabase as any)
-      .channel('smart-alerts-layout')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alerts' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alert_acks' }, load)
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
+  }, [pathname]);
 
   return (
     <div className="flex min-h-screen bg-background">
