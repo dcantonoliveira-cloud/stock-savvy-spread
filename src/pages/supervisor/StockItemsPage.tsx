@@ -896,7 +896,7 @@ export default function StockItemsPage() {
   const [importRows, setImportRows] = useState<any[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number; phase: string } | null>(null);
-  const [sortField, setSortField] = useState<'name' | 'current_stock' | 'unit_cost' | 'category' | 'min_stock'>('name');
+  const [sortField, setSortField] = useState<'name' | 'current_stock' | 'unit_cost' | 'category' | 'min_stock' | 'valor_total'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -955,11 +955,16 @@ export default function StockItemsPage() {
     if (sq) q = q.ilike('name', `%${sq}%`);
     if (cat !== 'all') q = q.eq('category', cat);
     if (subcat !== 'all') q = q.eq('subcategory_id', subcat);
-    q = q.order(sf, { ascending: sd === 'asc' }).range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
+    const dbField = sf === 'valor_total' ? 'name' : sf;
+    q = q.order(dbField, { ascending: sf === 'valor_total' ? true : sd === 'asc' }).range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
     const { data, count } = await q;
     const subMap: Record<string, string> = {};
     allSubcategoriesRef.current.forEach(s => { subMap[s.id] = s.name; });
-    const mapped: Item[] = (data || []).map((i: any) => ({ ...i, subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined }));
+    let mapped: Item[] = (data || []).map((i: any) => ({ ...i, subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined }));
+    if (sf === 'valor_total') {
+      const val = (i: Item) => i.current_stock * ((i.unit_cost || 0) / Math.max(1, i.purchase_qty || 1));
+      mapped = mapped.sort((a, b) => sd === 'desc' ? val(b) - val(a) : val(a) - val(b));
+    }
     setItems(mapped);
     setTotalCount(count || 0);
     // Merge categories from DB + categories used in current page
@@ -1390,8 +1395,14 @@ export default function StockItemsPage() {
   };
 
   const toggleSort = (field: typeof sortField) => {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(field); setSortDir('asc'); }
+    if (field === 'valor_total') {
+      if (sortField !== 'valor_total') { setSortField('valor_total'); setSortDir('desc'); }
+      else if (sortDir === 'desc') setSortDir('asc');
+      else { setSortField('name'); setSortDir('asc'); }
+    } else {
+      if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+      else { setSortField(field); setSortDir('asc'); }
+    }
     setPage(0);
   };
 
@@ -1496,7 +1507,9 @@ export default function StockItemsPage() {
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('unit_cost')}>
                   <div className="flex items-center justify-end gap-1">PREÇO <SortIcon field="unit_cost" /></div>
                 </th>
-                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">VALOR TOTAL</th>
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('valor_total')}>
+                  <div className="flex items-center justify-end gap-1">VALOR TOTAL <SortIcon field="valor_total" /></div>
+                </th>
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs min-w-[140px]">FORNECEDOR</th>
                 <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs w-20">AÇÕES</th>
               </tr>
