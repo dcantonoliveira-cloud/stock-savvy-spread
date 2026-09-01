@@ -177,6 +177,13 @@
   ::-webkit-scrollbar-thumb:hover { background: hsl(220 20% 70%); }
 }
 
+/* Rich text editor (Tiptap / ProseMirror) */
+.ProseMirror p { margin-top: 0.5rem; margin-bottom: 0.5rem; }
+.ProseMirror p:first-child { margin-top: 0; }
+.ProseMirror p.is-empty:only-child { margin: 0; }
+.ProseMirror > * + * { margin-top: 0.5rem; }
+.ProseMirror h1, .ProseMirror h2 { margin-top: 1rem; margin-bottom: 0.25rem; }
+
 /* Mobile supervisor app utilities */
 .pt-hero  { padding-top: calc(env(safe-area-inset-top, 0px) + 4.5rem); }
 .pb-safe  { padding-bottom: env(safe-area-inset-bottom, 16px); }

@@ -69,7 +69,7 @@ export default function RichTextEditor({ content, onChange, onBlur, placeholder 
     onBlur: ({ editor }) => onBlur?.(editor.getHTML()),
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] px-4 py-3 text-sm text-foreground [&_p]:my-2 [&_p:empty]:my-1 [&_p:empty]:h-4',
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] px-4 py-3 text-sm text-foreground',
       },
       handlePaste: (view, event) => {
         const html = event.clipboardData?.getData('text/html');
