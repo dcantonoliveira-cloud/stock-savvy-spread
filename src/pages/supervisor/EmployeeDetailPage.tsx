@@ -148,6 +148,9 @@ export default function EmployeeDetailPage() {
   const [tab, setTab] = useState<'info' | 'holerites' | 'permissoes' | 'ponto' | 'inventario'>('info');
   const [inventarioItems, setInventarioItems] = useState<any[]>([]);
   const [loadingInventario, setLoadingInventario] = useState(false);
+  const [invHistoryExpanded, setInvHistoryExpanded] = useState<string | null>(null);
+  const [invHistoryCounts, setInvHistoryCounts] = useState<any[]>([]);
+  const [invHistoryItems, setInvHistoryItems] = useState<Record<string, any[]>>({});
   const [form, setForm] = useState<Partial<Profile>>({});
 
   useEffect(() => { if (id) load(); }, [id]);
@@ -155,38 +158,34 @@ export default function EmployeeDetailPage() {
   const loadInventario = async () => {
     if (!id) return;
     setLoadingInventario(true);
-    const { data: activeCounts } = await (supabase as any)
-      .from('inventory_counts').select('id').eq('status', 'in_progress');
-    const activeIds = (activeCounts || []).map((c: any) => c.id);
-    if (!activeIds.length) { setInventarioItems([]); setLoadingInventario(false); return; }
 
-    // Items assigned directly to user
-    const { data: direct } = await (supabase as any)
-      .from('inventory_count_items')
-      .select('id, counted_stock, system_stock, stock_items:item_id(name, unit, category)')
-      .eq('assigned_user_id', id)
-      .in('count_id', activeIds);
+    // All entries this user submitted across all inventories
+    const { data: entries } = await (supabase as any)
+      .from('inventory_count_entries')
+      .select('count_item_id, quantity, updated_at, inventory_count_items:count_item_id(count_id, system_stock, counted_stock, stock_items:item_id(name, unit, category))')
+      .eq('user_id', id)
+      .order('updated_at', { ascending: false });
 
-    // User's groups
-    const { data: memberRows } = await (supabase as any)
-      .from('inventory_group_members').select('group_id').eq('user_id', id);
-    const groupIds = (memberRows || []).map((m: any) => m.group_id);
-    let groupItems: any[] = [];
-    if (groupIds.length > 0) {
-      const { data: gd } = await (supabase as any)
-        .from('inventory_count_items')
-        .select('id, counted_stock, system_stock, stock_items:item_id(name, unit, category)')
-        .in('assigned_group_id', groupIds)
-        .in('count_id', activeIds);
-      groupItems = gd || [];
+    if (!entries || entries.length === 0) { setInvHistoryCounts([]); setLoadingInventario(false); return; }
+
+    // Group by count_id
+    const byCount: Record<string, any[]> = {};
+    for (const e of entries as any[]) {
+      const countId = e.inventory_count_items?.count_id;
+      if (!countId) continue;
+      if (!byCount[countId]) byCount[countId] = [];
+      byCount[countId].push(e);
     }
 
-    const seen = new Set<string>();
-    const all: any[] = [];
-    for (const item of [...(direct || []), ...groupItems]) {
-      if (!seen.has(item.id)) { seen.add(item.id); all.push(item); }
-    }
-    setInventarioItems(all);
+    const countIds = Object.keys(byCount);
+    const { data: counts } = await (supabase as any)
+      .from('inventory_counts')
+      .select('id, status, created_at, completed_at')
+      .in('id', countIds)
+      .order('created_at', { ascending: false });
+
+    setInvHistoryCounts(counts || []);
+    setInvHistoryItems(byCount);
     setLoadingInventario(false);
   };
 
@@ -717,16 +716,65 @@ export default function EmployeeDetailPage() {
 
       {/* ── Tab: Inventário ── */}
       {tab === 'inventario' && id && (
-        <div className="bg-muted/30 rounded-2xl border border-border overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-border bg-white flex items-center gap-2 text-xs text-muted-foreground">
-            <Eye className="w-3.5 h-3.5" />
-            <span>Visualizando como <strong className="text-foreground">{profile?.display_name}</strong> — somente leitura</span>
-          </div>
-          <div className="p-4">
-            <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>}>
-              <EmployeeInventoryPage previewUserId={id} />
-            </Suspense>
-          </div>
+        <div className="space-y-3">
+          {loadingInventario ? (
+            <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : invHistoryCounts.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-border px-6 py-12 text-center text-muted-foreground text-sm">
+              Nenhum inventário registrado para este funcionário.
+            </div>
+          ) : invHistoryCounts.map((count: any) => {
+            const items = invHistoryItems[count.id] || [];
+            const isOpen = invHistoryExpanded === count.id;
+            const label = new Date(count.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+            return (
+              <div key={count.id} className="bg-white rounded-2xl border border-border overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors"
+                  onClick={() => setInvHistoryExpanded(isOpen ? null : count.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className={`w-4 h-4 ${count.status === 'completed' ? 'text-success' : 'text-amber-500'}`} />
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-foreground">{label}</p>
+                      <p className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? 'item contado' : 'itens contados'}</p>
+                    </div>
+                  </div>
+                  {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                </button>
+                {isOpen && (
+                  <div className="border-t border-border">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border/60 bg-muted/20">
+                          <th className="text-left px-5 py-2 font-semibold text-muted-foreground">INSUMO</th>
+                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground">SISTEMA</th>
+                          <th className="text-right px-3 py-2 font-semibold text-muted-foreground">CONTADO POR MIM</th>
+                          <th className="text-right px-5 py-2 font-semibold text-muted-foreground">TOTAL CONTAGEM</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {items.map((e: any, i: number) => {
+                          const item = e.inventory_count_items;
+                          return (
+                            <tr key={i} className="hover:bg-muted/10">
+                              <td className="px-5 py-2 font-medium text-foreground">
+                                {item?.stock_items?.name || '—'}
+                                <span className="text-muted-foreground font-normal ml-1">({item?.stock_items?.unit})</span>
+                              </td>
+                              <td className="px-3 py-2 text-right text-muted-foreground">{Number(item?.system_stock ?? 0).toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-primary">{Number(e.quantity).toFixed(2)}</td>
+                              <td className="px-5 py-2 text-right text-muted-foreground">{item?.counted_stock != null ? Number(item.counted_stock).toFixed(2) : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
