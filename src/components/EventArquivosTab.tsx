@@ -714,6 +714,101 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     return () => clearInterval(interval);
   }, [zapData?.doc_token, zapData?.signers.map(s=>s.status).join(',')]);
 
+  const fetchAddendumZapStatus = async (silent = false) => {
+    if (!zapToken || !addendumZapData) return;
+    if (!silent) setRefreshingZap(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+      const res = await fetch(`${proxyBase}?path=/api/v1/docs/${addendumZapData.doc_token}/`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'x-zapsign-token': zapToken,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      if (!res.ok) throw new Error('Erro ao buscar status');
+      const data = await res.json();
+      const updated: ZapData = {
+        ...addendumZapData,
+        signers: (data.signers ?? []).map((s: any) => ({
+          token: s.token, name: s.name, email: s.email,
+          status: s.status ?? 'pending', sign_url: s.sign_url,
+        })),
+        signed_file: data.signed_file ?? addendumZapData.signed_file ?? null,
+      };
+      setAddendumZapData(updated);
+      await supabase.from('events').update({ addendum_zapsign_data: updated as any }).eq('id', eventId);
+      if (!silent) toast.success('Status atualizado');
+    } catch {
+      if (!silent) toast.error('Erro ao atualizar status');
+    } finally {
+      if (!silent) setRefreshingZap(false);
+    }
+  };
+
+  const cancelAddendumZapSign = async () => {
+    if (!window.confirm('Cancelar o fluxo de assinaturas do aditivo? Os links enviados deixarão de funcionar.')) return;
+    if (!addendumZapData) return;
+    setCancelingZap(true);
+    try {
+      if (zapToken) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+          await fetch(`${proxyBase}?path=/api/v1/docs/${addendumZapData.doc_token}/`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${session?.access_token}`,
+              'x-zapsign-token': zapToken,
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+          });
+        } catch { /* ignora erro do ZapSign */ }
+      }
+      await supabase.from('events').update({ addendum_zapsign_data: null } as any).eq('id', eventId);
+      setAddendumZapData(null);
+      toast.success('Fluxo de assinaturas do aditivo cancelado');
+    } catch {
+      toast.error('Erro ao cancelar o fluxo de assinaturas');
+    } finally {
+      setCancelingZap(false);
+    }
+  };
+
+  const openAddendumSignedFile = async () => {
+    if (!addendumZapData || !zapToken) return;
+    setFetchingSignedFile(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+      const res = await fetch(`${proxyBase}?path=/api/v1/docs/${addendumZapData.doc_token}/`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'x-zapsign-token': zapToken,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      const docData = await res.json();
+      const url = docData.signed_file ?? addendumZapData.signed_file;
+      if (!url) { toast.error('URL do arquivo assinado não encontrada'); return; }
+      const label = addendumType === 'distrato' ? 'DISTRATO' : 'ADITIVO';
+      const fileName = `${label} - ${(event.event_name ?? 'Evento').trim()} - assinado.pdf`;
+      const fileRes = await fetch(url);
+      const blob = await fileRes.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = fileName;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      toast.error('Erro ao baixar arquivo assinado');
+    } finally {
+      setFetchingSignedFile(false);
+    }
+  };
+
   const copySignerLink = (signer: ZapSigner) => {
     const firstName = signer.name.split(' ')[0];
     navigator.clipboard.writeText(`${firstName} - ${signer.sign_url}`);
@@ -1076,16 +1171,63 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
 
         {addendumZapData && (
           <div className="mb-4 p-4 bg-muted/30 border border-border rounded-xl">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Status de assinaturas</p>
-            <div className="space-y-1.5">
-              {addendumZapData.signers.map((s, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{s.name}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.status === 'signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {s.status === 'signed' ? 'Assinado' : 'Pendente'}
-                  </span>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Assinaturas</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">
+                  Enviado {new Date(addendumZapData.sent_at).toLocaleDateString('pt-BR')}
+                </span>
+                <button onClick={() => fetchAddendumZapStatus(false)} disabled={refreshingZap} title="Atualizar status"
+                  className="p-1.5 rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50">
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshingZap ? 'animate-spin' : ''}`} />
+                </button>
+                {!addendumZapData.signers.every(s => s.status === 'signed') && (
+                  <button onClick={cancelAddendumZapSign} disabled={cancelingZap} title="Cancelar fluxo de assinaturas"
+                    className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50">
+                    {cancelingZap ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              {addendumZapData.signers.map(s => (
+                <div key={s.token} className="flex items-center justify-between py-2 px-3 bg-white border border-border rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{s.name}</p>
+                    <p className="text-[11px] text-muted-foreground">{s.email}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <SignerStatusBadge status={s.status} />
+                    {s.sign_url && (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => copySignerLink(s)} title="Copiar link de assinatura"
+                          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors border border-border rounded-lg px-2 py-1 hover:border-primary/30">
+                          <Copy className="w-3 h-3" />
+                          {s.name.split(' ')[0]} - link
+                        </button>
+                        <a href={s.sign_url} target="_blank" rel="noopener noreferrer" title="Abrir link de assinatura"
+                          className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-primary transition-colors border border-border rounded-lg hover:border-primary/30">
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
+              {addendumZapData.signers.every(s => s.status === 'signed') && (
+                <div className="flex items-center justify-center gap-3 pt-1">
+                  <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" />Todos assinaram!
+                  </p>
+                  {addendumZapData.signed_file && (
+                    <button onClick={openAddendumSignedFile} disabled={fetchingSignedFile}
+                      className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50">
+                      {fetchingSignedFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                      Ver aditivo assinado
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
