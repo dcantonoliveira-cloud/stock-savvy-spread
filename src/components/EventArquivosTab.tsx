@@ -298,6 +298,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [showAddendumZapForm, setShowAddendumZapForm] = useState(false);
   const [sendingAddendumZap, setSendingAddendumZap] = useState(false);
   const [generatingAddendumPdf, setGeneratingAddendumPdf] = useState(false);
+  const [addendumOpen, setAddendumOpen]         = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -966,7 +967,10 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       {/* 3. ADITIVO / DISTRATO */}
       <div className="bg-white border border-border rounded-2xl p-6">
         <div className="flex items-center justify-between mb-1">
-          <SectionDivider title="Aditivo / Distrato" />
+          <button onClick={() => setAddendumOpen(o => !o)} className="flex items-center gap-2 group">
+            <SectionDivider title="Aditivo / Distrato" />
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform -mt-4 ${addendumOpen ? 'rotate-180' : ''}`} />
+          </button>
           <div className="flex items-center gap-2 -mt-4 ml-4">
             <select
               value={addendumType}
@@ -1009,7 +1013,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
             </button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mb-4">Cole o texto do aditivo ou distrato — o PDF será gerado com o mesmo layout do contrato</p>
+        {!addendumOpen && <p className="text-xs text-muted-foreground mt-1">Clique para expandir e editar o aditivo ou distrato</p>}
+
+        {addendumOpen && (<><p className="text-xs text-muted-foreground mb-4">Cole ou escreva o texto — o PDF será gerado com o mesmo layout do contrato</p>
 
         {showAddendumZapForm && (
           <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
@@ -1067,14 +1073,13 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           </div>
         )}
 
-        <textarea
-          value={addendumText}
-          onChange={e => setAddendumText(e.target.value)}
+        <RichTextEditor
+          content={addendumText}
+          onChange={setAddendumText}
           onBlur={() => supabase.from('events').update({ addendum_text: addendumText, addendum_type: addendumType }).eq('id', eventId)}
-          placeholder={`Cole aqui o texto do ${addendumType}...`}
-          rows={12}
-          className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors resize-y font-mono"
+          placeholder={`Escreva ou cole o texto do ${addendumType}...`}
         />
+        </>)}
       </div>
 
       {/* 4. ARQUIVOS DO EVENTO */}
