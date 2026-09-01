@@ -896,7 +896,7 @@ export default function StockItemsPage() {
   const [importRows, setImportRows] = useState<any[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number; phase: string } | null>(null);
-  const [sortField, setSortField] = useState<'name' | 'current_stock' | 'unit_cost'>('name');
+  const [sortField, setSortField] = useState<'name' | 'current_stock' | 'unit_cost' | 'category' | 'min_stock'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -989,12 +989,16 @@ export default function StockItemsPage() {
   // Load metadata once on mount
   useEffect(() => { loadMeta(); }, []);
 
+  // Ref so realtime callback always calls the latest loadTotalValue (no stale closure)
+  const loadTotalValueRef = useRef(loadTotalValue);
+  useEffect(() => { loadTotalValueRef.current = loadTotalValue; });
+
   // Realtime: recalcula valor total sempre que qualquer item de estoque mudar
   useEffect(() => {
     const channel = supabase
       .channel('stock-items-value-watch')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_items' }, () => {
-        loadTotalValue();
+        loadTotalValueRef.current();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -1488,11 +1492,15 @@ export default function StockItemsPage() {
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none w-full min-w-[280px]" onClick={() => toggleSort('name')}>
                   <div className="flex items-center gap-1">PRODUTO <SortIcon field="name" /></div>
                 </th>
-                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">CATEGORIA</th>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('category')}>
+                  <div className="flex items-center gap-1">CATEGORIA <SortIcon field="category" /></div>
+                </th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort('current_stock')}>
                   <div className="flex items-center justify-end gap-1">ESTOQUE <SortIcon field="current_stock" /></div>
                 </th>
-                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs">MÍN.</th>
+                <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort('min_stock')}>
+                  <div className="flex items-center justify-end gap-1">MÍN. <SortIcon field="min_stock" /></div>
+                </th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none" onClick={() => toggleSort('unit_cost')}>
                   <div className="flex items-center justify-end gap-1">PREÇO <SortIcon field="unit_cost" /></div>
                 </th>
