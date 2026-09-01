@@ -949,11 +949,15 @@ export default function StockItemsPage() {
   // Persist page to sessionStorage
   useEffect(() => { sessionStorage.setItem(SESSION_KEY, String(page)); }, [page]);
 
-  // Debounce search → searchQuery, reset page
+  // Debounce search → searchQuery, reset page + filters
   useEffect(() => {
     const t = setTimeout(() => {
       setSearchQuery(search);
       setPage(0);
+      if (search.trim()) {
+        setFilterCategory('all');
+        setFilterSubcategory('all');
+      }
     }, 350);
     return () => clearTimeout(t);
   }, [search]);
