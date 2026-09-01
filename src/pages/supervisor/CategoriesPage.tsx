@@ -251,7 +251,6 @@ export default function CategoriesPage() {
               <th className="text-left px-3 py-2.5 w-6"></th>
               <th className="text-left px-3 py-2.5">CATEGORIA</th>
               <th className="text-center px-3 py-2.5">ITENS</th>
-              <th className="text-right px-3 py-2.5">EM ESTOQUE</th>
               <th className="text-right px-3 py-2.5">VALOR TOTAL</th>
               <th className="text-right px-3 py-2.5">% DO TOTAL</th>
               <th className="text-center px-3 py-2.5 w-24">AÇÕES</th>
@@ -292,7 +291,6 @@ export default function CategoriesPage() {
                       </div>
                     </td>
                     <td className="px-3 py-3 text-center text-sm font-medium text-foreground">{cat.itemCount}</td>
-                    <td className="px-3 py-3 text-right text-sm text-foreground">{fmtNum(cat.totalStock)}</td>
                     <td className="px-3 py-3 text-right font-semibold text-amber-700">
                       R$ {fmtNum(cat.totalValue)}
                     </td>
@@ -315,7 +313,7 @@ export default function CategoriesPage() {
                   {isExpanded && (
                     <>
                       <tr key={`${cat.name}-subs-header`} className="bg-amber-50/20">
-                        <td colSpan={8} className="px-8 pt-2 pb-1">
+                        <td colSpan={7} className="px-8 pt-2 pb-1">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Subcategorias</span>
                             <Button
@@ -334,7 +332,7 @@ export default function CategoriesPage() {
                       </tr>
                       {catSubs.length === 0 ? (
                         <tr key={`${cat.name}-subs-empty`} className="bg-amber-50/20 border-b border-border/30">
-                          <td colSpan={8} className="px-8 pb-3">
+                          <td colSpan={7} className="px-8 pb-3">
                             <p className="text-xs text-muted-foreground italic">Nenhuma subcategoria cadastrada.</p>
                           </td>
                         </tr>
@@ -342,8 +340,7 @@ export default function CategoriesPage() {
                         <>
                           {catSubs.map((sub, subIdx) => {
                             const subItems = items.filter(i => i.subcategory_id === sub.id);
-                            const subStock = subItems.reduce((s, i) => s + i.current_stock, 0);
-                            const subValue = subItems.reduce((s, i) => s + (i.valor_total ?? i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0);
+const subValue = subItems.reduce((s, i) => s + (i.valor_total ?? i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0);
                             const isLastSub = subIdx === catSubs.length - 1;
                             return (
                               <tr
@@ -359,7 +356,6 @@ export default function CategoriesPage() {
                                   </div>
                                 </td>
                                 <td className="px-3 py-2 text-center text-xs text-muted-foreground">{subItems.length}</td>
-                                <td className="px-3 py-2 text-right text-xs text-muted-foreground">{fmtNum(subStock)}</td>
                                 <td className="px-3 py-2 text-right text-xs font-medium text-amber-700/80">R$ {fmtNum(subValue)}</td>
                                 <td className="px-3 py-2 text-right text-xs text-muted-foreground">
                                   {cat.totalValue > 0 ? `${((subValue / cat.totalValue) * 100).toFixed(1)}%` : '—'}
@@ -386,7 +382,7 @@ export default function CategoriesPage() {
             })}
             {summaries.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-muted-foreground text-sm">
+                <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground text-sm">
                   Nenhuma categoria cadastrada.
                 </td>
               </tr>
