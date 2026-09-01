@@ -159,22 +159,19 @@ export default function EmployeeDetailPage() {
     if (!id) return;
     setLoadingInventario(true);
 
-    // All entries this user submitted across all inventories
-    const { data: entries } = await (supabase as any)
-      .from('inventory_count_entries')
-      .select('count_item_id, quantity, updated_at, inventory_count_items:count_item_id(count_id, system_stock, counted_stock, stock_items:item_id(name, unit, category))')
-      .eq('user_id', id)
-      .order('updated_at', { ascending: false });
+    // Items assigned to this user in any inventory count
+    const { data: countItems } = await (supabase as any)
+      .from('inventory_count_items')
+      .select('id, count_id, system_stock, counted_stock, stock_items:item_id(name, unit, category)')
+      .eq('assigned_user_id', id)
+      .order('count_id');
 
-    if (!entries || entries.length === 0) { setInvHistoryCounts([]); setLoadingInventario(false); return; }
+    if (!countItems || countItems.length === 0) { setInvHistoryCounts([]); setLoadingInventario(false); return; }
 
-    // Group by count_id
     const byCount: Record<string, any[]> = {};
-    for (const e of entries as any[]) {
-      const countId = e.inventory_count_items?.count_id;
-      if (!countId) continue;
-      if (!byCount[countId]) byCount[countId] = [];
-      byCount[countId].push(e);
+    for (const ci of countItems as any[]) {
+      if (!byCount[ci.count_id]) byCount[ci.count_id] = [];
+      byCount[ci.count_id].push({ inventory_count_items: ci, quantity: ci.counted_stock });
     }
 
     const countIds = Object.keys(byCount);
@@ -737,7 +734,7 @@ export default function EmployeeDetailPage() {
                     <CheckCircle2 className={`w-4 h-4 ${count.status === 'completed' ? 'text-success' : 'text-amber-500'}`} />
                     <div className="text-left">
                       <p className="text-sm font-semibold text-foreground">{label}</p>
-                      <p className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? 'item contado' : 'itens contados'}</p>
+                      <p className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? 'item atribuído' : 'itens atribuídos'}</p>
                     </div>
                   </div>
                   {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
