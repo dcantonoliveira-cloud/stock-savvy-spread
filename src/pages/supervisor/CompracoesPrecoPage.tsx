@@ -44,10 +44,14 @@ export default function ComparacaoPrecoPage() {
   const load = async () => {
     setLoading(true);
 
-    // Carrega todos item_suppliers agrupados por item_id
-    const { data: isData } = await (supabase.from('item_suppliers' as any) as any)
-      .select('id,item_id,fornecedor_id,unit_price,pedido_minimo,prazo_entrega_dias,condicao_pagamento,is_preferred,ativo,updated_at,fornecedores(nome)')
-      .order('unit_price', { ascending: true });
+    // Carrega item_suppliers e itens com fornecedor em paralelo (rápido)
+    const [{ data: isData }, { data: siWithData }] = await Promise.all([
+      (supabase.from('item_suppliers' as any) as any)
+        .select('id,item_id,fornecedor_id,unit_price,pedido_minimo,prazo_entrega_dias,condicao_pagamento,is_preferred,ativo,updated_at,fornecedores(nome)')
+        .order('unit_price', { ascending: true }),
+      supabase.from('stock_items').select('id,name,unit,category,unit_cost')
+        .neq('category', '_sistema_').order('name'),
+    ]);
 
     // Agrupa por item_id
     const byItem: Record<string, any[]> = {};
@@ -56,15 +60,11 @@ export default function ComparacaoPrecoPage() {
       byItem[r.item_id].push(r);
     }
 
-    // Busca TODOS os stock_items (não filtra por fornecedor)
-    const { data: siData } = await supabase
-      .from('stock_items').select('id,name,unit,category,unit_cost')
-      .neq('category', '_sistema_').order('name');
-
-    const cats = [...new Set(((siData || []) as any[]).map((s: any) => s.category).filter(Boolean))].sort();
+    const allItems = (siWithData || []) as any[];
+    const cats = [...new Set(allItems.map((s: any) => s.category).filter(Boolean))].sort();
     setCategorias(cats);
 
-    const result: ItemComFornecedores[] = ((siData || []) as any[]).map((si: any) => ({
+    const toRow = (si: any): ItemComFornecedores => ({
       id: si.id, name: si.name, unit: si.unit, category: si.category,
       unit_cost: si.unit_cost ?? 0,
       suppliers: (byItem[si.id] || []).map((r: any) => ({
@@ -76,10 +76,18 @@ export default function ComparacaoPrecoPage() {
         updated_at: r.updated_at, variacao_pct: null, media_90d: null,
       })),
       historico: [], loaded: false,
-    }));
+    });
 
-    setItems(result);
+    // Mostra primeiro os itens COM fornecedor (prioritários)
+    const withSuppliers = allItems.filter((si: any) => byItem[si.id]?.length > 0).map(toRow);
+    setItems(withSuppliers);
     setLoading(false);
+
+    // Carrega itens SEM fornecedor em background sem bloquear a UI
+    const withoutSuppliers = allItems.filter((si: any) => !byItem[si.id]?.length).map(toRow);
+    if (withoutSuppliers.length > 0) {
+      setItems(prev => [...prev, ...withoutSuppliers].sort((a, b) => a.name.localeCompare(b.name)));
+    }
   };
 
   const loadDetail = async (item: ItemComFornecedores) => {

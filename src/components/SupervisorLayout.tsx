@@ -156,7 +156,9 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
       setTopUrgent(urgentList[0]?.title ?? null);
     };
     load();
-  }, [pathname]);
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-background">
