@@ -10,7 +10,6 @@ import {
   Search, ScanBarcode, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { CATEGORIES } from '@/types/inventory';
 import BarcodeScanner from '@/components/BarcodeScanner';
 
 type StockItem = {
@@ -100,7 +99,7 @@ export default function EmployeeDashboard() {
     }
   };
 
-  const categories = CATEGORIES.filter(cat => items.some(i => i.category === cat));
+  const categories = Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort();
   const categoryItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : [];
   const searchResults = search ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())) : [];
 
