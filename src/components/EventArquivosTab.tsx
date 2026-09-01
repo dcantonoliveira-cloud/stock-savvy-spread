@@ -120,7 +120,7 @@ async function renderSection(innerHtml: string, widthPx: number, scale: number) 
   return canvas;
 }
 
-async function buildPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null): Promise<jsPDF> {
+async function buildPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null, docLabel = 'CONTRATO'): Promise<jsPDF> {
   const SCALE=2, PW_MM=210, PH_MM=297, MX_MM=12, HEADER_MM=38, FOOTER_MM=20;
   const CONTENT_W_MM=PW_MM-MX_MM*2, CONTENT_H_MM=PH_MM-HEADER_MM-FOOTER_MM;
   const PX_PER_MM=3.7795, CONTAINER_W_PX=Math.round(CONTENT_W_MM*PX_PER_MM);
@@ -140,7 +140,7 @@ async function buildPDF(html: string, eventName: string, logoBase64: string | nu
     if(logoBase64){try{pdf.addImage(logoBase64,'PNG',MX_MM,6,0,18);}catch{}}
     pdf.setDrawColor(160,140,100);pdf.setLineWidth(0.35);pdf.line(MX_MM,HEADER_MM-4,PW_MM-MX_MM,HEADER_MM-4);
     pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150,130,90);
-    pdf.text('CONTRATO',PW_MM-MX_MM,9,{align:'right'});
+    pdf.text(docLabel,PW_MM-MX_MM,9,{align:'right'});
     pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(80,70,55);
     pdf.text(eventName,PW_MM-MX_MM,14,{align:'right'});
     pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(120,110,90);
@@ -169,14 +169,14 @@ async function buildPDF(html: string, eventName: string, logoBase64: string | nu
   return pdf;
 }
 
-async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null) {
+async function downloadContractPDF(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null, docLabel = 'CONTRATO') {
   const pdf = await buildPDF(html, eventName, logoBase64, companyName, annexes, eventDate, eventLocation);
   const co=(companyName??'').trim().toUpperCase(), ev=(eventName??'Evento').trim();
   pdf.save(`CONTRATO ${co} - ${ev}.pdf`);
 }
 
-async function contractPDFBase64(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null): Promise<string> {
-  const pdf = await buildPDF(html, eventName, logoBase64, companyName, annexes, eventDate, eventLocation);
+async function contractPDFBase64(html: string, eventName: string, logoBase64: string | null, companyName?: string, annexes: string[] = [], eventDate?: string | null, eventLocation?: string | null, docLabel = 'CONTRATO'): Promise<string> {
+  const pdf = await buildPDF(html, eventName, logoBase64, companyName, annexes, eventDate, eventLocation, docLabel);
   return pdf.output('datauristring').split(',')[1];
 }
 
@@ -290,6 +290,14 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
   const [cancelingZap, setCancelingZap]       = useState(false);
   const [fetchingSignedFile, setFetchingSignedFile] = useState(false);
   const [showAllocTasting, setShowAllocTasting] = useState(false);
+  // Aditivo / Distrato
+  const [addendumType, setAddendumType]         = useState<'aditivo' | 'distrato'>('aditivo');
+  const [addendumText, setAddendumText]         = useState('');
+  const [addendumZapData, setAddendumZapData]   = useState<ZapData | null>(null);
+  const [addendumSigners, setAddendumSigners]   = useState<{ name: string; email: string; role?: string }[]>([]);
+  const [showAddendumZapForm, setShowAddendumZapForm] = useState(false);
+  const [sendingAddendumZap, setSendingAddendumZap] = useState(false);
+  const [generatingAddendumPdf, setGeneratingAddendumPdf] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -300,7 +308,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         supabase.from('tasting_session_events' as any)
           .select('id, session_id, situation_snapshot, paid_amount, tasting_sessions(id, scheduled_date, type)')
           .eq('event_id', eventId),
-        supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text,zapsign_data').eq('id', eventId).single(),
+        supabase.from('events').select('contract_text,contract_signed_url,annex_1_text,annex_2_text,zapsign_data,addendum_type,addendum_text,addendum_zapsign_data').eq('id', eventId).single(),
         getCompany(),
         supabase.from('event_files' as any).select('id,name,url,created_at').eq('event_id', eventId).order('created_at'),
         supabase.from('company_integrations' as any).select('api_key').eq('provider','zapsign').maybeSingle(),
@@ -318,6 +326,9 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         if (d.annex_1_text) { setAnnex1(d.annex_1_text); setShowAnnex1(true); }
         if (d.annex_2_text) { setAnnex2(d.annex_2_text); setShowAnnex2(true); }
         if (d.zapsign_data) setZapData(d.zapsign_data as ZapData);
+        if (d.addendum_type) setAddendumType(d.addendum_type as 'aditivo' | 'distrato');
+        if (d.addendum_text) setAddendumText(d.addendum_text);
+        if (d.addendum_zapsign_data) setAddendumZapData(d.addendum_zapsign_data as ZapData);
       }
       if (compData) {
         const c = compData;
@@ -504,6 +515,59 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
       toast.error('Erro ao enviar para ZapSign: ' + (e?.message ?? ''));
     } finally {
       setSendingZap(false);
+    }
+  };
+
+  const sendAddendumToZapSign = async () => {
+    if (!zapToken) { toast.error('Configure o token do ZapSign em Configurações → Conectores'); return; }
+    const validSigners = addendumSigners.filter(s => s.name && s.email);
+    if (validSigners.length === 0) { toast.error('Adicione ao menos um signatário com nome e email'); return; }
+    if (!addendumText.trim()) { toast.error('Escreva o texto do aditivo antes de enviar'); return; }
+
+    const docLabel = addendumType === 'distrato' ? 'DISTRATO' : 'ADITIVO';
+    setSendingAddendumZap(true);
+    const toastId = toast.loading(`Gerando PDF do ${docLabel.toLowerCase()}, aguarde...`);
+    try {
+      const base64 = await contractPDFBase64(addendumText, event.event_name ?? docLabel, companyLogo, companyName, [], event.event_date, event.location_text, docLabel);
+      toast.dismiss(toastId);
+      const { data: { session } } = await supabase.auth.getSession();
+      const proxyBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-proxy`;
+      const res = await fetch(`${proxyBase}?path=/api/v1/docs/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'x-zapsign-token': zapToken,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          name: `${docLabel} - ${event.event_name ?? 'Evento'}`,
+          base64_pdf: base64,
+          sandbox: false,
+          webhook_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapsign-webhook`,
+          signers: validSigners.map(s => ({ name: s.name, email: s.email, send_automatic_email: true })),
+        }),
+      });
+      if (!res.ok) { const e = await res.text(); throw new Error(e); }
+      const data = await res.json();
+      const zap: ZapData = {
+        doc_token: data.token,
+        open_id: data.open_id,
+        sent_at: new Date().toISOString(),
+        signers: (data.signers ?? []).map((s: any) => ({
+          token: s.token, name: s.name, email: s.email,
+          status: s.status ?? 'pending', sign_url: s.sign_url,
+        })),
+      };
+      setAddendumZapData(zap);
+      setShowAddendumZapForm(false);
+      await supabase.from('events').update({ addendum_zapsign_data: zap as any }).eq('id', eventId);
+      toast.success(`${docLabel} enviado para assinatura!`);
+    } catch (e: any) {
+      toast.dismiss(toastId);
+      toast.error(`Erro ao enviar para ZapSign: ${e?.message ?? ''}`);
+    } finally {
+      setSendingAddendumZap(false);
     }
   };
 
@@ -899,7 +963,121 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         )}
       </div>
 
-      {/* 3. ARQUIVOS DO EVENTO */}
+      {/* 3. ADITIVO / DISTRATO */}
+      <div className="bg-white border border-border rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-1">
+          <SectionDivider title="Aditivo / Distrato" />
+          <div className="flex items-center gap-2 -mt-4 ml-4">
+            <select
+              value={addendumType}
+              onChange={e => {
+                const t = e.target.value as 'aditivo' | 'distrato';
+                setAddendumType(t);
+                supabase.from('events').update({ addendum_type: t }).eq('id', eventId);
+              }}
+              className="h-8 px-2 text-[11px] font-bold uppercase tracking-wide border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20">
+              <option value="aditivo">Aditivo</option>
+              <option value="distrato">Distrato</option>
+            </select>
+            <button
+              onClick={async () => {
+                setGeneratingAddendumPdf(true);
+                try {
+                  const docLabel = addendumType === 'distrato' ? 'DISTRATO' : 'ADITIVO';
+                  const co = (companyName ?? '').trim().toUpperCase();
+                  const ev = (event.event_name ?? 'Evento').trim();
+                  const pdf = await buildPDF(addendumText, event.event_name ?? docLabel, companyLogo, companyName, [], event.event_date, event.location_text, docLabel);
+                  pdf.save(`${docLabel} ${co} - ${ev}.pdf`);
+                } catch (e: any) {
+                  toast.error('Erro ao gerar PDF: ' + (e?.message ?? ''));
+                } finally { setGeneratingAddendumPdf(false); }
+              }}
+              disabled={!addendumText.trim() || generatingAddendumPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide border border-border text-muted-foreground rounded-lg hover:bg-muted transition-colors disabled:opacity-40">
+              {generatingAddendumPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+              Baixar PDF
+            </button>
+            <button
+              onClick={() => {
+                if (!zapToken) { toast.error('Configure o ZapSign em Configurações → Conectores'); return; }
+                setShowAddendumZapForm(o => !o);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide rounded-lg transition-colors ${
+                zapToken ? 'border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10' : 'border border-border text-muted-foreground/50 bg-muted/30 cursor-not-allowed'
+              }`}>
+              <Send className="w-3 h-3" />Enviar para assinaturas
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">Cole o texto do aditivo ou distrato — o PDF será gerado com o mesmo layout do contrato</p>
+
+        {showAddendumZapForm && (
+          <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-foreground">Signatários</p>
+              <button onClick={() => setShowAddendumZapForm(false)} className="p-1 text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {addendumSigners.map((s, i) => (
+              <div key={i} className="flex gap-2 items-end">
+                <div className="w-36 shrink-0">
+                  <label className={labelCls}>Papel</label>
+                  <input className={inputCls} value={s.role ?? ''} onChange={e => setAddendumSigners(prev => prev.map((x, j) => j === i ? { ...x, role: e.target.value } : x))} placeholder="Ex: Contratante" />
+                </div>
+                <div className="flex-1">
+                  <label className={labelCls}>Nome</label>
+                  <input className={inputCls} value={s.name} onChange={e => setAddendumSigners(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Nome completo" />
+                </div>
+                <div className="flex-1">
+                  <label className={labelCls}>E-mail</label>
+                  <input className={inputCls} type="email" value={s.email} onChange={e => setAddendumSigners(prev => prev.map((x, j) => j === i ? { ...x, email: e.target.value } : x))} placeholder="email@exemplo.com" />
+                </div>
+                <button onClick={() => setAddendumSigners(prev => prev.filter((_, j) => j !== i))} className="p-2 text-muted-foreground hover:text-destructive transition-colors mb-0.5">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center justify-between pt-1">
+              <button onClick={() => setAddendumSigners(prev => [...prev, { name: '', email: '' }])}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <Plus className="w-3.5 h-3.5" />Adicionar signatário
+              </button>
+              <button onClick={sendAddendumToZapSign} disabled={sendingAddendumZap}
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60">
+                {sendingAddendumZap ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Enviando...</> : <><Send className="w-3.5 h-3.5" />Confirmar e enviar</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {addendumZapData && (
+          <div className="mb-4 p-4 bg-muted/30 border border-border rounded-xl">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Status de assinaturas</p>
+            <div className="space-y-1.5">
+              {addendumZapData.signers.map((s, i) => (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{s.name}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.status === 'signed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {s.status === 'signed' ? 'Assinado' : 'Pendente'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <textarea
+          value={addendumText}
+          onChange={e => setAddendumText(e.target.value)}
+          onBlur={() => supabase.from('events').update({ addendum_text: addendumText, addendum_type: addendumType }).eq('id', eventId)}
+          placeholder={`Cole aqui o texto do ${addendumType}...`}
+          rows={12}
+          className="w-full px-3 py-2.5 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors resize-y font-mono"
+        />
+      </div>
+
+      {/* 4. ARQUIVOS DO EVENTO */}
       <div className="bg-white border border-border rounded-2xl p-6">
         <div className="flex items-center justify-between mb-1">
           <SectionDivider title="Arquivos do evento" />
