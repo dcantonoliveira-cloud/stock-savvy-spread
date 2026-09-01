@@ -1082,6 +1082,11 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
           <button onClick={() => setAddendumOpen(o => !o)} className="flex items-center gap-2 group">
             <SectionDivider title="Aditivo / Distrato" />
             <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform -mt-4 ${addendumOpen ? 'rotate-180' : ''}`} />
+            {addendumText.trim() && (
+              <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-medium -mt-4">
+                {addendumType === 'distrato' ? 'Distrato gerado' : 'Aditivo gerado'}
+              </span>
+            )}
           </button>
           <div className="flex items-center gap-2 -mt-4 ml-4">
             <select
