@@ -48,8 +48,6 @@ export default function UsersPage() {
   const load = async () => {
     setLoading(true);
     const now = new Date();
-    const monthStart = startOfMonth(now).toISOString();
-    const monthEnd   = endOfMonth(now).toISOString();
 
     const [profRes, rolesRes, permsRes, psRes, teRes] = await Promise.all([
       supabase.from('profiles').select('user_id, display_name, email'),
@@ -57,9 +55,7 @@ export default function UsersPage() {
       supabase.from('employee_permissions').select('user_id, can_entry, can_output, access_stock, access_materials, is_admin, work_schedule'),
       supabase.from('payslips' as any).select('employee_id, status'),
       supabase.from('time_entries' as any)
-        .select('employee_id, type, recorded_at, adjustment_minutes')
-        .gte('recorded_at', monthStart)
-        .lte('recorded_at', monthEnd),
+        .select('employee_id, type, recorded_at, adjustment_minutes'),
     ]);
 
     const profiles = profRes.data ?? [];
@@ -74,7 +70,7 @@ export default function UsersPage() {
       const myPs = payslips.filter(ps => ps.employee_id === p.user_id);
       const myTe = teAll.filter(e => e.employee_id === p.user_id);
 
-      // Calcular saldo mensal
+      // Calcular saldo acumulado (todos os registros)
       let balance_min: number | null = null;
       if (myTe.length > 0) {
         const sched: WeekSchedule = (perm as any)?.work_schedule ?? DEFAULT_SCHEDULE;
@@ -284,7 +280,7 @@ export default function UsersPage() {
                         </span>
                       )}
                       {emp.role === 'employee' && emp.balance_min !== null && (
-                        <span title="Saldo de horas do mês" className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        <span title="Saldo de horas acumulado" className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           emp.balance_min >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
                         }`}>
                           {formatBalance(emp.balance_min)}
