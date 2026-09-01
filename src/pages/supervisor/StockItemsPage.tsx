@@ -929,6 +929,7 @@ export default function StockItemsPage() {
   const [sortField, setSortField] = useState<'name' | 'current_stock' | 'unit_cost' | 'category' | 'min_stock' | 'valor_total'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cellInputRef = useRef<HTMLInputElement>(null);
 
@@ -982,7 +983,7 @@ export default function StockItemsPage() {
   };
 
   const doLoad = async (sq: string, cat: string, subcat: string, sf: typeof sortField, sd: typeof sortDir, p: number) => {
-    setLoading(true);
+    setSearching(true);
     let q = (supabase.from('stock_items') as any).select('*', { count: 'exact' }).neq('category', '_sistema_');
     if (sq) q = q.ilike('name', `%${sq}%`);
     if (cat !== 'all') q = q.eq('category', cat);
@@ -997,7 +998,8 @@ export default function StockItemsPage() {
     // Merge categories from DB + categories used in current page
     const usedCats = mapped.map(i => i.category).filter(c => c && c.trim() !== '' && c !== '_sistema_');
     setAllCategories(prev => [...new Set([...prev, ...usedCats])].sort());
-    setLoading(false); // mostra a lista imediatamente
+    setLoading(false);
+    setSearching(false);
 
     // Carrega fornecedores em background sem bloquear a UI
     if (mapped.length > 0) {
@@ -1484,7 +1486,9 @@ export default function StockItemsPage() {
       {/* Filters */}
       <div className="flex gap-3 mb-2">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          {searching
+            ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+            : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />}
           <Input className="pl-9 h-9 bg-white" placeholder="Buscar item..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <Select value={filterCategory} onValueChange={v => { setFilterCategory(v); setFilterSubcategory('all'); setPage(0); }}>
