@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { ConnectionHealthBanner } from './ConnectionHealthBanner';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
+      <ConnectionHealthBanner />
 
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-border px-4 py-3 flex items-center justify-between shadow-xs">

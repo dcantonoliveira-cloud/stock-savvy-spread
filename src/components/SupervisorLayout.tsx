@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SupervisorSidebar from './SupervisorSidebar';
+import { ConnectionHealthBanner } from './ConnectionHealthBanner';
 import { supabase } from '@/integrations/supabase/client';
 import { Bell, Search, Receipt, LogOut, ChevronDown, Settings, AlertTriangle, FileSignature, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -162,6 +163,7 @@ export default function SupervisorLayout({ children }: { children: ReactNode }) 
 
   return (
     <div className="flex min-h-screen bg-background">
+      <ConnectionHealthBanner />
       <SupervisorSidebar />
 
       <div className="flex-1 flex flex-col min-h-screen ml-[180px] xl:ml-[210px]">
