@@ -211,7 +211,7 @@ export default function CategoriesPage() {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-display font-bold gold-text">Categorias</h1>
+          <h1 className="text-3xl font-display font-bold gold-text">Categorias de Insumos</h1>
           <p className="text-muted-foreground mt-1">
             {summaries.length} categorias · Valor total: <span className="text-primary font-semibold">R$ {fmtNum(totalValue)}</span>
           </p>

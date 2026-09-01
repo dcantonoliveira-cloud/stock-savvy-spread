@@ -20,7 +20,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/inventory': 'Inventários',
   '/kitchens': 'Centros de Custo',
   '/fornecedores': 'Fornecedores',
-  '/categories': 'Insumos',
+  '/categories': 'Categorias de Insumos',
   '/tags': 'Tags',
   '/sheets': 'Fichas Técnicas',
   '/event-menus': 'Cardápios de Eventos',
