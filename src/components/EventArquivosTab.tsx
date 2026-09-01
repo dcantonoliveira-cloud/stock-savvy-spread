@@ -390,6 +390,23 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     setZapSigners(signers.length > 0 ? signers : [{ name: '', email: '' }]);
   }, [showZapForm]);
 
+  // Pre-populate addendum signers (same logic as contract)
+  useEffect(() => {
+    if (!showAddendumZapForm) return;
+    const signers: { name: string; email: string; role?: string }[] = [];
+    if (event.clients?.name)
+      signers.push({ name: event.clients.name, email: event.clients.email ?? '', role: 'Contratante' });
+    if (signerName)
+      signers.push({ name: signerName, email: signerEmail, role: 'Assinante da empresa' });
+    if (witness1Name)
+      signers.push({ name: witness1Name, email: witness1Email, role: 'Testemunha da empresa' });
+    if (event.witness_name)
+      signers.push({ name: event.witness_name, email: event.witness_email ?? '', role: 'Testemunha 1' });
+    if (event.witness_2_name)
+      signers.push({ name: event.witness_2_name, email: event.witness_2_email ?? '', role: 'Testemunha 2' });
+    setAddendumSigners(signers.length > 0 ? signers : [{ name: '', email: '' }]);
+  }, [showAddendumZapForm]);
+
   const autoSave = (field: string, value: string) => {
     clearTimeout(timers.current[field]);
     timers.current[field] = setTimeout(async () => {
