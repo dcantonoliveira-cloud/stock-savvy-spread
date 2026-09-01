@@ -955,16 +955,11 @@ export default function StockItemsPage() {
     if (sq) q = q.ilike('name', `%${sq}%`);
     if (cat !== 'all') q = q.eq('category', cat);
     if (subcat !== 'all') q = q.eq('subcategory_id', subcat);
-    const dbField = sf === 'valor_total' ? 'name' : sf;
-    q = q.order(dbField, { ascending: sf === 'valor_total' ? true : sd === 'asc' }).range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
+    q = q.order(sf, { ascending: sd === 'asc' }).range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
     const { data, count } = await q;
     const subMap: Record<string, string> = {};
     allSubcategoriesRef.current.forEach(s => { subMap[s.id] = s.name; });
-    let mapped: Item[] = (data || []).map((i: any) => ({ ...i, subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined }));
-    if (sf === 'valor_total') {
-      const val = (i: Item) => i.current_stock * ((i.unit_cost || 0) / Math.max(1, i.purchase_qty || 1));
-      mapped = mapped.sort((a, b) => sd === 'desc' ? val(b) - val(a) : val(a) - val(b));
-    }
+    const mapped: Item[] = (data || []).map((i: any) => ({ ...i, subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined }));
     setItems(mapped);
     setTotalCount(count || 0);
     // Merge categories from DB + categories used in current page
