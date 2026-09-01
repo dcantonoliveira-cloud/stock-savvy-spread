@@ -225,6 +225,14 @@ export default function InventoryPage() {
     setCreating(false);
   };
 
+  const handleDeleteCount = async (id: string) => {
+    if (!confirm('Excluir este inventário? Esta ação não pode ser desfeita.')) return;
+    await supabase.from('inventory_count_items' as any).delete().eq('count_id', id);
+    await supabase.from('inventory_counts' as any).delete().eq('id', id);
+    toast.success('Inventário excluído');
+    load();
+  };
+
   const openPreview = async (row: AssigneeRow) => {
     setPreviewLabel(row.label);
     setPreviewItems([]);
@@ -558,6 +566,15 @@ export default function InventoryPage() {
                   </td>
                   <td className="px-4 py-3.5 text-muted-foreground/40">
                     <ChevronRight className="w-4 h-4" />
+                  </td>
+                  <td className="px-2 py-3.5" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDeleteCount(h.id); }}
+                      className="p-1.5 rounded text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      title="Excluir inventário"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </td>
                 </tr>
               );
