@@ -116,6 +116,22 @@ const GLOBAL_TABLES = new Set([
   'material_inventory_losses',
   'tasting_leads',
   'smart_alerts',
+  // Tabelas de estoque sem company_id (single-tenant)
+  'stock_items',
+  'stock_item_locations',
+  'stock_entries',
+  'stock_outputs',
+  'stock_transfers',
+  'stock_price_history',
+  'inventory_counts',
+  'inventory_count_items',
+  'item_suppliers',
+  'inventory_group_members',
+  // Tabelas sem company_id confirmadas por erro no backup
+  'employees',
+  'event_separation_items',
+  'event_stock_movements',
+  'client_portal_access',
 ])
 
 // Colunas de referência (IDs) que ganham uma coluna extra com o nome legível ao
