@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -27,10 +28,12 @@ type InventoryCount = {
 };
 
 export default function InventoryPage() {
+  const { profile } = useAuth();
   const [history, setHistory] = useState<InventoryCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [groups, setGroups] = useState<InventoryGroup[]>([]);
+  const [detailSearch, setDetailSearch] = useState('');
 
   // New count dialog
   const [newCountOpen, setNewCountOpen] = useState(false);
@@ -313,9 +316,40 @@ export default function InventoryPage() {
         grouped[row.item_id] = (grouped[row.item_id] || 0) + (row.counted_stock ?? 0);
       }
 
-      // Apply counted items
+      // Fetch current stock for all affected items to compute diff
+      const allItemIds = [...new Set((allRows as any[]).map((r: any) => r.item_id))];
+      const { data: currentStocks } = await (supabase as any)
+        .from('stock_items').select('id, current_stock').in('id', allItemIds);
+      const currentMap: Record<string, number> = Object.fromEntries(
+        ((currentStocks || []) as any[]).map((i: any) => [i.id, Number(i.current_stock) || 0])
+      );
+
+      const now = new Date().toISOString();
+      const who = profile?.display_name ?? 'Supervisor';
+      const countLabel = `Inventário ${new Date().toLocaleDateString('pt-BR')}`;
+
+      // Apply counted items + register movement
       for (const [itemId, total] of Object.entries(grouped)) {
         await supabase.from('stock_items').update({ current_stock: total } as any).eq('id', itemId);
+        const prev = currentMap[itemId] ?? 0;
+        const diff = (total as number) - prev;
+        if (diff > 0) {
+          await (supabase as any).from('stock_entries').insert({
+            item_id: itemId, quantity: diff, unit_cost: 0, created_at: now,
+            notes: `${countLabel} — por ${who}`,
+          });
+        } else if (diff < 0) {
+          await (supabase as any).from('stock_outputs').insert({
+            item_id: itemId, quantity: Math.abs(diff), created_at: now,
+            employee_name: who, notes: countLabel,
+          });
+        } else {
+          // sem diferença — registra entrada com qty 0 para constar no histórico
+          await (supabase as any).from('stock_entries').insert({
+            item_id: itemId, quantity: 0, unit_cost: 0, created_at: now,
+            notes: `${countLabel} — sem divergência`,
+          });
+        }
       }
 
       // Zero out uncounted items if option is enabled
@@ -325,6 +359,13 @@ export default function InventoryPage() {
         for (const itemId of uncountedIds) {
           if (!grouped[itemId]) {
             await supabase.from('stock_items').update({ current_stock: 0 } as any).eq('id', itemId);
+            const prev = currentMap[itemId] ?? 0;
+            if (prev > 0) {
+              await (supabase as any).from('stock_outputs').insert({
+                item_id: itemId, quantity: prev, created_at: now,
+                employee_name: who, notes: `${countLabel} — zerado (não contado)`,
+              });
+            }
           }
         }
       }
@@ -737,7 +778,7 @@ export default function InventoryPage() {
       </Dialog>
 
       {/* ── Detail Dialog ────────────────────────────────────────────────────── */}
-      <Dialog open={detailCountId !== null} onOpenChange={o => { if (!o) { setDetailCountId(null); setDetailItems([]); } }}>
+      <Dialog open={detailCountId !== null} onOpenChange={o => { if (!o) { setDetailCountId(null); setDetailItems([]); setDetailSearch(''); } }}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Resultado da Contagem</DialogTitle>
@@ -748,7 +789,7 @@ export default function InventoryPage() {
             <div className="py-12 text-center text-muted-foreground text-sm">Nenhum item contado ainda.</div>
           ) : (
             <>
-              <div className="flex items-center gap-4 mb-3 text-sm">
+              <div className="flex items-center gap-4 mb-3 text-sm flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 text-destructive" />
                   <span className="font-semibold text-destructive">{discrepancies.length}</span>
@@ -758,6 +799,15 @@ export default function InventoryPage() {
                   <CheckCircle2 className="w-4 h-4 text-success" />
                   <span className="font-semibold text-success">{matching.length}</span>
                   <span className="text-muted-foreground">OK</span>
+                </div>
+                <div className="flex-1 min-w-[180px]">
+                  <input
+                    type="text"
+                    placeholder="Buscar insumo..."
+                    value={detailSearch}
+                    onChange={e => setDetailSearch(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-border bg-white focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto">
@@ -772,7 +822,7 @@ export default function InventoryPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
-                    {detailItems.map(d => {
+                    {detailItems.filter(d => !detailSearch || (d.stock_items?.name ?? '').toLowerCase().includes(detailSearch.toLowerCase())).map(d => {
                       const diff = (d.counted_stock ?? 0) - d.system_stock;
                       const ok = diff === 0;
                       const uc = d.stock_items?.unit_cost ?? 0;

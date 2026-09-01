@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -869,6 +870,7 @@ const PAGE_SIZE = 50;
 const SESSION_KEY = 'stock_items_page';
 export default function StockItemsPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(() => parseInt(sessionStorage.getItem(SESSION_KEY) || '0', 10) || 0);
@@ -1034,12 +1036,49 @@ export default function StockItemsPage() {
     if (!editingCell) return;
     const val = parseFloat(editingValue.replace(',', '.'));
     if (isNaN(val)) { setEditingCell(null); return; }
+
+    const prevItem = items.find(i => i.id === editingCell.id);
     const { error } = await supabase.from('stock_items').update({ [editingCell.field]: val } as any).eq('id', editingCell.id);
     if (error) {
       toast.error('Erro ao salvar: ' + error.message);
       setEditingCell(null);
       return;
     }
+
+    // Registrar no histórico de movimentações
+    const now = new Date().toISOString();
+    const who = profile?.display_name ?? 'Supervisor';
+    if (editingCell.field === 'current_stock' && prevItem) {
+      const diff = val - (prevItem.current_stock || 0);
+      if (diff !== 0) {
+        if (diff > 0) {
+          await (supabase as any).from('stock_entries').insert({
+            item_id: editingCell.id,
+            quantity: diff,
+            unit_cost: 0,
+            created_at: now,
+            notes: `Ajuste manual por ${who} (anterior: ${prevItem.current_stock})`,
+          });
+        } else {
+          await (supabase as any).from('stock_outputs').insert({
+            item_id: editingCell.id,
+            quantity: Math.abs(diff),
+            created_at: now,
+            employee_name: who,
+            notes: `Ajuste manual (anterior: ${prevItem.current_stock})`,
+          });
+        }
+      }
+    } else if (editingCell.field === 'unit_cost' && prevItem) {
+      await (supabase as any).from('stock_entries').insert({
+        item_id: editingCell.id,
+        quantity: 0,
+        unit_cost: val,
+        created_at: now,
+        notes: `Atualização de preço por ${who} (anterior: R$ ${prevItem.unit_cost ?? 0})`,
+      });
+    }
+
     setItems(prev => prev.map(i => i.id === editingCell.id ? { ...i, [editingCell.field]: val } : i));
     toast.success('Salvo!');
     setEditingCell(null);
