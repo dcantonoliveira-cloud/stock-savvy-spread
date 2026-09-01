@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx';
 type Item = {
   id: string; name: string; category: string; unit: string;
   current_stock: number; min_stock: number; unit_cost: number;
+  purchase_qty: number; valor_total: number; subcategory_id: string | null;
 };
 
 type CategoryRecord = {
@@ -57,7 +58,7 @@ export default function CategoriesPage() {
 
   const load = async () => {
     const [itemsRes, catsRes, subsRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, category, unit, current_stock, min_stock, unit_cost, subcategory_id').order('name').range(0, 9999),
+      (supabase.from('stock_items') as any).select('id, name, category, unit, current_stock, min_stock, unit_cost, purchase_qty, valor_total, subcategory_id').order('name').range(0, 9999),
       supabase.from('categories').select('id, name, emoji').order('name'),
       supabase.from('subcategories').select('id, name, category_id').order('name'),
     ]);
@@ -87,7 +88,7 @@ export default function CategoriesPage() {
       emoji: cat.emoji,
       itemCount: catItems.length,
       totalStock: catItems.reduce((s, i) => s + i.current_stock, 0),
-      totalValue: catItems.reduce((s, i) => s + i.current_stock * i.unit_cost, 0),
+      totalValue: catItems.reduce((s, i) => s + (i.valor_total ?? i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0),
     };
   }).sort((a, b) => b.totalValue - a.totalValue);
 
@@ -310,56 +311,75 @@ export default function CategoriesPage() {
                     </td>
                   </tr>
 
-                  {/* Subcategories expanded row */}
+                  {/* Subcategories expanded rows */}
                   {isExpanded && (
-                    <tr key={`${cat.name}-subs`} className="bg-amber-50/30 border-b border-border/30">
-                      <td colSpan={8} className="px-8 py-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Subcategorias</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 text-xs"
-                            onClick={e => {
-                              const catRec = categoryRecords.find(c => c.name === cat.name);
-                              if (catRec) openAddSubcategory(catRec.id, e);
-                            }}
-                          >
-                            <Plus className="w-3 h-3 mr-1" />Subcategoria
-                          </Button>
-                        </div>
-                        {catSubs.length === 0 ? (
-                          <p className="text-xs text-muted-foreground italic">Nenhuma subcategoria cadastrada.</p>
-                        ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {catSubs.map(sub => {
-                              const subItemCount = items.filter(i => (i as any).subcategory_id === sub.id).length;
-                              return (
-                                <div
-                                  key={sub.id}
-                                  className="flex items-center gap-1.5 bg-white border border-border rounded-lg px-2.5 py-1.5 text-xs"
-                                >
-                                  <span className="font-medium text-foreground">{sub.name}</span>
-                                  <span className="text-muted-foreground">({subItemCount})</span>
-                                  <button
-                                    onClick={e => openEditSubcategory(sub, e)}
-                                    className="text-muted-foreground hover:text-primary transition-colors"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={e => handleDeleteSubcategory(sub, e)}
-                                    className="text-muted-foreground hover:text-destructive transition-colors"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              );
-                            })}
+                    <>
+                      <tr key={`${cat.name}-subs-header`} className="bg-amber-50/20">
+                        <td colSpan={8} className="px-8 pt-2 pb-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Subcategorias</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-5 text-[10px] px-2"
+                              onClick={e => {
+                                const catRec = categoryRecords.find(c => c.name === cat.name);
+                                if (catRec) openAddSubcategory(catRec.id, e);
+                              }}
+                            >
+                              <Plus className="w-2.5 h-2.5 mr-1" />Subcategoria
+                            </Button>
                           </div>
-                        )}
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                      {catSubs.length === 0 ? (
+                        <tr key={`${cat.name}-subs-empty`} className="bg-amber-50/20 border-b border-border/30">
+                          <td colSpan={8} className="px-8 pb-3">
+                            <p className="text-xs text-muted-foreground italic">Nenhuma subcategoria cadastrada.</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        <>
+                          {catSubs.map((sub, subIdx) => {
+                            const subItems = items.filter(i => i.subcategory_id === sub.id);
+                            const subStock = subItems.reduce((s, i) => s + i.current_stock, 0);
+                            const subValue = subItems.reduce((s, i) => s + (i.valor_total ?? i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0);
+                            const isLastSub = subIdx === catSubs.length - 1;
+                            return (
+                              <tr
+                                key={sub.id}
+                                className={`bg-amber-50/20 hover:bg-amber-50/50 transition-colors ${isLastSub ? 'border-b border-border/30' : ''}`}
+                              >
+                                <td className="px-5 py-2 text-muted-foreground text-xs">{subIdx + 1}</td>
+                                <td></td>
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-2 pl-4">
+                                    <div className="w-px h-4 bg-border/50" />
+                                    <span className="text-xs font-medium text-foreground/80">{sub.name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 text-center text-xs text-muted-foreground">{subItems.length}</td>
+                                <td className="px-3 py-2 text-right text-xs text-muted-foreground">{fmtNum(subStock)}</td>
+                                <td className="px-3 py-2 text-right text-xs font-medium text-amber-700/80">R$ {fmtNum(subValue)}</td>
+                                <td className="px-3 py-2 text-right text-xs text-muted-foreground">
+                                  {cat.totalValue > 0 ? `${((subValue / cat.totalValue) * 100).toFixed(1)}%` : '—'}
+                                </td>
+                                <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                                  <div className="flex items-center justify-center gap-0.5">
+                                    <button onClick={e => openEditSubcategory(sub, e)} className="p-1 rounded text-muted-foreground hover:text-primary transition-colors">
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                    <button onClick={e => handleDeleteSubcategory(sub, e)} className="p-1 rounded text-muted-foreground hover:text-destructive transition-colors">
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </>
+                      )}
+                    </>
                   )}
                 </>
               );
