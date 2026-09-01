@@ -44,7 +44,6 @@ const TABLE_GROUPS: Record<string, string[]> = {
     'cash_flow_entries', 'bills_payable', 'bank_accounts', 'bank_transfers',
     'credit_cards', 'credit_card_expenses',
     'invoices', 'invoice_items',
-    'payslips', 'payslip_versions',
   ],
   cadastros: [
     'categories', 'subcategories', 'tags', 'kitchens', 'suppliers',
@@ -52,17 +51,35 @@ const TABLE_GROUPS: Record<string, string[]> = {
     'checklist_templates', 'checklist_template_items',
     'employees', 'employee_permissions',
     'appointments',
+    'profiles', 'user_roles',
+    'companies', 'company_settings',
+    'smart_alerts',
+    'tasting_leads',
+    'event_separation_items',
+    'event_stock_movements',
+    'client_portal_access',
   ],
   estoque: [
     'stock_items', 'stock_item_locations',
     'stock_entries', 'stock_outputs', 'stock_transfers', 'stock_price_history',
     'inventory_counts', 'inventory_count_items',
+    'item_suppliers',
+    'inventory_groups', 'inventory_group_members',
   ],
   materiais: [
     'material_categories', 'material_items', 'material_base_list',
     'material_loans', 'material_loan_items',
+    'material_inventory_losses',
   ],
-  fichas_tecnicas: ['technical_sheets', 'technical_sheet_items', 'sheet_categories'],
+  fichas_tecnicas: [
+    'technical_sheets', 'technical_sheet_items', 'sheet_categories',
+    'technical_sheet_aliases',
+  ],
+  funcionarios: [
+    'time_entries',
+    'payslips', 'payslip_versions',
+    'electronic_signatures',
+  ],
 }
 const ALL_TABLES = Object.values(TABLE_GROUPS).flat()
 
@@ -78,10 +95,28 @@ const CHILD_TABLES: Record<string, { parent: string; fk: string }> = {
   payslip_versions:         { parent: 'payslips', fk: 'payslip_id' },
   inventory_count_items:    { parent: 'inventory_counts', fk: 'count_id' },
   material_loan_items:      { parent: 'material_loans', fk: 'loan_id' },
+  inventory_group_members:  { parent: 'inventory_groups', fk: 'group_id' },
+  item_suppliers:           { parent: 'stock_items', fk: 'item_id' },
+  technical_sheet_aliases:  { parent: 'technical_sheets', fk: 'sheet_id' },
+  electronic_signatures:    { parent: 'payslips', fk: 'payslip_id' },
+  payslip_versions:         { parent: 'payslips', fk: 'payslip_id' },
+  event_separation_items:   { parent: 'events', fk: 'event_id' },
+  event_stock_movements:    { parent: 'events', fk: 'event_id' },
+  client_portal_access:     { parent: 'clients', fk: 'client_id' },
 }
 
 // Tabelas sem company_id — fazem backup completo (único tenant).
-const GLOBAL_TABLES = new Set(['tasting_sessions'])
+const GLOBAL_TABLES = new Set([
+  'tasting_sessions',
+  'profiles', 'user_roles',
+  'companies', 'company_settings',
+  'inventory_groups',
+  'time_entries',
+  'payslips',
+  'material_inventory_losses',
+  'tasting_leads',
+  'smart_alerts',
+])
 
 // Colunas de referência (IDs) que ganham uma coluna extra com o nome legível ao
 // lado, para não precisar abrir outra planilha pra saber quem é quem. Se a
@@ -118,6 +153,11 @@ const LOOKUPS: Record<string, { fk: string; refTable: string; refColumn: string;
     { fk: 'kitchen_id', refTable: 'kitchens',    refColumn: 'name', newCol: 'cozinha_nome' },
   ],
   material_base_list:       [{ fk: 'material_item_id', refTable: 'material_items',      refColumn: 'name', newCol: 'item_nome' }],
+  item_suppliers:           [{ fk: 'item_id',    refTable: 'stock_items',    refColumn: 'name', newCol: 'insumo_nome' }],
+  inventory_group_members:  [{ fk: 'group_id',   refTable: 'inventory_groups', refColumn: 'name', newCol: 'grupo_nome' }],
+  technical_sheet_aliases:  [{ fk: 'sheet_id',   refTable: 'technical_sheets', refColumn: 'name', newCol: 'ficha_nome' }],
+  electronic_signatures:    [{ fk: 'payslip_id', refTable: 'payslips',       refColumn: 'title', newCol: 'holerite_titulo' }],
+  event_separation_items:   [{ fk: 'event_id',   refTable: 'events',         refColumn: 'event_name', newCol: 'event_nome' }],
   checklist_template_items: [{ fk: 'template_id',      refTable: 'checklist_templates', refColumn: 'name', newCol: 'template_nome' }],
   credit_card_expenses:     [{ fk: 'credit_card_id',   refTable: 'credit_cards',        refColumn: 'name', newCol: 'cartao_nome' }],
   bills_payable:            [{ fk: 'bank_account_id',  refTable: 'bank_accounts',       refColumn: 'name', newCol: 'conta_nome' }],
