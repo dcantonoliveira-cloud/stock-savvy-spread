@@ -734,13 +734,14 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 // ─── Item Form ───
-function ItemForm({ item, allCategories, allSubcategories, onSave, onCancel }: {
+function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, onSave, onCancel }: {
   item?: Item; allCategories: string[]; allSubcategories: Subcategory[];
+  allCategoryRecords: { id: string; name: string }[];
   onSave: (i: Partial<Item> & { name: string; category: string; unit: string }) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(item?.name || '');
-  const [category, setCategory] = useState(item?.category || 'Outros');
+  const [category, setCategory] = useState(item?.category || '');
   const [subcategoryId, setSubcategoryId] = useState(item?.subcategory_id || '');
   const [unit, setUnit] = useState(item?.unit || UNITS[0]);
   const [currentStock, setCurrentStock] = useState(item?.current_stock?.toString() || '0');
@@ -750,13 +751,21 @@ function ItemForm({ item, allCategories, allSubcategories, onSave, onCancel }: {
   const [barcode, setBarcode] = useState(item?.barcode || '');
   const [imageUrl, setImageUrl] = useState(item?.image_url || null);
 
-  // Subcategories filtered by chosen category
-  // We need to know the category_id for the chosen category name
-  // Since we don't have it directly, filter subcats that have items in same category
-  const availableSubcats = allSubcategories; // will be filtered by category name in the display
+  const catRec = allCategoryRecords.find(c => c.name === category);
+  const availableSubcats = catRec ? allSubcategories.filter(s => s.category_id === catRec.id) : allSubcategories;
+
+  const handleSubcatChange = (subcatId: string) => {
+    setSubcategoryId(subcatId);
+    const sub = allSubcategories.find(s => s.id === subcatId);
+    if (sub) {
+      const parentCat = allCategoryRecords.find(c => c.id === sub.category_id);
+      if (parentCat) setCategory(parentCat.name);
+    }
+  };
 
   const handleSubmit = () => {
     if (!name.trim()) { toast.error('Nome é obrigatório'); return; }
+    if (!subcategoryId) { toast.error('Subcategoria é obrigatória'); return; }
     onSave({
       ...(item?.id ? { id: item.id } : {}),
       name: name.trim(), category, unit,
@@ -792,10 +801,15 @@ function ItemForm({ item, allCategories, allSubcategories, onSave, onCancel }: {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
-          <Select value={category} onValueChange={v => { setCategory(v); setSubcategoryId(''); }}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{(allCategories.length > 0 ? allCategories : ['Outros']).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+          <label className="text-sm text-muted-foreground mb-1 block">Subcategoria *</label>
+          <Select value={subcategoryId || ''} onValueChange={handleSubcatChange}>
+            <SelectTrigger><SelectValue placeholder="Selecione a subcategoria" /></SelectTrigger>
+            <SelectContent>
+              {allSubcategories.map(s => {
+                const cat = allCategoryRecords.find(c => c.id === s.category_id);
+                return <SelectItem key={s.id} value={s.id}>{s.name}{cat ? ` (${cat.name})` : ''}</SelectItem>;
+              })}
+            </SelectContent>
           </Select>
         </div>
         <div>
@@ -806,16 +820,10 @@ function ItemForm({ item, allCategories, allSubcategories, onSave, onCancel }: {
           </Select>
         </div>
       </div>
-      {availableSubcats.length > 0 && (
+      {category && (
         <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Subcategoria</label>
-          <Select value={subcategoryId || 'none'} onValueChange={v => setSubcategoryId(v === 'none' ? '' : v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Nenhuma</SelectItem>
-              {availableSubcats.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <label className="text-sm text-muted-foreground mb-1 block">Categoria (definida pela subcategoria)</label>
+          <div className="px-3 py-2 rounded-md border border-border bg-muted/30 text-sm text-muted-foreground">{category}</div>
         </div>
       )}
       <div className="grid grid-cols-3 gap-4">
@@ -877,11 +885,13 @@ export default function StockItemsPage() {
   const [suppliers, setSuppliers] = useState<Record<string, Supplier[]>>({});
   const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const allSubcategoriesRef = useRef<Subcategory[]>([]);
+  const [allCategoryRecords, setAllCategoryRecords] = useState<{ id: string; name: string }[]>([]);
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterSubcategory, setFilterSubcategory] = useState('all');
   const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [editingSubcatItemId, setEditingSubcatItemId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ id: string; field: 'current_stock' | 'min_stock' | 'unit_cost' } | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -938,13 +948,15 @@ export default function StockItemsPage() {
 
   const loadMeta = async () => {
     const [catsRes, subsRes] = await Promise.all([
-      supabase.from('categories').select('name').order('name'),
+      supabase.from('categories').select('id, name').order('name'),
       supabase.from('subcategories').select('id, name, category_id').order('name'),
     ]);
     const subcats = (subsRes.data || []) as Subcategory[];
     allSubcategoriesRef.current = subcats;
     setAllSubcategories(subcats);
-    const dbCats = (catsRes.data || []).map((c: any) => c.name as string);
+    const catRecords = (catsRes.data || []) as { id: string; name: string }[];
+    setAllCategoryRecords(catRecords);
+    const dbCats = catRecords.map((c) => c.name);
     setAllCategories(dbCats.filter(c => c && c.trim() !== '' && c !== '_sistema_').sort());
     loadTotalValue();
   };
@@ -1078,6 +1090,18 @@ export default function StockItemsPage() {
     setItems(prev => prev.map(i => i.id === editingCell.id ? { ...i, [editingCell.field]: val } : i));
     toast.success('Salvo!');
     setEditingCell(null);
+  };
+
+  const saveSubcategory = async (itemId: string, subcatId: string) => {
+    const subcat = allSubcategoriesRef.current.find(s => s.id === subcatId);
+    if (!subcat) return;
+    const catRec = allCategoryRecords.find(c => c.id === subcat.category_id);
+    const newCategory = catRec?.name ?? '';
+    const { error } = await supabase.from('stock_items').update({ subcategory_id: subcatId, ...(newCategory ? { category: newCategory } : {}) } as any).eq('id', itemId);
+    if (error) { toast.error('Erro ao salvar subcategoria'); return; }
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, subcategory_id: subcatId, subcategory_name: subcat.name, ...(newCategory ? { category: newCategory } : {}) } : i));
+    setEditingSubcatItemId(null);
+    toast.success('Subcategoria atualizada');
   };
 
   const handleDelete = async (id: string) => {
@@ -1455,7 +1479,8 @@ export default function StockItemsPage() {
       {filterCategory !== 'all' && (() => {
         // With server-side pagination we can't reliably check current page items,
         // so show all subcategories and rely on the server filter.
-        const catSubcats = allSubcategories;
+        const catRec = allCategoryRecords.find(c => c.name === filterCategory);
+        const catSubcats = catRec ? allSubcategories.filter(s => s.category_id === catRec.id) : allSubcategories;
         if (catSubcats.length === 0) return null;
         return (
           <div className="flex gap-2 mb-4 flex-wrap">
@@ -1537,8 +1562,23 @@ export default function StockItemsPage() {
                             className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
                             onClick={() => navigate(`/items/${item.id}`)}
                           >{item.name}</span>
-                          {item.subcategory_name && (
-                            <span className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">{item.subcategory_name}</span>
+                          {editingSubcatItemId === item.id ? (
+                            <select
+                              autoFocus
+                              defaultValue={item.subcategory_id || ''}
+                              className="ml-1.5 text-[10px] border border-primary rounded px-1 py-0.5 bg-white outline-none"
+                              onBlur={() => setEditingSubcatItemId(null)}
+                              onChange={e => { if (e.target.value) saveSubcategory(item.id, e.target.value); }}
+                            >
+                              <option value="" disabled>Selecione...</option>
+                              {allSubcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                          ) : (
+                            <span
+                              className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5 cursor-pointer hover:bg-primary/10 hover:text-primary"
+                              title="Clique para trocar subcategoria"
+                              onClick={e => { e.stopPropagation(); setEditingSubcatItemId(item.id); }}
+                            >{item.subcategory_name || '+ subcat'}</span>
                           )}
                         </div>
                       </div>
@@ -1664,7 +1704,7 @@ export default function StockItemsPage() {
             <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
             <DialogDescription>{editingItem ? 'Atualize os dados do item' : 'Preencha os dados do novo item'}</DialogDescription>
           </DialogHeader>
-          <ItemForm item={editingItem} allCategories={allCategories} allSubcategories={allSubcategories} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
+          <ItemForm item={editingItem} allCategories={allCategories} allSubcategories={allSubcategories} allCategoryRecords={allCategoryRecords} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
         </DialogContent>
       </Dialog>
 
