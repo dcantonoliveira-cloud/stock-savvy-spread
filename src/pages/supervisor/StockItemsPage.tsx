@@ -874,6 +874,26 @@ function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, o
 
 const PAGE_SIZE = 50;
 
+const SUBCAT_COLORS: Record<string, string> = {
+  'Secos':                 'bg-amber-100 text-amber-800',
+  'Geladeira':             'bg-sky-100 text-sky-700',
+  'Ervas':                 'bg-green-100 text-green-700',
+  'Nuts':                  'bg-orange-100 text-orange-700',
+  'Panificação':           'bg-yellow-100 text-yellow-800',
+  'Rondello em casa':      'bg-purple-100 text-purple-700',
+  'Recheios':              'bg-pink-100 text-pink-700',
+  'Arosa':                 'bg-rose-100 text-rose-700',
+  'Hortifruto':            'bg-lime-100 text-lime-700',
+  'Limpeza':               'bg-cyan-100 text-cyan-700',
+  'Carnes':                'bg-red-100 text-red-700',
+  'Peixes':                'bg-blue-100 text-blue-700',
+  'Embalagem':             'bg-slate-100 text-slate-600',
+  'Cervejas':              'bg-amber-200 text-amber-900',
+  'Água':                  'bg-sky-50 text-sky-600',
+  'Água galão':            'bg-sky-100 text-sky-600',
+  'Refrigerantes e sucos': 'bg-fuchsia-100 text-fuchsia-700',
+};
+
 // ─── Main Page ───
 const SESSION_KEY = 'stock_items_page';
 export default function StockItemsPage() {
@@ -1515,6 +1535,7 @@ export default function StockItemsPage() {
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none w-full min-w-[280px]" onClick={() => toggleSort('name')}>
                   <div className="flex items-center gap-1">PRODUTO <SortIcon field="name" /></div>
                 </th>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">SUBCATEGORIA</th>
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('category')}>
                   <div className="flex items-center gap-1">CATEGORIA <SortIcon field="category" /></div>
                 </th>
@@ -1557,31 +1578,31 @@ export default function StockItemsPage() {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         {isLow && <div className="w-1.5 h-1.5 rounded-full bg-destructive flex-shrink-0" title="Estoque abaixo do mínimo" />}
-                        <div className="min-w-0">
-                          <span
-                            className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
-                            onClick={() => navigate(`/items/${item.id}`)}
-                          >{item.name}</span>
-                          {editingSubcatItemId === item.id ? (
-                            <select
-                              autoFocus
-                              defaultValue={item.subcategory_id || ''}
-                              className="ml-1.5 text-[10px] border border-primary rounded px-1 py-0.5 bg-white outline-none"
-                              onBlur={() => setEditingSubcatItemId(null)}
-                              onChange={e => { if (e.target.value) saveSubcategory(item.id, e.target.value); }}
-                            >
-                              <option value="" disabled>Selecione...</option>
-                              {allSubcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                          ) : (
-                            <span
-                              className="ml-1.5 text-[10px] text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5 cursor-pointer hover:bg-primary/10 hover:text-primary"
-                              title="Clique para trocar subcategoria"
-                              onClick={e => { e.stopPropagation(); setEditingSubcatItemId(item.id); }}
-                            >{item.subcategory_name || '+ subcat'}</span>
-                          )}
-                        </div>
+                        <span
+                          className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
+                          onClick={() => navigate(`/items/${item.id}`)}
+                        >{item.name}</span>
                       </div>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {editingSubcatItemId === item.id ? (
+                        <select
+                          autoFocus
+                          defaultValue={item.subcategory_id || ''}
+                          className="text-xs border border-primary rounded px-2 py-1 bg-white outline-none w-full max-w-[160px]"
+                          onBlur={() => setEditingSubcatItemId(null)}
+                          onChange={e => { if (e.target.value) saveSubcategory(item.id, e.target.value); }}
+                        >
+                          <option value="" disabled>Selecione...</option>
+                          {allSubcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      ) : (
+                        <span
+                          onClick={e => { e.stopPropagation(); setEditingSubcatItemId(item.id); }}
+                          title="Clique para trocar"
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-opacity hover:opacity-80 ${SUBCAT_COLORS[item.subcategory_name || ''] || 'bg-slate-100 text-slate-600'}`}
+                        >{item.subcategory_name || <span className="text-muted-foreground/60 italic font-normal">— sem sub</span>}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <Badge variant="outline" className="text-[10px] font-normal">{item.category || '—'}</Badge>
