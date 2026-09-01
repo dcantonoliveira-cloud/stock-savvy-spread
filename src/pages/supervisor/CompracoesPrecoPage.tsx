@@ -14,6 +14,7 @@ const LIMIAR_ALERTA = 10;
 
 type ItemComFornecedores = {
   id: string; name: string; unit: string; category: string;
+  unit_cost?: number;
   suppliers: SupplierRow[];
   historico: HistoricoPoint[];
   loaded: boolean;
@@ -42,6 +43,7 @@ export default function ComparacaoPrecoPage() {
 
   const load = async () => {
     setLoading(true);
+
     // Carrega todos item_suppliers agrupados por item_id
     const { data: isData } = await (supabase.from('item_suppliers' as any) as any)
       .select('id,item_id,fornecedor_id,unit_price,pedido_minimo,prazo_entrega_dias,condicao_pagamento,is_preferred,ativo,updated_at,fornecedores(nome)')
@@ -54,19 +56,17 @@ export default function ComparacaoPrecoPage() {
       byItem[r.item_id].push(r);
     }
 
-    // Só itens com ≥1 fornecedor (mostra tudo, mas itens com ≥2 são os mais úteis)
-    const itemIds = Object.keys(byItem).filter(id => byItem[id].length > 0);
-    if (itemIds.length === 0) { setLoading(false); return; }
-
+    // Busca TODOS os stock_items (não filtra por fornecedor)
     const { data: siData } = await supabase
-      .from('stock_items').select('id,name,unit,category')
-      .in('id', itemIds).order('name');
+      .from('stock_items').select('id,name,unit,category,unit_cost')
+      .neq('category', '_sistema_').order('name');
 
     const cats = [...new Set(((siData || []) as any[]).map((s: any) => s.category).filter(Boolean))].sort();
     setCategorias(cats);
 
     const result: ItemComFornecedores[] = ((siData || []) as any[]).map((si: any) => ({
       id: si.id, name: si.name, unit: si.unit, category: si.category,
+      unit_cost: si.unit_cost ?? 0,
       suppliers: (byItem[si.id] || []).map((r: any) => ({
         item_supplier_id: r.id, fornecedor_id: r.fornecedor_id,
         fornecedor_nome: r.fornecedores?.nome || '?',
@@ -318,10 +318,14 @@ export default function ComparacaoPrecoPage() {
                   {nome}
                 </th>
               ))}
+              <th className="border-b border-border px-3 py-2.5 text-center font-semibold text-muted-foreground whitespace-nowrap min-w-[120px] bg-slate-50">
+                SEM FORNECEDOR
+              </th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((item, rowIdx) => {
+              const hasSuppliers = item.suppliers.length > 0;
               const active = item.suppliers.filter(s => s.ativo && s.unit_price > 0);
               const best = active.length ? Math.min(...active.map(s => s.unit_price)) : null;
               const bestSupName = best != null ? active.find(s => s.unit_price === best)?.fornecedor_nome : null;
@@ -343,6 +347,11 @@ export default function ComparacaoPrecoPage() {
                         <span className="font-bold text-red-600">{fmtCur(best)}</span>
                         <div className="text-[10px] text-red-500 font-medium">{bestSupName}</div>
                       </div>
+                    ) : !hasSuppliers && (item.unit_cost ?? 0) > 0 ? (
+                      <div>
+                        <span className="font-bold text-slate-500">{fmtCur(item.unit_cost!)}</span>
+                        <div className="text-[10px] text-slate-400">Preço cadastrado</div>
+                      </div>
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
                   {/* One col per supplier */}
@@ -362,6 +371,16 @@ export default function ComparacaoPrecoPage() {
                       </td>
                     );
                   })}
+                  {/* Sem fornecedor col */}
+                  <td className="border-b border-border px-3 py-2 text-center whitespace-nowrap bg-slate-50/40">
+                    {!hasSuppliers && (item.unit_cost ?? 0) > 0 ? (
+                      <span className="font-semibold text-slate-600">{fmtCur(item.unit_cost!)}</span>
+                    ) : !hasSuppliers ? (
+                      <span className="text-muted-foreground/40 text-[10px]">sem preço</span>
+                    ) : (
+                      <span className="text-muted-foreground/20">—</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -376,7 +395,7 @@ export default function ComparacaoPrecoPage() {
       <div className="mb-5">
         <h1 className="text-3xl font-display font-bold gold-text">Comparação de Preços</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          {items.length} insumo{items.length !== 1 ? 's' : ''} com fornecedor cadastrado
+          {items.length} insumo{items.length !== 1 ? 's' : ''} · {items.filter(i => i.suppliers.length > 0).length} com fornecedor cadastrado
         </p>
       </div>
 
