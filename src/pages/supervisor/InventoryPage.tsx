@@ -60,6 +60,8 @@ export default function InventoryPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [applying, setApplying] = useState(false);
   const [zeroUncounted, setZeroUncounted] = useState(false);
+  const [editingDetailItem, setEditingDetailItem] = useState<string | null>(null);
+  const [editingDetailValue, setEditingDetailValue] = useState('');
   const detailCount = history.find(h => h.id === detailCountId);
 
   useEffect(() => { load(); }, []);
@@ -285,6 +287,17 @@ export default function InventoryPage() {
     }));
     setDetailItems(enriched);
     setLoadingDetail(false);
+  };
+
+  const commitDetailEdit = async (itemId: string) => {
+    const val = parseFloat(editingDetailValue.replace(',', '.'));
+    if (isNaN(val) || val < 0) { setEditingDetailItem(null); return; }
+    await (supabase as any)
+      .from('inventory_count_items')
+      .update({ counted_stock: val, difference: val - (detailItems.find(d => d.id === itemId)?.system_stock ?? 0) })
+      .eq('id', itemId);
+    setDetailItems(prev => prev.map(d => d.id === itemId ? { ...d, counted_stock: val, difference: val - d.system_stock } : d));
+    setEditingDetailItem(null);
   };
 
   const handleApplyToStock = async () => {
@@ -843,7 +856,23 @@ export default function InventoryPage() {
                           </td>
                           <td className="px-2 py-1.5 text-right text-xs text-muted-foreground">{Number(d.system_stock).toFixed(2)}</td>
                           <td className="px-2 py-1.5 text-right">
-                            <p className="font-semibold text-xs">{Number(d.counted_stock).toFixed(2)}</p>
+                            {editingDetailItem === d.id ? (
+                              <input
+                                autoFocus
+                                type="number"
+                                value={editingDetailValue}
+                                onChange={e => setEditingDetailValue(e.target.value)}
+                                onBlur={() => commitDetailEdit(d.id)}
+                                onKeyDown={e => { if (e.key === 'Enter') commitDetailEdit(d.id); if (e.key === 'Escape') setEditingDetailItem(null); }}
+                                className="w-20 text-right text-xs font-semibold border border-primary rounded px-1 py-0.5 focus:outline-none"
+                              />
+                            ) : (
+                              <p
+                                className="font-semibold text-xs cursor-pointer hover:text-primary hover:underline"
+                                title="Clique para corrigir"
+                                onClick={() => { setEditingDetailItem(d.id); setEditingDetailValue(Number(d.counted_stock).toString()); }}
+                              >{Number(d.counted_stock).toFixed(2)}</p>
+                            )}
                             {val > 0 && <p className="text-[10px] text-muted-foreground/70">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
                           </td>
                           <td className="px-3 py-1.5 text-right">
