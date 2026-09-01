@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -274,7 +274,7 @@ export default function StockItemDetailPage() {
           const sparkPrices = priceHistory.map(e => e.unit_cost).filter(p => p > 0);
 
           return (
-            <>
+            <React.Fragment>
               {/* Card: Preço Atual */}
               <div className="bg-white rounded-xl border border-border shadow-sm p-4">
                 <div className="flex items-center gap-2 mb-1">
@@ -345,7 +345,7 @@ export default function StockItemDetailPage() {
                   </p>
                 )}
               </div>
-            </>
+            </React.Fragment>
           );
         })()}
       </div>
