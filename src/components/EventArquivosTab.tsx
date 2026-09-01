@@ -1240,7 +1240,7 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
         <RichTextEditor
           content={addendumText}
           onChange={setAddendumText}
-          onBlur={() => supabase.from('events').update({ addendum_text: addendumText, addendum_type: addendumType }).eq('id', eventId)}
+          onBlur={(html) => supabase.from('events').update({ addendum_text: html, addendum_type: addendumType }).eq('id', eventId)}
           placeholder={`Escreva ou cole o texto do ${addendumType}...`}
         />
         </>)}
