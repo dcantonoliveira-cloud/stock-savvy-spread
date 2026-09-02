@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Plus, Pencil, Trash2, Search, Upload, FileSpreadsheet,
   Sparkles, Loader2, ChevronUp, ChevronDown, AlertTriangle, CheckCircle2,
-  Merge, Store, X, Star, StarOff, Printer, BarChart2
+  Merge, Store, X, Star, StarOff, Printer, BarChart2, Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MaterialLabelPrint, type LabelItem } from '@/components/MaterialLabelPrint';
@@ -980,6 +980,7 @@ export default function StockItemsPage() {
   const [allCategoryRecords, setAllCategoryRecords] = useState<{ id: string; name: string }[]>([]);
   const [allProfiles, setAllProfiles] = useState<{ user_id: string; display_name: string }[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([]);
+  const [itemsWithResponsible, setItemsWithResponsible] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -1046,11 +1047,12 @@ export default function StockItemsPage() {
   };
 
   const loadMeta = async () => {
-    const [catsRes, subsRes, profsRes, grpsRes] = await Promise.all([
+    const [catsRes, subsRes, profsRes, grpsRes, rolesRes] = await Promise.all([
       supabase.from('categories').select('id, name').order('name'),
       supabase.from('subcategories').select('id, name, category_id').order('name'),
       supabase.from('profiles').select('user_id, display_name').order('display_name'),
       (supabase.from('inventory_groups') as any).select('id, name').order('name'),
+      supabase.from('user_roles').select('user_id, role').eq('role', 'employee'),
     ]);
     const subcats = (subsRes.data || []) as Subcategory[];
     allSubcategoriesRef.current = subcats;
@@ -1059,7 +1061,8 @@ export default function StockItemsPage() {
     setAllCategoryRecords(catRecords);
     const dbCats = catRecords.map((c) => c.name);
     setAllCategories(dbCats.filter(c => c && c.trim() !== '' && c !== '_sistema_').sort());
-    setAllProfiles((profsRes.data || []) as { user_id: string; display_name: string }[]);
+    const employeeIds = new Set(((rolesRes.data || []) as { user_id: string }[]).map(r => r.user_id));
+    setAllProfiles(((profsRes.data || []) as { user_id: string; display_name: string }[]).filter(p => employeeIds.has(p.user_id)));
     setAllGroups((grpsRes.data || []) as { id: string; name: string }[]);
     loadTotalValue();
   };
@@ -1094,6 +1097,11 @@ export default function StockItemsPage() {
             suppMap[s.item_id].push(s);
           }
           setSuppliers(suppMap);
+        });
+
+      (supabase.from('stock_item_responsibles') as any).select('item_id').in('item_id', ids)
+        .then(({ data: respData }: any) => {
+          setItemsWithResponsible(new Set(((respData || []) as any[]).map(r => r.item_id)));
         });
     }
   };
@@ -1672,6 +1680,9 @@ export default function StockItemsPage() {
                           className="font-medium text-foreground leading-tight hover:text-primary hover:underline cursor-pointer"
                           onClick={() => navigate(`/items/${item.id}`)}
                         >{item.name}</span>
+                        {itemsWithResponsible.has(item.id) && (
+                          <Users className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" title="Tem responsável definido" />
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
