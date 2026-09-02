@@ -69,14 +69,17 @@ export default function EventMenusPage() {
   };
 
   const handleCreate = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const createdBy = user?.email || null;
+
     if (createMode === 'event') {
       if (!selectedEventId) { toast.error('Selecione um evento'); return; }
       setCreating(true);
       const { data, error } = await (supabase.from('event_menus') as any)
-        .insert({ event_id: selectedEventId, status: 'draft', wizard_step: 1 })
+        .insert({ event_id: selectedEventId, status: 'draft', wizard_step: 1, created_by: createdBy })
         .select('id').single();
       setCreating(false);
-      if (error || !data) { toast.error('Erro ao criar cardápio'); return; }
+      if (error || !data) { toast.error('Erro ao criar cardápio: ' + (error?.message || '')); console.error(error); return; }
       setCreateOpen(false); resetCreate();
       navigate(`/event-menus/${data.id}`);
     } else {
@@ -86,11 +89,11 @@ export default function EventMenusPage() {
       const { data, error } = await (supabase.from('event_menus') as any)
         .insert({
           name: manualName.trim(), event_date: manualDate, location: manualLocation.trim() || null,
-          guest_count: parseInt(manualGuests) || 0, status: 'draft', wizard_step: 1,
+          guest_count: parseInt(manualGuests) || 0, status: 'draft', wizard_step: 1, created_by: createdBy,
         })
         .select('id').single();
       setCreating(false);
-      if (error || !data) { toast.error('Erro ao criar cardápio'); return; }
+      if (error || !data) { toast.error('Erro ao criar cardápio: ' + (error?.message || '')); console.error(error); return; }
       setCreateOpen(false); resetCreate();
       navigate(`/event-menus/${data.id}`);
     }
