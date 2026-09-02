@@ -25,9 +25,6 @@ export function deleteSavedShoppingList(id: string) {
   localStorage.setItem('savedShoppingLists', JSON.stringify(lists));
 }
 
-const MANTIMENTOS_ID = '3fc5dd78-8578-4c45-9c01-6ba8a2123e7a';
-
-
 type ShoppingItem = {
   id: string; name: string; unit: string; category: string;
   needed: number; inStock: number; toBuy: number; unitCost: number;
@@ -61,21 +58,34 @@ export default function ConsolidatedShoppingListDialog({ open, onClose, menuIds,
   const load = async () => {
     setLoading(true);
     try {
-      const { data: menusData } = await supabase
-        .from('event_menus').select('id, name, event_date, guest_count').in('id', menuIds);
-      setEvents((menusData || []) as EventSummary[]);
+      const { data: menusData } = await (supabase
+        .from('event_menus') as any).select('id, name, event_date, guest_count, events:event_id(event_name, event_date, guest_count)').in('id', menuIds);
+      setEvents(((menusData || []) as any[]).map(m => ({
+        id: m.id,
+        name: m.events?.event_name || m.name,
+        event_date: m.events?.event_date || m.event_date,
+        guest_count: m.events?.guest_count ?? m.guest_count,
+      })));
 
       const { data: dishesData } = await supabase
         .from('event_menu_dishes').select('id, menu_id, sheet_id, planned_quantity, planned_unit').in('menu_id', menuIds);
 
       const sheetIds = [...new Set((dishesData || []).map((d: any) => d.sheet_id).filter(Boolean))];
+      const dishIds = (dishesData || []).map((d: any) => d.id);
 
-      const [sheetsRes, sheetItemsRes] = await Promise.all([
+      const [sheetsRes, sheetItemsRes, overridesRes] = await Promise.all([
         supabase.from('technical_sheets').select('id, name, yield_quantity').in('id', sheetIds),
-        supabase.from('technical_sheet_items').select('id, sheet_id, item_id, quantity, section').in('sheet_id', sheetIds),
+        supabase.from('technical_sheet_items').select('id, sheet_id, item_id, quantity, unit, section').in('sheet_id', sheetIds),
+        dishIds.length ? (supabase.from('event_menu_dish_items') as any).select('menu_dish_id, item_id, override_quantity').in('menu_dish_id', dishIds) : Promise.resolve({ data: [] }),
       ]);
       const sheetsData = sheetsRes.data || [];
       const sheetItemsData = sheetItemsRes.data || [];
+
+      // Sobrescritas manuais feitas no passo 2 (Quantidades) do cardápio — têm prioridade sobre o cálculo automático
+      const overrideByDishItem: Record<string, number> = {};
+      for (const o of (overridesRes.data || []) as any[]) {
+        if (o.override_quantity != null) overrideByDishItem[`${o.menu_dish_id}:${o.item_id}`] = o.override_quantity;
+      }
 
       const referencedItemIds = [...new Set(sheetItemsData.map((si: any) => si.item_id).filter(Boolean))];
       const { data: stockData } = await supabase
@@ -97,17 +107,15 @@ export default function ConsolidatedShoppingListDialog({ open, onClose, menuIds,
         if (!menu) return;
         const sheet = sheetsMap[dish.sheet_id];
         if (!sheet) return;
-        const isMantimentos = dish.sheet_id === MANTIMENTOS_ID;
         const recipeItems = (sheet.items || []).filter((i: any) => !i.section || i.section === 'receita');
         if (recipeItems.length === 0) return;
-        const scale = isMantimentos
-          ? menu.guest_count / (sheet.yield_quantity || 1)
-          : dish.planned_quantity / (sheet.yield_quantity || 1);
+        const scale = dish.planned_quantity / (sheet.yield_quantity || 1);
         recipeItems.forEach((si: any) => {
           const s = stock.find((x: any) => x.id === si.item_id);
           const itemUnit = s?.unit || 'un';
-          const qtyInItemUnit = convertToItemUnit(si.quantity, itemUnit, itemUnit);
-          const needed = qtyInItemUnit * scale;
+          const overrideKey = `${dish.id}:${si.item_id}`;
+          const rawQty = overrideKey in overrideByDishItem ? overrideByDishItem[overrideKey] : si.quantity * scale;
+          const needed = convertToItemUnit(rawQty, si.unit || itemUnit, itemUnit);
           if (!map[si.item_id]) {
             map[si.item_id] = { id: si.item_id, name: s?.name || si.item_id, unit: itemUnit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: s?.unit_cost || 0 };
           }
@@ -167,10 +175,10 @@ export default function ConsolidatedShoppingListDialog({ open, onClose, menuIds,
   };
 
   const handlePrintAll = () => {
-    const toBuy = shoppingList.filter(i => i.toBuy > 0);
+    const toBuy = shoppingList.filter(i => getEffectiveQty(i) > 0);
     if (toBuy.length === 0) return;
-    const rows = toBuy.map(i => `<tr><td>${i.name}</td><td>${i.category}</td><td class="right">${fmtNum(i.toBuy)} ${i.unit}</td><td class="right">R$ ${fmtCur(i.unitCost)}</td><td class="right">R$ ${fmtCur(i.toBuy * i.unitCost)}</td></tr>`).join('');
-    const total = toBuy.reduce((s, i) => s + i.toBuy * i.unitCost, 0);
+    const rows = toBuy.map(i => `<tr><td>${i.name}</td><td>${i.category}</td><td class="right">${fmtNum(getEffectiveQty(i))} ${i.unit}</td><td class="right">R$ ${fmtCur(i.unitCost)}</td><td class="right">R$ ${fmtCur(getEffectiveQty(i) * i.unitCost)}</td></tr>`).join('');
+    const total = toBuy.reduce((s, i) => s + getEffectiveQty(i) * i.unitCost, 0);
     const eventNames = events.map(e => e.name).join(', ');
     printBase('Lista de Compras', `<h2>Lista de Compras</h2><p>${eventNames}</p>
       <table><thead><tr><th>Item</th><th>Categoria</th><th class="right">Qtd</th><th class="right">Preço</th><th class="right">Total</th></tr></thead>
@@ -304,7 +312,9 @@ export default function ConsolidatedShoppingListDialog({ open, onClose, menuIds,
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {filteredList.map(item => (
+                    {filteredList.map(item => {
+                      const effQty = getEffectiveQty(item);
+                      return (
                       <tr key={item.id} className={item.toBuy > 0 ? 'bg-red-50/30' : ''}>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
@@ -318,15 +328,26 @@ export default function ConsolidatedShoppingListDialog({ open, onClose, menuIds,
                         <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(item.needed)} {item.unit}</td>
                         <td className="px-4 py-3 text-right text-muted-foreground">{fmtNum(item.inStock)} {item.unit}</td>
                         <td className="px-4 py-3 text-right font-semibold">
-                          {item.toBuy > 0
-                            ? <span className="text-destructive">{fmtNum(item.toBuy)} {item.unit}</span>
-                            : <span className="text-success text-xs">✓ ok</span>}
+                          <div className="flex items-center justify-end gap-1">
+                            <input type="number" step="any" min="0"
+                              className={`w-20 text-right bg-transparent border border-transparent hover:border-border focus:border-primary focus:outline-none rounded px-1.5 py-0.5 text-sm transition-colors ${item.toBuy > 0 ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}
+                              value={qtyOverrides[item.id] !== undefined ? qtyOverrides[item.id] : item.toBuy}
+                              onChange={e => setQtyOverrides(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              onBlur={e => {
+                                const v = parseFloat(e.target.value);
+                                if (isNaN(v) || v < 0) setQtyOverrides(prev => ({ ...prev, [item.id]: item.toBuy }));
+                                else setQtyOverrides(prev => ({ ...prev, [item.id]: v }));
+                              }}
+                            />
+                            <span className="text-xs text-muted-foreground">{item.unit}</span>
+                          </div>
                         </td>
                         <td className="px-5 py-3 text-right text-muted-foreground">
-                          {item.toBuy > 0 ? `R$ ${fmtCur(item.toBuy * item.unitCost)}` : '—'}
+                          {effQty > 0 ? `R$ ${fmtCur(effQty * item.unitCost)}` : '—'}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                     {filteredList.length === 0 && (
                       <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm">Nenhum item neste filtro</td></tr>
                     )}
