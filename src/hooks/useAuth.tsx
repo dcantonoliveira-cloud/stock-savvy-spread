@@ -148,24 +148,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Atualiza permissões em tempo real quando o admin salvar mudanças
-    const permChannel = supabase
-      .channel('permissions-watch')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'employee_permissions',
-      }, (payload: any) => {
-        const changedUserId = payload.new?.user_id ?? payload.old?.user_id;
-        if (currentUserId && changedUserId === currentUserId) {
-          fetchUserData(currentUserId);
-        }
-      })
-      .subscribe();
+    // Atualiza permissões quando a aba volta a ficar em foco — evita manter um
+    // canal Realtime (postgres_changes) sempre aberto pra cada sessão logada,
+    // que sobrecarregava o banco (WAL polling contínuo do Supabase Realtime).
+    const onFocus = () => {
+      if (currentUserId) fetchUserData(currentUserId);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') onFocus();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       subscription.unsubscribe();
-      supabase.removeChannel(permChannel);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 
