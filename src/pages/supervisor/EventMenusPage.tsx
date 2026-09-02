@@ -74,9 +74,16 @@ export default function EventMenusPage() {
 
     if (createMode === 'event') {
       if (!selectedEventId) { toast.error('Selecione um evento'); return; }
+      const selectedEvent = events.find(e => e.id === selectedEventId);
       setCreating(true);
       const { data, error } = await (supabase.from('event_menus') as any)
-        .insert({ event_id: selectedEventId, status: 'draft', wizard_step: 1, created_by: createdBy })
+        .insert({
+          event_id: selectedEventId, status: 'draft', wizard_step: 1, created_by: createdBy,
+          // Preenche só pra satisfazer a coluna obrigatória — a exibição sempre lê
+          // o nome/data/local/convidados ao vivo do evento vinculado, não daqui.
+          name: selectedEvent?.event_name || 'Cardápio', event_date: selectedEvent?.event_date || null,
+          location: selectedEvent?.location_text || null, guest_count: selectedEvent?.guest_count || 100,
+        })
         .select('id').single();
       setCreating(false);
       if (error || !data) { toast.error('Erro ao criar cardápio: ' + (error?.message || '')); console.error(error); return; }
