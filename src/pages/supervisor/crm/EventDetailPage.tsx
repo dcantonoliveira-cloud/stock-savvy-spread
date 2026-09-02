@@ -220,6 +220,8 @@ export default function EventDetailPage() {
   const [lostModal, setLostModal] = useState(false);
   const [form, setForm] = useState<Partial<EventDetail>>({});
   const [clientForm, setClientForm] = useState<Record<string, string>>({});
+  const [linkedMenuId, setLinkedMenuId] = useState<string | null>(null);
+  const [creatingMenu, setCreatingMenu] = useState(false);
   const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clientTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formRef = useRef<Partial<EventDetail>>({});
@@ -227,6 +229,29 @@ export default function EventDetailPage() {
   const clientFormRef = useRef<Record<string, string>>({});
   const eventIdRef = useRef<string | undefined>(undefined);
   const menuAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    (supabase.from('event_menus') as any).select('id').eq('event_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      .then(({ data }: any) => setLinkedMenuId(data?.id ?? null));
+  }, [id]);
+
+  const handleMontarCardapio = async () => {
+    if (!id) return;
+    setCreatingMenu(true);
+    const { data, error } = await (supabase.from('event_menus') as any)
+      .insert({
+        event_id: id, status: 'draft', wizard_step: 1,
+        name: form.event_name ?? event?.clients?.name ?? 'Cardápio',
+        event_date: form.event_date ?? event?.event_date ?? null,
+        location: form.location_text ?? event?.location_text ?? null,
+        guest_count: form.guest_count ?? event?.guest_count ?? 100,
+      })
+      .select('id').single();
+    setCreatingMenu(false);
+    if (error || !data) { toast.error('Erro ao criar cardápio'); return; }
+    navigate(`/event-menus/${data.id}`);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -974,6 +999,27 @@ export default function EventDetailPage() {
         {/* ── CARDÁPIO ── */}
         {tab === 'Cardápio' && (
           <div className="bg-white border border-border rounded-2xl p-6">
+            {/* Cardápio com fichas técnicas + lista de compras (fluxo novo) */}
+            <div className="flex items-center justify-between gap-3 mb-5 p-4 rounded-xl border border-primary/20 bg-primary/5">
+              <div className="flex items-center gap-2.5">
+                <UtensilsCrossed className="w-4 h-4 text-primary flex-shrink-0" />
+                <p className="text-sm text-foreground">
+                  {linkedMenuId
+                    ? 'Esse evento já tem um cardápio montado (pratos, quantidades e lista de compras).'
+                    : 'Monte o cardápio desse evento com fichas técnicas e gere a lista de compras.'}
+                </p>
+              </div>
+              {linkedMenuId ? (
+                <Button size="sm" onClick={() => navigate(`/event-menus/${linkedMenuId}`)}>
+                  Ir para o Cardápio
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleMontarCardapio} disabled={creatingMenu}>
+                  {creatingMenu ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}Montar Cardápio
+                </Button>
+              )}
+            </div>
+
             {/* Mode toggle */}
             <div className="flex items-center gap-3 mb-5">
               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Cardápio do Evento</span>
