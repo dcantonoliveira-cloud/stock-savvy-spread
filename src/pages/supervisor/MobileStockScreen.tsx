@@ -376,6 +376,28 @@ function NfScreen({ onBack }: { onBack: () => void }) {
         notes: 'Importado via NF (mobile)', registered_by: user.id,
       })));
       if (error) throw error;
+
+      // Atualiza o custo do item (dispara histórico de preço via trigger) e vincula o fornecedor
+      for (const i of valid) {
+        if (i.unit_cost > 0) {
+          await supabase.from('stock_items').update({ unit_cost: i.unit_cost } as any).eq('id', i.matched_item_id!);
+        }
+        if (parsed.supplier?.trim()) {
+          const supplierName = parsed.supplier.trim();
+          const { data: existing } = await supabase.from('item_suppliers').select('id')
+            .eq('item_id', i.matched_item_id!).ilike('supplier_name', supplierName).maybeSingle();
+          if (existing) {
+            if (i.unit_cost > 0) await supabase.from('item_suppliers').update({ unit_price: i.unit_cost } as any).eq('id', (existing as any).id);
+          } else {
+            const { count } = await supabase.from('item_suppliers').select('id', { count: 'exact', head: true }).eq('item_id', i.matched_item_id!);
+            await supabase.from('item_suppliers').insert({
+              item_id: i.matched_item_id!, supplier_name: supplierName,
+              unit_price: i.unit_cost || 0, is_preferred: !count || count === 0,
+            } as any);
+          }
+        }
+      }
+
       toast.success(`${valid.length} entrada(s) registrada(s)!`);
       setParsed(null);
     } catch (e: any) {

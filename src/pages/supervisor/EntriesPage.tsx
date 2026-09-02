@@ -164,6 +164,24 @@ export default function EntriesPage() {
 
   const defaultKitchen = kitchens.find(k => k.is_default);
 
+  // Vincula (ou atualiza) o fornecedor da entrada na ficha do insumo (item_suppliers),
+  // pra aparecer no Estoque Geral e não ficar só como texto solto na entrada.
+  const linkSupplierToItem = async (itemId: string, supplierName: string, unitCost: number | null) => {
+    const { data: existing } = await supabase.from('item_suppliers').select('id')
+      .eq('item_id', itemId).ilike('supplier_name', supplierName).maybeSingle();
+    if (existing) {
+      if (unitCost && unitCost > 0) {
+        await supabase.from('item_suppliers').update({ unit_price: unitCost } as any).eq('id', (existing as any).id);
+      }
+      return;
+    }
+    const { count } = await supabase.from('item_suppliers').select('id', { count: 'exact', head: true }).eq('item_id', itemId);
+    await supabase.from('item_suppliers').insert({
+      item_id: itemId, supplier_name: supplierName,
+      unit_price: unitCost || 0, is_preferred: !count || count === 0,
+    } as any);
+  };
+
   const load = async (date?: string) => {
     let entriesQuery = supabase
       .from('stock_entries')
@@ -271,6 +289,16 @@ export default function EntriesPage() {
       registered_by: user.id,
     });
     if (error) { toast.error('Erro ao registrar entrada'); return; }
+
+    // Atualiza o custo do item (dispara automaticamente o histórico de preço via trigger)
+    // e vincula o fornecedor ao item, se informado.
+    const parsedCost = unitCost ? parseFloat(unitCost) : null;
+    if (parsedCost && parsedCost > 0) {
+      await supabase.from('stock_items').update({ unit_cost: parsedCost } as any).eq('id', itemId);
+    }
+    if (supplier.trim()) {
+      await linkSupplierToItem(itemId, supplier.trim(), parsedCost);
+    }
 
     // Update stock_item_locations for the chosen kitchen
     const existingLoc = itemLocations.find(l => l.kitchen_id === allocationKitchenId);
@@ -642,10 +670,13 @@ export default function EntriesPage() {
       const { error } = await supabase.from('stock_entries').insert(inserts);
       if (error) throw error;
 
-      // Update unit_cost on stock_items
+      // Update unit_cost on stock_items (dispara histórico de preço via trigger) e vincula o fornecedor
       for (const i of validItems) {
         if (i.unit_cost > 0) {
           await supabase.from('stock_items').update({ unit_cost: i.unit_cost } as any).eq('id', i.matched_item_id!);
+        }
+        if (parsedInvoice.supplier?.trim()) {
+          await linkSupplierToItem(i.matched_item_id!, parsedInvoice.supplier.trim(), i.unit_cost || null);
         }
       }
 
