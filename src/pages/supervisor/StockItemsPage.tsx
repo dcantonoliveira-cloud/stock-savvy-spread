@@ -26,6 +26,8 @@ type Item = {
   image_url: string | null; barcode: string | null;
   subcategory_id: string | null;
   subcategory_name?: string;
+  counter_user_id: string | null;
+  counter_group_id: string | null;
 };
 
 type Subcategory = {
@@ -734,9 +736,11 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 // ─── Item Form ───
-function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, onSave, onCancel }: {
+function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, allProfiles, allGroups, onSave, onCancel }: {
   item?: Item; allCategories: string[]; allSubcategories: Subcategory[];
   allCategoryRecords: { id: string; name: string }[];
+  allProfiles: { user_id: string; display_name: string }[];
+  allGroups: { id: string; name: string }[];
   onSave: (i: Partial<Item> & { name: string; category: string; unit: string }) => void;
   onCancel: () => void;
 }) {
@@ -750,6 +754,9 @@ function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, o
   const [purchaseQty, setPurchaseQty] = useState(item?.purchase_qty?.toString() || '1');
   const [barcode, setBarcode] = useState(item?.barcode || '');
   const [imageUrl, setImageUrl] = useState(item?.image_url || null);
+  const [responsible, setResponsible] = useState(
+    item?.counter_user_id ? `user:${item.counter_user_id}` : item?.counter_group_id ? `group:${item.counter_group_id}` : ''
+  );
 
   const catRec = allCategoryRecords.find(c => c.name === category);
   const availableSubcats = catRec ? allSubcategories.filter(s => s.category_id === catRec.id) : allSubcategories;
@@ -776,6 +783,8 @@ function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, o
       barcode: barcode.trim() || null,
       image_url: imageUrl,
       subcategory_id: subcategoryId || null,
+      counter_user_id: responsible.startsWith('user:') ? responsible.slice(5) : null,
+      counter_group_id: responsible.startsWith('group:') ? responsible.slice(6) : null,
     } as any);
   };
 
@@ -864,6 +873,17 @@ function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, o
         <label className="text-sm text-muted-foreground mb-1 block">Código de Barras</label>
         <Input value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="EAN" />
       </div>
+      <div>
+        <label className="text-sm text-muted-foreground mb-1 block">Responsável pelo inventário</label>
+        <Select value={responsible || 'none'} onValueChange={v => setResponsible(v === 'none' ? '' : v)}>
+          <SelectTrigger><SelectValue placeholder="Sem responsável" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sem responsável</SelectItem>
+            {allGroups.map(g => <SelectItem key={g.id} value={`group:${g.id}`}>👥 {g.name}</SelectItem>)}
+            {allProfiles.map(p => <SelectItem key={p.user_id} value={`user:${p.user_id}`}>{p.display_name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="flex gap-3 pt-2">
         <Button onClick={handleSubmit} className="flex-1">Salvar</Button>
         <Button variant="outline" onClick={onCancel}>Cancelar</Button>
@@ -906,6 +926,9 @@ export default function StockItemsPage() {
   const [allSubcategories, setAllSubcategories] = useState<Subcategory[]>([]);
   const allSubcategoriesRef = useRef<Subcategory[]>([]);
   const [allCategoryRecords, setAllCategoryRecords] = useState<{ id: string; name: string }[]>([]);
+  const [allProfiles, setAllProfiles] = useState<{ user_id: string; display_name: string }[]>([]);
+  const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([]);
+  const [editingResponsibleItemId, setEditingResponsibleItemId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -972,9 +995,11 @@ export default function StockItemsPage() {
   };
 
   const loadMeta = async () => {
-    const [catsRes, subsRes] = await Promise.all([
+    const [catsRes, subsRes, profsRes, grpsRes] = await Promise.all([
       supabase.from('categories').select('id, name').order('name'),
       supabase.from('subcategories').select('id, name, category_id').order('name'),
+      supabase.from('profiles').select('user_id, display_name').order('display_name'),
+      (supabase.from('inventory_groups') as any).select('id, name').order('name'),
     ]);
     const subcats = (subsRes.data || []) as Subcategory[];
     allSubcategoriesRef.current = subcats;
@@ -983,6 +1008,8 @@ export default function StockItemsPage() {
     setAllCategoryRecords(catRecords);
     const dbCats = catRecords.map((c) => c.name);
     setAllCategories(dbCats.filter(c => c && c.trim() !== '' && c !== '_sistema_').sort());
+    setAllProfiles((profsRes.data || []) as { user_id: string; display_name: string }[]);
+    setAllGroups((grpsRes.data || []) as { id: string; name: string }[]);
     loadTotalValue();
   };
 
@@ -1128,6 +1155,17 @@ export default function StockItemsPage() {
     setItems(prev => prev.map(i => i.id === itemId ? { ...i, subcategory_id: subcatId, subcategory_name: subcat.name, ...(newCategory ? { category: newCategory } : {}) } : i));
     setEditingSubcatItemId(null);
     toast.success('Subcategoria atualizada');
+  };
+
+  const saveResponsible = async (itemId: string, value: string) => {
+    // value: '' (sem responsável), `user:<id>` ou `group:<id>`
+    const counter_user_id = value.startsWith('user:') ? value.slice(5) : null;
+    const counter_group_id = value.startsWith('group:') ? value.slice(6) : null;
+    const { error } = await supabase.from('stock_items').update({ counter_user_id, counter_group_id } as any).eq('id', itemId);
+    if (error) { toast.error('Erro ao salvar responsável'); return; }
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, counter_user_id, counter_group_id } : i));
+    setEditingResponsibleItemId(null);
+    toast.success('Responsável atualizado');
   };
 
   const handleDelete = async (id: string) => {
@@ -1551,6 +1589,7 @@ export default function StockItemsPage() {
                 <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap cursor-pointer select-none" onClick={() => toggleSort('category')}>
                   <div className="flex items-center gap-1">CATEGORIA <SortIcon field="category" /></div>
                 </th>
+                <th className="text-left px-3 py-3 font-semibold text-muted-foreground text-xs whitespace-nowrap">RESPONSÁVEL</th>
                 <th className="text-right px-3 py-3 font-semibold text-muted-foreground text-xs cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort('current_stock')}>
                   <div className="flex items-center justify-end gap-1">ESTOQUE <SortIcon field="current_stock" /></div>
                 </th>
@@ -1618,6 +1657,37 @@ export default function StockItemsPage() {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <Badge variant="outline" className="text-[10px] font-normal">{item.category || '—'}</Badge>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {editingResponsibleItemId === item.id ? (
+                        <select
+                          autoFocus
+                          defaultValue={item.counter_user_id ? `user:${item.counter_user_id}` : item.counter_group_id ? `group:${item.counter_group_id}` : ''}
+                          className="text-xs border border-primary rounded px-2 py-1 bg-white outline-none w-full max-w-[160px]"
+                          onBlur={() => setEditingResponsibleItemId(null)}
+                          onChange={e => saveResponsible(item.id, e.target.value)}
+                        >
+                          <option value="">Sem responsável</option>
+                          <optgroup label="Grupos">
+                            {allGroups.map(g => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}
+                          </optgroup>
+                          <optgroup label="Pessoas">
+                            {allProfiles.map(p => <option key={p.user_id} value={`user:${p.user_id}`}>{p.display_name}</option>)}
+                          </optgroup>
+                        </select>
+                      ) : (
+                        <span
+                          onClick={e => { e.stopPropagation(); setEditingResponsibleItemId(item.id); }}
+                          title="Clique para trocar"
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-opacity hover:opacity-80 ${(item.counter_user_id || item.counter_group_id) ? 'bg-indigo-50 text-indigo-700' : ''}`}
+                        >
+                          {item.counter_user_id
+                            ? (allProfiles.find(p => p.user_id === item.counter_user_id)?.display_name || '—')
+                            : item.counter_group_id
+                              ? (allGroups.find(g => g.id === item.counter_group_id)?.name || '—')
+                              : <span className="text-muted-foreground/60 italic font-normal">— sem responsável</span>}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {editingCell?.id === item.id && editingCell.field === 'current_stock' ? (
@@ -1737,7 +1807,7 @@ export default function StockItemsPage() {
             <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
             <DialogDescription>{editingItem ? 'Atualize os dados do item' : 'Preencha os dados do novo item'}</DialogDescription>
           </DialogHeader>
-          <ItemForm item={editingItem} allCategories={allCategories} allSubcategories={allSubcategories} allCategoryRecords={allCategoryRecords} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
+          <ItemForm item={editingItem} allCategories={allCategories} allSubcategories={allSubcategories} allCategoryRecords={allCategoryRecords} allProfiles={allProfiles} allGroups={allGroups} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
         </DialogContent>
       </Dialog>
 
