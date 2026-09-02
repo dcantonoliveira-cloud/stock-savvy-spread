@@ -264,19 +264,23 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
   };
 
   const handleGenerateExcel = () => {
-    const rows = filteredRows.map(r => ({
-      Insumo: r.name,
-      Categoria: r.category,
-      Subcategoria: r.subcategoryName || '',
-      Necessário: r.needed,
-      'Em Estoque': r.inStock,
-      Unidade: r.unit,
-      'A Comprar': getEffectiveQty(r),
-      'Custo Unit.': r.unitCost,
-      'Custo Total': getEffectiveQty(r) * r.unitCost,
-      Responsáveis: r.responsibleNames.join(', '),
-      Fornecedores: r.supplierNames.join(', '),
-    }));
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const rows = filteredRows.map(r => {
+      const eff = getEffectiveQty(r);
+      return {
+        Insumo: r.name,
+        Categoria: r.category,
+        Subcategoria: r.subcategoryName || '',
+        Necessário: round2(r.needed),
+        'Em Estoque': round2(r.inStock),
+        Unidade: r.unit,
+        'A Comprar': round2(eff),
+        'Custo Unit.': round2(r.unitCost),
+        'Custo Total': round2(eff * r.unitCost),
+        Responsáveis: r.responsibleNames.join(', '),
+        Fornecedores: r.supplierNames.join(', '),
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Lista de Compras');
