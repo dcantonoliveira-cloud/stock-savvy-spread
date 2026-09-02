@@ -58,7 +58,7 @@ export default function EventMenusPage() {
     if (!createOpen || createMode !== 'event') return;
     const today = new Date().toISOString().slice(0, 10);
     supabase.from('events').select('id, event_name, event_date, location_text, guest_count')
-      .gte('event_date', today).not('event_name', 'is', null).neq('event_name', '')
+      .gte('event_date', today).eq('status', 'confirmed').not('event_name', 'is', null).neq('event_name', '')
       .order('event_date', { ascending: true }).limit(200)
       .then(({ data }) => { if (data) setEvents(data as unknown as EventOption[]); });
   }, [createOpen, createMode]);
