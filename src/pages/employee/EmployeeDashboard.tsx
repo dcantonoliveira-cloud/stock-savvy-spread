@@ -16,6 +16,7 @@ type StockItem = {
   id: string;
   name: string;
   category: string;
+  subcategory_id: string | null;
   unit: string;
   current_stock: number;
   image_url: string | null;
@@ -24,6 +25,8 @@ type StockItem = {
 
 type Kitchen = { id: string; name: string };
 type Location = { id: string; item_id: string; kitchen_id: string; current_stock: number };
+type Subcategory = { id: string; name: string; category_id: string };
+type CategoryRecord = { id: string; name: string };
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   'Carnes': '🥩', 'Bebidas': '🥤', 'Frios': '🧀', 'Hortifruti': '🥬',
@@ -35,9 +38,12 @@ export default function EmployeeDashboard() {
   const [items, setItems] = useState<StockItem[]>([]);
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [categoryRecords, setCategoryRecords] = useState<CategoryRecord[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [mode, setMode] = useState<'entry' | 'output' | 'transfer' | null>(null);
   const [quantity, setQuantity] = useState('');
@@ -53,14 +59,18 @@ export default function EmployeeDashboard() {
   const [tfToKitchen, setTfToKitchen] = useState('');
 
   const loadData = async () => {
-    const [itemsRes, kitchensRes, locsRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, category, unit, current_stock, image_url, barcode' as any).order('name').range(0, 9999),
+    const [itemsRes, kitchensRes, locsRes, subcatsRes, catsRes] = await Promise.all([
+      supabase.from('stock_items').select('id, name, category, subcategory_id, unit, current_stock, image_url, barcode' as any).order('name').range(0, 9999),
       supabase.from('kitchens').select('id, name').order('name'),
       supabase.from('stock_item_locations').select('id, item_id, kitchen_id, current_stock'),
+      supabase.from('subcategories').select('id, name, category_id').order('name'),
+      supabase.from('categories').select('id, name').order('name'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data as unknown as StockItem[]);
     if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
     if (locsRes.data) setLocations(locsRes.data as Location[]);
+    if (subcatsRes.data) setSubcategories(subcatsRes.data as Subcategory[]);
+    if (catsRes.data) setCategoryRecords(catsRes.data as CategoryRecord[]);
     setLoadingItems(false);
   };
 
@@ -100,7 +110,14 @@ export default function EmployeeDashboard() {
   };
 
   const categories = Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort();
-  const categoryItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : [];
+  const categoryItemsAll = selectedCategory ? items.filter(i => i.category === selectedCategory) : [];
+  const categoryRecord = selectedCategory ? categoryRecords.find(c => c.name === selectedCategory) : null;
+  const subcategoriesForCategory = categoryRecord
+    ? subcategories.filter(s => s.category_id === categoryRecord.id && categoryItemsAll.some(i => i.subcategory_id === s.id))
+    : [];
+  const categoryItems = selectedSubcategory
+    ? categoryItemsAll.filter(i => i.subcategory_id === selectedSubcategory)
+    : categoryItemsAll;
   const searchResults = search ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())) : [];
 
   const handleAction = (item: StockItem, action: 'entry' | 'output' | 'transfer') => {
@@ -251,7 +268,7 @@ export default function EmployeeDashboard() {
                   return (
                     <button
                       key={cat}
-                      onClick={() => setSelectedCategory(cat)}
+                      onClick={() => { setSelectedCategory(cat); setSelectedSubcategory(null); }}
                       className="flex flex-col items-center justify-center rounded-2xl bg-card border border-border p-6 shadow-sm hover:shadow-md hover:border-primary/30 transition-all active:scale-95"
                     >
                       <span className="text-4xl mb-2">{CATEGORY_EMOJIS[cat] || '📦'}</span>
@@ -268,15 +285,46 @@ export default function EmployeeDashboard() {
           {/* Items in category */}
           {!search && selectedCategory && (
             <div>
-              <button onClick={() => setSelectedCategory(null)} className="flex items-center gap-2 text-sm text-primary mb-4 hover:underline">
+              <button onClick={() => { setSelectedCategory(null); setSelectedSubcategory(null); }} className="flex items-center gap-2 text-sm text-primary mb-4 hover:underline">
                 <ArrowLeft className="w-4 h-4" /> Voltar às categorias
               </button>
               <p className="text-sm text-muted-foreground mb-3">
                 {CATEGORY_EMOJIS[selectedCategory]} {selectedCategory} · {categoryItems.length} {categoryItems.length === 1 ? 'item' : 'itens'}
               </p>
+
+              {/* Filtro de subcategoria — estilo totem: botões grandes, roláveis na horizontal */}
+              {subcategoriesForCategory.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-3 mb-3 -mx-4 px-4 scrollbar-none">
+                  <button
+                    onClick={() => setSelectedSubcategory(null)}
+                    className={`flex-shrink-0 h-11 px-5 rounded-full text-sm font-bold transition-all active:scale-95 ${
+                      selectedSubcategory === null
+                        ? 'bg-primary text-primary-foreground shadow-md'
+                        : 'bg-card border-2 border-border text-muted-foreground'
+                    }`}
+                  >
+                    Todas
+                  </button>
+                  {subcategoriesForCategory.map(sub => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setSelectedSubcategory(sub.id)}
+                      className={`flex-shrink-0 h-11 px-5 rounded-full text-sm font-bold transition-all active:scale-95 ${
+                        selectedSubcategory === sub.id
+                          ? 'bg-primary text-primary-foreground shadow-md'
+                          : 'bg-card border-2 border-border text-muted-foreground'
+                      }`}
+                    >
+                      {sub.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                 {categoryItems.map(item => <ItemCard key={item.id} item={item} />)}
               </div>
+              {categoryItems.length === 0 && <p className="text-center text-muted-foreground py-12">Nenhum item nessa subcategoria.</p>}
             </div>
           )}
 
