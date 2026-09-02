@@ -18,6 +18,11 @@ export default defineConfig(({ mode }) => ({
     react(),
     legacy({
       targets: ["ios >= 12", "safari >= 12"],
+      // iOS 12/Safari 12 suportam <script type="module"> mas ainda não têm
+      // Promise.allSettled (só chegou no Safari 13) — sem isso, esses
+      // navegadores carregam o bundle "moderno" sem o polyfill necessário
+      // e a página quebra com "undefined is not a function".
+      modernPolyfills: true,
     }),
     mode === "development" && componentTagger(),
     VitePWA({
