@@ -5,8 +5,23 @@ import { toast } from 'sonner';
 import {
   Search, ArrowUpCircle, ArrowDownCircle, Camera, X,
   Loader2, CheckCircle, AlertCircle, ChevronLeft, Package,
-  FileImage,
+  FileImage, Link2,
 } from 'lucide-react';
+
+const normalizeStr = (s: string) =>
+  s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ').trim();
+
+const similarityScore = (a: string, b: string): number => {
+  if (a === b) return 1;
+  const wordsA = a.split(' ').filter(w => w.length > 2);
+  const wordsB = b.split(' ').filter(w => w.length > 2);
+  if (wordsA.length === 0 || wordsB.length === 0) return 0;
+  const matches = wordsA.filter(w => wordsB.some(wb => wb.includes(w) || w.includes(wb)));
+  return matches.length / Math.max(wordsA.length, wordsB.length);
+};
 
 async function resizeImageToBase64(file: File, maxPx: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -239,22 +254,59 @@ function NfScreen({ onBack }: { onBack: () => void }) {
   const [parsing, setParsing] = useState(false);
   const [parsed, setParsed] = useState<{ supplier: string; invoice_number: string; items: ParsedItem[] } | null>(null);
   const [items, setItems] = useState<StockItem[]>([]);
+  const [aliases, setAliases] = useState<{ item_id: string; alias: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [linkPickerIdx, setLinkPickerIdx] = useState<number | null>(null);
+  const [linkSearch, setLinkSearch] = useState('');
 
   useEffect(() => {
-    supabase.from('stock_items').select('id, name, unit, current_stock, category' as any)
-      .order('name').range(0, 9999)
-      .then(({ data }) => { if (data) setItems(data as unknown as StockItem[]); });
+    Promise.all([
+      supabase.from('stock_items').select('id, name, unit, current_stock, category' as any).order('name').range(0, 9999),
+      (supabase.from('stock_item_aliases') as any).select('item_id, alias'),
+    ]).then(([itemsRes, aliasesRes]) => {
+      if (itemsRes.data) setItems(itemsRes.data as unknown as StockItem[]);
+      if (aliasesRes.data) setAliases(aliasesRes.data as { item_id: string; alias: string }[]);
+    });
   }, []);
 
   const matchItems = (raw: any[]): ParsedItem[] => {
     return raw.map(pi => {
-      const match = items.find(s =>
-        s.name.toLowerCase().includes(pi.name.toLowerCase().slice(0, 6)) ||
-        pi.name.toLowerCase().includes(s.name.toLowerCase().slice(0, 6))
-      );
+      const piNorm = normalizeStr(pi.name);
+      let match: StockItem | null = null;
+
+      // 1. Apelido cadastrado manualmente — match exato, prioridade máxima
+      const aliasHit = aliases.find(a => normalizeStr(a.alias) === piNorm);
+      if (aliasHit) match = items.find(s => s.id === aliasHit.item_id) || null;
+
+      // 2. Nome exato/substring ou similaridade por palavras
+      if (!match) {
+        let bestScore = 0;
+        for (const s of items) {
+          const sNorm = normalizeStr(s.name);
+          if (sNorm === piNorm || piNorm.includes(sNorm) || sNorm.includes(piNorm)) { match = s; bestScore = 1; break; }
+          const score = similarityScore(piNorm, sNorm);
+          if (score > bestScore && score >= 0.5) { bestScore = score; match = s; }
+        }
+      }
+
       return { name: pi.name, quantity: pi.quantity, unit_cost: pi.unit_cost || 0, unit: pi.unit || 'un', matched_item_id: match?.id || null, matched_item_name: match?.name || null, status: match ? 'matched' : 'unmatched' };
     });
+  };
+
+  const linkToItem = (idx: number, item: StockItem) => {
+    if (!parsed) return;
+    const rawName = parsed.items[idx].name;
+    const updated = [...parsed.items];
+    updated[idx] = { ...updated[idx], matched_item_id: item.id, matched_item_name: item.name, status: 'matched' };
+    setParsed({ ...parsed, items: updated });
+    setLinkPickerIdx(null);
+    setLinkSearch('');
+    // Salva o nome da NF como apelido — da próxima vez o sistema já casa sozinho
+    if (rawName && normalizeStr(rawName) !== normalizeStr(item.name)) {
+      (supabase.from('stock_item_aliases') as any)
+        .upsert({ item_id: item.id, alias: rawName.trim() }, { onConflict: 'item_id,alias' })
+        .then(() => setAliases(prev => [...prev, { item_id: item.id, alias: rawName.trim() }]));
+    }
   };
 
   const handleFile = async (file: File) => {
@@ -421,9 +473,58 @@ function NfScreen({ onBack }: { onBack: () => void }) {
                   </div>
                 </div>
               </div>
+
+              {/* Vincular a insumo existente */}
+              <button
+                onClick={() => { setLinkPickerIdx(idx); setLinkSearch(''); }}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold border-t border-gray-100 text-gray-500 hover:bg-gray-50"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                {item.matched_item_id ? 'Trocar insumo vinculado' : 'Vincular a insumo existente'}
+              </button>
             </div>
           ))}
         </div>
+
+        {/* Picker de vínculo manual */}
+        {linkPickerIdx !== null && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-end" onClick={() => setLinkPickerIdx(null)}>
+            <div className="bg-white w-full rounded-t-3xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="px-4 pt-4 pb-2 flex items-center justify-between border-b border-gray-100">
+                <p className="font-bold text-gray-800">Vincular a insumo</p>
+                <button onClick={() => setLinkPickerIdx(null)} className="p-1 text-gray-400"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="px-4 py-3">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Buscar insumo..."
+                  value={linkSearch}
+                  onChange={e => setLinkSearch(e.target.value)}
+                  className="w-full h-11 px-3 rounded-xl border-2 border-gray-200 focus:outline-none focus:border-gray-400 text-sm"
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 pb-6">
+                {items
+                  .filter(s => !linkSearch.trim() || normalizeStr(s.name).includes(normalizeStr(linkSearch)))
+                  .slice(0, 100)
+                  .map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => linkToItem(linkPickerIdx, s)}
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-gray-50 flex items-center justify-between"
+                    >
+                      <span className="text-sm text-gray-800">{s.name}</span>
+                      <span className="text-[11px] text-gray-400">{s.category}</span>
+                    </button>
+                  ))}
+                {items.filter(s => !linkSearch.trim() || normalizeStr(s.name).includes(normalizeStr(linkSearch))).length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">Nenhum insumo encontrado</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="fixed bottom-20 left-4 right-4 z-40">
           <button onClick={confirm} disabled={submitting || parsed.items.length === 0}

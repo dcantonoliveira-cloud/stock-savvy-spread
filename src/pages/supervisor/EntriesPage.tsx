@@ -118,6 +118,7 @@ function ItemSearchCombobox({ items, value, onChange }: {
 export default function EntriesPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
+  const [aliases, setAliases] = useState<{ item_id: string; alias: string }[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -175,13 +176,15 @@ export default function EntriesPage() {
       entriesQuery = entriesQuery.limit(500);
     }
 
-    const [itemsRes, entriesRes, kitchensRes] = await Promise.all([
+    const [itemsRes, entriesRes, kitchensRes, aliasesRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, unit, current_stock, barcode').order('name').range(0, 9999),
       entriesQuery,
       supabase.from('kitchens').select('id, name, is_default').order('name'),
+      (supabase.from('stock_item_aliases') as any).select('item_id, alias'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data as Item[]);
     if (entriesRes.data) setEntries(entriesRes.data);
+    if (aliasesRes.data) setAliases(aliasesRes.data as { item_id: string; alias: string }[]);
     setTotalCount(entriesRes.count ?? null);
     if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
   };
@@ -416,7 +419,14 @@ export default function EntriesPage() {
       // 1. Try barcode match first (exact)
       let match = pi.barcode ? items.find(i => i.barcode === pi.barcode) : null;
 
-      // 2. Fuzzy name match
+      // 2. Apelido cadastrado manualmente (match exato, prioridade máxima)
+      if (!match) {
+        const piNorm = normalize(pi.name);
+        const aliasHit = aliases.find(a => normalize(a.alias) === piNorm);
+        if (aliasHit) match = items.find(i => i.id === aliasHit.item_id) || null;
+      }
+
+      // 3. Fuzzy name match
       if (!match) {
         const piNorm = normalize(pi.name);
         let bestScore = 0;
@@ -526,7 +536,14 @@ export default function EntriesPage() {
     const updated = [...parsedInvoice.items];
     if (field === 'matched_item_id') {
       const match = value ? items.find(i => i.id === value) : null;
+      const rawName = updated[idx].name;
       updated[idx] = { ...updated[idx], matched_item_id: value || null, matched_item_name: match?.name || null, status: match ? 'matched' : 'unmatched' };
+      // Salva o nome vindo da NF como apelido — da próxima vez o sistema já casa sozinho
+      if (match && rawName && normalize(rawName) !== normalize(match.name)) {
+        (supabase.from('stock_item_aliases') as any)
+          .upsert({ item_id: match.id, alias: rawName.trim() }, { onConflict: 'item_id,alias' })
+          .then(() => setAliases(prev => [...prev, { item_id: match.id, alias: rawName.trim() }]));
+      }
     } else {
       (updated[idx] as any)[field] = value;
     }
