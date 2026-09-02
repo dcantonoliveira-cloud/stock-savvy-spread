@@ -91,7 +91,7 @@ export default function CategoriesPage() {
       totalStock: catItems.reduce((s, i) => s + i.current_stock, 0),
       totalValue: catItems.reduce((s, i) => s + (i.valor_total ?? i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0),
     };
-  }).sort((a, b) => b.totalValue - a.totalValue);
+  }).filter(c => c.name !== '_sistema_').sort((a, b) => b.totalValue - a.totalValue);
 
   const totalValue = summaries.reduce((s, c) => s + c.totalValue, 0);
 
