@@ -311,7 +311,7 @@ export default function InventoryPage() {
     const [{ data: items }, { data: entries }, { data: profiles }] = await Promise.all([
       (supabase as any)
         .from('inventory_count_items')
-        .select('*, stock_items:item_id(name, unit, category, unit_cost, purchase_qty, subcategories:subcategory_id(name))')
+        .select('*, frozen_value, stock_items:item_id(name, unit, category, unit_cost, purchase_qty, subcategories:subcategory_id(name))')
         .eq('count_id', countId)
         .not('counted_stock', 'is', null)
         .order('counted_stock', { ascending: false }),
@@ -433,10 +433,20 @@ export default function InventoryPage() {
         }
       }
 
-      // Congela o valor do inventário no momento da conclusão (imune a mudanças futuras de preço)
+      // Congela o valor de cada item + o total do inventário no momento da conclusão (imune a mudanças futuras de preço)
       const { data: finalValueRows } = await (supabase as any).from('inventory_count_items')
-        .select('counted_stock, stock_items:item_id(unit_cost, purchase_qty)')
+        .select('id, counted_stock, stock_items:item_id(unit_cost, purchase_qty)')
         .eq('count_id', detailCountId).not('counted_stock', 'is', null);
+
+      const frozenUpdates = ((finalValueRows || []) as any[]).map((r: any) => {
+        const uc = r.stock_items?.unit_cost ?? 0;
+        const pq = Math.max(1, r.stock_items?.purchase_qty ?? 1);
+        return { id: r.id, frozen_value: Number(r.counted_stock) * (uc / pq) };
+      });
+      if (frozenUpdates.length > 0) {
+        await (supabase as any).from('inventory_count_items').upsert(frozenUpdates);
+      }
+
       const final_value = ((finalValueRows || []) as any[]).reduce((s: number, r: any) => {
         const uc = r.stock_items?.unit_cost ?? 0;
         const pq = Math.max(1, r.stock_items?.purchase_qty ?? 1);
@@ -921,7 +931,7 @@ export default function InventoryPage() {
                       const ok = diff === 0;
                       const uc = d.stock_items?.unit_cost ?? 0;
                       const pq = Math.max(1, d.stock_items?.purchase_qty ?? 1);
-                      const val = Number(d.counted_stock) * (uc / pq);
+                      const val = d.frozen_value ?? (Number(d.counted_stock) * (uc / pq));
                       return (
                         <tr key={d.id} className={!ok ? 'bg-red-50/40' : ''}>
                           <td className="px-3 py-1.5">
@@ -975,6 +985,7 @@ export default function InventoryPage() {
               {/* Total valor inventariado */}
               {detailItems.length > 0 && (() => {
                 const total = detailItems.reduce((s, d) => {
+                  if (d.frozen_value != null) return s + d.frozen_value;
                   const uc = d.stock_items?.unit_cost ?? 0;
                   const pq = Math.max(1, d.stock_items?.purchase_qty ?? 1);
                   return s + Number(d.counted_stock) * (uc / pq);
@@ -1051,7 +1062,7 @@ function InventoryReport({ items, totalItemsInCount }: { items: any[]; totalItem
     const uc = d.stock_items?.unit_cost ?? 0;
     const pq = Math.max(1, d.stock_items?.purchase_qty ?? 1);
     const qty = Number(d.counted_stock) || 0;
-    const value = qty * (uc / pq);
+    const value = d.frozen_value != null ? d.frozen_value : qty * (uc / pq);
     totalValue += value;
 
     if (!byCategory[cat]) byCategory[cat] = { count: 0, value: 0 };
