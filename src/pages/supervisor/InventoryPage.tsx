@@ -116,8 +116,9 @@ export default function InventoryPage() {
   };
 
   const openNewCount = async () => {
-    const [{ data: items }, { data: empData }, { data: grpData }] = await Promise.all([
-      (supabase as any).from('stock_items').select('id, counter_user_id, counter_group_id'),
+    const [{ data: items }, { data: respData }, { data: empData }, { data: grpData }] = await Promise.all([
+      (supabase as any).from('stock_items').select('id'),
+      (supabase as any).from('stock_item_responsibles').select('item_id, user_id, group_id'),
       supabase.from('profiles').select('user_id, display_name'),
       (supabase as any).from('inventory_groups').select('id, name'),
     ]);
@@ -125,21 +126,27 @@ export default function InventoryPage() {
     const empMap = Object.fromEntries(((empData ?? []) as Employee[]).map(e => [e.user_id, e.display_name]));
     const grpLabelMap = Object.fromEntries(((grpData ?? []) as any[]).map(g => [g.id, g.name]));
 
+    const respByItem: Record<string, { user_id: string | null; group_id: string | null }[]> = {};
+    for (const r of (respData || []) as any[]) {
+      if (!respByItem[r.item_id]) respByItem[r.item_id] = [];
+      respByItem[r.item_id].push({ user_id: r.user_id, group_id: r.group_id });
+    }
+
     const userMap: Record<string, { label: string; count: number }> = {};
     const grpMap: Record<string, { label: string; count: number }> = {};
     let unassigned = 0;
 
     for (const item of (items || []) as any[]) {
-      if (item.counter_user_id) {
-        const uid = item.counter_user_id;
-        if (!userMap[uid]) userMap[uid] = { label: empMap[uid] ?? uid, count: 0 };
-        userMap[uid].count++;
-      } else if (item.counter_group_id) {
-        const gid = item.counter_group_id;
-        if (!grpMap[gid]) grpMap[gid] = { label: grpLabelMap[gid] ?? gid, count: 0 };
-        grpMap[gid].count++;
-      } else {
-        unassigned++;
+      const resp = respByItem[item.id] || [];
+      if (resp.length === 0) { unassigned++; continue; }
+      for (const r of resp) {
+        if (r.user_id) {
+          if (!userMap[r.user_id]) userMap[r.user_id] = { label: empMap[r.user_id] ?? r.user_id, count: 0 };
+          userMap[r.user_id].count++;
+        } else if (r.group_id) {
+          if (!grpMap[r.group_id]) grpMap[r.group_id] = { label: grpLabelMap[r.group_id] ?? r.group_id, count: 0 };
+          grpMap[r.group_id].count++;
+        }
       }
     }
 
@@ -166,10 +173,17 @@ export default function InventoryPage() {
       if (countErr || !countData) throw countErr;
       const cId = (countData as any).id;
 
-      const { data: allItems } = await (supabase as any)
-        .from('stock_items')
-        .select('id, current_stock, counter_user_id, counter_group_id');
+      const [{ data: allItems }, { data: allResp }] = await Promise.all([
+        (supabase as any).from('stock_items').select('id, current_stock'),
+        (supabase as any).from('stock_item_responsibles').select('item_id, user_id, group_id'),
+      ]);
       if (!allItems) throw new Error('no items');
+
+      const respByItem: Record<string, { user_id: string | null; group_id: string | null }[]> = {};
+      for (const r of (allResp || []) as any[]) {
+        if (!respByItem[r.item_id]) respByItem[r.item_id] = [];
+        respByItem[r.item_id].push({ user_id: r.user_id, group_id: r.group_id });
+      }
 
       // Build override maps
       const userOverride: Record<string, string | null> = {};
@@ -185,33 +199,52 @@ export default function InventoryPage() {
         }
       }
 
+      // Resolve responsáveis finais (com overrides aplicados) por item
+      const finalRespByIdx: { user_id: string | null; group_id: string | null }[][] = [];
       const countItemsData = (allItems as any[]).map(item => {
-        let assigned_user_id = item.counter_user_id ?? null;
-        let assigned_group_id = item.counter_group_id ?? null;
-
-        // Apply overrides
-        if (item.counter_user_id && userOverride[item.counter_user_id] !== undefined) {
-          assigned_user_id = userOverride[item.counter_user_id];
-        }
-        if (item.counter_group_id && grpOverride[item.counter_group_id] !== undefined) {
-          assigned_group_id = grpOverride[item.counter_group_id];
-        }
+        let resp = respByItem[item.id] || [];
+        resp = resp
+          .map(r => {
+            if (r.user_id && userOverride[r.user_id] !== undefined) {
+              const ov = userOverride[r.user_id];
+              return ov ? { user_id: ov, group_id: null } : null;
+            }
+            if (r.group_id && grpOverride[r.group_id] !== undefined) {
+              const ov = grpOverride[r.group_id];
+              return ov ? { user_id: null, group_id: ov } : null;
+            }
+            return r;
+          })
+          .filter((r): r is { user_id: string | null; group_id: string | null } => r !== null);
+        finalRespByIdx.push(resp);
 
         return {
           count_id: cId,
           item_id: item.id,
           system_stock: item.current_stock ?? 0,
-          assigned_user_id,
-          assigned_group_id,
+          // Mantém 1º responsável nas colunas legadas (compat) — os demais vão na tabela de assignees
+          assigned_user_id: resp[0]?.user_id ?? null,
+          assigned_group_id: resp[0]?.group_id ?? null,
         };
       });
 
-      const { error: insertErr } = await supabase.from('inventory_count_items' as any).insert(countItemsData);
-      if (insertErr) {
+      const { data: insertedItems, error: insertErr } = await supabase.from('inventory_count_items' as any).insert(countItemsData).select('id');
+      if (insertErr || !insertedItems) {
         await supabase.from('inventory_counts' as any).delete().eq('id', cId);
-        toast.error('Erro ao criar contagem: ' + insertErr.message);
+        toast.error('Erro ao criar contagem: ' + insertErr?.message);
         setCreating(false);
         return;
+      }
+
+      // Fan-out: grava TODOS os responsáveis (inclusive extras além do 1º) na tabela de assignees
+      const assigneeRowsToInsert: { count_item_id: string; user_id: string | null; group_id: string | null }[] = [];
+      (insertedItems as any[]).forEach((row, idx) => {
+        for (const r of finalRespByIdx[idx]) {
+          assigneeRowsToInsert.push({ count_item_id: row.id, user_id: r.user_id, group_id: r.group_id });
+        }
+      });
+      if (assigneeRowsToInsert.length > 0) {
+        await supabase.from('inventory_count_item_assignees' as any).insert(assigneeRowsToInsert);
       }
 
       toast.success('Contagem criada! Os funcionários já podem contar no app deles.');

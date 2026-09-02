@@ -736,11 +736,9 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 // ─── Item Form ───
-function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, allProfiles, allGroups, onSave, onCancel }: {
+function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, onSave, onCancel }: {
   item?: Item; allCategories: string[]; allSubcategories: Subcategory[];
   allCategoryRecords: { id: string; name: string }[];
-  allProfiles: { user_id: string; display_name: string }[];
-  allGroups: { id: string; name: string }[];
   onSave: (i: Partial<Item> & { name: string; category: string; unit: string }) => void;
   onCancel: () => void;
 }) {
@@ -754,9 +752,6 @@ function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, a
   const [purchaseQty, setPurchaseQty] = useState(item?.purchase_qty?.toString() || '1');
   const [barcode, setBarcode] = useState(item?.barcode || '');
   const [imageUrl, setImageUrl] = useState(item?.image_url || null);
-  const [responsible, setResponsible] = useState(
-    item?.counter_user_id ? `user:${item.counter_user_id}` : item?.counter_group_id ? `group:${item.counter_group_id}` : ''
-  );
 
   const catRec = allCategoryRecords.find(c => c.name === category);
   const availableSubcats = catRec ? allSubcategories.filter(s => s.category_id === catRec.id) : allSubcategories;
@@ -783,8 +778,6 @@ function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, a
       barcode: barcode.trim() || null,
       image_url: imageUrl,
       subcategory_id: subcategoryId || null,
-      counter_user_id: responsible.startsWith('user:') ? responsible.slice(5) : null,
-      counter_group_id: responsible.startsWith('group:') ? responsible.slice(6) : null,
     } as any);
   };
 
@@ -873,17 +866,9 @@ function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, a
         <label className="text-sm text-muted-foreground mb-1 block">Código de Barras</label>
         <Input value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="EAN" />
       </div>
-      <div>
-        <label className="text-sm text-muted-foreground mb-1 block">Responsável pelo inventário</label>
-        <Select value={responsible || 'none'} onValueChange={v => setResponsible(v === 'none' ? '' : v)}>
-          <SelectTrigger><SelectValue placeholder="Sem responsável" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Sem responsável</SelectItem>
-            {allGroups.map(g => <SelectItem key={g.id} value={`group:${g.id}`}>👥 {g.name}</SelectItem>)}
-            {allProfiles.map(p => <SelectItem key={p.user_id} value={`user:${p.user_id}`}>{p.display_name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
+      {item?.id && (
+        <p className="text-xs text-muted-foreground italic">Responsáveis pelo inventário: edite na coluna "RESPONSÁVEL" da tabela após salvar.</p>
+      )}
       <div className="flex gap-3 pt-2">
         <Button onClick={handleSubmit} className="flex-1">Salvar</Button>
         <Button variant="outline" onClick={onCancel}>Cancelar</Button>
@@ -929,6 +914,7 @@ export default function StockItemsPage() {
   const [allProfiles, setAllProfiles] = useState<{ user_id: string; display_name: string }[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([]);
   const [editingResponsibleItemId, setEditingResponsibleItemId] = useState<string | null>(null);
+  const [itemResponsibles, setItemResponsibles] = useState<Record<string, { id: string; user_id: string | null; group_id: string | null }[]>>({});
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -1044,6 +1030,16 @@ export default function StockItemsPage() {
           }
           setSuppliers(suppMap);
         });
+
+      (supabase.from('stock_item_responsibles') as any).select('id, item_id, user_id, group_id').in('item_id', ids)
+        .then(({ data: respData }: any) => {
+          const respMap: Record<string, { id: string; user_id: string | null; group_id: string | null }[]> = {};
+          for (const r of (respData || []) as any[]) {
+            if (!respMap[r.item_id]) respMap[r.item_id] = [];
+            respMap[r.item_id].push({ id: r.id, user_id: r.user_id, group_id: r.group_id });
+          }
+          setItemResponsibles(respMap);
+        });
     }
   };
 
@@ -1157,15 +1153,22 @@ export default function StockItemsPage() {
     toast.success('Subcategoria atualizada');
   };
 
-  const saveResponsible = async (itemId: string, value: string) => {
-    // value: '' (sem responsável), `user:<id>` ou `group:<id>`
-    const counter_user_id = value.startsWith('user:') ? value.slice(5) : null;
-    const counter_group_id = value.startsWith('group:') ? value.slice(6) : null;
-    const { error } = await supabase.from('stock_items').update({ counter_user_id, counter_group_id } as any).eq('id', itemId);
-    if (error) { toast.error('Erro ao salvar responsável'); return; }
-    setItems(prev => prev.map(i => i.id === itemId ? { ...i, counter_user_id, counter_group_id } : i));
-    setEditingResponsibleItemId(null);
-    toast.success('Responsável atualizado');
+  const addResponsible = async (itemId: string, value: string) => {
+    if (!value) return;
+    const user_id = value.startsWith('user:') ? value.slice(5) : null;
+    const group_id = value.startsWith('group:') ? value.slice(6) : null;
+    const already = (itemResponsibles[itemId] || []).some(r => r.user_id === user_id && r.group_id === group_id);
+    if (already) return;
+    const { data, error } = await (supabase.from('stock_item_responsibles') as any)
+      .insert({ item_id: itemId, user_id, group_id }).select('id, item_id, user_id, group_id').single();
+    if (error) { toast.error('Erro ao adicionar responsável'); return; }
+    setItemResponsibles(prev => ({ ...prev, [itemId]: [...(prev[itemId] || []), { id: data.id, user_id, group_id }] }));
+  };
+
+  const removeResponsible = async (itemId: string, respId: string) => {
+    const { error } = await (supabase.from('stock_item_responsibles') as any).delete().eq('id', respId);
+    if (error) { toast.error('Erro ao remover responsável'); return; }
+    setItemResponsibles(prev => ({ ...prev, [itemId]: (prev[itemId] || []).filter(r => r.id !== respId) }));
   };
 
   const handleDelete = async (id: string) => {
@@ -1658,36 +1661,47 @@ export default function StockItemsPage() {
                     <td className="px-3 py-2 whitespace-nowrap">
                       <Badge variant="outline" className="text-[10px] font-normal">{item.category || '—'}</Badge>
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {editingResponsibleItemId === item.id ? (
-                        <select
-                          autoFocus
-                          defaultValue={item.counter_user_id ? `user:${item.counter_user_id}` : item.counter_group_id ? `group:${item.counter_group_id}` : ''}
-                          className="text-xs border border-primary rounded px-2 py-1 bg-white outline-none w-full max-w-[160px]"
-                          onBlur={() => setEditingResponsibleItemId(null)}
-                          onChange={e => saveResponsible(item.id, e.target.value)}
-                        >
-                          <option value="">Sem responsável</option>
-                          <optgroup label="Grupos">
-                            {allGroups.map(g => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}
-                          </optgroup>
-                          <optgroup label="Pessoas">
-                            {allProfiles.map(p => <option key={p.user_id} value={`user:${p.user_id}`}>{p.display_name}</option>)}
-                          </optgroup>
-                        </select>
-                      ) : (
-                        <span
-                          onClick={e => { e.stopPropagation(); setEditingResponsibleItemId(item.id); }}
-                          title="Clique para trocar"
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-opacity hover:opacity-80 ${(item.counter_user_id || item.counter_group_id) ? 'bg-indigo-50 text-indigo-700' : ''}`}
-                        >
-                          {item.counter_user_id
-                            ? (allProfiles.find(p => p.user_id === item.counter_user_id)?.display_name || '—')
-                            : item.counter_group_id
-                              ? (allGroups.find(g => g.id === item.counter_group_id)?.name || '—')
-                              : <span className="text-muted-foreground/60 italic font-normal">— sem responsável</span>}
-                        </span>
-                      )}
+                    <td className="px-3 py-2 relative">
+                      {(() => {
+                        const resp = itemResponsibles[item.id] || [];
+                        return (
+                          <div className="flex flex-wrap items-center gap-1 max-w-[220px]">
+                            {resp.map(r => {
+                              const label = r.user_id
+                                ? allProfiles.find(p => p.user_id === r.user_id)?.display_name
+                                : allGroups.find(g => g.id === r.group_id)?.name;
+                              return (
+                                <span key={r.id} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700">
+                                  {r.group_id && '👥 '}{label || '—'}
+                                  <button onClick={e => { e.stopPropagation(); removeResponsible(item.id, r.id); }} className="hover:text-red-600">×</button>
+                                </span>
+                              );
+                            })}
+                            <button
+                              onClick={e => { e.stopPropagation(); setEditingResponsibleItemId(editingResponsibleItemId === item.id ? null : item.id); }}
+                              className="text-[11px] text-muted-foreground hover:text-primary border border-dashed border-border rounded px-1.5 py-0.5"
+                            >+ resp</button>
+                            {resp.length === 0 && editingResponsibleItemId !== item.id && (
+                              <span className="text-muted-foreground/60 italic font-normal text-[11px]">sem responsável</span>
+                            )}
+                            {editingResponsibleItemId === item.id && (
+                              <div className="absolute z-20 top-full left-0 mt-1 bg-white border border-border rounded-lg shadow-lg p-2 w-56 max-h-64 overflow-y-auto" onClick={e => e.stopPropagation()}>
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground/60 px-1 mb-1">Grupos</p>
+                                {allGroups.map(g => (
+                                  <button key={g.id} onClick={() => addResponsible(item.id, `group:${g.id}`)}
+                                    className="w-full text-left px-2 py-1 text-xs rounded hover:bg-muted flex items-center gap-1">👥 {g.name}</button>
+                                ))}
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground/60 px-1 mb-1 mt-2">Pessoas</p>
+                                {allProfiles.map(p => (
+                                  <button key={p.user_id} onClick={() => addResponsible(item.id, `user:${p.user_id}`)}
+                                    className="w-full text-left px-2 py-1 text-xs rounded hover:bg-muted">{p.display_name}</button>
+                                ))}
+                                <button onClick={() => setEditingResponsibleItemId(null)} className="w-full text-center px-2 py-1 text-xs text-muted-foreground hover:text-foreground mt-1 border-t border-border pt-1.5">Fechar</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {editingCell?.id === item.id && editingCell.field === 'current_stock' ? (
@@ -1807,7 +1821,7 @@ export default function StockItemsPage() {
             <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
             <DialogDescription>{editingItem ? 'Atualize os dados do item' : 'Preencha os dados do novo item'}</DialogDescription>
           </DialogHeader>
-          <ItemForm item={editingItem} allCategories={allCategories} allSubcategories={allSubcategories} allCategoryRecords={allCategoryRecords} allProfiles={allProfiles} allGroups={allGroups} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
+          <ItemForm item={editingItem} allCategories={allCategories} allSubcategories={allSubcategories} allCategoryRecords={allCategoryRecords} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
         </DialogContent>
       </Dialog>
 

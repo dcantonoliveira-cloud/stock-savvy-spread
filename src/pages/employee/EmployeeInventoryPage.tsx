@@ -485,9 +485,33 @@ export default function EmployeeInventoryPage({ previewUserId }: { previewUserId
         groupData = gd || [];
       }
 
+      // Load items assigned via extra assignees (multi-responsável)
+      const { data: directAssignees } = await (supabase as any)
+        .from('inventory_count_item_assignees')
+        .select('count_item_id')
+        .eq('user_id', effectiveUserId);
+      let groupAssignees: any[] = [];
+      if (groupIds.length > 0) {
+        const { data: ga } = await (supabase as any)
+          .from('inventory_count_item_assignees')
+          .select('count_item_id')
+          .in('group_id', groupIds);
+        groupAssignees = ga || [];
+      }
+      const extraIds = [...new Set([...(directAssignees || []), ...groupAssignees].map((a: any) => a.count_item_id))];
+      let extraData: any[] = [];
+      if (extraIds.length > 0) {
+        const { data: ed } = await (supabase as any)
+          .from('inventory_count_items')
+          .select('id, count_id, item_id, system_stock, counted_stock, stock_items(name, unit, category), inventory_counts(id, created_at)')
+          .in('id', extraIds)
+          .in('count_id', [...activeIds]);
+        extraData = ed || [];
+      }
+
       const seen = new Set<string>();
       const all: InventoryCountItem[] = [];
-      for (const item of [...(directData || []), ...groupData]) {
+      for (const item of [...(directData || []), ...groupData, ...extraData]) {
         if (!seen.has(item.id) && activeIds.has(item.count_id)) {
           seen.add(item.id);
           all.push(item as InventoryCountItem);
