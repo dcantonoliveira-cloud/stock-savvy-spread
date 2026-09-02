@@ -153,6 +153,10 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
   });
 
   const totalCost = filteredRows.reduce((s, r) => s + getEffectiveQty(r) * r.unitCost, 0);
+  const itemsInStockCount = filteredRows.filter(r => getEffectiveQty(r) <= 0).length;
+  const itemsToBuyCount = filteredRows.filter(r => getEffectiveQty(r) > 0).length;
+  const totalListValue = filteredRows.reduce((s, r) => s + r.needed * r.unitCost, 0);
+  const stockDeductionValue = filteredRows.reduce((s, r) => s + Math.min(r.needed, r.inStock) * r.unitCost, 0);
 
   const handlePrint = () => {
     const win = window.open('', '_blank');
@@ -311,6 +315,30 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
           <Button variant="outline" size="sm" onClick={handleGenerateExcel}>
             <SheetIcon className="w-3.5 h-3.5 mr-1.5" />Gerar Excel
           </Button>
+        </div>
+      </div>
+
+      {/* Resumo */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex-1 min-w-[140px] rounded-xl border border-border bg-white px-4 py-3">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">Em estoque</p>
+          <p className="text-lg font-bold text-success">{itemsInStockCount}</p>
+        </div>
+        <div className="flex-1 min-w-[140px] rounded-xl border border-border bg-white px-4 py-3">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">A comprar</p>
+          <p className="text-lg font-bold text-amber-700">{itemsToBuyCount}</p>
+        </div>
+        <div className="flex-1 min-w-[140px] rounded-xl border border-border bg-white px-4 py-3">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">Valor da compra</p>
+          <p className="text-lg font-bold text-amber-700">R$ {fmtCur(totalCost)}</p>
+        </div>
+        <div className="flex-1 min-w-[140px] rounded-xl border border-border bg-white px-4 py-3">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">Valor total da lista</p>
+          <p className="text-lg font-bold text-foreground">R$ {fmtCur(totalListValue)}</p>
+        </div>
+        <div className="flex-1 min-w-[140px] rounded-xl border border-border bg-white px-4 py-3">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">A deduzir do estoque</p>
+          <p className="text-lg font-bold text-sky-700">R$ {fmtCur(stockDeductionValue)}</p>
         </div>
       </div>
 

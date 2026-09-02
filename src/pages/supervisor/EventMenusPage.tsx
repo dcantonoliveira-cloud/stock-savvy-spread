@@ -8,12 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Eye, Package, X, ShoppingCart, Search, Loader2 } from 'lucide-react';
 import ConsolidatedShoppingListDialog from '@/components/ConsolidatedShoppingListDialog';
 import { toast } from 'sonner';
+import { convertToItemUnit } from '@/lib/units';
+import { fmtCur } from '@/lib/format';
 
 type EventOption = { id: string; event_name: string; event_date: string; location_text: string | null; guest_count: number | null };
 type MenuRow = {
   id: string; event_id: string | null; status: string;
   name: string | null; location: string | null; event_date: string | null; guest_count: number | null;
-  created_at: string; dishCount: number;
+  created_at: string; dishCount: number; totalValue: number;
   events: { event_name: string; event_date: string; location_text: string | null; guest_count: number | null } | null;
 };
 
@@ -43,12 +45,58 @@ export default function EventMenusPage() {
       .order('created_at', { ascending: false });
     const menusData = (data || []) as any[];
     const ids = menusData.map(m => m.id);
+
     const dishCounts: Record<string, number> = {};
+    const totalValueByMenu: Record<string, number> = {};
+
     if (ids.length) {
-      const { data: dishRows } = await (supabase.from('event_menu_dishes') as any).select('menu_id').in('menu_id', ids);
-      for (const d of (dishRows || []) as any[]) dishCounts[d.menu_id] = (dishCounts[d.menu_id] || 0) + 1;
+      const { data: dishRows } = await (supabase.from('event_menu_dishes') as any)
+        .select('id, menu_id, sheet_id, planned_quantity').in('menu_id', ids);
+      const dishes = (dishRows || []) as { id: string; menu_id: string; sheet_id: string; planned_quantity: number }[];
+      for (const d of dishes) dishCounts[d.menu_id] = (dishCounts[d.menu_id] || 0) + 1;
+
+      if (dishes.length > 0) {
+        const sheetIds = [...new Set(dishes.map(d => d.sheet_id))];
+        const dishIds = dishes.map(d => d.id);
+        const [sheetsRes, itemsRes, overridesRes] = await Promise.all([
+          supabase.from('technical_sheets').select('id, yield_quantity').in('id', sheetIds),
+          (supabase.from('technical_sheet_items') as any).select('sheet_id, item_id, quantity, unit').in('sheet_id', sheetIds),
+          (supabase.from('event_menu_dish_items') as any).select('menu_dish_id, item_id, override_quantity').in('menu_dish_id', dishIds),
+        ]);
+        const yieldBySheet: Record<string, number> = {};
+        for (const s of (sheetsRes.data || []) as any[]) yieldBySheet[s.id] = s.yield_quantity || 1;
+
+        const overrideByDishItem: Record<string, number> = {};
+        for (const o of (overridesRes.data || []) as any[]) {
+          if (o.override_quantity != null) overrideByDishItem[`${o.menu_dish_id}:${o.item_id}`] = o.override_quantity;
+        }
+
+        const sheetItems = (itemsRes.data || []) as { sheet_id: string; item_id: string; quantity: number; unit: string }[];
+        const itemIds = [...new Set(sheetItems.map(i => i.item_id))];
+        const { data: stockData } = itemIds.length
+          ? await (supabase.from('stock_items') as any).select('id, unit, unit_cost, purchase_qty').in('id', itemIds)
+          : { data: [] as any[] };
+        const stockById: Record<string, { unit: string; unit_cost: number; purchase_qty: number | null }> = {};
+        for (const s of (stockData || []) as any[]) stockById[s.id] = s;
+
+        for (const dish of dishes) {
+          const yieldQty = yieldBySheet[dish.sheet_id] || 1;
+          const factor = (dish.planned_quantity || 0) / yieldQty;
+          for (const si of sheetItems.filter(i => i.sheet_id === dish.sheet_id)) {
+            const stock = stockById[si.item_id];
+            if (!stock) continue;
+            const overrideKey = `${dish.id}:${si.item_id}`;
+            const rawQty = overrideKey in overrideByDishItem ? overrideByDishItem[overrideKey] : si.quantity * factor;
+            if (rawQty === 0) continue;
+            const neededInItemUnit = convertToItemUnit(rawQty, si.unit || stock.unit, stock.unit);
+            const effUnitCost = (stock.unit_cost || 0) / Math.max(1, stock.purchase_qty || 1);
+            totalValueByMenu[dish.menu_id] = (totalValueByMenu[dish.menu_id] || 0) + neededInItemUnit * effUnitCost;
+          }
+        }
+      }
     }
-    setMenus(menusData.map(m => ({ ...m, dishCount: dishCounts[m.id] || 0 })));
+
+    setMenus(menusData.map(m => ({ ...m, dishCount: dishCounts[m.id] || 0, totalValue: totalValueByMenu[m.id] || 0 })));
     setLoading(false);
   };
 
@@ -208,6 +256,7 @@ export default function EventMenusPage() {
               <th className="text-left px-3 py-2.5">LOCAL</th>
               <th className="text-center px-3 py-2.5">CONVIDADOS</th>
               <th className="text-center px-3 py-2.5">PRATOS</th>
+              <th className="text-right px-3 py-2.5">VALOR TOTAL</th>
               <th className="text-center px-3 py-2.5 w-20">AÇÕES</th>
             </tr>
           </thead>
@@ -221,6 +270,7 @@ export default function EventMenusPage() {
                 <td className="px-3 py-3"><div className="h-4 bg-muted rounded w-24" /></td>
                 <td className="px-3 py-3 text-center"><div className="h-4 bg-muted rounded w-8 mx-auto" /></td>
                 <td className="px-3 py-3 text-center"><div className="h-4 bg-muted rounded w-8 mx-auto" /></td>
+                <td className="px-3 py-3 text-right"><div className="h-4 bg-muted rounded w-16 ml-auto" /></td>
                 <td className="px-3 py-3"><div className="h-4 bg-muted rounded w-16 mx-auto" /></td>
               </tr>
             ))}
@@ -242,6 +292,7 @@ export default function EventMenusPage() {
                 <td className="px-3 py-3 text-xs text-muted-foreground">{displayLocation(m) || '—'}</td>
                 <td className="px-3 py-3 text-center text-sm font-medium text-foreground">{displayGuests(m) ?? '—'}</td>
                 <td className="px-3 py-3 text-center text-sm font-medium text-foreground">{m.dishCount}</td>
+                <td className="px-3 py-3 text-right text-sm font-medium text-foreground">{m.totalValue > 0 ? `R$ ${fmtCur(m.totalValue)}` : '—'}</td>
                 <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center justify-center gap-0.5">
                     <Button variant="ghost" size="icon" className="w-7 h-7" title="Abrir" onClick={() => navigate(`/event-menus/${m.id}`)}><Eye className="w-3.5 h-3.5" /></Button>
@@ -251,7 +302,7 @@ export default function EventMenusPage() {
               </tr>
             ))}
             {!loading && menus.length === 0 && (
-              <tr><td colSpan={8} className="px-5 py-16 text-center text-muted-foreground"><Package className="w-10 h-10 mx-auto mb-3 opacity-30" /><p>Nenhum cardápio criado ainda.</p></td></tr>
+              <tr><td colSpan={9} className="px-5 py-16 text-center text-muted-foreground"><Package className="w-10 h-10 mx-auto mb-3 opacity-30" /><p>Nenhum cardápio criado ainda.</p></td></tr>
             )}
           </tbody>
         </table>
