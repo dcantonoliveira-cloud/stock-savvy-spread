@@ -97,16 +97,23 @@ export default function InventoryPage() {
     if (histRes.data) {
       const counts = histRes.data as any[];
       const enriched = await Promise.all(counts.map(async c => {
-        const [{ count: total }, { count: counted }, { data: valueRows }] = await Promise.all([
+        const [{ count: total }, { count: counted }] = await Promise.all([
           (supabase.from('inventory_count_items' as any) as any).select('*', { count: 'exact', head: true }).eq('count_id', c.id),
           (supabase.from('inventory_count_items' as any) as any).select('*', { count: 'exact', head: true }).eq('count_id', c.id).not('counted_stock', 'is', null),
-          (supabase as any).from('inventory_count_items').select('counted_stock, stock_items:item_id(unit_cost, purchase_qty)').eq('count_id', c.id).not('counted_stock', 'is', null),
         ]);
-        const inventory_value = ((valueRows || []) as any[]).reduce((s: number, r: any) => {
-          const uc = r.stock_items?.unit_cost ?? 0;
-          const pq = Math.max(1, r.stock_items?.purchase_qty ?? 1);
-          return s + Number(r.counted_stock) * (uc / pq);
-        }, 0);
+        // Concluído: usa o valor congelado no momento da conclusão (imune a mudanças futuras de preço).
+        // Em andamento: calcula ao vivo com os preços atuais.
+        let inventory_value = c.final_value;
+        if (c.status !== 'completed' || inventory_value === null || inventory_value === undefined) {
+          const { data: valueRows } = await (supabase as any).from('inventory_count_items')
+            .select('counted_stock, stock_items:item_id(unit_cost, purchase_qty)')
+            .eq('count_id', c.id).not('counted_stock', 'is', null);
+          inventory_value = ((valueRows || []) as any[]).reduce((s: number, r: any) => {
+            const uc = r.stock_items?.unit_cost ?? 0;
+            const pq = Math.max(1, r.stock_items?.purchase_qty ?? 1);
+            return s + Number(r.counted_stock) * (uc / pq);
+          }, 0);
+        }
         return { ...c, total_items: total || 0, counted_items: counted || 0, inventory_value };
       }));
       setHistory(enriched as InventoryCount[]);
@@ -424,9 +431,19 @@ export default function InventoryPage() {
         }
       }
 
+      // Congela o valor do inventário no momento da conclusão (imune a mudanças futuras de preço)
+      const { data: finalValueRows } = await (supabase as any).from('inventory_count_items')
+        .select('counted_stock, stock_items:item_id(unit_cost, purchase_qty)')
+        .eq('count_id', detailCountId).not('counted_stock', 'is', null);
+      const final_value = ((finalValueRows || []) as any[]).reduce((s: number, r: any) => {
+        const uc = r.stock_items?.unit_cost ?? 0;
+        const pq = Math.max(1, r.stock_items?.purchase_qty ?? 1);
+        return s + Number(r.counted_stock) * (uc / pq);
+      }, 0);
+
       await supabase
         .from('inventory_counts' as any)
-        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .update({ status: 'completed', completed_at: new Date().toISOString(), final_value })
         .eq('id', detailCountId);
 
       const uncountedCount = (allRows as any[]).filter(r => r.counted_stock === null).length;
