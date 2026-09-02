@@ -48,6 +48,7 @@ export default function CategoriesPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [catSearch, setCatSearch] = useState('');
 
   // Subcategory dialog state
   const [subDialogOpen, setSubDialogOpen] = useState(false);
@@ -243,6 +244,17 @@ export default function CategoriesPage() {
         </div>
       </div>
 
+      {summaries.length > 8 && (
+        <div className="relative mb-4 max-w-xs">
+          <input
+            value={catSearch}
+            onChange={e => setCatSearch(e.target.value)}
+            placeholder="Filtrar categoria..."
+            className="w-full h-9 pl-3 pr-3 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+          />
+        </div>
+      )}
+
       <div className="rounded-xl border border-border overflow-hidden bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead>
@@ -257,11 +269,15 @@ export default function CategoriesPage() {
             </tr>
           </thead>
           <tbody>
-            {summaries.map((cat, idx) => {
-              const catSubs = subcategories.filter(s => {
-                const catRec = categoryRecords.find(c => c.name === cat.name);
-                return catRec && s.category_id === catRec.id;
-              });
+            {summaries.filter(c => !catSearch.trim() || c.name.toLowerCase().includes(catSearch.toLowerCase())).map((cat, idx) => {
+              const catRec = categoryRecords.find(c => c.name === cat.name);
+              const catSubs = subcategories.filter(s =>
+                catRec && (
+                  s.category_id === catRec.id ||
+                  // fallback: categoria veio de extraCats (sem UUID real) — busca pelo nome
+                  categoryRecords.find(c => c.id === s.category_id)?.name === cat.name
+                )
+              );
               const isExpanded = expandedCategories.has(cat.id);
               return (
                 <>
