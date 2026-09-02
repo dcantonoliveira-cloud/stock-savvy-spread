@@ -1451,6 +1451,10 @@ export default function StockItemsPage() {
     setPage(0);
   };
 
+  // Sempre reativo: recalcula quando allSubcategories chega, mesmo se doLoad terminou primeiro
+  const subcategoryNameById: Record<string, string> = {};
+  allSubcategories.forEach(s => { subcategoryNameById[s.id] = s.name; });
+
   const SortIcon = ({ field }: { field: typeof sortField }) =>
     sortField === field
       ? (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)
@@ -1608,8 +1612,8 @@ export default function StockItemsPage() {
                         <span
                           onClick={e => { e.stopPropagation(); setEditingSubcatItemId(item.id); }}
                           title="Clique para trocar"
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-opacity hover:opacity-80 ${SUBCAT_COLORS[item.subcategory_name || ''] || 'bg-slate-100 text-slate-600'}`}
-                        >{item.subcategory_name || <span className="text-muted-foreground/60 italic font-normal">— sem sub</span>}</span>
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium cursor-pointer transition-opacity hover:opacity-80 ${SUBCAT_COLORS[subcategoryNameById[item.subcategory_id || ''] || ''] || 'bg-slate-100 text-slate-600'}`}
+                        >{subcategoryNameById[item.subcategory_id || ''] || <span className="text-muted-foreground/60 italic font-normal">— sem sub</span>}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
