@@ -62,6 +62,7 @@ export default function InventoryPage() {
   const [zeroUncounted, setZeroUncounted] = useState(false);
   const [editingDetailItem, setEditingDetailItem] = useState<string | null>(null);
   const [editingDetailValue, setEditingDetailValue] = useState('');
+  const [detailTab, setDetailTab] = useState<'itens' | 'relatorio'>('itens');
   const detailCount = history.find(h => h.id === detailCountId);
 
   useEffect(() => { load(); }, []);
@@ -304,12 +305,13 @@ export default function InventoryPage() {
 
   const openDetail = async (countId: string) => {
     setDetailCountId(countId);
+    setDetailTab('itens');
     setLoadingDetail(true);
 
     const [{ data: items }, { data: entries }, { data: profiles }] = await Promise.all([
       (supabase as any)
         .from('inventory_count_items')
-        .select('*, stock_items:item_id(name, unit, category, unit_cost, purchase_qty)')
+        .select('*, stock_items:item_id(name, unit, category, unit_cost, purchase_qty, subcategories:subcategory_id(name))')
         .eq('count_id', countId)
         .not('counted_stock', 'is', null)
         .order('counted_stock', { ascending: false }),
@@ -869,6 +871,18 @@ export default function InventoryPage() {
             <div className="py-12 text-center text-muted-foreground text-sm">Nenhum item contado ainda.</div>
           ) : (
             <>
+              <div className="flex items-center gap-2 mb-3 border-b border-border">
+                <button
+                  onClick={() => setDetailTab('itens')}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${detailTab === 'itens' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                >Itens</button>
+                <button
+                  onClick={() => setDetailTab('relatorio')}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${detailTab === 'relatorio' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                >Relatório</button>
+              </div>
+              {detailTab === 'itens' ? (
+              <>
               <div className="flex items-center gap-4 mb-3 text-sm flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 text-destructive" />
@@ -974,6 +988,10 @@ export default function InventoryPage() {
                   </div>
                 ) : null;
               })()}
+              </>
+              ) : (
+                <InventoryReport items={detailItems} totalItemsInCount={detailCount?.total_items ?? detailItems.length} />
+              )}
               {detailCount?.status !== 'completed' && (
                 <div className="border-t border-border pt-4 mt-2">
                   {/* Toggle: zerar não contados */}
@@ -1013,6 +1031,160 @@ export default function InventoryPage() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function InventoryReport({ items, totalItemsInCount }: { items: any[]; totalItemsInCount: number }) {
+  const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const byCategory: Record<string, { count: number; value: number }> = {};
+  const bySubcategory: Record<string, { category: string; count: number; value: number }> = {};
+  const byCounter: Record<string, { count: number; qty: number }> = {};
+  let totalValue = 0;
+  let biggestDiscrepancy: { name: string; diff: number } | null = null;
+  let discrepanciesCount = 0;
+
+  for (const d of items) {
+    const cat = d.stock_items?.category || 'Sem categoria';
+    const sub = d.stock_items?.subcategories?.name || 'Sem subcategoria';
+    const uc = d.stock_items?.unit_cost ?? 0;
+    const pq = Math.max(1, d.stock_items?.purchase_qty ?? 1);
+    const qty = Number(d.counted_stock) || 0;
+    const value = qty * (uc / pq);
+    totalValue += value;
+
+    if (!byCategory[cat]) byCategory[cat] = { count: 0, value: 0 };
+    byCategory[cat].count++;
+    byCategory[cat].value += value;
+
+    const subKey = `${cat} / ${sub}`;
+    if (!bySubcategory[subKey]) bySubcategory[subKey] = { category: cat, count: 0, value: 0 };
+    bySubcategory[subKey].count++;
+    bySubcategory[subKey].value += value;
+
+    const diff = qty - Number(d.system_stock || 0);
+    if (diff !== 0) {
+      discrepanciesCount++;
+      if (!biggestDiscrepancy || Math.abs(diff) > Math.abs(biggestDiscrepancy.diff)) {
+        biggestDiscrepancy = { name: d.stock_items?.name || '—', diff };
+      }
+    }
+
+    for (const c of d.counters || []) {
+      if (!byCounter[c.name]) byCounter[c.name] = { count: 0, qty: 0 };
+      byCounter[c.name].count++;
+      byCounter[c.name].qty += Number(c.qty) || 0;
+    }
+  }
+
+  const catRows = Object.entries(byCategory).sort((a, b) => b[1].value - a[1].value);
+  const subRows = Object.entries(bySubcategory).sort((a, b) => b[1].value - a[1].value);
+  const counterRows = Object.entries(byCounter).sort((a, b) => b[1].count - a[1].count);
+
+  return (
+    <div className="flex-1 overflow-y-auto space-y-5 pb-2 pr-1">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3 rounded-xl border border-border bg-white">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">Valor total</p>
+          <p className="text-lg font-bold text-amber-700">{fmtBRL(totalValue)}</p>
+        </div>
+        <div className="p-3 rounded-xl border border-border bg-white">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">Itens contados</p>
+          <p className="text-lg font-bold text-foreground">{items.length}/{totalItemsInCount}</p>
+        </div>
+        <div className="p-3 rounded-xl border border-border bg-white">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">Divergências</p>
+          <p className="text-lg font-bold text-destructive">{discrepanciesCount}</p>
+        </div>
+        <div className="p-3 rounded-xl border border-border bg-white">
+          <p className="text-[11px] text-muted-foreground uppercase font-semibold">Maior divergência</p>
+          {biggestDiscrepancy ? (
+            <p className="text-xs font-semibold text-foreground leading-tight mt-1.5">
+              {biggestDiscrepancy.name}{' '}
+              <span className={biggestDiscrepancy.diff > 0 ? 'text-success' : 'text-destructive'}>
+                ({biggestDiscrepancy.diff > 0 ? '+' : ''}{biggestDiscrepancy.diff.toFixed(2)})
+              </span>
+            </p>
+          ) : <p className="text-xs text-muted-foreground mt-1.5">—</p>}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Por categoria</p>
+        <div className="rounded-xl border border-border overflow-hidden bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-muted-foreground bg-muted/20 border-b border-border">
+                <th className="text-left px-3 py-2">Categoria</th>
+                <th className="text-right px-3 py-2">Itens</th>
+                <th className="text-right px-3 py-2">Valor</th>
+                <th className="text-right px-3 py-2">%</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {catRows.map(([name, v]) => (
+                <tr key={name}>
+                  <td className="px-3 py-1.5 text-xs font-medium">{name}</td>
+                  <td className="px-3 py-1.5 text-xs text-right text-muted-foreground">{v.count}</td>
+                  <td className="px-3 py-1.5 text-xs text-right font-semibold">{fmtBRL(v.value)}</td>
+                  <td className="px-3 py-1.5 text-xs text-right text-muted-foreground">{totalValue > 0 ? ((v.value / totalValue) * 100).toFixed(1) : '0'}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Por subcategoria</p>
+        <div className="rounded-xl border border-border overflow-hidden bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-muted-foreground bg-muted/20 border-b border-border">
+                <th className="text-left px-3 py-2">Subcategoria</th>
+                <th className="text-left px-3 py-2">Categoria</th>
+                <th className="text-right px-3 py-2">Itens</th>
+                <th className="text-right px-3 py-2">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {subRows.map(([key, v]) => (
+                <tr key={key}>
+                  <td className="px-3 py-1.5 text-xs font-medium">{key.split(' / ')[1]}</td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">{v.category}</td>
+                  <td className="px-3 py-1.5 text-xs text-right text-muted-foreground">{v.count}</td>
+                  <td className="px-3 py-1.5 text-xs text-right font-semibold">{fmtBRL(v.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {counterRows.length > 0 && (
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Quem contou</p>
+          <div className="rounded-xl border border-border overflow-hidden bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground bg-muted/20 border-b border-border">
+                  <th className="text-left px-3 py-2">Pessoa</th>
+                  <th className="text-right px-3 py-2">Itens contados</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {counterRows.map(([name, v]) => (
+                  <tr key={name}>
+                    <td className="px-3 py-1.5 text-xs font-medium">{name}</td>
+                    <td className="px-3 py-1.5 text-xs text-right text-muted-foreground">{v.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
