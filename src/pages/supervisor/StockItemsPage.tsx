@@ -1009,6 +1009,15 @@ function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, a
 
 const PAGE_SIZE = 50;
 
+// Busca tolerante: casa se o nome contém alguma das palavras digitadas (>=3 letras),
+// não só o texto inteiro — ex: "queijo provolone" encontra "PROVOLONE"
+function buildLooseNameOrFilter(query: string): string {
+  const escape = (w: string) => w.replace(/[%,()]/g, '');
+  const words = query.trim().split(/\s+/).map(escape).filter(w => w.length >= 3);
+  const terms = words.length > 0 ? words : [escape(query.trim())];
+  return terms.map(w => `name.ilike.%${w}%`).join(',');
+}
+
 const SUBCAT_COLORS: Record<string, string> = {
   'Secos':                 'bg-amber-100 text-amber-800',
   'Geladeira':             'bg-sky-100 text-sky-700',
@@ -1133,7 +1142,7 @@ export default function StockItemsPage() {
   const doLoad = async (sq: string, cat: string, subcat: string, sf: typeof sortField, sd: typeof sortDir, p: number) => {
     setSearching(true);
     let q = (supabase.from('stock_items') as any).select('*', { count: 'exact' }).neq('category', '_sistema_');
-    if (sq) q = q.ilike('name', `%${sq}%`);
+    if (sq) q = q.or(buildLooseNameOrFilter(sq));
     if (cat !== 'all') q = q.eq('category', cat);
     if (subcat !== 'all') q = q.eq('subcategory_id', subcat);
     q = q.order(sf, { ascending: sd === 'asc' }).range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
@@ -1556,7 +1565,7 @@ export default function StockItemsPage() {
 
   const exportStock = async () => {
     let q = (supabase.from('stock_items') as any).select('*').neq('category', '_sistema_');
-    if (searchQuery) q = q.ilike('name', `%${searchQuery}%`);
+    if (searchQuery) q = q.or(buildLooseNameOrFilter(searchQuery));
     if (filterCategory !== 'all') q = q.eq('category', filterCategory);
     if (filterSubcategory !== 'all') q = q.eq('subcategory_id', filterSubcategory);
     q = q.order('name').range(0, 9999);

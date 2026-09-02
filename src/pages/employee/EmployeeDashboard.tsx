@@ -28,6 +28,20 @@ type Location = { id: string; item_id: string; kitchen_id: string; current_stock
 type Subcategory = { id: string; name: string; category_id: string };
 type CategoryRecord = { id: string; name: string };
 
+const normalizeText = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+// Busca tolerante: casa se o nome contém o texto inteiro OU pelo menos uma das palavras digitadas
+// (ex: "queijo provolone" encontra "PROVOLONE")
+function looseMatch(itemName: string, query: string): boolean {
+  const nItem = normalizeText(itemName);
+  const nQuery = normalizeText(query);
+  if (!nQuery) return true;
+  if (nItem.includes(nQuery)) return true;
+  const words = nQuery.split(/\s+/).filter(w => w.length >= 3);
+  return words.some(w => nItem.includes(w));
+}
+
 const CATEGORY_EMOJIS: Record<string, string> = {
   'Carnes': '🥩', 'Bebidas': '🥤', 'Frios': '🧀', 'Hortifruti': '🥬',
   'Secos': '🌾', 'Descartáveis': '🥤', 'Limpeza': '🧹', 'Outros': '📦',
@@ -118,7 +132,7 @@ export default function EmployeeDashboard() {
   const categoryItems = selectedSubcategory
     ? categoryItemsAll.filter(i => i.subcategory_id === selectedSubcategory)
     : categoryItemsAll;
-  const searchResults = search ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase())) : [];
+  const searchResults = search ? items.filter(i => looseMatch(i.name, search)) : [];
 
   const handleAction = (item: StockItem, action: 'entry' | 'output' | 'transfer') => {
     setSelectedItem(item);
