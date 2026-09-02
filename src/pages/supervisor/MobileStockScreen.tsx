@@ -476,55 +476,50 @@ function NfScreen({ onBack }: { onBack: () => void }) {
 
               {/* Vincular a insumo existente */}
               <button
-                onClick={() => { setLinkPickerIdx(idx); setLinkSearch(''); }}
+                onClick={() => {
+                  if (linkPickerIdx === idx) { setLinkPickerIdx(null); return; }
+                  setLinkPickerIdx(idx); setLinkSearch('');
+                }}
                 className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold border-t border-gray-100 text-gray-500 hover:bg-gray-50"
               >
                 <Link2 className="w-3.5 h-3.5" />
                 {item.matched_item_id ? 'Trocar insumo vinculado' : 'Vincular a insumo existente'}
               </button>
+
+              {/* Painel de busca inline (sem overlay, evita conflito com a barra de navegação) */}
+              {linkPickerIdx === idx && (
+                <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Buscar insumo..."
+                    value={linkSearch}
+                    onChange={e => setLinkSearch(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border-2 border-gray-200 focus:outline-none focus:border-gray-400 bg-white text-sm mb-2"
+                  />
+                  <div className="max-h-56 overflow-y-auto rounded-xl bg-white border border-gray-100">
+                    {items
+                      .filter(s => !linkSearch.trim() || normalizeStr(s.name).includes(normalizeStr(linkSearch)))
+                      .slice(0, 50)
+                      .map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => linkToItem(idx, s)}
+                          className="w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50 flex items-center justify-between"
+                        >
+                          <span className="text-sm text-gray-800">{s.name}</span>
+                          <span className="text-[11px] text-gray-400 flex-shrink-0 ml-2">{s.category}</span>
+                        </button>
+                      ))}
+                    {items.filter(s => !linkSearch.trim() || normalizeStr(s.name).includes(normalizeStr(linkSearch))).length === 0 && (
+                      <p className="text-sm text-gray-400 text-center py-4">Nenhum insumo encontrado</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
-
-        {/* Picker de vínculo manual */}
-        {linkPickerIdx !== null && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-end" onClick={() => setLinkPickerIdx(null)}>
-            <div className="bg-white w-full rounded-t-3xl max-h-[75vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="px-4 pt-4 pb-2 flex items-center justify-between border-b border-gray-100">
-                <p className="font-bold text-gray-800">Vincular a insumo</p>
-                <button onClick={() => setLinkPickerIdx(null)} className="p-1 text-gray-400"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="px-4 py-3">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Buscar insumo..."
-                  value={linkSearch}
-                  onChange={e => setLinkSearch(e.target.value)}
-                  className="w-full h-11 px-3 rounded-xl border-2 border-gray-200 focus:outline-none focus:border-gray-400 text-sm"
-                />
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 pb-6">
-                {items
-                  .filter(s => !linkSearch.trim() || normalizeStr(s.name).includes(normalizeStr(linkSearch)))
-                  .slice(0, 100)
-                  .map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => linkToItem(linkPickerIdx, s)}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-gray-50 flex items-center justify-between"
-                    >
-                      <span className="text-sm text-gray-800">{s.name}</span>
-                      <span className="text-[11px] text-gray-400">{s.category}</span>
-                    </button>
-                  ))}
-                {items.filter(s => !linkSearch.trim() || normalizeStr(s.name).includes(normalizeStr(linkSearch))).length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">Nenhum insumo encontrado</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="fixed bottom-20 left-4 right-4 z-40">
           <button onClick={confirm} disabled={submitting || parsed.items.length === 0}
