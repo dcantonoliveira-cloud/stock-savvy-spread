@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Loader2, ShoppingCart, Printer, FileDown, Camera } from 'lucide-react';
+import { Loader2, ShoppingCart, Printer, FileDown, Camera, Sheet as SheetIcon } from 'lucide-react';
 import { convertToItemUnit } from '@/lib/units';
 import { fmtNum, fmtCur } from '@/lib/format';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import * as XLSX from 'xlsx';
 
 type Row = {
   itemId: string; name: string; unit: string; needed: number; inStock: number; toBuy: number; unitCost: number;
@@ -262,6 +263,26 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
     }
   };
 
+  const handleGenerateExcel = () => {
+    const rows = filteredRows.map(r => ({
+      Insumo: r.name,
+      Categoria: r.category,
+      Subcategoria: r.subcategoryName || '',
+      Necessário: r.needed,
+      'Em Estoque': r.inStock,
+      Unidade: r.unit,
+      'A Comprar': getEffectiveQty(r),
+      'Custo Unit.': r.unitCost,
+      'Custo Total': getEffectiveQty(r) * r.unitCost,
+      Responsáveis: r.responsibleNames.join(', '),
+      Fornecedores: r.supplierNames.join(', '),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lista de Compras');
+    XLSX.writeFile(wb, `Lista de Compras - ${title}.xlsx`);
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   }
@@ -282,6 +303,9 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
           </Button>
           <Button variant="outline" size="sm" onClick={handleGenerateImage} disabled={exporting !== null}>
             {exporting === 'image' ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Camera className="w-3.5 h-3.5 mr-1.5" />}Gerar print
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleGenerateExcel}>
+            <SheetIcon className="w-3.5 h-3.5 mr-1.5" />Gerar Excel
           </Button>
         </div>
       </div>
