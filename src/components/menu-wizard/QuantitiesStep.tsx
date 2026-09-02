@@ -2,12 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, X, Loader2 } from 'lucide-react';
+import { Search, Plus, X, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import SheetFormModal from '@/components/SheetFormModal';
+import { convertToItemUnit } from '@/lib/units';
 
-type DishRow = { id: string; sheet_id: string; sheet_name: string; planned_quantity: number; planned_unit: string };
+type DishRow = { id: string; sheet_id: string; sheet_name: string; planned_quantity: number; planned_unit: string; yield_quantity: number };
 type Sheet = { id: string; name: string; category: string | null; yield_unit: string };
+type RecipeIngredient = {
+  item_id: string; item_name: string; recipe_quantity: number; unit: string;
+  overrideId: string | null; override_quantity: number | null;
+};
 
 const normalize = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -21,10 +26,15 @@ export default function QuantitiesStep({ menuId, onContinue, onBack }: { menuId:
   const [formOpen, setFormOpen] = useState(false);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [ingredientsByDish, setIngredientsByDish] = useState<Record<string, RecipeIngredient[]>>({});
+  const [loadingIngredients, setLoadingIngredients] = useState<string | null>(null);
+  const ingredientDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   const load = async () => {
     setLoading(true);
     const { data } = await (supabase.from('event_menu_dishes') as any)
-      .select('id, sheet_id, planned_quantity, planned_unit, technical_sheets:sheet_id(name)')
+      .select('id, sheet_id, planned_quantity, planned_unit, technical_sheets:sheet_id(name, yield_quantity)')
       .eq('menu_id', menuId)
       .order('created_at');
     if (data) {
@@ -33,9 +43,68 @@ export default function QuantitiesStep({ menuId, onContinue, onBack }: { menuId:
         sheet_name: d.technical_sheets?.name || '?',
         planned_quantity: d.planned_quantity ?? 0,
         planned_unit: d.planned_unit || 'un',
+        yield_quantity: d.technical_sheets?.yield_quantity || 1,
       })).sort((a, b) => a.sheet_name.localeCompare(b.sheet_name, 'pt-BR')));
     }
     setLoading(false);
+  };
+
+  const toggleExpand = async (dish: DishRow) => {
+    if (expandedId === dish.id) { setExpandedId(null); return; }
+    setExpandedId(dish.id);
+    if (ingredientsByDish[dish.id]) return; // já carregado
+    setLoadingIngredients(dish.id);
+    const [itemsRes, overridesRes] = await Promise.all([
+      (supabase.from('technical_sheet_items') as any)
+        .select('item_id, quantity, unit, stock_items:item_id(name, unit)')
+        .eq('sheet_id', dish.sheet_id),
+      (supabase.from('event_menu_dish_items') as any)
+        .select('id, item_id, override_quantity')
+        .eq('menu_dish_id', dish.id),
+    ]);
+    const overrideMap: Record<string, { id: string; override_quantity: number | null }> = {};
+    for (const o of (overridesRes.data || []) as any[]) {
+      overrideMap[o.item_id] = { id: o.id, override_quantity: o.override_quantity };
+    }
+    const ingredients: RecipeIngredient[] = ((itemsRes.data || []) as any[]).map(i => ({
+      item_id: i.item_id,
+      item_name: i.stock_items?.name || '?',
+      recipe_quantity: Number(i.quantity) || 0,
+      unit: i.unit || i.stock_items?.unit || '',
+      overrideId: overrideMap[i.item_id]?.id ?? null,
+      override_quantity: overrideMap[i.item_id]?.override_quantity ?? null,
+    })).sort((a, b) => a.item_name.localeCompare(b.item_name, 'pt-BR'));
+    setIngredientsByDish(prev => ({ ...prev, [dish.id]: ingredients }));
+    setLoadingIngredients(null);
+  };
+
+  const updateIngredientOverride = (dish: DishRow, ing: RecipeIngredient, value: string) => {
+    const val = parseFloat(value.replace(',', '.'));
+    const overrideValue = isNaN(val) ? null : val;
+    setIngredientsByDish(prev => ({
+      ...prev,
+      [dish.id]: prev[dish.id].map(i => i.item_id === ing.item_id ? { ...i, override_quantity: overrideValue } : i),
+    }));
+    const key = `${dish.id}:${ing.item_id}`;
+    clearTimeout(ingredientDebounceRef.current[key]);
+    ingredientDebounceRef.current[key] = setTimeout(async () => {
+      const calculated = ing.recipe_quantity * (dish.planned_quantity / (dish.yield_quantity || 1));
+      if (ing.overrideId) {
+        await (supabase.from('event_menu_dish_items') as any)
+          .update({ override_quantity: overrideValue, calculated_quantity: calculated })
+          .eq('id', ing.overrideId);
+      } else {
+        const { data } = await (supabase.from('event_menu_dish_items') as any)
+          .insert({ menu_dish_id: dish.id, item_id: ing.item_id, calculated_quantity: calculated, override_quantity: overrideValue, unit: ing.unit })
+          .select('id').single();
+        if (data) {
+          setIngredientsByDish(prev => ({
+            ...prev,
+            [dish.id]: prev[dish.id].map(i => i.item_id === ing.item_id ? { ...i, overrideId: data.id } : i),
+          }));
+        }
+      }
+    }, 400);
   };
 
   useEffect(() => { load(); }, [menuId]);
@@ -98,21 +167,64 @@ export default function QuantitiesStep({ menuId, onContinue, onBack }: { menuId:
 
       <div className="rounded-xl border border-border overflow-hidden bg-white">
         <div className="divide-y divide-border/50">
-          {dishes.map(d => (
-            <div key={d.id} className="flex items-center gap-3 px-4 py-3">
-              <span className="flex-1 text-sm font-medium text-foreground">{d.sheet_name}</span>
-              <Input
-                type="text" inputMode="decimal"
-                value={String(d.planned_quantity)}
-                onChange={e => updateQuantity(d.id, e.target.value)}
-                className="w-24 text-right"
-              />
-              <span className="text-xs text-muted-foreground w-14">{d.planned_unit}</span>
-              <button onClick={() => removeDish(d.id)} className="text-muted-foreground hover:text-destructive flex-shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+          {dishes.map(d => {
+            const isExpanded = expandedId === d.id;
+            const ingredients = ingredientsByDish[d.id];
+            const factor = d.planned_quantity / (d.yield_quantity || 1);
+            return (
+              <div key={d.id}>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <button onClick={() => toggleExpand(d)} className="text-muted-foreground hover:text-foreground flex-shrink-0" title="Ver receita">
+                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </button>
+                  <span className="flex-1 text-sm font-medium text-foreground cursor-pointer" onClick={() => toggleExpand(d)}>{d.sheet_name}</span>
+                  <Input
+                    type="text" inputMode="decimal"
+                    value={String(d.planned_quantity)}
+                    onChange={e => updateQuantity(d.id, e.target.value)}
+                    className="w-24 text-right"
+                  />
+                  <span className="text-xs text-muted-foreground w-14">{d.planned_unit}</span>
+                  <button onClick={() => removeDish(d.id)} className="text-muted-foreground hover:text-destructive flex-shrink-0">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div className="bg-muted/20 border-t border-border px-4 py-3 pl-11">
+                    {loadingIngredients === d.id ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />Carregando receita...
+                      </div>
+                    ) : ingredients && ingredients.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {ingredients.map(ing => {
+                          const calculated = ing.recipe_quantity * factor;
+                          const displayValue = ing.override_quantity ?? calculated;
+                          const isOverridden = ing.override_quantity != null;
+                          return (
+                            <div key={ing.item_id} className="flex items-center gap-3 text-sm">
+                              <span className="flex-1 text-foreground">{ing.item_name}</span>
+                              {isOverridden && <span className="text-[10px] text-amber-600 font-medium">editado</span>}
+                              <Input
+                                type="text" inputMode="decimal"
+                                value={String(Number(displayValue.toFixed(4)))}
+                                onChange={e => updateIngredientOverride(d, ing, e.target.value)}
+                                className="w-24 text-right h-8 text-xs"
+                              />
+                              <span className="text-xs text-muted-foreground w-14">{ing.unit}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-2">Essa ficha não tem insumos cadastrados.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {dishes.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-10">Nenhum prato selecionado.</p>
           )}

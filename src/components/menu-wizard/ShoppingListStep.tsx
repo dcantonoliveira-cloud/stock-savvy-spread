@@ -15,19 +15,27 @@ export default function ShoppingListStep({ menuId, onBack }: { menuId: string; o
     const build = async () => {
       setLoading(true);
       const { data: dishData } = await (supabase.from('event_menu_dishes') as any)
-        .select('sheet_id, planned_quantity')
+        .select('id, sheet_id, planned_quantity')
         .eq('menu_id', menuId);
-      const dishes = (dishData || []) as { sheet_id: string; planned_quantity: number }[];
+      const dishes = (dishData || []) as { id: string; sheet_id: string; planned_quantity: number }[];
 
       if (dishes.length === 0) { setRows([]); setLoading(false); return; }
 
       const sheetIds = [...new Set(dishes.map(d => d.sheet_id))];
-      const [sheetsRes, itemsRes] = await Promise.all([
+      const dishIds = dishes.map(d => d.id);
+      const [sheetsRes, itemsRes, overridesRes] = await Promise.all([
         supabase.from('technical_sheets').select('id, yield_quantity').in('id', sheetIds),
         (supabase.from('technical_sheet_items') as any).select('sheet_id, item_id, quantity, unit').in('sheet_id', sheetIds),
+        (supabase.from('event_menu_dish_items') as any).select('menu_dish_id, item_id, override_quantity').in('menu_dish_id', dishIds),
       ]);
       const yieldBySheet: Record<string, number> = {};
       for (const s of (sheetsRes.data || []) as any[]) yieldBySheet[s.id] = s.yield_quantity || 1;
+
+      // Sobrescritas manuais feitas no passo 2 (Quantidades) — têm prioridade sobre o cálculo automático
+      const overrideByDishItem: Record<string, number> = {};
+      for (const o of (overridesRes.data || []) as any[]) {
+        if (o.override_quantity != null) overrideByDishItem[`${o.menu_dish_id}:${o.item_id}`] = o.override_quantity;
+      }
 
       const sheetItems = (itemsRes.data || []) as { sheet_id: string; item_id: string; quantity: number; unit: string }[];
       const itemIds = [...new Set(sheetItems.map(i => i.item_id))];
@@ -42,11 +50,13 @@ export default function ShoppingListStep({ menuId, onBack }: { menuId: string; o
       for (const dish of dishes) {
         const yieldQty = yieldBySheet[dish.sheet_id] || 1;
         const factor = (dish.planned_quantity || 0) / yieldQty;
-        if (factor === 0) continue;
         for (const si of sheetItems.filter(i => i.sheet_id === dish.sheet_id)) {
           const stock = stockById[si.item_id];
           if (!stock) continue;
-          const neededInItemUnit = convertToItemUnit(si.quantity * factor, si.unit || stock.unit, stock.unit);
+          const overrideKey = `${dish.id}:${si.item_id}`;
+          const recipeQty = overrideKey in overrideByDishItem ? overrideByDishItem[overrideKey] : si.quantity * factor;
+          if (recipeQty === 0) continue;
+          const neededInItemUnit = convertToItemUnit(recipeQty, si.unit || stock.unit, stock.unit);
           neededByItem[si.item_id] = (neededByItem[si.item_id] || 0) + neededInItemUnit;
         }
       }
