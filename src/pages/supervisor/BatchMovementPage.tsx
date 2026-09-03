@@ -59,6 +59,8 @@ export default function BatchMovementPage() {
 
     for (const line of validLines) {
       const qty = parseFloat(line.qty);
+      // Não seta stock_items.current_stock diretamente: o trigger do banco (on_stock_entry/on_stock_output)
+      // já ajusta o valor sozinho a partir da quantidade inserida. Setar os dois duplicaria o ajuste.
       if (mode === 'entrada') {
         const { error } = await (supabase.from('stock_entries') as any).insert({
           item_id: line.item.id, quantity: qty,
@@ -66,20 +68,15 @@ export default function BatchMovementPage() {
           registered_by: user.id,
         });
         if (error) { console.error(error); hasError = true; continue; }
-        await (supabase.from('stock_items') as any)
-          .update({ current_stock: line.item.current_stock + qty })
-          .eq('id', line.item.id);
       } else {
         const { error } = await (supabase.from('stock_outputs') as any).insert({
           item_id: line.item.id, quantity: qty,
           notes: notes.trim() || null,
           employee_name: user.email || 'Supervisor',
           date: now.split('T')[0],
+          registered_by: user.id,
         });
         if (error) { console.error(error); hasError = true; continue; }
-        await (supabase.from('stock_items') as any)
-          .update({ current_stock: Math.max(0, line.item.current_stock - qty) })
-          .eq('id', line.item.id);
       }
     }
 

@@ -234,8 +234,13 @@ export default function StockItemDetailPage() {
       } as any);
       movError = error;
     }
-    if (movError) toast.error('Estoque atualizado, mas o histórico não pôde ser registrado: ' + movError.message);
-    await supabase.from('stock_items').update({ current_stock: newQty } as any).eq('id', item.id);
+    if (movError) {
+      toast.error('Erro ao corrigir estoque: ' + movError.message);
+      setCorrectionSaving(false);
+      return;
+    }
+    // Não seta stock_items.current_stock diretamente aqui: o trigger do banco (on_stock_entry/on_stock_output)
+    // já ajusta o valor sozinho a partir da quantidade inserida acima. Setar os dois duplicaria o ajuste.
 
     // Sync stock_item_locations: apply the diff to the default kitchen location
     const { data: defaultKitchen } = await supabase.from('kitchens').select('id').eq('is_default', true).single();

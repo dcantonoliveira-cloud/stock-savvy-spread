@@ -1267,17 +1267,12 @@ export default function StockItemsPage() {
     if (isNaN(val)) { setEditingCell(null); return; }
 
     const prevItem = items.find(i => i.id === editingCell.id);
-    const { error } = await supabase.from('stock_items').update({ [editingCell.field]: val } as any).eq('id', editingCell.id);
-    if (error) {
-      toast.error('Erro ao salvar: ' + error.message);
-      setEditingCell(null);
-      return;
-    }
-
-    // Registrar no histórico de movimentações
     const now = new Date().toISOString();
     const who = profile?.display_name ?? 'Supervisor';
+
     if (editingCell.field === 'current_stock' && prevItem) {
+      // Não seta stock_items.current_stock diretamente aqui: o trigger do banco (on_stock_entry/on_stock_output)
+      // já ajusta o valor sozinho a partir da quantidade inserida abaixo. Setar os dois duplicaria o ajuste.
       const diff = val - (prevItem.current_stock || 0);
       if (diff !== 0) {
         if (diff > 0) {
@@ -1289,7 +1284,7 @@ export default function StockItemsPage() {
             notes: `Ajuste manual por ${who} (anterior: ${prevItem.current_stock})`,
             registered_by: user?.id,
           });
-          if (movError) toast.error('Estoque salvo, mas o histórico não pôde ser registrado: ' + movError.message);
+          if (movError) { toast.error('Erro ao salvar: ' + movError.message); setEditingCell(null); return; }
         } else {
           const { error: movError } = await (supabase as any).from('stock_outputs').insert({
             item_id: editingCell.id,
@@ -1299,10 +1294,12 @@ export default function StockItemsPage() {
             notes: `Ajuste manual (anterior: ${prevItem.current_stock})`,
             registered_by: user?.id,
           });
-          if (movError) toast.error('Estoque salvo, mas o histórico não pôde ser registrado: ' + movError.message);
+          if (movError) { toast.error('Erro ao salvar: ' + movError.message); setEditingCell(null); return; }
         }
       }
     } else if (editingCell.field === 'unit_cost' && prevItem) {
+      const { error } = await supabase.from('stock_items').update({ unit_cost: val } as any).eq('id', editingCell.id);
+      if (error) { toast.error('Erro ao salvar: ' + error.message); setEditingCell(null); return; }
       const { error: movError } = await (supabase as any).from('stock_entries').insert({
         item_id: editingCell.id,
         quantity: 0,
@@ -1313,6 +1310,9 @@ export default function StockItemsPage() {
       });
       if (movError) toast.error('Preço salvo, mas o histórico não pôde ser registrado: ' + movError.message);
       setPriceLinkPrompt({ item: prevItem, price: val });
+    } else {
+      const { error } = await supabase.from('stock_items').update({ [editingCell.field]: val } as any).eq('id', editingCell.id);
+      if (error) { toast.error('Erro ao salvar: ' + error.message); setEditingCell(null); return; }
     }
 
     setItems(prev => prev.map(i => i.id === editingCell.id ? { ...i, [editingCell.field]: val } : i));

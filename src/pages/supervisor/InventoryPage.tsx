@@ -392,8 +392,9 @@ export default function InventoryPage() {
       const countLabel = `Inventário ${new Date().toLocaleDateString('pt-BR')}`;
 
       // Apply counted items + register movement
+      // Não seta stock_items.current_stock diretamente: o trigger do banco (on_stock_entry/on_stock_output)
+      // já ajusta o valor sozinho a partir da quantidade inserida abaixo. Setar os dois duplicaria o ajuste.
       for (const [itemId, total] of Object.entries(grouped)) {
-        await supabase.from('stock_items').update({ current_stock: total } as any).eq('id', itemId);
         const prev = currentMap[itemId] ?? 0;
         const diff = (total as number) - prev;
         if (diff > 0) {
@@ -421,7 +422,6 @@ export default function InventoryPage() {
         const uncountedIds = [...new Set(uncounted.map((r: any) => r.item_id))];
         for (const itemId of uncountedIds) {
           if (!grouped[itemId]) {
-            await supabase.from('stock_items').update({ current_stock: 0 } as any).eq('id', itemId);
             const prev = currentMap[itemId] ?? 0;
             if (prev > 0) {
               await (supabase as any).from('stock_outputs').insert({
