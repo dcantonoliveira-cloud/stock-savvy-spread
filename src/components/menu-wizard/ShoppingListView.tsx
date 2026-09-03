@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Loader2, ShoppingCart, Printer, FileDown, Camera, Sheet as SheetIcon } from 'lucide-react';
+import { Loader2, ShoppingCart, Printer, FileDown, Camera, Sheet as SheetIcon, ChevronDown } from 'lucide-react';
 import { convertToItemUnit } from '@/lib/units';
 import { fmtNum, fmtCur } from '@/lib/format';
 import { toast } from 'sonner';
@@ -10,6 +10,56 @@ import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 
 type Tag = { id: string; name: string; color: string };
+
+// ─── Filtro multi-seleção (dropdown com checkboxes) ───
+function MultiSelectFilter({ label, options, selected, onChange }: {
+  label: string; options: { value: string; label: string }[]; selected: string[]; onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v]);
+
+  const displayLabel = selected.length === 0
+    ? label
+    : selected.length === 1
+      ? (options.find(o => o.value === selected[0])?.label ?? label)
+      : `${selected.length} selecionados`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className={`h-9 px-3 text-sm border rounded-lg bg-white flex items-center gap-1.5 whitespace-nowrap ${selected.length > 0 ? 'border-primary/50 text-primary font-medium' : 'border-border text-foreground'}`}
+      >
+        {displayLabel} <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+      </button>
+      {open && (
+        <div className="absolute z-30 top-full left-0 mt-1 bg-white border border-border rounded-lg shadow-lg py-1 min-w-[200px] max-h-64 overflow-y-auto">
+          {selected.length > 0 && (
+            <button type="button" onClick={() => onChange([])} className="w-full text-left px-3 py-1.5 text-xs text-primary hover:bg-muted/60 border-b border-border mb-1">
+              Limpar seleção
+            </button>
+          )}
+          {options.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground">Nenhuma opção</p>}
+          {options.map(o => (
+            <label key={o.value} className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/60 cursor-pointer">
+              <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggle(o.value)} />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Row = {
   itemId: string; name: string; unit: string; needed: number; inStock: number; toBuy: number; unitCost: number;
@@ -22,11 +72,11 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
   const [loading, setLoading] = useState(true);
   const [qtyOverrides, setQtyOverrides] = useState<Record<string, number | string>>({});
 
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [subcategoryFilter, setSubcategoryFilter] = useState('all');
-  const [responsibleFilter, setResponsibleFilter] = useState('all');
-  const [supplierFilter, setSupplierFilter] = useState('all');
-  const [tagFilter, setTagFilter] = useState('all');
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [subcategoryFilters, setSubcategoryFilters] = useState<string[]>([]);
+  const [responsibleFilters, setResponsibleFilters] = useState<string[]>([]);
+  const [supplierFilters, setSupplierFilters] = useState<string[]>([]);
+  const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [onlyToBuy, setOnlyToBuy] = useState(false);
 
   const [exporting, setExporting] = useState<'pdf' | 'image' | null>(null);
@@ -150,7 +200,7 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
 
   const categories = Array.from(new Set(rows.map(r => r.category))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const subcategories = Array.from(new Set(
-    rows.filter(r => categoryFilter === 'all' || r.category === categoryFilter).map(r => r.subcategoryName).filter(Boolean)
+    rows.filter(r => categoryFilters.length === 0 || categoryFilters.includes(r.category)).map(r => r.subcategoryName).filter(Boolean)
   )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const responsibles = Array.from(new Set(rows.flatMap(r => r.responsibleNames))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const suppliers = Array.from(new Set(rows.flatMap(r => r.supplierNames))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -159,11 +209,11 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
   const allTags = Object.values(tagsById).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const filteredRows = rows.filter(r => {
-    if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
-    if (subcategoryFilter !== 'all' && r.subcategoryName !== subcategoryFilter) return false;
-    if (responsibleFilter !== 'all' && !r.responsibleNames.includes(responsibleFilter)) return false;
-    if (supplierFilter !== 'all' && !r.supplierNames.includes(supplierFilter)) return false;
-    if (tagFilter !== 'all' && !r.tags.some(t => t.id === tagFilter)) return false;
+    if (categoryFilters.length > 0 && !categoryFilters.includes(r.category)) return false;
+    if (subcategoryFilters.length > 0 && !subcategoryFilters.includes(r.subcategoryName)) return false;
+    if (responsibleFilters.length > 0 && !r.responsibleNames.some(n => responsibleFilters.includes(n))) return false;
+    if (supplierFilters.length > 0 && !r.supplierNames.some(n => supplierFilters.includes(n))) return false;
+    if (tagFilters.length > 0 && !r.tags.some(t => tagFilters.includes(t.id))) return false;
     if (onlyToBuy && getEffectiveQty(r) <= 0) return false;
     return true;
   });
@@ -360,26 +410,36 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
 
       {/* Filtros */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <select value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setSubcategoryFilter('all'); }} className="h-9 px-3 text-sm border border-border rounded-lg bg-white">
-          <option value="all">Todas categorias</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={subcategoryFilter} onChange={e => setSubcategoryFilter(e.target.value)} className="h-9 px-3 text-sm border border-border rounded-lg bg-white">
-          <option value="all">Todas subcategorias</option>
-          {subcategories.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={responsibleFilter} onChange={e => setResponsibleFilter(e.target.value)} className="h-9 px-3 text-sm border border-border rounded-lg bg-white">
-          <option value="all">Todos responsáveis</option>
-          {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-        <select value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} className="h-9 px-3 text-sm border border-border rounded-lg bg-white">
-          <option value="all">Todos fornecedores</option>
-          {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} className="h-9 px-3 text-sm border border-border rounded-lg bg-white">
-          <option value="all">Todas tags</option>
-          {allTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        <MultiSelectFilter
+          label="Todas categorias"
+          options={categories.map(c => ({ value: c, label: c }))}
+          selected={categoryFilters}
+          onChange={v => { setCategoryFilters(v); setSubcategoryFilters([]); }}
+        />
+        <MultiSelectFilter
+          label="Todas subcategorias"
+          options={subcategories.map(s => ({ value: s, label: s }))}
+          selected={subcategoryFilters}
+          onChange={setSubcategoryFilters}
+        />
+        <MultiSelectFilter
+          label="Todos responsáveis"
+          options={responsibles.map(r => ({ value: r, label: r }))}
+          selected={responsibleFilters}
+          onChange={setResponsibleFilters}
+        />
+        <MultiSelectFilter
+          label="Todos fornecedores"
+          options={suppliers.map(s => ({ value: s, label: s }))}
+          selected={supplierFilters}
+          onChange={setSupplierFilters}
+        />
+        <MultiSelectFilter
+          label="Todas tags"
+          options={allTags.map(t => ({ value: t.id, label: t.name }))}
+          selected={tagFilters}
+          onChange={setTagFilters}
+        />
         <label className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-lg bg-white cursor-pointer">
           <input type="checkbox" checked={onlyToBuy} onChange={e => setOnlyToBuy(e.target.checked)} />
           Só o que precisa comprar
