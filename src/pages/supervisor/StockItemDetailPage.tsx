@@ -178,7 +178,7 @@ export default function StockItemDetailPage() {
     setCorrectionSaving(true);
     const diff = newQty - item.current_stock;
     if (diff === 0) { setCorrectionSaving(false); setCorrectionOpen(false); return; }
-    const notes = correctionNotes.trim() || 'Correção de estoque';
+    const notes = correctionNotes.trim() ? `Correção de estoque — ${correctionNotes.trim()}` : 'Correção de estoque';
     if (diff > 0) {
       await supabase.from('stock_entries').insert({
         item_id: item.id,
