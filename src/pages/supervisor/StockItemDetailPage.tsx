@@ -247,10 +247,20 @@ export default function StockItemDetailPage() {
     : item.unit_cost;
 
   // All movements merged
-  const allMovements = [
-    ...entries.map(e => ({ id: e.id, type: 'entrada' as const, date: e.created_at, qty: e.quantity, cost: e.unit_cost || null, who: e.supplier, ref: e.invoice_number, notes: e.notes })),
-    ...outputs.map(o => ({ id: o.id, type: 'saida' as const, date: o.created_at, qty: o.quantity, cost: null, who: o.employee_name, ref: o.event_name, notes: o.notes })),
+  const isCorrectionNote = (notes: string | null) =>
+    !!notes && (notes.startsWith('Ajuste manual') || notes.startsWith('Correção de estoque'));
+  const allMovementsRaw = [
+    ...entries.filter(e => e.quantity !== 0).map(e => ({ id: e.id, type: 'entrada' as const, date: e.created_at, qty: e.quantity, cost: e.unit_cost || null, who: e.supplier, ref: e.invoice_number, notes: e.notes, isCorrection: isCorrectionNote(e.notes) })),
+    ...outputs.map(o => ({ id: o.id, type: 'saida' as const, date: o.created_at, qty: o.quantity, cost: null, who: o.employee_name, ref: o.event_name, notes: o.notes, isCorrection: isCorrectionNote(o.notes) })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Running balance: newest movement lands on the item's current stock, walking backwards from there
+  let runningBalance = item.current_stock;
+  const allMovements = allMovementsRaw.map(m => {
+    const balanceAfter = runningBalance;
+    runningBalance -= m.type === 'entrada' ? m.qty : -m.qty;
+    return { ...m, balanceAfter };
+  });
 
   const totalMovPages = Math.ceil(allMovements.length / PAGE_SIZE);
   const pagedMovements = allMovements.slice(movPage * PAGE_SIZE, (movPage + 1) * PAGE_SIZE);
@@ -447,6 +457,7 @@ export default function StockItemDetailPage() {
                 <th className="text-left px-5 py-2">DATA</th>
                 <th className="text-center px-3 py-2">TIPO</th>
                 <th className="text-right px-3 py-2">QUANTIDADE</th>
+                <th className="text-right px-3 py-2">QTD. ATUAL</th>
                 <th className="text-right px-3 py-2">CUSTO UNIT.</th>
                 <th className="text-left px-3 py-2">REFERÊNCIA</th>
                 <th className="text-left px-3 py-2">OBSERVAÇÕES</th>
@@ -457,12 +468,17 @@ export default function StockItemDetailPage() {
                 <tr key={m.id} className="hover:bg-amber-50/40 transition-colors">
                   <td className="px-5 py-2.5 text-muted-foreground text-xs">{fmtDate(m.date)}</td>
                   <td className="px-3 py-2.5 text-center">
-                    {m.type === 'entrada'
-                      ? <span className="inline-flex items-center gap-1 rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-[10px] font-semibold"><TrendingUp className="w-2.5 h-2.5" />Entrada</span>
-                      : <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-semibold"><TrendingDown className="w-2.5 h-2.5" />Saída</span>}
+                    {m.isCorrection
+                      ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-semibold"><SlidersHorizontal className="w-2.5 h-2.5" />Correção</span>
+                      : m.type === 'entrada'
+                        ? <span className="inline-flex items-center gap-1 rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-[10px] font-semibold"><TrendingUp className="w-2.5 h-2.5" />Entrada</span>
+                        : <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-semibold"><TrendingDown className="w-2.5 h-2.5" />Saída</span>}
                   </td>
                   <td className={`px-3 py-2.5 text-right font-semibold ${m.type === 'entrada' ? 'text-success' : 'text-destructive'}`}>
                     {m.type === 'entrada' ? '+' : '-'}{fmtNum(m.qty)} {item.unit}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-muted-foreground text-xs">
+                    {fmtNum(m.balanceAfter)} {item.unit}
                   </td>
                   <td className="px-3 py-2.5 text-right text-muted-foreground text-xs">
                     {m.cost != null ? fmtCur(m.cost) : '—'}
@@ -472,7 +488,7 @@ export default function StockItemDetailPage() {
                 </tr>
               ))}
               {pagedMovements.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-muted-foreground text-sm">Nenhuma movimentação registrada</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground text-sm">Nenhuma movimentação registrada</td></tr>
               )}
             </tbody>
           </table>

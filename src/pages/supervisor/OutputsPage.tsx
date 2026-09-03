@@ -145,8 +145,23 @@ export default function SupervisorOutputsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    const output = outputs.find(o => o.id === id);
     await supabase.from('stock_outputs').delete().eq('id', id);
-    toast.success('Saída removida!');
+    if (output && output.quantity) {
+      const { data: itemRow } = await supabase.from('stock_items').select('current_stock').eq('id', output.item_id).single();
+      const newStock = ((itemRow as any)?.current_stock || 0) + output.quantity;
+      await supabase.from('stock_items').update({ current_stock: newStock } as any).eq('id', output.item_id);
+      const { data: defaultKitchen } = await supabase.from('kitchens').select('id').eq('is_default', true).single();
+      if (defaultKitchen) {
+        const { data: loc } = await supabase.from('stock_item_locations')
+          .select('id, current_stock').eq('item_id', output.item_id).eq('kitchen_id', (defaultKitchen as any).id).maybeSingle();
+        if (loc) {
+          const newLocStock = (loc as any).current_stock + output.quantity;
+          await supabase.from('stock_item_locations').update({ current_stock: newLocStock } as any).eq('id', (loc as any).id);
+        }
+      }
+    }
+    toast.success('Saída removida! Estoque ajustado.');
     load(filterDate || undefined);
   };
 
