@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 interface TimeEntry {
   id: string;
-  type: 'entry' | 'exit';
+  type: 'entry' | 'exit' | 'adjustment';
   recorded_at: string;
   note: string | null;
   latitude: number | null;
@@ -44,7 +44,10 @@ export default function PontoPage() {
       .eq('employee_id', user.id)
       .order('recorded_at', { ascending: false })
       .limit(100);
-    setEntries((data ?? []) as unknown as TimeEntry[]);
+    // Ajustes manuais de banco de horas (feitos pelo supervisor) não são batidas de ponto —
+    // ignorá-los aqui pra não confundir o botão de Entrada/Saída nem o histórico.
+    const punches = ((data ?? []) as unknown as TimeEntry[]).filter(e => e.type === 'entry' || e.type === 'exit');
+    setEntries(punches);
     setLoading(false);
   }, [user]);
 
