@@ -63,6 +63,8 @@ export default function EmployeeDashboard() {
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
   const [eventName, setEventName] = useState('');
+  const [entryUnitCost, setEntryUnitCost] = useState('');
+  const [entrySupplier, setEntrySupplier] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -140,6 +142,8 @@ export default function EmployeeDashboard() {
     setQuantity('');
     setNotes('');
     setEventName('');
+    setEntryUnitCost('');
+    setEntrySupplier('');
     setTfFromKitchen('');
     setTfToKitchen('');
   };
@@ -156,14 +160,37 @@ export default function EmployeeDashboard() {
     setSubmitting(true);
 
     if (mode === 'entry') {
+      const parsedCost = entryUnitCost ? parseFloat(entryUnitCost.replace(',', '.')) : null;
+      const supplierName = entrySupplier.trim() || null;
       const { error } = await supabase.from('stock_entries').insert({
         item_id: selectedItem.id,
         quantity: parseFloat(quantity),
+        unit_cost: parsedCost,
+        supplier: supplierName,
         notes: notes.trim() || null,
         registered_by: user.id,
       });
-      if (error) toast.error('Erro ao registrar entrada');
-      else toast.success(`✅ Entrada de ${quantity} ${selectedItem.unit} de ${selectedItem.name}`);
+      if (error) { toast.error('Erro ao registrar entrada'); setSubmitting(false); return; }
+
+      // Atualiza o preço do item (dispara histórico de preço via trigger) e vincula o fornecedor
+      if (parsedCost && parsedCost > 0) {
+        await supabase.from('stock_items').update({ unit_cost: parsedCost } as any).eq('id', selectedItem.id);
+      }
+      if (supplierName) {
+        const { data: existing } = await supabase.from('item_suppliers').select('id')
+          .eq('item_id', selectedItem.id).ilike('supplier_name', supplierName).maybeSingle();
+        if (existing) {
+          if (parsedCost && parsedCost > 0) await supabase.from('item_suppliers').update({ unit_price: parsedCost } as any).eq('id', (existing as any).id);
+        } else {
+          const { count } = await supabase.from('item_suppliers').select('id', { count: 'exact', head: true }).eq('item_id', selectedItem.id);
+          await supabase.from('item_suppliers').insert({
+            item_id: selectedItem.id, supplier_name: supplierName,
+            unit_price: parsedCost || 0, is_preferred: !count || count === 0,
+          } as any);
+        }
+      }
+
+      toast.success(`✅ Entrada de ${quantity} ${selectedItem.unit} de ${selectedItem.name}`);
     } else if (mode === 'output') {
       const { error } = await supabase.from('stock_outputs').insert({
         item_id: selectedItem.id,
@@ -408,6 +435,18 @@ export default function EmployeeDashboard() {
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Evento (opcional)</label>
                   <Input className="h-11 rounded-xl" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="Ex: Casamento Silva" />
+                </div>
+              )}
+              {mode === 'entry' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Preço pago (opcional)</label>
+                    <Input type="number" inputMode="decimal" className="h-11 rounded-xl" value={entryUnitCost} onChange={e => setEntryUnitCost(e.target.value)} placeholder="R$ 0,00" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Fornecedor (opcional)</label>
+                    <Input className="h-11 rounded-xl" value={entrySupplier} onChange={e => setEntrySupplier(e.target.value)} placeholder="Ex: Atacadão" />
+                  </div>
                 </div>
               )}
               <div>
