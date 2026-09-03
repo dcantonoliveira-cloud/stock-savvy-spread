@@ -49,11 +49,12 @@ export default function ProducaoPage() {
 
   useEffect(() => {
     load();
-    const sub = (supabase as any)
-      .channel('production_employee')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_orders' }, load)
-      .subscribe();
-    return () => sub.unsubscribe();
+    // Atualiza periodicamente e ao voltar pra aba, em vez de manter um canal Realtime aberto
+    // (canais Realtime ficam consultando o WAL do banco o tempo todo, mesmo sem mudanças —
+    // pesado se a tela ficar aberta o dia inteiro na cozinha).
+    const interval = setInterval(load, 15000);
+    window.addEventListener('focus', load);
+    return () => { clearInterval(interval); window.removeEventListener('focus', load); };
   }, []);
 
   const cycleStatus = async (order: Order) => {

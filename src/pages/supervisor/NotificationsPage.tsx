@@ -73,9 +73,11 @@ export default function NotificationsPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    const ch = (supabase as any).channel('smart-alerts-page')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'smart_alerts' }, load).subscribe();
-    return () => supabase.removeChannel(ch);
+    // Atualiza periodicamente e ao voltar pra aba, em vez de manter um canal Realtime aberto
+    // (canais Realtime ficam consultando o WAL do banco o tempo todo, mesmo sem mudanças).
+    const interval = setInterval(load, 30000);
+    window.addEventListener('focus', load);
+    return () => { clearInterval(interval); window.removeEventListener('focus', load); };
   }, [load]);
 
   async function resolve(id: string) {

@@ -66,11 +66,12 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
   useEffect(() => {
     // Pequeno delay garante que a sessão Supabase esteja pronta
     const t = setTimeout(load, 300);
-    const ch = supabase
-      .channel('notif-panel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_notifications' }, load)
-      .subscribe();
-    return () => { clearTimeout(t); supabase.removeChannel(ch); };
+    // Atualiza periodicamente e ao voltar pra aba, em vez de manter um canal Realtime aberto
+    // (canais Realtime ficam consultando o WAL do banco o tempo todo, mesmo sem mudanças —
+    // pesado se o Dashboard ficar aberto o dia inteiro).
+    const interval = setInterval(load, 30000);
+    window.addEventListener('focus', load);
+    return () => { clearTimeout(t); clearInterval(interval); window.removeEventListener('focus', load); };
   }, [load]);
 
   const handleClick = async (n: Notif) => {
