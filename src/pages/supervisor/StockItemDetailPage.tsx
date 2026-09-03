@@ -83,7 +83,7 @@ export default function StockItemDetailPage() {
 
   const load = async () => {
     setLoading(true);
-    const [itemRes, entriesRes, outputsRes, suppliersRes, sheetItemsRes, profsRes, grpsRes, rolesRes] = await Promise.all([
+    const [itemRes, entriesRes, outputsRes, suppliersRes, sheetItemsRes, profsRes, grpsRes, rolesRes, priceHistRes] = await Promise.all([
       supabase.from('stock_items').select('*').eq('id', id!).single(),
       supabase.from('stock_entries').select('*').eq('item_id', id!).order('created_at', { ascending: false }).limit(200),
       supabase.from('stock_outputs').select('*').eq('item_id', id!).order('created_at', { ascending: false }).limit(200),
@@ -92,14 +92,44 @@ export default function StockItemDetailPage() {
       supabase.from('profiles').select('user_id, display_name').order('display_name'),
       (supabase.from('inventory_groups') as any).select('id, name').order('name'),
       supabase.from('user_roles').select('user_id, role').eq('role', 'employee'),
+      (supabase.from('stock_price_history') as any).select('new_price, created_at').eq('item_id', id!).order('created_at', { ascending: false }).limit(1),
     ]);
 
     if (!itemRes.data) { navigate('/items'); return; }
     const itemData = itemRes.data as unknown as StockItem;
-    setItem(itemData);
-    setEntries((entriesRes.data || []) as unknown as Entry[]);
+    const entriesData = (entriesRes.data || []) as unknown as Entry[];
+    const suppliersData = (suppliersRes.data || []) as unknown as Supplier[];
+
+    // Self-cura: entrada de compra mais recente com preço deve mandar no "Preço Atual" e no fornecedor cadastrado,
+    // a menos que uma edição manual de preço (stock_price_history) seja mais recente que ela.
+    const latestPricedEntry = entriesData.find(e => e.unit_cost && e.unit_cost > 0);
+    const latestManualEdit = ((priceHistRes.data || []) as any[])[0];
+    if (latestPricedEntry) {
+      const entryIsNewer = !latestManualEdit || new Date(latestPricedEntry.created_at).getTime() >= new Date(latestManualEdit.created_at).getTime();
+      if (entryIsNewer && Math.abs((itemData.unit_cost || 0) - latestPricedEntry.unit_cost) > 0.001) {
+        await supabase.from('stock_items').update({ unit_cost: latestPricedEntry.unit_cost } as any).eq('id', id!);
+        itemData.unit_cost = latestPricedEntry.unit_cost;
+      }
+      const supplierName = latestPricedEntry.supplier?.trim();
+      if (supplierName) {
+        const existingSupplier = suppliersData.find(s => s.supplier_name.toLowerCase() === supplierName.toLowerCase());
+        if (!existingSupplier) {
+          const { data: newSup } = await supabase.from('item_suppliers').insert({
+            item_id: id, supplier_name: supplierName, unit_price: latestPricedEntry.unit_cost,
+            is_preferred: suppliersData.length === 0,
+          } as any).select('*').single();
+          if (newSup) suppliersData.push(newSup as unknown as Supplier);
+        } else if (entryIsNewer && Math.abs(existingSupplier.unit_price - latestPricedEntry.unit_cost) > 0.001) {
+          await supabase.from('item_suppliers').update({ unit_price: latestPricedEntry.unit_cost } as any).eq('id', existingSupplier.id);
+          existingSupplier.unit_price = latestPricedEntry.unit_cost;
+        }
+      }
+    }
+
+    setItem({ ...itemData });
+    setEntries(entriesData);
     setOutputs((outputsRes.data || []) as unknown as Output[]);
-    setSuppliers((suppliersRes.data || []) as unknown as Supplier[]);
+    setSuppliers(suppliersData);
 
     const employeeIds = new Set(((rolesRes.data || []) as { user_id: string }[]).map(r => r.user_id));
     setAllProfiles(((profsRes.data || []) as { user_id: string; display_name: string }[]).filter(p => employeeIds.has(p.user_id)));
