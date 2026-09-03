@@ -108,6 +108,10 @@ export default function ContractFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventId) return;
+    if (!form.witness_name.trim() || !form.witness_cpf.trim()) {
+      alert('Por favor, preencha o nome completo e o CPF da testemunha antes de enviar.');
+      return;
+    }
     setSaving(true);
 
     const { error: eventErr } = await (supabase.from as any)('events').update({
