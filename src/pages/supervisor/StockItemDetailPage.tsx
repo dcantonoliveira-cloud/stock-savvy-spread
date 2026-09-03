@@ -7,14 +7,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Package, Store, ChevronLeft, ChevronRight,
-  ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2, Star, StarOff, SlidersHorizontal
+  ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2, Star, StarOff, SlidersHorizontal, Barcode, Boxes
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum, fmtCur, fmtDate } from '@/lib/format';
+import ResponsibleEditor from '@/components/stock-item/ResponsibleEditor';
+import AliasEditor from '@/components/stock-item/AliasEditor';
+import TagEditor from '@/components/stock-item/TagEditor';
 
 type StockItem = {
   id: string; name: string; category: string; unit: string;
   current_stock: number; min_stock: number; unit_cost: number;
+  subcategory_id: string | null; barcode: string | null; purchase_qty: number | null; image_url: string | null;
 };
 
 type Entry = {
@@ -48,6 +52,9 @@ export default function StockItemDetailPage() {
   const [sheetUsages, setSheetUsages] = useState<SheetUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'movimentos' | 'precos' | 'fornecedores' | 'pratos'>('movimentos');
+  const [subcategoryName, setSubcategoryName] = useState<string | null>(null);
+  const [allProfiles, setAllProfiles] = useState<{ user_id: string; display_name: string }[]>([]);
+  const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([]);
 
   // Pagination
   const [movPage, setMovPage] = useState(0);
@@ -71,19 +78,34 @@ export default function StockItemDetailPage() {
 
   const load = async () => {
     setLoading(true);
-    const [itemRes, entriesRes, outputsRes, suppliersRes, sheetItemsRes] = await Promise.all([
+    const [itemRes, entriesRes, outputsRes, suppliersRes, sheetItemsRes, profsRes, grpsRes, rolesRes] = await Promise.all([
       supabase.from('stock_items').select('*').eq('id', id!).single(),
       supabase.from('stock_entries').select('*').eq('item_id', id!).order('created_at', { ascending: false }).limit(200),
       supabase.from('stock_outputs').select('*').eq('item_id', id!).order('created_at', { ascending: false }).limit(200),
       supabase.from('item_suppliers').select('*').eq('item_id', id!).order('is_preferred', { ascending: false }),
       supabase.from('technical_sheet_items').select('sheet_id, quantity, unit_cost, section, technical_sheets(name)').eq('item_id', id!),
+      supabase.from('profiles').select('user_id, display_name').order('display_name'),
+      (supabase.from('inventory_groups') as any).select('id, name').order('name'),
+      supabase.from('user_roles').select('user_id, role').eq('role', 'employee'),
     ]);
 
     if (!itemRes.data) { navigate('/items'); return; }
-    setItem(itemRes.data as unknown as StockItem);
+    const itemData = itemRes.data as unknown as StockItem;
+    setItem(itemData);
     setEntries((entriesRes.data || []) as unknown as Entry[]);
     setOutputs((outputsRes.data || []) as unknown as Output[]);
     setSuppliers((suppliersRes.data || []) as unknown as Supplier[]);
+
+    const employeeIds = new Set(((rolesRes.data || []) as { user_id: string }[]).map(r => r.user_id));
+    setAllProfiles(((profsRes.data || []) as { user_id: string; display_name: string }[]).filter(p => employeeIds.has(p.user_id)));
+    setAllGroups((grpsRes.data || []) as { id: string; name: string }[]);
+
+    if (itemData.subcategory_id) {
+      const { data: subcat } = await supabase.from('subcategories').select('name').eq('id', itemData.subcategory_id).single();
+      setSubcategoryName((subcat as any)?.name ?? null);
+    } else {
+      setSubcategoryName(null);
+    }
 
     const usages: SheetUsage[] = (sheetItemsRes.data || []).map((row: any) => ({
       sheet_id: row.sheet_id,
@@ -232,12 +254,30 @@ export default function StockItemDetailPage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground">{item.name}</h1>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <Badge variant="outline" className="text-xs">{item.category || 'Sem categoria'}</Badge>
+            {subcategoryName && <Badge variant="outline" className="text-xs">{subcategoryName}</Badge>}
             <span className="text-xs text-muted-foreground">{item.unit}</span>
+            {item.min_stock > 0 && <span className="text-xs text-muted-foreground">· mín. {fmtNum(item.min_stock)} {item.unit}</span>}
+            {item.purchase_qty && item.purchase_qty > 1 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><Boxes className="w-3 h-3" />{fmtNum(item.purchase_qty)} {item.unit}/embalagem</span>
+            )}
+            {item.barcode && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><Barcode className="w-3 h-3" />{item.barcode}</span>
+            )}
             {isLow && <Badge variant="destructive" className="text-xs">Estoque baixo</Badge>}
           </div>
         </div>
+        {item.image_url && (
+          <img src={item.image_url} alt={item.name} className="w-14 h-14 rounded-lg object-cover border border-border" />
+        )}
+      </div>
+
+      {/* Detalhes: responsáveis, apelidos, tags */}
+      <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-4">
+        <ResponsibleEditor itemId={item.id} allProfiles={allProfiles} allGroups={allGroups} />
+        <AliasEditor itemId={item.id} />
+        <TagEditor itemId={item.id} />
       </div>
 
       {/* Stats */}
