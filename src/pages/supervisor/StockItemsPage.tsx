@@ -939,6 +939,7 @@ export default function StockItemsPage() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterSubcategory, setFilterSubcategory] = useState('all');
   const [filterTag, setFilterTag] = useState('all');
+  const [filterLowStock, setFilterLowStock] = useState(false);
   const [allTagsForFilter, setAllTagsForFilter] = useState<{ id: string; name: string; color: string }[]>([]);
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [editingSubcatItemId, setEditingSubcatItemId] = useState<string | null>(null);
@@ -1024,9 +1025,9 @@ export default function StockItemsPage() {
     loadTotalValue();
   };
 
-  const doLoad = async (sq: string, cat: string, subcat: string, tag: string, sf: typeof sortField, sd: typeof sortDir, p: number) => {
+  const doLoad = async (sq: string, cat: string, subcat: string, tag: string, sf: typeof sortField, sd: typeof sortDir, p: number, lowStock: boolean = filterLowStock) => {
     setSearching(true);
-    let q = (supabase.from('stock_items') as any).select('*', { count: 'exact' }).neq('category', '_sistema_');
+    let q = (supabase.from('stock_items') as any).select('*', { count: lowStock ? undefined : 'exact' }).neq('category', '_sistema_');
     if (sq) q = q.or(buildLooseNameOrFilter(sq));
     if (cat !== 'all') q = q.eq('category', cat);
     if (subcat !== 'all') q = q.eq('subcategory_id', subcat);
@@ -1035,8 +1036,21 @@ export default function StockItemsPage() {
       const tagItemIds = ((tagLinks || []) as any[]).map(l => l.item_id);
       q = q.in('id', tagItemIds.length ? tagItemIds : ['00000000-0000-0000-0000-000000000000']);
     }
-    q = q.order(sf, { ascending: sd === 'asc' }).range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
-    const { data, count } = await q;
+    let data: any[] = [];
+    let count = 0;
+    if (lowStock) {
+      // PostgREST não compara duas colunas entre si — filtra client-side após buscar tudo que tem mínimo definido
+      q = q.gt('min_stock', 0).order(sf, { ascending: sd === 'asc' }).range(0, 4999);
+      const res = await q;
+      const allLow = ((res.data || []) as any[]).filter(i => (i.current_stock || 0) < i.min_stock);
+      count = allLow.length;
+      data = allLow.slice(p * PAGE_SIZE, (p + 1) * PAGE_SIZE);
+    } else {
+      q = q.order(sf, { ascending: sd === 'asc' }).range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
+      const res = await q;
+      data = res.data || [];
+      count = res.count || 0;
+    }
     const subMap: Record<string, string> = {};
     allSubcategoriesRef.current.forEach(s => { subMap[s.id] = s.name; });
     const mapped: Item[] = (data || []).map((i: any) => ({ ...i, subcategory_name: i.subcategory_id ? subMap[i.subcategory_id] : undefined }));
@@ -1080,7 +1094,7 @@ export default function StockItemsPage() {
   };
 
   const load = () => {
-    doLoad(searchQuery, filterCategory, filterSubcategory, filterTag, sortField, sortDir, page);
+    doLoad(searchQuery, filterCategory, filterSubcategory, filterTag, sortField, sortDir, page, filterLowStock);
   };
 
   // Load metadata once on mount
@@ -1095,8 +1109,8 @@ export default function StockItemsPage() {
 
   // Reload items whenever query params change
   useEffect(() => {
-    doLoad(searchQuery, filterCategory, filterSubcategory, filterTag, sortField, sortDir, page);
-  }, [searchQuery, filterCategory, filterSubcategory, filterTag, sortField, sortDir, page]);
+    doLoad(searchQuery, filterCategory, filterSubcategory, filterTag, sortField, sortDir, page, filterLowStock);
+  }, [searchQuery, filterCategory, filterSubcategory, filterTag, sortField, sortDir, page, filterLowStock]);
 
   // Lazy-load ALL items when duplicate dialog opens (paginated to bypass any server limit)
   useEffect(() => {
@@ -1583,6 +1597,15 @@ export default function StockItemsPage() {
             ))}
           </SelectContent>
         </Select>
+        <Button
+          type="button"
+          variant="outline"
+          className={`h-9 gap-1.5 ${filterLowStock ? 'bg-destructive/10 border-destructive/40 text-destructive hover:bg-destructive/15 hover:text-destructive' : 'bg-white'}`}
+          onClick={() => { setFilterLowStock(v => !v); setPage(0); }}
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Abaixo do mínimo
+        </Button>
       </div>
       {/* Subcategory filter chips */}
       {filterCategory !== 'all' && (() => {
