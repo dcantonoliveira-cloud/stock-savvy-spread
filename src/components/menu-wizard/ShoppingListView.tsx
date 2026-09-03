@@ -11,6 +11,8 @@ import * as XLSX from 'xlsx';
 
 type Tag = { id: string; name: string; color: string };
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 // ─── Filtro multi-seleção (dropdown com checkboxes) ───
 function MultiSelectFilter({ label, options, selected, onChange }: {
   label: string; options: { value: string; label: string }[]; selected: string[]; onChange: (v: string[]) => void;
@@ -334,7 +336,6 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
   };
 
   const handleGenerateExcel = () => {
-    const round2 = (n: number) => Math.round(n * 100) / 100;
     const rows = filteredRows.map(r => {
       const eff = getEffectiveQty(r);
       return {
@@ -478,12 +479,12 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
                       <input
                         type="number" step="any" min="0"
                         className={`w-20 text-right bg-transparent border border-transparent hover:border-border focus:border-primary focus:outline-none rounded px-1.5 py-0.5 text-sm transition-colors ${eff > 0 ? 'text-amber-700' : 'text-success'}`}
-                        value={qtyOverrides[r.itemId] !== undefined ? qtyOverrides[r.itemId] : r.toBuy}
+                        value={qtyOverrides[r.itemId] !== undefined ? qtyOverrides[r.itemId] : round2(r.toBuy)}
                         onChange={e => setQtyOverrides(prev => ({ ...prev, [r.itemId]: e.target.value }))}
                         onBlur={e => {
                           const v = parseFloat(e.target.value);
-                          if (isNaN(v) || v < 0) setQtyOverrides(prev => ({ ...prev, [r.itemId]: r.toBuy }));
-                          else setQtyOverrides(prev => ({ ...prev, [r.itemId]: v }));
+                          if (isNaN(v) || v < 0) setQtyOverrides(prev => ({ ...prev, [r.itemId]: round2(r.toBuy) }));
+                          else setQtyOverrides(prev => ({ ...prev, [r.itemId]: round2(v) }));
                         }}
                       />
                       <span className="text-xs text-muted-foreground">{r.unit}</span>
