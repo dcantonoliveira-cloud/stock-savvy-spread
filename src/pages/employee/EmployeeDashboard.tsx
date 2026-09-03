@@ -27,6 +27,7 @@ type Kitchen = { id: string; name: string };
 type Location = { id: string; item_id: string; kitchen_id: string; current_stock: number };
 type Subcategory = { id: string; name: string; category_id: string };
 type CategoryRecord = { id: string; name: string };
+type Tag = { id: string; name: string; color: string };
 
 const normalizeText = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -54,10 +55,13 @@ export default function EmployeeDashboard() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [categoryRecords, setCategoryRecords] = useState<CategoryRecord[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [itemTagsMap, setItemTagsMap] = useState<Record<string, string[]>>({});
   const [loadingItems, setLoadingItems] = useState(true);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [mode, setMode] = useState<'entry' | 'output' | 'transfer' | null>(null);
   const [quantity, setQuantity] = useState('');
@@ -75,18 +79,29 @@ export default function EmployeeDashboard() {
   const [tfToKitchen, setTfToKitchen] = useState('');
 
   const loadData = async () => {
-    const [itemsRes, kitchensRes, locsRes, subcatsRes, catsRes] = await Promise.all([
+    const [itemsRes, kitchensRes, locsRes, subcatsRes, catsRes, tagsRes, itemTagsRes] = await Promise.all([
       supabase.from('stock_items').select('id, name, category, subcategory_id, unit, current_stock, image_url, barcode' as any).order('name').range(0, 9999),
       supabase.from('kitchens').select('id, name').order('name'),
       supabase.from('stock_item_locations').select('id, item_id, kitchen_id, current_stock'),
       supabase.from('subcategories').select('id, name, category_id').order('name'),
       supabase.from('categories').select('id, name').order('name'),
+      supabase.from('tags').select('id, name, color').order('name'),
+      (supabase.from('stock_item_tags') as any).select('item_id, tag_id'),
     ]);
     if (itemsRes.data) setItems(itemsRes.data as unknown as StockItem[]);
     if (kitchensRes.data) setKitchens(kitchensRes.data as Kitchen[]);
     if (locsRes.data) setLocations(locsRes.data as Location[]);
     if (subcatsRes.data) setSubcategories(subcatsRes.data as Subcategory[]);
     if (catsRes.data) setCategoryRecords(catsRes.data as CategoryRecord[]);
+    if (tagsRes.data) setAllTags(tagsRes.data as Tag[]);
+    if (itemTagsRes.data) {
+      const map: Record<string, string[]> = {};
+      for (const l of itemTagsRes.data as { item_id: string; tag_id: string }[]) {
+        if (!map[l.item_id]) map[l.item_id] = [];
+        map[l.item_id].push(l.tag_id);
+      }
+      setItemTagsMap(map);
+    }
     setLoadingItems(false);
   };
 
@@ -125,8 +140,10 @@ export default function EmployeeDashboard() {
     }
   };
 
-  const categories = Array.from(new Set(items.map(i => i.category).filter(Boolean))).sort();
-  const categoryItemsAll = selectedCategory ? items.filter(i => i.category === selectedCategory) : [];
+  const usedTags = allTags.filter(t => Object.values(itemTagsMap).some(tagIds => tagIds.includes(t.id)));
+  const tagFilteredItems = selectedTag ? items.filter(i => (itemTagsMap[i.id] || []).includes(selectedTag)) : items;
+  const categories = Array.from(new Set(tagFilteredItems.map(i => i.category).filter(Boolean))).sort();
+  const categoryItemsAll = selectedCategory ? tagFilteredItems.filter(i => i.category === selectedCategory) : [];
   const categoryRecord = selectedCategory ? categoryRecords.find(c => c.name === selectedCategory) : null;
   const subcategoriesForCategory = categoryRecord
     ? subcategories.filter(s => s.category_id === categoryRecord.id && categoryItemsAll.some(i => i.subcategory_id === s.id))
@@ -134,7 +151,7 @@ export default function EmployeeDashboard() {
   const categoryItems = selectedSubcategory
     ? categoryItemsAll.filter(i => i.subcategory_id === selectedSubcategory)
     : categoryItemsAll;
-  const searchResults = search ? items.filter(i => looseMatch(i.name, search)) : [];
+  const searchResults = search ? tagFilteredItems.filter(i => looseMatch(i.name, search)) : [];
 
   const handleAction = (item: StockItem, action: 'entry' | 'output' | 'transfer') => {
     setSelectedItem(item);
@@ -288,6 +305,37 @@ export default function EmployeeDashboard() {
             </Button>
           </div>
 
+          {/* Filtro de tags — estilo totem */}
+          {usedTags.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-1 -mx-4 px-4 scrollbar-none">
+              <button
+                onClick={() => setSelectedTag(null)}
+                className={`flex-shrink-0 h-9 px-4 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                  selectedTag === null
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'bg-card border-2 border-border text-muted-foreground'
+                }`}
+              >
+                Todas as tags
+              </button>
+              {usedTags.map(tag => (
+                <button
+                  key={tag.id}
+                  onClick={() => setSelectedTag(prev => prev === tag.id ? null : tag.id)}
+                  className={`flex-shrink-0 h-9 px-4 rounded-full text-xs font-bold transition-all active:scale-95 inline-flex items-center gap-1.5 ${
+                    selectedTag === tag.id
+                      ? 'text-white shadow-md'
+                      : 'bg-card border-2 border-border text-muted-foreground'
+                  }`}
+                  style={selectedTag === tag.id ? { backgroundColor: tag.color, borderColor: tag.color } : undefined}
+                >
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: selectedTag === tag.id ? '#fff' : tag.color }} />
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Search results */}
           {search && (
             <div>
@@ -305,7 +353,7 @@ export default function EmployeeDashboard() {
               <p className="text-sm text-muted-foreground mb-3">Selecione uma categoria</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {categories.map(cat => {
-                  const count = items.filter(i => i.category === cat).length;
+                  const count = tagFilteredItems.filter(i => i.category === cat).length;
                   return (
                     <button
                       key={cat}
