@@ -230,6 +230,127 @@ function SupplierDialog({ item, open, onClose, initialSuppliers = [] }: { item: 
   );
 }
 
+// ─── Link Price to Supplier Dialog (após editar o preço na tabela) ───
+function LinkSupplierDialog({ item, newPrice, open, onClose }: { item: Item | null; newPrice: number; open: boolean; onClose: () => void }) {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [existingNames, setExistingNames] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!item || !open) return;
+    setLoading(true);
+    setAdding(false);
+    setNewName('');
+    Promise.all([
+      supabase.from('item_suppliers').select('*').eq('item_id', item.id).order('is_preferred', { ascending: false }),
+      supabase.from('item_suppliers').select('supplier_name').limit(500),
+    ]).then(([suppRes, namesRes]) => {
+      setSuppliers((suppRes.data || []) as Supplier[]);
+      setExistingNames(Array.from(new Set(((namesRes.data || []) as any[]).map(r => r.supplier_name as string))).sort());
+      setLoading(false);
+    });
+  }, [item, open]);
+
+  const linkExisting = async (supplierId: string) => {
+    setSaving(true);
+    const { error } = await supabase.from('item_suppliers').update({ unit_price: newPrice } as any).eq('id', supplierId);
+    setSaving(false);
+    if (error) { toast.error('Erro ao vincular fornecedor'); return; }
+    toast.success('Fornecedor atualizado com o novo preço!');
+    onClose();
+  };
+
+  const createAndLink = async () => {
+    if (!item || !newName.trim()) return;
+    setSaving(true);
+    const { error } = await supabase.from('item_suppliers').insert({
+      item_id: item.id, supplier_name: newName.trim(),
+      unit_price: newPrice, is_preferred: suppliers.length === 0,
+    } as any);
+    setSaving(false);
+    if (error) { toast.error('Erro ao vincular fornecedor'); return; }
+    toast.success('Fornecedor vinculado!');
+    onClose();
+  };
+
+  if (!item) return null;
+  return (
+    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Store className="w-5 h-5 text-primary" />Vincular a um fornecedor?</DialogTitle>
+          <DialogDescription>
+            Preço de <strong>{item.name}</strong> atualizado para {newPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. Quer vincular esse valor a um fornecedor?
+          </DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <div className="py-6 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {suppliers.map(s => (
+              <button key={s.id} disabled={saving} onClick={() => linkExisting(s.id)}
+                className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left disabled:opacity-50">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  {s.is_preferred && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />}
+                  {s.supplier_name}
+                </span>
+                <span className="text-xs text-muted-foreground">atual: R$ {s.unit_price.toFixed(2)}</span>
+              </button>
+            ))}
+            {suppliers.length === 0 && !adding && (
+              <p className="text-sm text-muted-foreground text-center py-2">Nenhum fornecedor cadastrado ainda.</p>
+            )}
+            {adding ? (
+              <div className="flex flex-col gap-2 p-3 rounded-xl border border-primary/40 bg-primary/5">
+                <div className="relative">
+                  <Input
+                    placeholder="Nome do fornecedor"
+                    value={newName}
+                    onChange={e => { setNewName(e.target.value); setShowSuggestions(true); }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                    className="h-8 text-sm w-full"
+                    autoFocus
+                    onKeyDown={e => e.key === 'Enter' && createAndLink()}
+                  />
+                  {showSuggestions && (() => {
+                    const filtered = existingNames.filter(n => !newName || n.toLowerCase().includes(newName.toLowerCase()));
+                    return filtered.length > 0 ? (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filtered.map(n => (
+                          <button key={n} className="w-full text-left px-3 py-2 text-sm hover:bg-muted/60 transition-colors flex items-center gap-2"
+                            onMouseDown={() => { setNewName(n); setShowSuggestions(false); }}>
+                            <Store className="w-3 h-3 shrink-0 text-muted-foreground" />{n}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={createAndLink} disabled={saving || !newName.trim()} className="h-8 flex-1">
+                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Vincular'}
+                  </Button>
+                  <button onClick={() => { setAdding(false); setNewName(''); }}><X className="w-4 h-4 text-muted-foreground" /></button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" className="w-full" onClick={() => setAdding(true)}>
+                <Plus className="w-4 h-4 mr-1" />Novo fornecedor
+              </Button>
+            )}
+          </div>
+        )}
+        <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={onClose}>Agora não</Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Duplicate Dialog ───
 const DUP_PAGE_SIZE = 50;
 function DuplicateReviewDialog({ open, onClose, items, onDone }: {
@@ -948,6 +1069,7 @@ export default function StockItemsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | undefined>();
   const [supplierItem, setSupplierItem] = useState<Item | null>(null);
+  const [priceLinkPrompt, setPriceLinkPrompt] = useState<{ item: Item; price: number } | null>(null);
   const [labelItem, setLabelItem] = useState<LabelItem | null>(null);
   const [totalStockValue, setTotalStockValue] = useState(0);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
@@ -1184,6 +1306,7 @@ export default function StockItemsPage() {
         created_at: now,
         notes: `Atualização de preço por ${who} (anterior: R$ ${prevItem.unit_cost ?? 0})`,
       });
+      setPriceLinkPrompt({ item: prevItem, price: val });
     }
 
     setItems(prev => prev.map(i => i.id === editingCell.id ? { ...i, [editingCell.field]: val } : i));
@@ -1887,6 +2010,12 @@ export default function StockItemsPage() {
       </Dialog>
 
       <SupplierDialog item={supplierItem} open={supplierItem !== null} onClose={() => { setSupplierItem(null); load(); }} />
+      <LinkSupplierDialog
+        item={priceLinkPrompt?.item ?? null}
+        newPrice={priceLinkPrompt?.price ?? 0}
+        open={priceLinkPrompt !== null}
+        onClose={() => { setPriceLinkPrompt(null); load(); }}
+      />
       <DuplicateReviewDialog open={duplicateOpen} onClose={() => setDuplicateOpen(false)} items={allItemsForDialogs} onDone={() => { setDuplicateOpen(false); load(); }} />
       <StockReportDialog open={reportOpen} onClose={() => setReportOpen(false)} />
       <MaterialLabelPrint item={labelItem} onClose={() => setLabelItem(null)} />
