@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -44,6 +45,7 @@ const PAGE_SIZE = 50;
 export default function StockItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
 
   const [item, setItem] = useState<StockItem | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -253,8 +255,16 @@ export default function StockItemDetailPage() {
     const newPrice = parseFloat(priceEditValue.replace(',', '.'));
     if (isNaN(newPrice) || newPrice < 0) { toast.error('Preço inválido'); return; }
     setPriceEditSaving(true);
+    const who = profile?.display_name ?? 'Supervisor';
     // Atualiza direto em stock_items — dispara automaticamente o histórico de preço (trigger no banco)
     const { error } = await supabase.from('stock_items').update({ unit_cost: newPrice } as any).eq('id', item.id);
+    if (!error) {
+      // Registra também como entrada de preço (qtd 0) pra aparecer no Histórico de Preços
+      await supabase.from('stock_entries').insert({
+        item_id: item.id, quantity: 0, unit_cost: newPrice,
+        notes: `Atualização de preço por ${who} (anterior: R$ ${item.unit_cost ?? 0})`,
+      } as any);
+    }
     setPriceEditSaving(false);
     if (error) { toast.error('Erro ao salvar preço'); return; }
     toast.success(`Preço atualizado para ${fmtCur(newPrice)}`);
