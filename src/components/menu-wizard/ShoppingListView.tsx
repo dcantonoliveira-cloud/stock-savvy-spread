@@ -9,10 +9,12 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
 
+type Tag = { id: string; name: string; color: string };
+
 type Row = {
   itemId: string; name: string; unit: string; needed: number; inStock: number; toBuy: number; unitCost: number;
   category: string; subcategoryId: string | null; subcategoryName: string;
-  responsibleNames: string[]; supplierNames: string[];
+  responsibleNames: string[]; supplierNames: string[]; tags: Tag[];
 };
 
 export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: string[]; title: string; onBack?: () => void }) {
@@ -24,6 +26,7 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
   const [subcategoryFilter, setSubcategoryFilter] = useState('all');
   const [responsibleFilter, setResponsibleFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState('all');
   const [onlyToBuy, setOnlyToBuy] = useState(false);
 
   const [exporting, setExporting] = useState<'pdf' | 'image' | null>(null);
@@ -59,13 +62,14 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
       const sheetItems = (itemsRes.data || []) as { sheet_id: string; item_id: string; quantity: number; unit: string }[];
       const itemIds = [...new Set(sheetItems.map(i => i.item_id))];
 
-      const [stockRes, subcatsRes, respRes, suppliersRes, profilesRes, groupsRes] = await Promise.all([
+      const [stockRes, subcatsRes, respRes, suppliersRes, profilesRes, groupsRes, itemTagsRes] = await Promise.all([
         itemIds.length ? (supabase.from('stock_items') as any).select('id, name, unit, current_stock, category, subcategory_id, unit_cost, purchase_qty').in('id', itemIds) : Promise.resolve({ data: [] }),
         supabase.from('subcategories').select('id, name'),
         itemIds.length ? (supabase.from('stock_item_responsibles') as any).select('item_id, user_id, group_id').in('item_id', itemIds) : Promise.resolve({ data: [] }),
         itemIds.length ? (supabase.from('item_suppliers') as any).select('item_id, supplier_name').in('item_id', itemIds) : Promise.resolve({ data: [] }),
         supabase.from('profiles').select('user_id, display_name'),
         (supabase.from('inventory_groups') as any).select('id, name'),
+        itemIds.length ? (supabase.from('stock_item_tags') as any).select('item_id, tags:tag_id(id, name, color)').in('item_id', itemIds) : Promise.resolve({ data: [] }),
       ]);
 
       const stockById: Record<string, { name: string; unit: string; current_stock: number; category: string; subcategory_id: string | null; unit_cost: number; purchase_qty: number | null }> = {};
@@ -91,6 +95,13 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
       for (const s of (suppliersRes.data || []) as any[]) {
         if (!suppliersByItem[s.item_id]) suppliersByItem[s.item_id] = [];
         suppliersByItem[s.item_id].push(s.supplier_name);
+      }
+
+      const tagsByItem: Record<string, Tag[]> = {};
+      for (const t of (itemTagsRes.data || []) as any[]) {
+        if (!t.tags) continue;
+        if (!tagsByItem[t.item_id]) tagsByItem[t.item_id] = [];
+        tagsByItem[t.item_id].push(t.tags);
       }
 
       const neededByItem: Record<string, number> = {};
@@ -120,6 +131,7 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
           subcategoryName: stock?.subcategory_id ? (subcatNameById[stock.subcategory_id] || '') : '',
           responsibleNames: responsiblesByItem[itemId] || [],
           supplierNames: suppliersByItem[itemId] || [],
+          tags: tagsByItem[itemId] || [],
         };
       }).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
@@ -142,12 +154,16 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
   )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const responsibles = Array.from(new Set(rows.flatMap(r => r.responsibleNames))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const suppliers = Array.from(new Set(rows.flatMap(r => r.supplierNames))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const tagsById: Record<string, Tag> = {};
+  for (const r of rows) for (const t of r.tags) tagsById[t.id] = t;
+  const allTags = Object.values(tagsById).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const filteredRows = rows.filter(r => {
     if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
     if (subcategoryFilter !== 'all' && r.subcategoryName !== subcategoryFilter) return false;
     if (responsibleFilter !== 'all' && !r.responsibleNames.includes(responsibleFilter)) return false;
     if (supplierFilter !== 'all' && !r.supplierNames.includes(supplierFilter)) return false;
+    if (tagFilter !== 'all' && !r.tags.some(t => t.id === tagFilter)) return false;
     if (onlyToBuy && getEffectiveQty(r) <= 0) return false;
     return true;
   });
@@ -360,6 +376,10 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
           <option value="all">Todos fornecedores</option>
           {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <select value={tagFilter} onChange={e => setTagFilter(e.target.value)} className="h-9 px-3 text-sm border border-border rounded-lg bg-white">
+          <option value="all">Todas tags</option>
+          {allTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
         <label className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-lg bg-white cursor-pointer">
           <input type="checkbox" checked={onlyToBuy} onChange={e => setOnlyToBuy(e.target.checked)} />
           Só o que precisa comprar
@@ -381,7 +401,16 @@ export default function ShoppingListView({ menuIds, title, onBack }: { menuIds: 
               const eff = getEffectiveQty(r);
               return (
                 <tr key={r.itemId} className={eff > 0 ? 'bg-amber-50/40' : ''}>
-                  <td className="px-4 py-2 font-medium text-foreground">{r.name}</td>
+                  <td className="px-4 py-2 font-medium text-foreground">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {r.name}
+                      {r.tags.map(t => (
+                        <span key={t.id} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: t.color + '20', color: t.color }}>
+                          {t.name}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
                   <td className="px-4 py-2 text-right text-muted-foreground">{fmtNum(r.needed)} {r.unit}</td>
                   <td className="px-4 py-2 text-right text-muted-foreground">{fmtNum(r.inStock)} {r.unit}</td>
                   <td className="px-4 py-2 text-right font-semibold">
