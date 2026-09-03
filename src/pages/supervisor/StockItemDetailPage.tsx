@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Package, Store, ChevronLeft, ChevronRight,
-  ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2, Star, StarOff, SlidersHorizontal, Barcode, Boxes
+  ClipboardList, DollarSign, History, Utensils, Pencil, Trash2, Plus, Loader2, Star, StarOff, SlidersHorizontal, Barcode, Boxes, Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum, fmtCur, fmtDate } from '@/lib/format';
@@ -51,7 +51,7 @@ export default function StockItemDetailPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [sheetUsages, setSheetUsages] = useState<SheetUsage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'movimentos' | 'precos' | 'fornecedores' | 'pratos'>('movimentos');
+  const [activeTab, setActiveTab] = useState<'movimentos' | 'precos' | 'fornecedores' | 'pratos' | 'config'>('movimentos');
   const [subcategoryName, setSubcategoryName] = useState<string | null>(null);
   const [allProfiles, setAllProfiles] = useState<{ user_id: string; display_name: string }[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([]);
@@ -64,6 +64,11 @@ export default function StockItemDetailPage() {
   const [correctionQty, setCorrectionQty] = useState('');
   const [correctionNotes, setCorrectionNotes] = useState('');
   const [correctionSaving, setCorrectionSaving] = useState(false);
+
+  // Price edit dialog
+  const [priceEditOpen, setPriceEditOpen] = useState(false);
+  const [priceEditValue, setPriceEditValue] = useState('');
+  const [priceEditSaving, setPriceEditSaving] = useState(false);
 
   // Supplier dialog state
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
@@ -213,6 +218,20 @@ export default function StockItemDetailPage() {
     load();
   };
 
+  const handlePriceEdit = async () => {
+    if (!item) return;
+    const newPrice = parseFloat(priceEditValue.replace(',', '.'));
+    if (isNaN(newPrice) || newPrice < 0) { toast.error('Preço inválido'); return; }
+    setPriceEditSaving(true);
+    // Atualiza direto em stock_items — dispara automaticamente o histórico de preço (trigger no banco)
+    const { error } = await supabase.from('stock_items').update({ unit_cost: newPrice } as any).eq('id', item.id);
+    setPriceEditSaving(false);
+    if (error) { toast.error('Erro ao salvar preço'); return; }
+    toast.success(`Preço atualizado para ${fmtCur(newPrice)}`);
+    setPriceEditOpen(false);
+    load();
+  };
+
   if (loading || !item) return (
     <div className="flex items-center justify-center h-64">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -273,13 +292,6 @@ export default function StockItemDetailPage() {
         )}
       </div>
 
-      {/* Detalhes: responsáveis, apelidos, tags */}
-      <div className="bg-white rounded-xl border border-border shadow-sm p-4 space-y-4">
-        <ResponsibleEditor itemId={item.id} allProfiles={allProfiles} allGroups={allGroups} />
-        <AliasEditor itemId={item.id} />
-        <TagEditor itemId={item.id} />
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* Estoque Atual — clicável para corrigir */}
@@ -315,11 +327,18 @@ export default function StockItemDetailPage() {
 
           return (
             <React.Fragment>
-              {/* Card: Preço Atual */}
-              <div className="bg-white rounded-xl border border-border shadow-sm p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <DollarSign className="w-4 h-4 text-amber-600" />
-                  <span className="text-xs text-muted-foreground">Preço Atual</span>
+              {/* Card: Preço Atual — clicável para editar */}
+              <div
+                className="bg-white rounded-xl border border-border shadow-sm p-4 cursor-pointer group hover:border-primary/40 hover:shadow-md transition-all"
+                onClick={() => { setPriceEditValue(String(item.unit_cost || '')); setPriceEditOpen(true); }}
+                title="Clique para editar o preço"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-amber-600" />
+                    <span className="text-xs text-muted-foreground">Preço Atual</span>
+                  </div>
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
                 </div>
                 <p className="text-xl font-bold text-amber-600">
                   {currentPrice > 0 ? fmtCur(currentPrice) : '—'}
@@ -331,6 +350,9 @@ export default function StockItemDetailPage() {
                 )}
                 {!priceDiff && preferredSupplier && (
                   <p className="text-[11px] mt-1 text-muted-foreground/60">{preferredSupplier.supplier_name}</p>
+                )}
+                {!priceDiff && !preferredSupplier && (
+                  <p className="text-[10px] text-muted-foreground/50 mt-0.5 group-hover:text-primary/60 transition-colors">clique para editar</p>
                 )}
               </div>
 
@@ -397,6 +419,7 @@ export default function StockItemDetailPage() {
           ['precos', `Histórico de Preços (${pricedEntries.length})`, DollarSign],
           ['fornecedores', `Fornecedores (${suppliers.length})`, Store],
           ['pratos', `Pratos que usam (${sheetUsages.length})`, Utensils],
+          ['config', 'Configurações', Settings],
         ] as const).map(([tab, label, Icon]) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className={`px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${activeTab === tab ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
@@ -647,6 +670,15 @@ export default function StockItemDetailPage() {
         </div>
       )}
 
+      {/* Tab: Configurações */}
+      {activeTab === 'config' && (
+        <div className="bg-white rounded-xl border border-border shadow-sm p-5 space-y-5">
+          <ResponsibleEditor itemId={item.id} allProfiles={allProfiles} allGroups={allGroups} />
+          <AliasEditor itemId={item.id} />
+          <TagEditor itemId={item.id} />
+        </div>
+      )}
+
       {/* Stock Correction Dialog */}
       <Dialog open={correctionOpen} onOpenChange={o => { if (!o) setCorrectionOpen(false); }}>
         <DialogContent className="max-w-sm">
@@ -692,6 +724,42 @@ export default function StockItemDetailPage() {
               <Button variant="outline" className="flex-1" onClick={() => setCorrectionOpen(false)}>Cancelar</Button>
               <Button className="flex-1 gold-button" onClick={handleCorrection} disabled={correctionSaving}>
                 {correctionSaving && <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />}
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Price Edit Dialog */}
+      <Dialog open={priceEditOpen} onOpenChange={o => { if (!o) setPriceEditOpen(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Editar Preço — {item.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <p className="text-xs text-muted-foreground">
+              Atual: <strong>{item.unit_cost > 0 ? fmtCur(item.unit_cost) : '—'}</strong>. Isso atualiza o preço do insumo e fica registrado no histórico de preços automaticamente.
+            </p>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Novo preço da embalagem (R$)</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={priceEditValue}
+                onChange={e => setPriceEditValue(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handlePriceEdit()}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setPriceEditOpen(false)}>Cancelar</Button>
+              <Button className="flex-1 gold-button" onClick={handlePriceEdit} disabled={priceEditSaving}>
+                {priceEditSaving && <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />}
                 Salvar
               </Button>
             </div>
