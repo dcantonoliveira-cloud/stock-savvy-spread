@@ -31,12 +31,16 @@ export default function TagsPage() {
 
   const load = async () => {
     setLoading(true);
-    const [tagsRes, usageRes] = await Promise.all([
+    const [tagsRes, usageRes, itemUsageRes] = await Promise.all([
       supabase.from('tags').select('*').order('name'),
       supabase.from('technical_sheet_items').select('tag_id').not('tag_id', 'is', null),
+      (supabase.from('stock_item_tags') as any).select('tag_id'),
     ]);
     const usageMap: Record<string, number> = {};
     (usageRes.data || []).forEach((r: any) => {
+      if (r.tag_id) usageMap[r.tag_id] = (usageMap[r.tag_id] || 0) + 1;
+    });
+    (itemUsageRes.data || []).forEach((r: any) => {
       if (r.tag_id) usageMap[r.tag_id] = (usageMap[r.tag_id] || 0) + 1;
     });
     const rows = (tagsRes.data || []).map((t: any) => ({
@@ -105,7 +109,7 @@ export default function TagsPage() {
         <div>
           <h1 className="text-3xl font-display font-bold gold-text">Tags</h1>
           <p className="text-muted-foreground mt-1">
-            {tags.length} tags cadastradas · usadas em ingredientes de fichas técnicas
+            {tags.length} tags cadastradas · usadas em insumos e ingredientes de fichas técnicas
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -117,7 +121,7 @@ export default function TagsPage() {
         <div className="py-24 text-center">
           <Tag className="w-12 h-12 mx-auto mb-4 opacity-20 text-muted-foreground" />
           <p className="text-muted-foreground text-sm">Nenhuma tag criada ainda.</p>
-          <p className="text-muted-foreground text-xs mt-1">Tags servem para classificar ingredientes nas fichas técnicas.</p>
+          <p className="text-muted-foreground text-xs mt-1">Tags servem para classificar insumos e ingredientes das fichas técnicas.</p>
           <Button className="mt-6" onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Criar primeira tag</Button>
         </div>
       ) : (

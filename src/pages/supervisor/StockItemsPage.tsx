@@ -1124,6 +1124,7 @@ export default function StockItemsPage() {
   const [allProfiles, setAllProfiles] = useState<{ user_id: string; display_name: string }[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([]);
   const [itemsWithResponsible, setItemsWithResponsible] = useState<Set<string>>(new Set());
+  const [itemTagsMap, setItemTagsMap] = useState<Record<string, { id: string; name: string; color: string }[]>>({});
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -1254,6 +1255,17 @@ export default function StockItemsPage() {
       (supabase.from('stock_item_responsibles') as any).select('item_id').in('item_id', ids)
         .then(({ data: respData }: any) => {
           setItemsWithResponsible(new Set(((respData || []) as any[]).map(r => r.item_id)));
+        });
+
+      (supabase.from('stock_item_tags') as any).select('item_id, tags:tag_id(id, name, color)').in('item_id', ids)
+        .then(({ data: tagLinkData }: any) => {
+          const map: Record<string, { id: string; name: string; color: string }[]> = {};
+          for (const l of (tagLinkData || []) as any[]) {
+            if (!l.tags) continue;
+            if (!map[l.item_id]) map[l.item_id] = [];
+            map[l.item_id].push(l.tags);
+          }
+          setItemTagsMap(map);
         });
     }
   };
@@ -1853,6 +1865,15 @@ export default function StockItemsPage() {
                         {itemsWithResponsible.has(item.id) && (
                           <Users className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" title="Tem responsável definido" />
                         )}
+                        {(itemTagsMap[item.id] || []).map(tag => (
+                          <span
+                            key={tag.id}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
+                            style={{ background: tag.color + '20', color: tag.color }}
+                          >
+                            {tag.name}
+                          </span>
+                        ))}
                       </div>
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
