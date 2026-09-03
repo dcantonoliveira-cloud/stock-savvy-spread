@@ -45,7 +45,7 @@ const PAGE_SIZE = 50;
 export default function StockItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   const [item, setItem] = useState<StockItem | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -211,24 +211,30 @@ export default function StockItemDetailPage() {
     const diff = newQty - item.current_stock;
     if (diff === 0) { setCorrectionSaving(false); setCorrectionOpen(false); return; }
     const notes = correctionNotes.trim() ? `Correção de estoque — ${correctionNotes.trim()}` : 'Correção de estoque';
+    let movError = null;
     if (diff > 0) {
-      await supabase.from('stock_entries').insert({
+      const { error } = await supabase.from('stock_entries').insert({
         item_id: item.id,
         quantity: diff,
         unit_cost: item.unit_cost,
         notes,
         supplier: null,
         invoice_number: null,
+        registered_by: user?.id,
       } as any);
+      movError = error;
     } else {
-      await supabase.from('stock_outputs').insert({
+      const { error } = await supabase.from('stock_outputs').insert({
         item_id: item.id,
         quantity: Math.abs(diff),
         notes,
         employee_name: 'Correção de estoque',
         event_name: null,
+        registered_by: user?.id,
       } as any);
+      movError = error;
     }
+    if (movError) toast.error('Estoque atualizado, mas o histórico não pôde ser registrado: ' + movError.message);
     await supabase.from('stock_items').update({ current_stock: newQty } as any).eq('id', item.id);
 
     // Sync stock_item_locations: apply the diff to the default kitchen location
@@ -260,10 +266,12 @@ export default function StockItemDetailPage() {
     const { error } = await supabase.from('stock_items').update({ unit_cost: newPrice } as any).eq('id', item.id);
     if (!error) {
       // Registra também como entrada de preço (qtd 0) pra aparecer no Histórico de Preços
-      await supabase.from('stock_entries').insert({
+      const { error: movError } = await supabase.from('stock_entries').insert({
         item_id: item.id, quantity: 0, unit_cost: newPrice,
         notes: `Atualização de preço por ${who} (anterior: R$ ${item.unit_cost ?? 0})`,
+        registered_by: user?.id,
       } as any);
+      if (movError) toast.error('Preço salvo, mas o histórico não pôde ser registrado: ' + movError.message);
     }
     setPriceEditSaving(false);
     if (error) { toast.error('Erro ao salvar preço'); return; }

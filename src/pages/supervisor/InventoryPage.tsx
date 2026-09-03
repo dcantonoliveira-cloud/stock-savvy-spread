@@ -28,7 +28,7 @@ type InventoryCount = {
 };
 
 export default function InventoryPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [history, setHistory] = useState<InventoryCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -399,18 +399,18 @@ export default function InventoryPage() {
         if (diff > 0) {
           await (supabase as any).from('stock_entries').insert({
             item_id: itemId, quantity: diff, unit_cost: 0, created_at: now,
-            notes: `${countLabel} — por ${who}`,
+            notes: `${countLabel} — por ${who}`, registered_by: user?.id,
           });
         } else if (diff < 0) {
           await (supabase as any).from('stock_outputs').insert({
             item_id: itemId, quantity: Math.abs(diff), created_at: now,
-            employee_name: who, notes: countLabel,
+            employee_name: who, notes: countLabel, registered_by: user?.id,
           });
         } else {
           // sem diferença — registra entrada com qty 0 para constar no histórico
           await (supabase as any).from('stock_entries').insert({
             item_id: itemId, quantity: 0, unit_cost: 0, created_at: now,
-            notes: `${countLabel} — sem divergência`,
+            notes: `${countLabel} — sem divergência`, registered_by: user?.id,
           });
         }
       }
@@ -426,7 +426,7 @@ export default function InventoryPage() {
             if (prev > 0) {
               await (supabase as any).from('stock_outputs').insert({
                 item_id: itemId, quantity: prev, created_at: now,
-                employee_name: who, notes: `${countLabel} — zerado (não contado)`,
+                employee_name: who, notes: `${countLabel} — zerado (não contado)`, registered_by: user?.id,
               });
             }
           }

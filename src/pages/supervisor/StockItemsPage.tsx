@@ -1043,7 +1043,7 @@ const SUBCAT_COLORS: Record<string, string> = {
 const SESSION_KEY = 'stock_items_page';
 export default function StockItemsPage() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(() => parseInt(sessionStorage.getItem(SESSION_KEY) || '0', 10) || 0);
@@ -1281,31 +1281,37 @@ export default function StockItemsPage() {
       const diff = val - (prevItem.current_stock || 0);
       if (diff !== 0) {
         if (diff > 0) {
-          await (supabase as any).from('stock_entries').insert({
+          const { error: movError } = await (supabase as any).from('stock_entries').insert({
             item_id: editingCell.id,
             quantity: diff,
             unit_cost: 0,
             created_at: now,
             notes: `Ajuste manual por ${who} (anterior: ${prevItem.current_stock})`,
+            registered_by: user?.id,
           });
+          if (movError) toast.error('Estoque salvo, mas o histórico não pôde ser registrado: ' + movError.message);
         } else {
-          await (supabase as any).from('stock_outputs').insert({
+          const { error: movError } = await (supabase as any).from('stock_outputs').insert({
             item_id: editingCell.id,
             quantity: Math.abs(diff),
             created_at: now,
             employee_name: who,
             notes: `Ajuste manual (anterior: ${prevItem.current_stock})`,
+            registered_by: user?.id,
           });
+          if (movError) toast.error('Estoque salvo, mas o histórico não pôde ser registrado: ' + movError.message);
         }
       }
     } else if (editingCell.field === 'unit_cost' && prevItem) {
-      await (supabase as any).from('stock_entries').insert({
+      const { error: movError } = await (supabase as any).from('stock_entries').insert({
         item_id: editingCell.id,
         quantity: 0,
         unit_cost: val,
         created_at: now,
         notes: `Atualização de preço por ${who} (anterior: R$ ${prevItem.unit_cost ?? 0})`,
+        registered_by: user?.id,
       });
+      if (movError) toast.error('Preço salvo, mas o histórico não pôde ser registrado: ' + movError.message);
       setPriceLinkPrompt({ item: prevItem, price: val });
     }
 
