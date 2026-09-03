@@ -1021,13 +1021,11 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                       <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
                         <Check className="w-3.5 h-3.5" />Todos assinaram!
                       </p>
-                      {zapData.signed_file && (
-                        <button onClick={openSignedFile} disabled={fetchingSignedFile}
-                          className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50">
-                          {fetchingSignedFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                          Ver contrato assinado
-                        </button>
-                      )}
+                      <button onClick={openSignedFile} disabled={fetchingSignedFile}
+                        className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50">
+                        {fetchingSignedFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                        Ver contrato assinado
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1224,13 +1222,11 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
                   <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
                     <Check className="w-3.5 h-3.5" />Todos assinaram!
                   </p>
-                  {addendumZapData.signed_file && (
-                    <button onClick={openAddendumSignedFile} disabled={fetchingSignedFile}
-                      className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50">
-                      {fetchingSignedFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                      Ver aditivo assinado
-                    </button>
-                  )}
+                  <button onClick={openAddendumSignedFile} disabled={fetchingSignedFile}
+                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50">
+                    {fetchingSignedFile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                    Ver aditivo assinado
+                  </button>
                 </div>
               )}
             </div>
