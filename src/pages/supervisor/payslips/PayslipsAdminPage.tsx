@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
   Upload, FileText, Eye, Download,
-  Plus, Loader2, X, ArrowLeft, Search, Layers, Trash2, Send,
+  Plus, Loader2, X, ArrowLeft, Search, Layers, Trash2, Send, Check,
 } from 'lucide-react';
 import BulkPayslipUpload from '@/components/payslips/BulkPayslipUpload';
 import { sha256Hex } from '@/lib/payslipPdf';
@@ -47,6 +47,10 @@ export default function PayslipsAdminPage() {
   const [filterSearch, setFilterSearch] = useState('');
   const [bulkOpen, setBulkOpen] = useState(false);
   const [filterMonth, setFilterMonth] = useState('');
+  const [editingCompetenciaId, setEditingCompetenciaId] = useState<string | null>(null);
+  const [editMonth, setEditMonth] = useState(0);
+  const [editYear, setEditYear] = useState(new Date().getFullYear());
+  const [savingCompetencia, setSavingCompetencia] = useState(false);
   const [form, setForm] = useState({
     employee_id: employeeFilter ?? '',
     month: new Date().getMonth(),
@@ -116,6 +120,24 @@ export default function PayslipsAdminPage() {
     const r = data?.results ?? {};
     if (r.whatsapp?.ok) toast.success('Lembrete enviado por WhatsApp');
     else toast.error(r.whatsapp?.error ?? 'Erro ao enviar WhatsApp');
+  };
+
+  const openEditCompetencia = (p: Payslip) => {
+    const [y, mo] = p.reference_month.split('-');
+    setEditYear(parseInt(y));
+    setEditMonth(parseInt(mo) - 1);
+    setEditingCompetenciaId(p.id);
+  };
+
+  const saveCompetencia = async (id: string) => {
+    setSavingCompetencia(true);
+    const refMonth = `${editYear}-${String(editMonth + 1).padStart(2, '0')}-01`;
+    const { error } = await supabase.from('payslips' as any).update({ reference_month: refMonth }).eq('id', id);
+    setSavingCompetencia(false);
+    if (error) { toast.error('Erro ao salvar competência'); return; }
+    setPayslips(prev => prev.map(p => p.id === id ? { ...p, reference_month: refMonth } : p));
+    setEditingCompetenciaId(null);
+    toast.success('Competência atualizada!');
   };
 
   const deletePayslip = async (p: Payslip) => {
@@ -464,10 +486,32 @@ export default function PayslipsAdminPage() {
                     <p className="text-xs text-muted-foreground">{(p as any).profiles?.email}</p>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {(() => {
-                      const [y, mo] = p.reference_month.split('-');
-                      return `${MONTHS[parseInt(mo) - 1]}/${y}`;
-                    })()}
+                    {editingCompetenciaId === p.id ? (
+                      <div className="flex items-center gap-1">
+                        <select value={editMonth} onChange={e => setEditMonth(parseInt(e.target.value))}
+                          className="h-7 text-xs border border-border rounded-md px-1 bg-white">
+                          {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+                        </select>
+                        <input type="number" value={editYear} onChange={e => setEditYear(parseInt(e.target.value) || editYear)}
+                          className="h-7 w-16 text-xs border border-border rounded-md px-1" />
+                        <button onClick={() => saveCompetencia(p.id)} disabled={savingCompetencia}
+                          className="p-1 rounded-md hover:bg-emerald-50 text-emerald-600 disabled:opacity-40" title="Salvar">
+                          {savingCompetencia ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        </button>
+                        <button onClick={() => setEditingCompetenciaId(null)} disabled={savingCompetencia}
+                          className="p-1 rounded-md hover:bg-muted text-muted-foreground" title="Cancelar">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => openEditCompetencia(p)}
+                        className="hover:text-primary hover:underline transition-colors" title="Clique para editar a competência">
+                        {(() => {
+                          const [y, mo] = p.reference_month.split('-');
+                          return `${MONTHS[parseInt(mo) - 1]}/${y}`;
+                        })()}
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">
                     {tipoFromTitle}
