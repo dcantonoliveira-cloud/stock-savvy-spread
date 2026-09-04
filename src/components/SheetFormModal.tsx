@@ -242,6 +242,20 @@ export default function SheetFormModal({ open, onClose, onSaved, sheetId, initia
     }
   }, [open, sheetId, mode]);
 
+  // O custo salvo em technical_sheet_items é só um retrato do momento em que a ficha foi salva —
+  // toda vez que o catálogo de insumos terminar de carregar, recalcula o custo de cada linha
+  // com o preço ATUAL do insumo, em vez de deixar o valor antigo (ou zerado) na tela.
+  useEffect(() => {
+    if (stockItems.length === 0) return;
+    setFormItems(prev => prev.map(item => {
+      if (!item.item_id) return item;
+      const si = stockItems.find(s => s.id === item.item_id);
+      if (!si) return item;
+      const effCost = effectiveUnitCost(si.unit_cost || 0, si.purchase_qty);
+      return { ...item, unit_cost: calcRecipeUnitCost(effCost, si.unit, item.unit || si.unit) };
+    }));
+  }, [stockItems]);
+
   const addItem = () => setFormItems(p => [...p, { item_id: '', item_name: '', quantity: 0, gross_quantity: 0, correction_factor: 1, unit: '', unit_cost: 0 }]);
   const removeItem = (idx: number) => setFormItems(p => p.filter((_, i) => i !== idx));
   const updateItem = (idx: number, field: string, value: any) => {
