@@ -14,13 +14,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MaterialLabelPrint, type LabelItem } from '@/components/MaterialLabelPrint';
-import { UNITS } from '@/types/inventory';
 import * as XLSX from 'xlsx';
 import { ItemImage } from '@/components/ItemImage';
 import { fmtNum } from '@/lib/format';
-import ResponsibleEditor from '@/components/stock-item/ResponsibleEditor';
-import AliasEditor from '@/components/stock-item/AliasEditor';
-import TagEditor from '@/components/stock-item/TagEditor';
+import ItemFormDialog from '@/components/stock-item/ItemFormDialog';
 
 type Item = {
   id: string; name: string; category: string; unit: string;
@@ -859,155 +856,6 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
   );
 }
 
-// ─── Item Form ───
-
-function ItemForm({ item, allCategories, allSubcategories, allCategoryRecords, allProfiles, allGroups, onSave, onCancel }: {
-  item?: Item; allCategories: string[]; allSubcategories: Subcategory[];
-  allCategoryRecords: { id: string; name: string }[];
-  allProfiles: { user_id: string; display_name: string }[];
-  allGroups: { id: string; name: string }[];
-  onSave: (i: Partial<Item> & { name: string; category: string; unit: string }) => void;
-  onCancel: () => void;
-}) {
-  const [name, setName] = useState(item?.name || '');
-  const [category, setCategory] = useState(item?.category || '');
-  const [subcategoryId, setSubcategoryId] = useState(item?.subcategory_id || '');
-  const [unit, setUnit] = useState(item?.unit || UNITS[0]);
-  const [currentStock, setCurrentStock] = useState(item?.current_stock?.toString() || '0');
-  const [minStock, setMinStock] = useState(item?.min_stock?.toString() || '0');
-  const [unitCost, setUnitCost] = useState(item?.unit_cost?.toString() || '0');
-  const [purchaseQty, setPurchaseQty] = useState(item?.purchase_qty?.toString() || '1');
-  const [barcode, setBarcode] = useState(item?.barcode || '');
-  const [imageUrl, setImageUrl] = useState(item?.image_url || null);
-
-  const catRec = allCategoryRecords.find(c => c.name === category);
-  const availableSubcats = catRec ? allSubcategories.filter(s => s.category_id === catRec.id) : allSubcategories;
-
-  const handleSubcatChange = (subcatId: string) => {
-    setSubcategoryId(subcatId);
-    const sub = allSubcategories.find(s => s.id === subcatId);
-    if (sub) {
-      const parentCat = allCategoryRecords.find(c => c.id === sub.category_id);
-      if (parentCat) setCategory(parentCat.name);
-    }
-  };
-
-  const handleSubmit = () => {
-    if (!name.trim()) { toast.error('Nome é obrigatório'); return; }
-    if (!subcategoryId) { toast.error('Subcategoria é obrigatória'); return; }
-    onSave({
-      ...(item?.id ? { id: item.id } : {}),
-      name: name.trim(), category, unit,
-      current_stock: parseFloat(currentStock) || 0,
-      min_stock: parseFloat(minStock) || 0,
-      unit_cost: parseFloat(unitCost) || 0,
-      purchase_qty: parseFloat(purchaseQty) || 1,
-      barcode: barcode.trim() || null,
-      image_url: imageUrl,
-      subcategory_id: subcategoryId || null,
-    } as any);
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Imagem — só aparece no modo edição de item existente */}
-      {item?.id && (
-        <div className="flex flex-col items-center py-2">
-          <ItemImage
-            itemId={item.id}
-            itemName={name || item.name}
-            imageUrl={imageUrl}
-            size="lg"
-            editMode={true}
-            onImageUpdate={setImageUrl}
-          />
-        </div>
-      )}
-
-      <div>
-        <label className="text-sm text-muted-foreground mb-1 block">Nome *</label>
-        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Filé Mignon" autoFocus />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Subcategoria *</label>
-          <Select value={subcategoryId || ''} onValueChange={handleSubcatChange}>
-            <SelectTrigger><SelectValue placeholder="Selecione a subcategoria" /></SelectTrigger>
-            <SelectContent>
-              {allSubcategories.map(s => {
-                const cat = allCategoryRecords.find(c => c.id === s.category_id);
-                return <SelectItem key={s.id} value={s.id}>{s.name}{cat ? ` (${cat.name})` : ''}</SelectItem>;
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Unidade</label>
-          <Select value={unit} onValueChange={setUnit}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-      </div>
-      {category && (
-        <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Categoria (definida pela subcategoria)</label>
-          <div className="px-3 py-2 rounded-md border border-border bg-muted/30 text-sm text-muted-foreground">{category}</div>
-        </div>
-      )}
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Estoque Atual</label>
-          <Input type="number" value={currentStock} onChange={e => setCurrentStock(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Mínimo</label>
-          <Input type="number" value={minStock} onChange={e => setMinStock(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-sm text-muted-foreground mb-1 block">Preço da embalagem (R$)</label>
-          <Input type="number" step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} />
-        </div>
-      </div>
-      <div>
-        <label className="text-sm text-muted-foreground mb-1 block">
-          Qtde por embalagem de compra
-          <span className="ml-1 text-xs text-muted-foreground/70">(ex: 5 para "pacote de 5{unit})"</span>
-        </label>
-        <div className="flex items-center gap-2">
-          <Input
-            type="number" step="any" value={purchaseQty}
-            onChange={e => setPurchaseQty(e.target.value)}
-            className="w-32"
-            min="0.001"
-          />
-          <span className="text-sm text-muted-foreground">{unit} / embalagem</span>
-        </div>
-        {parseFloat(purchaseQty) > 1 && parseFloat(unitCost) > 0 && (
-          <p className="text-xs text-primary mt-1">
-            Custo por {unit} ≈ R$ {fmtNum(parseFloat(unitCost) / parseFloat(purchaseQty))}
-          </p>
-        )}
-      </div>
-      <div>
-        <label className="text-sm text-muted-foreground mb-1 block">Código de Barras</label>
-        <Input value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="EAN" />
-      </div>
-      {item?.id && (
-        <>
-          <ResponsibleEditor itemId={item.id} allProfiles={allProfiles} allGroups={allGroups} />
-          <AliasEditor itemId={item.id} />
-          <TagEditor itemId={item.id} />
-        </>
-      )}
-      <div className="flex gap-3 pt-2">
-        <Button onClick={handleSubmit} className="flex-1">Salvar</Button>
-        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
-      </div>
-    </div>
-  );
-}
-
 const PAGE_SIZE = 50;
 
 // Busca tolerante: casa se o nome contém alguma das palavras digitadas (>=3 letras),
@@ -1442,48 +1290,6 @@ export default function StockItemsPage() {
     } finally {
       setDeleteConfirmLoading(false);
     }
-  };
-
-  const handleSave = async (data: Partial<Item> & { name: string; category: string; unit: string }) => {
-    if (data.id) {
-      const { error } = await supabase.from('stock_items').update(data as any).eq('id', data.id);
-      if (error) { toast.error('Erro ao atualizar: ' + error.message); console.error('[update]', error); return; }
-      toast.success('Item atualizado!');
-    } else {
-      const { id: _id, ...insertData } = data as any;
-      // Tenta inserir com todos os campos primeiro
-      const { data: created, error } = await supabase
-        .from('stock_items')
-        .insert(insertData as any)
-        .select('id, name')
-        .single();
-      if (error || !created) {
-        console.error('[insert] erro:', error?.message, error);
-        // Fallback: tenta só com campos essenciais
-        const { purchase_qty: _pq, subcategory_id: _sc, barcode: _bc, image_url: _iu, ...coreData } = insertData;
-        const { data: created2, error: e2 } = await supabase
-          .from('stock_items')
-          .insert(coreData as any)
-          .select('id, name')
-          .single();
-        if (e2 || !created2) {
-          console.error('[insert fallback] erro:', e2?.message, e2);
-          toast.error('Erro ao cadastrar: ' + (e2?.message || error?.message || 'Item não foi salvo no banco'));
-          return;
-        }
-        console.log('[insert fallback] criado:', created2);
-        toast.success('Item cadastrado!');
-        setDialogOpen(false);
-        setEditingItem(undefined);
-        load();
-        return;
-      }
-      console.log('[insert] criado:', created);
-      toast.success('Item cadastrado!');
-    }
-    setDialogOpen(false);
-    setEditingItem(undefined);
-    load();
   };
 
   const handleExcelFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1972,15 +1778,12 @@ export default function StockItemsPage() {
       </div>
 
       {/* Dialogs */}
-      <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) setEditingItem(undefined); }}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
-            <DialogDescription>{editingItem ? 'Atualize os dados do item' : 'Preencha os dados do novo item'}</DialogDescription>
-          </DialogHeader>
-          <ItemForm item={editingItem} allCategories={allCategories} allSubcategories={allSubcategories} allCategoryRecords={allCategoryRecords} allProfiles={allProfiles} allGroups={allGroups} onSave={handleSave} onCancel={() => { setDialogOpen(false); setEditingItem(undefined); }} />
-        </DialogContent>
-      </Dialog>
+      <ItemFormDialog
+        open={dialogOpen}
+        item={editingItem}
+        onClose={() => { setDialogOpen(false); setEditingItem(undefined); }}
+        onSaved={() => load()}
+      />
 
       <Dialog open={importDialogOpen} onOpenChange={o => { setImportDialogOpen(o); if (!o) setImportRows([]); }}>
         <DialogContent className="max-w-md">

@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getCompatibleUnits, calcRecipeUnitCost, effectiveUnitCost } from '@/lib/units';
 import { fmtCur } from '@/lib/format';
+import ItemFormDialog from '@/components/stock-item/ItemFormDialog';
 
 type StockItem = { id: string; name: string; unit: string; unit_cost: number; purchase_qty: number | null };
 type SheetItem = { id?: string; item_id: string; item_name: string; quantity: number | string; gross_quantity: number | string; correction_factor: number; unit: string; unit_cost: number };
@@ -86,34 +87,6 @@ function ItemCombobox({ stockItems, value, onSelect, onCreateNew }: {
         </Command>
       </PopoverContent>
     </Popover>
-  );
-}
-
-// ── Quick Create Item Dialog ──────────────────────────────────────────────────
-function QuickCreateItemDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (item: StockItem) => void }) {
-  const [name, setName] = useState(''); const [unit, setUnit] = useState('kg'); const [cost, setCost] = useState('0');
-  const save = async () => {
-    if (!name.trim()) { toast.error('Nome obrigatório'); return; }
-    const { data, error } = await (supabase.from('stock_items') as any).insert({ name: name.trim(), unit, unit_cost: parseFloat(cost) || 0, purchase_qty: 1 }).select().single();
-    if (error) { toast.error('Erro ao criar item'); return; }
-    toast.success('Item criado!'); onCreated(data as StockItem); onClose(); setName(''); setCost('0');
-  };
-  return (
-    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Criar Novo Insumo</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <Input placeholder="Nome do item" value={name} onChange={e => setName(e.target.value)} autoFocus />
-          <div className="grid grid-cols-2 gap-2">
-            <select className="h-9 text-sm border rounded-md px-2 bg-background" value={unit} onChange={e => setUnit(e.target.value)}>
-              {['kg','g','L','ml','un','unid','pct','cx'].map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-            <Input type="number" placeholder="Custo/unidade" value={cost} onChange={e => setCost(e.target.value)} />
-          </div>
-          <Button onClick={save} className="w-full">Criar Item</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -437,13 +410,12 @@ export default function SheetFormModal({ open, onClose, onSaved, sheetId, initia
         </DialogContent>
       </Dialog>
 
-      <QuickCreateItemDialog
+      <ItemFormDialog
         open={quickCreate}
         onClose={() => setQuickCreate(false)}
-        onCreated={item => {
+        onSaved={item => {
           setStockItems(p => [...p, item]);
           if (quickCreateIdx !== null) updateItem(quickCreateIdx, 'item_id', item.id);
-          setQuickCreate(false);
         }}
       />
     </>
