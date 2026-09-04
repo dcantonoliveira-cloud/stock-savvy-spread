@@ -47,6 +47,7 @@ interface EventDetail {
   professional_count: number | null;
   professional_meal_value: number | null;
   professional_meal_type: string | null;
+  brunch: string | null;
   additional_hours: number | null;
   organizer: string | null;
   organizer_id: string | null;
@@ -350,6 +351,7 @@ export default function EventDetailPage() {
       professional_count: toNum(data.professional_count),
       professional_meal_value: toNum(data.professional_meal_value),
       professional_meal_type: data.professional_meal_type,
+      brunch: data.brunch ?? null,
       additional_hours: toNum(data.additional_hours), notes: data.notes,
       organizer: data.organizer, organizer_id: data.organizer_id ?? null,
       decorator: data.decorator, decorator_id: data.decorator_id ?? null,
@@ -857,9 +859,8 @@ export default function EventDetailPage() {
 
                 <F label="Qtd. profissionais" value={s('professional_count')} onChange={v => setF('professional_count', v)} type="number" />
                 <F label="Valor alim. profissionais" value={s('professional_meal_value')} onChange={v => setF('professional_meal_value', v)} type="number" suffix="R$" />
-                <div className="col-span-2">
-                  <F label="Alimentação profissionais" value={s('professional_meal_type')} onChange={v => setF('professional_meal_type', v)} placeholder="ex: separada" />
-                </div>
+                <F label="Alimentação profissionais" value={s('professional_meal_type')} onChange={v => setF('professional_meal_type', v)} placeholder="ex: separada" />
+                <F label="Brunch" value={s('brunch')} onChange={v => setF('brunch', v)} placeholder="ex: sim, às 10h" />
               </div>
 
               {/* Observações – rich text */}
@@ -1175,6 +1176,7 @@ const FIELD_LABELS: Record<string, string> = {
   organizer_id: 'Assessora', organizer: 'Assessora', decorator_id: 'Decoradora', decorator: 'Decoradora',
   pastry_chef: 'Confeiteiro', band_dj: 'Banda/DJ', bartender: 'Barman', photo_video: 'Foto/Vídeo',
   professional_count: 'Quantidade de profissionais', professional_meal_value: 'Refeição profissional',
+  professional_meal_type: 'Alimentação profissionais', brunch: 'Brunch',
   pricing_mode: 'Modo de precificação', notes: 'Observações',
   menu_text: 'Cardápio (texto)', menu_mode: 'Modo Cardápio',
   status: 'Status', ceremony_time: 'Horário Cerimônia', duration_hours: 'Duração (horas)',
