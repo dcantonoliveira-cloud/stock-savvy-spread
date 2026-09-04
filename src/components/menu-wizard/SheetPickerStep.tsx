@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Search, Pencil, Copy, Plus, ArrowUpDown, X, Loader2, ListChecks } from 'lucide-react';
+import { Search, Pencil, Copy, Plus, ArrowUpDown, Loader2, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 import SheetFormModal from '@/components/SheetFormModal';
 
@@ -19,7 +18,7 @@ export default function SheetPickerStep({ menuId, onContinue }: { menuId: string
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [selectedPopupOpen, setSelectedPopupOpen] = useState(false);
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit' | 'duplicate'>('create');
   const [formSheetId, setFormSheetId] = useState<string | null>(null);
@@ -53,18 +52,10 @@ export default function SheetPickerStep({ menuId, onContinue }: { menuId: string
     }
   };
 
-  const removeFromPopup = async (sheetId: string) => {
-    const rowId = selected.get(sheetId);
-    if (!rowId) return;
-    await supabase.from('event_menu_dishes').delete().eq('id', rowId);
-    setSelected(prev => { const next = new Map(prev); next.delete(sheetId); return next; });
-  };
-
   const filtered = sheets
     .filter(s => !search.trim() || normalize(s.name).includes(normalize(search)))
+    .filter(s => !showOnlySelected || selected.has(s.id))
     .sort((a, b) => sortDir === 'asc' ? a.name.localeCompare(b.name, 'pt-BR') : b.name.localeCompare(a.name, 'pt-BR'));
-
-  const selectedSheets = sheets.filter(s => selected.has(s.id)).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const openEdit = (sheetId: string) => { setFormMode('edit'); setFormSheetId(sheetId); setFormOpen(true); };
   const openDuplicate = (sheetId: string) => { setFormMode('duplicate'); setFormSheetId(sheetId); setFormOpen(true); };
@@ -92,8 +83,12 @@ export default function SheetPickerStep({ menuId, onContinue }: { menuId: string
         <Button variant="outline" onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}>
           <ArrowUpDown className="w-4 h-4 mr-2" />{sortDir === 'asc' ? 'A → Z' : 'Z → A'}
         </Button>
-        <Button variant="outline" onClick={() => setSelectedPopupOpen(true)}>
-          <ListChecks className="w-4 h-4 mr-2" />Ver selecionados ({selected.size})
+        <Button
+          variant={showOnlySelected ? 'default' : 'outline'}
+          onClick={() => setShowOnlySelected(v => !v)}
+        >
+          <ListChecks className="w-4 h-4 mr-2" />
+          {showOnlySelected ? 'Ver todos' : `Ver selecionados (${selected.size})`}
         </Button>
         <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Nova ficha técnica</Button>
       </div>
@@ -124,7 +119,9 @@ export default function SheetPickerStep({ menuId, onContinue }: { menuId: string
             );
           })}
           {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-10">Nenhuma ficha técnica encontrada.</p>
+            <p className="text-sm text-muted-foreground text-center py-10">
+              {showOnlySelected ? 'Nada selecionado ainda.' : 'Nenhuma ficha técnica encontrada.'}
+            </p>
           )}
         </div>
       </div>
@@ -134,27 +131,6 @@ export default function SheetPickerStep({ menuId, onContinue }: { menuId: string
           Continuar ({selected.size} {selected.size === 1 ? 'prato' : 'pratos'})
         </Button>
       </div>
-
-      {/* Popup: selecionados em ordem alfabética */}
-      <Dialog open={selectedPopupOpen} onOpenChange={setSelectedPopupOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Pratos selecionados</DialogTitle>
-            <DialogDescription>{selectedSheets.length} prato{selectedSheets.length !== 1 ? 's' : ''}, em ordem alfabética</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[50vh] overflow-y-auto divide-y divide-border/50">
-            {selectedSheets.map(s => (
-              <div key={s.id} className="flex items-center justify-between py-2">
-                <span className="text-sm text-foreground">{s.name}</span>
-                <button onClick={() => removeFromPopup(s.id)} className="text-muted-foreground hover:text-destructive">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            {selectedSheets.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">Nada selecionado ainda.</p>}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <SheetFormModal
         open={formOpen}
