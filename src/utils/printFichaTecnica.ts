@@ -16,6 +16,7 @@ export interface FichaEvent {
   professional_count: number | null;
   professional_meal_value: number | null;
   professional_meal_type: string | null;
+  brunch: string | null;
   organizer: string | null;
   decorator: string | null;
   pastry_chef: string | null;
@@ -125,6 +126,7 @@ function buildPage1Html(event: FichaEvent, customFields: CustomField[], company:
     { label: 'Não Pagantes',         value: event.non_paying_guests ? String(event.non_paying_guests) : null, skipIfEmpty: true },
     { label: 'Qtd. Profissionais',   value: event.professional_count ? String(event.professional_count) : null, skipIfEmpty: true },
     { label: 'Alim. Profissionais',  value: event.professional_meal_type, skipIfEmpty: true },
+    { label: 'Brunch',                value: event.brunch, skipIfEmpty: true },
   ];
 
   const equipeFields: Field[] = [
