@@ -38,18 +38,22 @@ export function ParetoSummary({ result, subject, metricLabel }: { result: Pareto
 }
 
 export function ParetoChart({
-  rows, barColor = '#2E4A7A', lineColor = '#B8922A', valueFormatter, limit = 20,
+  rows, barColor = '#2E4A7A', lineColor = '#B8922A', valueFormatter, limit = 20, cutoffCount,
 }: {
   rows: ParetoRow[];
   barColor?: string;
   lineColor?: string;
   valueFormatter: (v: number) => string;
   limit?: number;
+  /** Se informado, garante que o ponto de corte dos 80% (result.cutoffCount) apareça no gráfico,
+   * mesmo que isso exija mostrar mais barras que `limit` (até um teto de 60). */
+  cutoffCount?: number;
 }) {
+  const effectiveLimit = cutoffCount != null ? Math.min(Math.max(limit, cutoffCount + 3), 60) : limit;
   return (
     <div className="h-64 -ml-2">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={rows.slice(0, limit)} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
+        <ComposedChart data={rows.slice(0, effectiveLimit)} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} angle={-40} textAnchor="end" interval={0} height={60} />
           <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={valueFormatter} width={70} />

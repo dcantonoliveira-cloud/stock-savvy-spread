@@ -652,10 +652,23 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const [paretoLoading, setParetoLoading] = useState(false);
   const [pareto, setPareto] = useState<{ entradas: ParetoResult; saidas: ParetoResult } | null>(null);
 
-  const buildParetoResult = (totals: Map<string, number>, itemMap: Map<string, { name: string; cost: number }>): ParetoResult => {
-    // Divide pelo nº de semanas do período -> média semanal (não só o total do período)
+  const buildParetoResult = (
+    totals: Map<string, number>,
+    itemMap: Map<string, { name: string; cost: number }>,
+    firstMovementAt: Map<string, number>,
+  ): ParetoResult => {
+    // Divide pelas semanas em que o item de fato teve movimentação (desde o 1º lançamento dele
+    // dentro da janela) — não pelas 12 semanas fixas, senão um item que só começou a se mexer
+    // há 2 semanas fica sub-representado (dividindo o valor por 12 em vez de 2).
+    const now = Date.now();
     const rowsRaw = [...totals.entries()]
-      .map(([id, total]) => ({ name: itemMap.get(id)?.name || '?', avgWeekly: total / PARETO_WEEKS }))
+      .map(([id, total]) => {
+        const first = firstMovementAt.get(id);
+        const weeksActive = first != null
+          ? Math.min(PARETO_WEEKS, Math.max(1, Math.ceil((now - first) / (7 * 24 * 3600 * 1000))))
+          : PARETO_WEEKS;
+        return { name: itemMap.get(id)?.name || '?', avgWeekly: total / weeksActive };
+      })
       .filter(r => r.avgWeekly > 0)
       .sort((a, b) => b.avgWeekly - a.avgWeekly);
 
@@ -696,8 +709,10 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       itemMap.set(i.id, { name: i.name, cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty), purchaseQty: i.purchase_qty });
     }
 
-    // Soma o valor de entradas e saídas separadamente
+    // Soma o valor de entradas e saídas separadamente, guardando também a data do 1º
+    // lançamento de cada item na janela (pra dividir a média pelas semanas reais dele)
     const entryTotals = new Map<string, number>();
+    const entryFirstAt = new Map<string, number>();
     for (const e of (entriesRes.data || []) as any[]) {
       if (isCorrection(e.notes)) continue;
       const meta = itemMap.get(e.item_id);
@@ -705,18 +720,25 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       // e.unit_cost também está no preço da embalagem de compra — converte antes de valorizar
       const cost = e.unit_cost && e.unit_cost > 0 ? effectiveUnitCost(e.unit_cost, meta.purchaseQty) : meta.cost;
       entryTotals.set(e.item_id, (entryTotals.get(e.item_id) || 0) + (e.quantity || 0) * cost);
+      const t = new Date(e.created_at).getTime();
+      const prevT = entryFirstAt.get(e.item_id);
+      if (prevT === undefined || t < prevT) entryFirstAt.set(e.item_id, t);
     }
     const outputTotals = new Map<string, number>();
+    const outputFirstAt = new Map<string, number>();
     for (const o of (outputsRes.data || []) as any[]) {
       if (isCorrection(o.notes)) continue;
       const meta = itemMap.get(o.item_id);
       if (!meta) continue;
       outputTotals.set(o.item_id, (outputTotals.get(o.item_id) || 0) + (o.quantity || 0) * meta.cost);
+      const t = new Date(o.created_at).getTime();
+      const prevT = outputFirstAt.get(o.item_id);
+      if (prevT === undefined || t < prevT) outputFirstAt.set(o.item_id, t);
     }
 
     setPareto({
-      entradas: buildParetoResult(entryTotals, itemMap),
-      saidas: buildParetoResult(outputTotals, itemMap),
+      entradas: buildParetoResult(entryTotals, itemMap, entryFirstAt),
+      saidas: buildParetoResult(outputTotals, itemMap, outputFirstAt),
     });
     setParetoLoading(false);
   };
@@ -918,7 +940,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Média semanal do valor de entradas e de saídas de cada item nas últimas {PARETO_WEEKS} semanas, separadas. Correções manuais não entram na conta.
+                  Valor médio por semana de entradas e de saídas de cada item, olhando os últimos {PARETO_WEEKS} semanas — dividido pelas semanas em que o item de fato teve movimentação (não pelas {PARETO_WEEKS} semanas fixas, pra não sub-representar item que começou a se mexer recentemente). Correções manuais não entram na conta.
                 </p>
 
                 {pareto && (
@@ -943,7 +965,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                           ) : (
                             <div className="h-64 -ml-2">
                               <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={r.rows.slice(0, 20)} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
+                                <ComposedChart data={r.rows.slice(0, Math.min(Math.max(20, r.cutoffCount + 3), 60))} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                                   <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} angle={-40} textAnchor="end" interval={0} height={60} />
                                   <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `R$${fmtNum(v)}`} width={70} />

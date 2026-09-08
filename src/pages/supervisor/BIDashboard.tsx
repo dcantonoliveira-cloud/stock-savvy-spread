@@ -1622,7 +1622,7 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
           <div className="bg-white border border-border rounded-xl p-5 space-y-3">
             <SH>Curva de Pareto — assessoras por receita (desde 2025)</SH>
             <ParetoSummary result={assessoraPareto} subject="assessoras" metricLabel="a receita" />
-            <ParetoChart rows={assessoraPareto.rows} barColor="#3D5C38" valueFormatter={fmBRL} />
+            <ParetoChart rows={assessoraPareto.rows} cutoffCount={assessoraPareto.cutoffCount} barColor="#3D5C38" valueFormatter={fmBRL} />
           </div>
         )}
 
@@ -1676,7 +1676,7 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
           <div className="bg-white border border-border rounded-xl p-5 space-y-3">
             <SH>Curva de Pareto — locais por receita (desde 2025)</SH>
             <ParetoSummary result={localPareto} subject="locais" metricLabel="a receita" />
-            <ParetoChart rows={localPareto.rows} barColor="#7A2C1E" valueFormatter={fmBRL} />
+            <ParetoChart rows={localPareto.rows} cutoffCount={localPareto.cutoffCount} barColor="#7A2C1E" valueFormatter={fmBRL} />
           </div>
         )}
 

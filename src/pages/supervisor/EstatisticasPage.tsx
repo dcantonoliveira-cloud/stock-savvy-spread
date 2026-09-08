@@ -1009,7 +1009,7 @@ export default function EstatisticasPage() {
               <div className="p-5 border-b border-border space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Curva de Pareto — produto por receita (desde 2025)</p>
                 <ParetoSummary result={menuPareto} subject="produtos" metricLabel="a receita" />
-                <ParetoChart rows={menuPareto.rows} valueFormatter={v => `R$${fmtNum(v)}`} />
+                <ParetoChart rows={menuPareto.rows} cutoffCount={menuPareto.cutoffCount} valueFormatter={v => `R$${fmtNum(v)}`} />
               </div>
             )}
 
