@@ -20,6 +20,9 @@ type Event = {
   guest_count: number | null;
   status: string;
   location_text: string | null;
+  organizer?: string | null;
+  created_at?: string | null;
+  tasting_date?: string | null;
 };
 
 type Session = {
@@ -56,7 +59,6 @@ const GOLD_300 = '#D4AB52';
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CONFIRMED  = ['confirmed', 'completed'];
 const OPEN       = ['lead', 'negotiating', 'tasting_scheduled'];
-const ALL_OPEN   = ['lead', 'negotiating', 'tasting_scheduled', 'cancelled'];
 
 const MONTH_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const MONTH_FULL  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -65,7 +67,7 @@ const WEEK_SHORT  = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 const STATUS_LABEL: Record<string, string> = {
   lead: '1º Contato', negotiating: 'Negociando',
   tasting_scheduled: 'Degustação', confirmed: 'Confirmado',
-  completed: 'Realizado', cancelled: 'Não fechou', lost: 'Cancelado',
+  completed: 'Realizado', cancelled: 'Cancelado', lost: 'Não fechou',
 };
 const STATUS_CLS: Record<string, string> = {
   lead: 'bg-sky-100 text-sky-700',
@@ -73,8 +75,8 @@ const STATUS_CLS: Record<string, string> = {
   tasting_scheduled: 'bg-purple-100 text-purple-700',
   confirmed: 'bg-emerald-100 text-emerald-700',
   completed: 'bg-emerald-200 text-emerald-800',
-  cancelled: 'bg-rose-100 text-rose-600',
-  lost: 'bg-red-100 text-red-700',
+  cancelled: 'bg-red-100 text-red-700',
+  lost: 'bg-rose-100 text-rose-600',
 };
 const STATUS_COLOR: Record<string, string> = {
   lead: '#38bdf8', negotiating: '#fbbf24', tasting_scheduled: '#a78bfa',
@@ -485,21 +487,44 @@ function EvCard({ ev, onSelect }: { ev: Event; onSelect: (id: string) => void })
 }
 
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
+// Mesmas categorias e critérios da tela desktop de Orçamentos (OrcamentosPage):
+// Em aberto = pipeline com data futura ou sem data · Vencidos = pipeline com data já passada
+// Não fechados = status 'lost' · Cancelados = status 'cancelled'.
+function isExpiredQuote(ev: Event) {
+  return OPEN.includes(ev.status) && !!ev.event_date && ev.event_date < today();
+}
+
+function diasEmAberto(created?: string | null) {
+  if (!created) return null;
+  const diff = Math.floor((Date.now() - new Date(created).getTime()) / 86_400_000);
+  return `${diff}d`;
+}
+
 function QuotesScreen({ events, loading, onSelect }: {
   events: Event[]; loading: boolean; onSelect: (id: string) => void;
 }) {
-  const pipeline = events.filter(e => ['lead', 'negotiating'].includes(e.status));
-  const other    = events.filter(e => ['tasting_scheduled', 'cancelled', 'lost'].includes(e.status));
-  const all      = events.filter(e => ALL_OPEN.includes(e.status));
+  const named    = events.filter(e => (e.event_name ?? '').trim() !== '');
+  const emAberto = named.filter(e => OPEN.includes(e.status) && !isExpiredQuote(e));
+  const vencidos = named.filter(e => isExpiredQuote(e));
+  const naoFechados = named.filter(e => e.status === 'lost');
+  const cancelados  = named.filter(e => e.status === 'cancelled');
+  const all = [...emAberto, ...vencidos, ...naoFechados, ...cancelados];
   const [search, setSearch] = useState('');
 
   const filtered = all
     .filter(e => !search || (e.event_name ?? '').toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => (a.event_date ?? 'zzzz').localeCompare(b.event_date ?? 'zzzz'));
 
+  const sections = [
+    { title: 'Em aberto', list: emAberto },
+    { title: 'Vencidos', list: vencidos },
+    { title: 'Não fechados', list: naoFechados },
+    { title: 'Cancelados', list: cancelados },
+  ];
+
   return (
     <div className="flex-1 overflow-y-auto scrollbar-none pb-32 bg-[#f2f2f2] min-h-screen">
-      <Hero title="Orçamentos" sub={`${pipeline.length} em negociação`} />
+      <Hero title="Orçamentos" sub={`${emAberto.length} em aberto`} />
       <div className="px-4 pt-4 space-y-4">
         {/* Search */}
         <div className="relative">
@@ -518,24 +543,14 @@ function QuotesScreen({ events, loading, onSelect }: {
           )}
         </div>
 
-        {/* Pipeline */}
-        {!search && pipeline.length > 0 && (
-          <div>
-            <SectionTitle>Pipeline</SectionTitle>
+        {!search && sections.map(s => s.list.length > 0 && (
+          <div key={s.title}>
+            <SectionTitle>{s.title}</SectionTitle>
             <div className="space-y-2">
-              {pipeline.map(ev => <QuoteCard key={ev.id} ev={ev} onSelect={onSelect} />)}
+              {s.list.map(ev => <QuoteCard key={ev.id} ev={ev} onSelect={onSelect} expired={isExpiredQuote(ev)} />)}
             </div>
           </div>
-        )}
-
-        {!search && other.length > 0 && (
-          <div>
-            <SectionTitle>Outros</SectionTitle>
-            <div className="space-y-2">
-              {other.map(ev => <QuoteCard key={ev.id} ev={ev} onSelect={onSelect} />)}
-            </div>
-          </div>
-        )}
+        ))}
 
         {search && (
           loading ? (
@@ -544,7 +559,7 @@ function QuotesScreen({ events, loading, onSelect }: {
             <p className="text-center text-gray-400 py-12 text-sm">Nenhum resultado</p>
           ) : (
             <div className="space-y-2">
-              {filtered.map(ev => <QuoteCard key={ev.id} ev={ev} onSelect={onSelect} />)}
+              {filtered.map(ev => <QuoteCard key={ev.id} ev={ev} onSelect={onSelect} expired={isExpiredQuote(ev)} />)}
             </div>
           )
         )}
@@ -557,7 +572,8 @@ function QuotesScreen({ events, loading, onSelect }: {
   );
 }
 
-function QuoteCard({ ev, onSelect }: { ev: Event; onSelect: (id: string) => void }) {
+function QuoteCard({ ev, onSelect, expired }: { ev: Event; onSelect: (id: string) => void; expired?: boolean }) {
+  const dias = diasEmAberto(ev.created_at);
   return (
     <button onClick={() => onSelect(ev.id)}
       className="bg-white rounded-3xl shadow-sm p-4 flex items-start gap-3 w-full text-left active:scale-95 transition-transform">
@@ -570,7 +586,7 @@ function QuoteCard({ ev, onSelect }: { ev: Event; onSelect: (id: string) => void
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {ev.event_date && (
-            <span className="flex items-center gap-1 text-xs text-gray-400">
+            <span className={`flex items-center gap-1 text-xs ${expired ? 'text-amber-600 font-semibold' : 'text-gray-400'}`}>
               <CalendarDays className="w-3 h-3" />{fmtFull(ev.event_date)}
             </span>
           )}
@@ -579,6 +595,15 @@ function QuoteCard({ ev, onSelect }: { ev: Event; onSelect: (id: string) => void
               <MapPin className="w-3 h-3" />{ev.location_text}
             </span>
           )}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap mt-1">
+          {ev.organizer && <span className="text-xs text-gray-400">{ev.organizer}</span>}
+          {ev.tasting_date && (
+            <span className={`text-xs font-medium ${ev.tasting_date < today() ? 'text-red-500' : 'text-purple-600'}`}>
+              Degustação {fmtShort(ev.tasting_date)}
+            </span>
+          )}
+          {dias && <span className="text-xs text-gray-300">{dias} em aberto</span>}
         </div>
       </div>
       <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" />
@@ -1037,13 +1062,28 @@ export default function MobileSupervisorApp() {
     (async () => {
       setLoading(true);
       const [eventsRes, sessRes, statsRes, tseRes] = await Promise.all([
-        supabase.from('events').select('id, event_name, event_date, guest_count, status, location_text').order('event_date'),
+        supabase.from('events').select('id, event_name, event_date, guest_count, status, location_text, organizer, created_at')
+          .is('deleted_at', null).order('event_date'),
         (supabase.from as any)('tasting_sessions').select('id, scheduled_date, type, max_couples').order('scheduled_date', { ascending: false }),
         (supabase.from as any)('tasting_session_stats').select('session_id, total, fechados'),
         (supabase.from as any)('tasting_session_events').select('session_id, event_id, events(id, event_name, event_date, status, guest_count)'),
       ]);
 
-      if (eventsRes.data) setEvents(eventsRes.data as Event[]);
+      // Menor data de degustação agendada por evento (mesmo critério da tela desktop de Orçamentos)
+      const sessDateMap: Record<string, string> = {};
+      for (const s of (sessRes.data ?? []) as any[]) {
+        if (s.scheduled_date) sessDateMap[s.id] = s.scheduled_date;
+      }
+      const tastingByEvent: Record<string, string> = {};
+      for (const r of (tseRes.data ?? []) as any[]) {
+        const d = sessDateMap[r.session_id];
+        if (!d || !r.event_id) continue;
+        if (!tastingByEvent[r.event_id] || d < tastingByEvent[r.event_id]) tastingByEvent[r.event_id] = d;
+      }
+
+      if (eventsRes.data) {
+        setEvents((eventsRes.data as Event[]).map(e => ({ ...e, tasting_date: tastingByEvent[e.id] ?? null })));
+      }
 
       const statsMap: Record<string, { total: number; fechados: number }> = {};
       for (const r of (statsRes.data ?? []) as any[]) {
