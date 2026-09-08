@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum, fmtCur, fmtDate } from '@/lib/format';
+import { effectiveUnitCost } from '@/lib/units';
 import ResponsibleEditor from '@/components/stock-item/ResponsibleEditor';
 import AliasEditor from '@/components/stock-item/AliasEditor';
 import TagEditor from '@/components/stock-item/TagEditor';
@@ -374,7 +375,9 @@ export default function StockItemDetailPage() {
           <p className="text-[10px] text-muted-foreground/50 mt-0.5 group-hover:text-primary/60 transition-colors">clique para ajustar</p>
         </div>
         {(() => {
-          const stockValue = item.current_stock * (item.unit_cost > 0 ? item.unit_cost : avgCost);
+          // unit_cost é o preço da embalagem de compra (ex: caixa com 1000un) — precisa dividir
+          // pela quantidade por embalagem pra chegar no valor por unidade do estoque.
+          const stockValue = item.current_stock * (item.unit_cost > 0 ? effectiveUnitCost(item.unit_cost, item.purchase_qty) : avgCost);
           const preferredSupplier = suppliers.find(s => s.is_preferred) ?? suppliers[0];
           const otherSuppliers = suppliers.filter(s => s !== preferredSupplier);
           const currentPrice = preferredSupplier?.unit_price ?? item.unit_cost;
