@@ -265,6 +265,42 @@ export default function StockItemDetailPage() {
     load();
   };
 
+  const [deletingMovId, setDeletingMovId] = useState<string | null>(null);
+
+  const deleteMovement = async (m: { id: string; type: 'entrada' | 'saida'; qty: number }) => {
+    if (!item) return;
+    const label = m.type === 'entrada' ? 'entrada' : 'saída';
+    if (!confirm(`Excluir esta ${label} de ${fmtNum(m.qty)} ${item.unit}? O estoque será ajustado automaticamente.`)) return;
+    setDeletingMovId(m.id);
+
+    const table = m.type === 'entrada' ? 'stock_entries' : 'stock_outputs';
+    const { error } = await supabase.from(table).delete().eq('id', m.id);
+    if (error) { toast.error('Erro ao excluir: ' + error.message); setDeletingMovId(null); return; }
+
+    // Mesmo cálculo de compensação usado nas páginas de Entradas e Saídas: o gatilho do banco
+    // só ajusta o estoque em inserções, então ao excluir precisamos desfazer manualmente.
+    const { data: itemRow } = await supabase.from('stock_items').select('current_stock').eq('id', item.id).single();
+    const currentStock = (itemRow as any)?.current_stock || 0;
+    const newStock = m.type === 'entrada' ? Math.max(0, currentStock - m.qty) : currentStock + m.qty;
+    await supabase.from('stock_items').update({ current_stock: newStock } as any).eq('id', item.id);
+
+    const { data: defaultKitchen } = await supabase.from('kitchens').select('id').eq('is_default', true).single();
+    if (defaultKitchen) {
+      const { data: loc } = await supabase.from('stock_item_locations')
+        .select('id, current_stock').eq('item_id', item.id).eq('kitchen_id', (defaultKitchen as any).id).maybeSingle();
+      if (loc) {
+        const newLocStock = m.type === 'entrada'
+          ? Math.max(0, (loc as any).current_stock - m.qty)
+          : (loc as any).current_stock + m.qty;
+        await supabase.from('stock_item_locations').update({ current_stock: newLocStock } as any).eq('id', (loc as any).id);
+      }
+    }
+
+    toast.success(`${m.type === 'entrada' ? 'Entrada' : 'Saída'} removida! Estoque ajustado.`);
+    setDeletingMovId(null);
+    load();
+  };
+
   const handlePriceEdit = async () => {
     if (!item) return;
     const newPrice = parseFloat(priceEditValue.replace(',', '.'));
@@ -521,6 +557,7 @@ export default function StockItemDetailPage() {
                 <th className="text-right px-3 py-2">CUSTO UNIT.</th>
                 <th className="text-left px-3 py-2">REFERÊNCIA</th>
                 <th className="text-left px-3 py-2">OBSERVAÇÕES</th>
+                <th className="w-10" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
@@ -545,10 +582,19 @@ export default function StockItemDetailPage() {
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.who || m.ref || '—'}</td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.notes || '—'}</td>
+                  <td className="px-2 py-2.5 text-center">
+                    <button
+                      onClick={() => deleteMovement({ id: m.id, type: m.type, qty: m.qty })}
+                      disabled={deletingMovId === m.id}
+                      title="Excluir movimentação"
+                      className="p-1 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40">
+                      {deletingMovId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </td>
                 </tr>
               ))}
               {pagedMovements.length === 0 && (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground text-sm">Nenhuma movimentação registrada</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted-foreground text-sm">Nenhuma movimentação registrada</td></tr>
               )}
             </tbody>
           </table>
