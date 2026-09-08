@@ -681,9 +681,14 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
     const [itemsRes, entriesRes, outputsRes] = await Promise.all([
       (supabase.from('stock_items') as any).select('id, name, unit_cost, purchase_qty').neq('category', '_sistema_').range(0, 9999),
-      (supabase.from('stock_entries') as any).select('item_id, quantity, unit_cost, created_at').gte('created_at', sinceIso).range(0, 9999),
-      (supabase.from('stock_outputs') as any).select('item_id, quantity, created_at').gte('created_at', sinceIso).range(0, 9999),
+      (supabase.from('stock_entries') as any).select('item_id, quantity, unit_cost, created_at, notes').gte('created_at', sinceIso).range(0, 9999),
+      (supabase.from('stock_outputs') as any).select('item_id, quantity, created_at, notes').gte('created_at', sinceIso).range(0, 9999),
     ]);
+
+    // Correção manual não é movimentação real do negócio (é ajuste administrativo pra
+    // acertar um erro de lançamento) — não deve contar no Pareto, senão distorce o gráfico.
+    const isCorrection = (notes: string | null) =>
+      !!notes && (notes.startsWith('Ajuste manual') || notes.startsWith('Correção de estoque'));
 
     // Custo efetivo (por unidade do item, não da embalagem de compra) usado pra valorizar cada movimentação
     const itemMap = new Map<string, { name: string; cost: number; purchaseQty: number | null }>();
@@ -694,6 +699,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     // Soma o valor de entradas e saídas separadamente
     const entryTotals = new Map<string, number>();
     for (const e of (entriesRes.data || []) as any[]) {
+      if (isCorrection(e.notes)) continue;
       const meta = itemMap.get(e.item_id);
       if (!meta) continue;
       // e.unit_cost também está no preço da embalagem de compra — converte antes de valorizar
@@ -702,6 +708,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     }
     const outputTotals = new Map<string, number>();
     for (const o of (outputsRes.data || []) as any[]) {
+      if (isCorrection(o.notes)) continue;
       const meta = itemMap.get(o.item_id);
       if (!meta) continue;
       outputTotals.set(o.item_id, (outputTotals.get(o.item_id) || 0) + (o.quantity || 0) * meta.cost);
@@ -911,7 +918,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Média semanal do valor de entradas e de saídas de cada item nas últimas {PARETO_WEEKS} semanas, separadas.
+                  Média semanal do valor de entradas e de saídas de cada item nas últimas {PARETO_WEEKS} semanas, separadas. Correções manuais não entram na conta.
                 </p>
 
                 {pareto && (
