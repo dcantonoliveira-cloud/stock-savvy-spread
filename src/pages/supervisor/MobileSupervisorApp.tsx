@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { QRCodeSVG } from 'qrcode.react';
