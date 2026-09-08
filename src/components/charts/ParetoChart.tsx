@@ -1,6 +1,6 @@
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine,
+  Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot,
 } from 'recharts';
 
 export interface ParetoInput { name: string; value: number }
@@ -50,10 +50,12 @@ export function ParetoChart({
   cutoffCount?: number;
 }) {
   const effectiveLimit = cutoffCount != null ? Math.min(Math.max(limit, cutoffCount + 3), 60) : limit;
+  const shownRows = rows.slice(0, effectiveLimit);
+  const cutoffRow = cutoffCount != null ? shownRows[cutoffCount - 1] : undefined;
   return (
     <div className="h-64 -ml-2">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={rows.slice(0, effectiveLimit)} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
+        <ComposedChart data={shownRows} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} angle={-40} textAnchor="end" interval={0} height={60} />
           <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={valueFormatter} width={70} />
@@ -62,8 +64,15 @@ export function ParetoChart({
             formatter={(v: number, n: string) => n === 'value' ? [valueFormatter(v), 'Valor'] : [`${v.toFixed(1).replace('.', ',')}%`, 'Acumulado']}
           />
           <ReferenceLine yAxisId="right" y={80} stroke={lineColor} strokeDasharray="4 4" />
+          {cutoffRow && (
+            <ReferenceLine yAxisId="right" x={cutoffRow.name} stroke={lineColor} strokeDasharray="4 4"
+              label={{ value: `${cutoffCount}º item`, position: 'insideTopRight', fontSize: 10, fill: lineColor }} />
+          )}
           <Bar yAxisId="left" dataKey="value" name="value" fill={barColor} radius={[3, 3, 0, 0]} />
           <Line yAxisId="right" dataKey="cumPct" name="cumPct" stroke={lineColor} strokeWidth={2} dot={false} />
+          {cutoffRow && (
+            <ReferenceDot yAxisId="right" x={cutoffRow.name} y={cutoffRow.cumPct} r={5} fill={lineColor} stroke="#fff" strokeWidth={2} />
+          )}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

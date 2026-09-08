@@ -21,7 +21,7 @@ import { effectiveUnitCost } from '@/lib/units';
 import ItemFormDialog from '@/components/stock-item/ItemFormDialog';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  ResponsiveContainer, ReferenceLine,
+  ResponsiveContainer, ReferenceLine, ReferenceDot,
 } from 'recharts';
 
 type Item = {
@@ -635,6 +635,23 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
 // ─── Stock Report Dialog ───
 const PARETO_WEEKS = 12;
 
+function StockParetoTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+  return (
+    <div className="bg-white border border-border rounded-lg shadow-lg p-3 text-xs space-y-1 max-w-[220px]">
+      <p className="font-semibold text-sm text-foreground">{label}</p>
+      <p className="text-muted-foreground">Média semanal: <span className="font-semibold text-foreground">R$ {fmtNum(d.avgWeekly)}</span></p>
+      <p className="text-muted-foreground">
+        Movimentado no período: <span className="font-semibold text-foreground">{fmtNum(d.qty)} {d.unit}</span>
+        {' '}({d.count} lançamento{d.count !== 1 ? 's' : ''})
+      </p>
+      <p className="text-amber-600">Acumulado: <span className="font-semibold">{fmtNum(d.cumPct)}%</span></p>
+    </div>
+  );
+}
+
 function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<{
@@ -647,15 +664,17 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     suspectDuplicates: { name: string; count: number; totalValue: number; ids: string[] }[];
   } | null>(null);
 
-  type ParetoResult = { cutoffCount: number; totalWithMovement: number; rows: { name: string; avgWeekly: number; cumPct: number }[] };
+  type ParetoResult = { cutoffCount: number; totalWithMovement: number; rows: { name: string; avgWeekly: number; cumPct: number; qty: number; unit: string; count: number }[] };
 
   const [paretoLoading, setParetoLoading] = useState(false);
   const [pareto, setPareto] = useState<{ entradas: ParetoResult; saidas: ParetoResult } | null>(null);
 
   const buildParetoResult = (
     totals: Map<string, number>,
-    itemMap: Map<string, { name: string; cost: number }>,
+    itemMap: Map<string, { name: string; cost: number; unit: string }>,
     firstMovementAt: Map<string, number>,
+    qtyTotals: Map<string, number>,
+    countTotals: Map<string, number>,
   ): ParetoResult => {
     // Divide pelas semanas em que o item de fato teve movimentação (desde o 1º lançamento dele
     // dentro da janela) — não pelas 12 semanas fixas, senão um item que só começou a se mexer
@@ -667,7 +686,13 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
         const weeksActive = first != null
           ? Math.min(PARETO_WEEKS, Math.max(1, Math.ceil((now - first) / (7 * 24 * 3600 * 1000))))
           : PARETO_WEEKS;
-        return { name: itemMap.get(id)?.name || '?', avgWeekly: total / weeksActive };
+        return {
+          name: itemMap.get(id)?.name || '?',
+          avgWeekly: total / weeksActive,
+          qty: qtyTotals.get(id) || 0,
+          unit: itemMap.get(id)?.unit || '',
+          count: countTotals.get(id) || 0,
+        };
       })
       .filter(r => r.avgWeekly > 0)
       .sort((a, b) => b.avgWeekly - a.avgWeekly);
@@ -693,7 +718,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     const sinceIso = since.toISOString();
 
     const [itemsRes, entriesRes, outputsRes] = await Promise.all([
-      (supabase.from('stock_items') as any).select('id, name, unit_cost, purchase_qty').neq('category', '_sistema_').range(0, 9999),
+      (supabase.from('stock_items') as any).select('id, name, unit, unit_cost, purchase_qty').neq('category', '_sistema_').range(0, 9999),
       (supabase.from('stock_entries') as any).select('item_id, quantity, unit_cost, created_at, notes').gte('created_at', sinceIso).range(0, 9999),
       (supabase.from('stock_outputs') as any).select('item_id, quantity, created_at, notes').gte('created_at', sinceIso).range(0, 9999),
     ]);
@@ -704,14 +729,17 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       !!notes && (notes.startsWith('Ajuste manual') || notes.startsWith('Correção de estoque'));
 
     // Custo efetivo (por unidade do item, não da embalagem de compra) usado pra valorizar cada movimentação
-    const itemMap = new Map<string, { name: string; cost: number; purchaseQty: number | null }>();
+    const itemMap = new Map<string, { name: string; cost: number; purchaseQty: number | null; unit: string }>();
     for (const i of (itemsRes.data || []) as any[]) {
-      itemMap.set(i.id, { name: i.name, cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty), purchaseQty: i.purchase_qty });
+      itemMap.set(i.id, { name: i.name, cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty), purchaseQty: i.purchase_qty, unit: i.unit || '' });
     }
 
-    // Soma o valor de entradas e saídas separadamente, guardando também a data do 1º
-    // lançamento de cada item na janela (pra dividir a média pelas semanas reais dele)
+    // Soma o valor de entradas e saídas separadamente, guardando também a quantidade total,
+    // o nº de lançamentos e a data do 1º lançamento de cada item na janela (pra dividir a
+    // média pelas semanas reais dele e mostrar contexto de fluxo no tooltip)
     const entryTotals = new Map<string, number>();
+    const entryQty = new Map<string, number>();
+    const entryCount = new Map<string, number>();
     const entryFirstAt = new Map<string, number>();
     for (const e of (entriesRes.data || []) as any[]) {
       if (isCorrection(e.notes)) continue;
@@ -720,25 +748,31 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       // e.unit_cost também está no preço da embalagem de compra — converte antes de valorizar
       const cost = e.unit_cost && e.unit_cost > 0 ? effectiveUnitCost(e.unit_cost, meta.purchaseQty) : meta.cost;
       entryTotals.set(e.item_id, (entryTotals.get(e.item_id) || 0) + (e.quantity || 0) * cost);
+      entryQty.set(e.item_id, (entryQty.get(e.item_id) || 0) + (e.quantity || 0));
+      entryCount.set(e.item_id, (entryCount.get(e.item_id) || 0) + 1);
       const t = new Date(e.created_at).getTime();
       const prevT = entryFirstAt.get(e.item_id);
       if (prevT === undefined || t < prevT) entryFirstAt.set(e.item_id, t);
     }
     const outputTotals = new Map<string, number>();
+    const outputQty = new Map<string, number>();
+    const outputCount = new Map<string, number>();
     const outputFirstAt = new Map<string, number>();
     for (const o of (outputsRes.data || []) as any[]) {
       if (isCorrection(o.notes)) continue;
       const meta = itemMap.get(o.item_id);
       if (!meta) continue;
       outputTotals.set(o.item_id, (outputTotals.get(o.item_id) || 0) + (o.quantity || 0) * meta.cost);
+      outputQty.set(o.item_id, (outputQty.get(o.item_id) || 0) + (o.quantity || 0));
+      outputCount.set(o.item_id, (outputCount.get(o.item_id) || 0) + 1);
       const t = new Date(o.created_at).getTime();
       const prevT = outputFirstAt.get(o.item_id);
       if (prevT === undefined || t < prevT) outputFirstAt.set(o.item_id, t);
     }
 
     setPareto({
-      entradas: buildParetoResult(entryTotals, itemMap, entryFirstAt),
-      saidas: buildParetoResult(outputTotals, itemMap, outputFirstAt),
+      entradas: buildParetoResult(entryTotals, itemMap, entryFirstAt, entryQty, entryCount),
+      saidas: buildParetoResult(outputTotals, itemMap, outputFirstAt, outputQty, outputCount),
     });
     setParetoLoading(false);
   };
@@ -962,24 +996,33 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                           </div>
                           {r.rows.length === 0 ? (
                             <p className="text-xs text-muted-foreground text-center py-6">Nenhuma {label.toLowerCase() === 'entradas' ? 'entrada' : 'saída'} no período.</p>
-                          ) : (
-                            <div className="h-64 -ml-2">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={r.rows.slice(0, Math.min(Math.max(20, r.cutoffCount + 3), 60))} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} angle={-40} textAnchor="end" interval={0} height={60} />
-                                  <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `R$${fmtNum(v)}`} width={70} />
-                                  <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `${v}%`} width={40} />
-                                  <RTooltip
-                                    formatter={(v: number, n: string) => n === 'avgWeekly' ? [`R$ ${fmtNum(v)}`, 'Média semanal'] : [`${fmtNum(v)}%`, 'Acumulado']}
-                                  />
-                                  <ReferenceLine yAxisId="right" y={80} stroke="#B8922A" strokeDasharray="4 4" />
-                                  <Bar yAxisId="left" dataKey="avgWeekly" name="avgWeekly" fill={color} radius={[3, 3, 0, 0]} />
-                                  <Line yAxisId="right" dataKey="cumPct" name="cumPct" stroke="#B8922A" strokeWidth={2} dot={false} />
-                                </ComposedChart>
-                              </ResponsiveContainer>
-                            </div>
-                          )}
+                          ) : (() => {
+                            const shown = r.rows.slice(0, Math.min(Math.max(20, r.cutoffCount + 3), 60));
+                            const cutoffRow = shown[r.cutoffCount - 1];
+                            return (
+                              <div className="h-64 -ml-2">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <ComposedChart data={shown} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} angle={-40} textAnchor="end" interval={0} height={60} />
+                                    <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `R$${fmtNum(v)}`} width={70} />
+                                    <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `${v}%`} width={40} />
+                                    <RTooltip content={<StockParetoTooltip />} />
+                                    <ReferenceLine yAxisId="right" y={80} stroke="#B8922A" strokeDasharray="4 4" />
+                                    {cutoffRow && (
+                                      <ReferenceLine yAxisId="right" x={cutoffRow.name} stroke="#B8922A" strokeDasharray="4 4"
+                                        label={{ value: `${r.cutoffCount}º item`, position: 'insideTopRight', fontSize: 10, fill: '#B8922A' }} />
+                                    )}
+                                    <Bar yAxisId="left" dataKey="avgWeekly" name="avgWeekly" fill={color} radius={[3, 3, 0, 0]} />
+                                    <Line yAxisId="right" dataKey="cumPct" name="cumPct" stroke="#B8922A" strokeWidth={2} dot={false} />
+                                    {cutoffRow && (
+                                      <ReferenceDot yAxisId="right" x={cutoffRow.name} y={cutoffRow.cumPct} r={5} fill="#B8922A" stroke="#fff" strokeWidth={2} />
+                                    )}
+                                  </ComposedChart>
+                                </ResponsiveContainer>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
