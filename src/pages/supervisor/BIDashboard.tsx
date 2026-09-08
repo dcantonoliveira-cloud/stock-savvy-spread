@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { LOST_REASONS, getLostReasonLabel } from '@/lib/lostReasons';
+import { computePareto, ParetoChart, ParetoSummary } from '@/components/charts/ParetoChart';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const COLORS = ['#B8922A','#2E4A7A','#3D5C38','#D4AA50','#8C7B6A','#7A2C1E','#1E5C5A','#7A6240','#5C3D8A','#2C5C7A','#4A7A3D','#7A4A2C'];
@@ -1563,6 +1564,9 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
     Receita: Math.round(s.receita / 1000),
   }));
 
+  const assessoraPareto = computePareto(assessorasStats.map(s => ({ name: s.name, value: s.receita })));
+  const localPareto = computePareto(locaisStats.map(s => ({ name: s.name, value: s.receita })));
+
   return (
     <div className="space-y-8">
 
@@ -1609,6 +1613,14 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
           </div>
         )}
 
+        {assessoraPareto.total > 0 && (
+          <div className="bg-white border border-border rounded-xl p-5 space-y-3">
+            <SH>Curva de Pareto — assessoras por receita</SH>
+            <ParetoSummary result={assessoraPareto} subject="assessoras" metricLabel="a receita" />
+            <ParetoChart rows={assessoraPareto.rows} barColor="#3D5C38" valueFormatter={fmBRL} />
+          </div>
+        )}
+
         <TabelaParceiros stats={assessorasStats} ticketMedioGlobal={ticketMedio} label="Ranking de assessoras" />
       </div>
 
@@ -1652,6 +1664,14 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
                 <Line yAxisId="v" type="monotone" dataKey="Receita" name="Receita R$K" stroke="#B8922A" strokeWidth={2} dot={{ r: 4 }} />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        )}
+
+        {localPareto.total > 0 && (
+          <div className="bg-white border border-border rounded-xl p-5 space-y-3">
+            <SH>Curva de Pareto — locais por receita</SH>
+            <ParetoSummary result={localPareto} subject="locais" metricLabel="a receita" />
+            <ParetoChart rows={localPareto.rows} barColor="#7A2C1E" valueFormatter={fmBRL} />
           </div>
         )}
 

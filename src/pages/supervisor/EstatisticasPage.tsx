@@ -10,6 +10,7 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { toast } from 'sonner';
+import { computePareto, ParetoChart, ParetoSummary } from '@/components/charts/ParetoChart';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -448,18 +449,21 @@ export default function EstatisticasPage() {
 
   // Cardápios
   const menuData = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const counts: Record<string, { count: number; receita: number }> = {};
     completed.forEach(e => {
       const key = e.product_name?.trim() || 'Não especificado';
-      counts[key] = (counts[key] ?? 0) + 1;
+      if (!counts[key]) counts[key] = { count: 0, receita: 0 };
+      counts[key].count += 1;
+      counts[key].receita += e.total_value ?? 0;
     });
     const total = completed.length || 1;
     return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count]) => ({ name, count, pct: Math.round((count / total) * 100) }));
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([name, d]) => ({ name, count: d.count, receita: d.receita, pct: Math.round((d.count / total) * 100) }));
   }, [completed]);
   const menuTotal = menuData.reduce((s, r) => s + r.count, 0);
   const menuPctTotal = menuData.reduce((s, r) => s + r.pct, 0);
+  const menuPareto = useMemo(() => computePareto(menuData.map(m => ({ name: m.name, value: m.receita }))), [menuData]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -982,25 +986,36 @@ export default function EstatisticasPage() {
             <div className="p-5 border-b border-border">
               <p className="font-semibold text-foreground">Cardápios</p>
             </div>
+
+            {menuPareto.total > 0 && (
+              <div className="p-5 border-b border-border space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Curva de Pareto — produto por receita</p>
+                <ParetoSummary result={menuPareto} subject="produtos" metricLabel="a receita" />
+                <ParetoChart rows={menuPareto.rows} valueFormatter={v => `R$${fmtNum(v)}`} />
+              </div>
+            )}
+
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/30 border-b border-border text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                   <th className="text-left px-5 py-3">Tipo do cardápio</th>
                   <th className="text-right px-4 py-3">Qtd Eventos</th>
+                  <th className="text-right px-4 py-3">Receita</th>
                   <th className="text-right px-5 py-3">%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {menuData.map(({ name, count, pct }) => (
+                {menuData.map(({ name, count, receita, pct }) => (
                   <tr key={name} className="hover:bg-muted/20 transition-colors">
                     <td className="px-5 py-2.5 text-foreground">{name}</td>
                     <td className="px-4 py-2.5 text-right font-semibold text-foreground">{count}</td>
+                    <td className="px-4 py-2.5 text-right text-muted-foreground">{fmtBRL(receita)}</td>
                     <td className="px-5 py-2.5 text-right font-semibold text-muted-foreground">{pct}%</td>
                   </tr>
                 ))}
                 {menuData.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-5 py-10 text-center text-muted-foreground text-sm">
+                    <td colSpan={4} className="px-5 py-10 text-center text-muted-foreground text-sm">
                       Nenhum dado de cardápio disponível.
                     </td>
                   </tr>
@@ -1011,6 +1026,7 @@ export default function EstatisticasPage() {
                   <tr className="border-t-2 border-border bg-muted/30 font-semibold">
                     <td className="px-5 py-3 text-foreground">Total</td>
                     <td className="px-4 py-3 text-right text-foreground">{menuTotal}</td>
+                    <td className="px-4 py-3 text-right text-foreground">{fmtBRL(menuData.reduce((s, r) => s + r.receita, 0))}</td>
                     <td className="px-5 py-3 text-right text-muted-foreground">{menuPctTotal}%</td>
                   </tr>
                 </tfoot>
