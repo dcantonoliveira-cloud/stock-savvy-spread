@@ -308,7 +308,7 @@ export default function EventDetailPage() {
     const daysToEvent = eventDate
       ? Math.ceil((new Date(eventDate + 'T12:00:00').getTime() - Date.now()) / 86400000)
       : null;
-    const isNearEvent = daysToEvent !== null && daysToEvent <= 15;
+    const isNearEvent = daysToEvent !== null && daysToEvent >= 0 && daysToEvent <= 15;
 
     const criticalFields: Array<{ key: keyof EventDetail; label: string; isMenu?: boolean }> = [
       { key: 'menu_text', label: 'Cardápio', isMenu: true },
