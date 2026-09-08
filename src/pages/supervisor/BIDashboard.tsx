@@ -1564,8 +1564,13 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
     Receita: Math.round(s.receita / 1000),
   }));
 
-  const assessoraPareto = computePareto(assessorasStats.map(s => ({ name: s.name, value: s.receita })));
-  const localPareto = computePareto(locaisStats.map(s => ({ name: s.name, value: s.receita })));
+  // Pareto: sempre desde 2025, e buildStats já descarta eventos sem assessora/local definido
+  const fc2025 = fc.filter(e => (e.event_date ?? '') >= '2025-01-01');
+  const ab2025 = ab.filter(e => (e.event_date ?? '') >= '2025-01-01');
+  const assessorasStats2025 = buildStats(fc2025, ab2025, e => normStr(e.organizer), ticketMedio);
+  const locaisStats2025 = buildStats(fc2025, ab2025, e => locName(e), ticketMedio);
+  const assessoraPareto = computePareto(assessorasStats2025.map(s => ({ name: s.name, value: s.receita })));
+  const localPareto = computePareto(locaisStats2025.map(s => ({ name: s.name, value: s.receita })));
 
   return (
     <div className="space-y-8">
@@ -1615,7 +1620,7 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
 
         {assessoraPareto.total > 0 && (
           <div className="bg-white border border-border rounded-xl p-5 space-y-3">
-            <SH>Curva de Pareto — assessoras por receita</SH>
+            <SH>Curva de Pareto — assessoras por receita (desde 2025)</SH>
             <ParetoSummary result={assessoraPareto} subject="assessoras" metricLabel="a receita" />
             <ParetoChart rows={assessoraPareto.rows} barColor="#3D5C38" valueFormatter={fmBRL} />
           </div>
@@ -1669,7 +1674,7 @@ function TabParceiros({ fc, ab, all, locName, ticketMedio }: {
 
         {localPareto.total > 0 && (
           <div className="bg-white border border-border rounded-xl p-5 space-y-3">
-            <SH>Curva de Pareto — locais por receita</SH>
+            <SH>Curva de Pareto — locais por receita (desde 2025)</SH>
             <ParetoSummary result={localPareto} subject="locais" metricLabel="a receita" />
             <ParetoChart rows={localPareto.rows} barColor="#7A2C1E" valueFormatter={fmBRL} />
           </div>

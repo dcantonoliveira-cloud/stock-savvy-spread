@@ -86,6 +86,7 @@ export default function EstatisticasPage() {
   const [fatProducao, setFatProducao] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tastings, setTastings] = useState<any[]>([]);
+  const [productParetoRows, setProductParetoRows] = useState<{ product_name: string | null; total_value: number | null }[]>([]);
   const [sessionStats, setSessionStats] = useState<Record<string, { novos: number; fechados: number }>>({});
   const [tastingRange, setTastingRange] = useState<'3m' | '1a' | 'all'>('1a');
   const [activeCell, setActiveCell] = useState<{ key: string; month: number } | null>(null);
@@ -201,6 +202,14 @@ export default function EstatisticasPage() {
     else { setMetasAll(next); setEditingMetas(false); toast.success('Metas salvas'); }
     setSavingMetas(false);
   };
+
+  // Dados pro Pareto de produto — sempre desde 2025, independente do ano selecionado no filtro
+  useEffect(() => {
+    supabase.from('events').select('product_name, total_value')
+      .in('status', ['completed', 'confirmed'])
+      .gte('event_date', '2025-01-01')
+      .then(({ data }) => setProductParetoRows((data ?? []) as any[]));
+  }, []);
 
   // ── Load data ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -463,7 +472,16 @@ export default function EstatisticasPage() {
   }, [completed]);
   const menuTotal = menuData.reduce((s, r) => s + r.count, 0);
   const menuPctTotal = menuData.reduce((s, r) => s + r.pct, 0);
-  const menuPareto = useMemo(() => computePareto(menuData.map(m => ({ name: m.name, value: m.receita }))), [menuData]);
+  // Pareto de produto: sempre desde 2025 (independente do filtro de ano acima) e sem "Não especificado"
+  const menuPareto = useMemo(() => {
+    const totals: Record<string, number> = {};
+    productParetoRows.forEach(e => {
+      const key = e.product_name?.trim();
+      if (!key) return;
+      totals[key] = (totals[key] ?? 0) + (e.total_value ?? 0);
+    });
+    return computePareto(Object.entries(totals).map(([name, value]) => ({ name, value })));
+  }, [productParetoRows]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -989,7 +1007,7 @@ export default function EstatisticasPage() {
 
             {menuPareto.total > 0 && (
               <div className="p-5 border-b border-border space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Curva de Pareto — produto por receita</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Curva de Pareto — produto por receita (desde 2025)</p>
                 <ParetoSummary result={menuPareto} subject="produtos" metricLabel="a receita" />
                 <ParetoChart rows={menuPareto.rows} valueFormatter={v => `R$${fmtNum(v)}`} />
               </div>
