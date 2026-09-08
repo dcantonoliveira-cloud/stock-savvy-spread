@@ -647,12 +647,31 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     suspectDuplicates: { name: string; count: number; totalValue: number; ids: string[] }[];
   } | null>(null);
 
+  type ParetoResult = { cutoffCount: number; totalWithMovement: number; rows: { name: string; avgWeekly: number; cumPct: number }[] };
+
   const [paretoLoading, setParetoLoading] = useState(false);
-  const [pareto, setPareto] = useState<{
-    cutoffCount: number;
-    totalWithMovement: number;
-    rows: { name: string; avgWeekly: number; cumPct: number }[];
-  } | null>(null);
+  const [pareto, setPareto] = useState<{ entradas: ParetoResult; saidas: ParetoResult } | null>(null);
+
+  const buildParetoResult = (totals: Map<string, number>, itemMap: Map<string, { name: string; cost: number }>): ParetoResult => {
+    // Divide pelo nº de semanas do período -> média semanal (não só o total do período)
+    const rowsRaw = [...totals.entries()]
+      .map(([id, total]) => ({ name: itemMap.get(id)?.name || '?', avgWeekly: total / PARETO_WEEKS }))
+      .filter(r => r.avgWeekly > 0)
+      .sort((a, b) => b.avgWeekly - a.avgWeekly);
+
+    const grandTotal = rowsRaw.reduce((s, r) => s + r.avgWeekly, 0);
+    let cum = 0;
+    let cutoffCount = rowsRaw.length;
+    let cutoffReached = false;
+    const rows = rowsRaw.map((r, idx) => {
+      cum += r.avgWeekly;
+      const cumPct = grandTotal > 0 ? (cum / grandTotal) * 100 : 0;
+      if (!cutoffReached && cumPct >= 80) { cutoffCount = idx + 1; cutoffReached = true; }
+      return { ...r, cumPct };
+    });
+
+    return { cutoffCount, totalWithMovement: rowsRaw.length, rows };
+  };
 
   const analyzePareto = async () => {
     setParetoLoading(true);
@@ -672,38 +691,25 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       itemMap.set(i.id, { name: i.name, cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty) });
     }
 
-    // Soma o valor movimentado (entradas + saídas) de cada item no período todo
-    const totals = new Map<string, number>();
+    // Soma o valor de entradas e saídas separadamente
+    const entryTotals = new Map<string, number>();
     for (const e of (entriesRes.data || []) as any[]) {
       const meta = itemMap.get(e.item_id);
       if (!meta) continue;
       const cost = e.unit_cost && e.unit_cost > 0 ? e.unit_cost : meta.cost;
-      totals.set(e.item_id, (totals.get(e.item_id) || 0) + (e.quantity || 0) * cost);
+      entryTotals.set(e.item_id, (entryTotals.get(e.item_id) || 0) + (e.quantity || 0) * cost);
     }
+    const outputTotals = new Map<string, number>();
     for (const o of (outputsRes.data || []) as any[]) {
       const meta = itemMap.get(o.item_id);
       if (!meta) continue;
-      totals.set(o.item_id, (totals.get(o.item_id) || 0) + (o.quantity || 0) * meta.cost);
+      outputTotals.set(o.item_id, (outputTotals.get(o.item_id) || 0) + (o.quantity || 0) * meta.cost);
     }
 
-    // Divide pelo nº de semanas do período -> média semanal (não só o total do período)
-    const rowsRaw = [...totals.entries()]
-      .map(([id, total]) => ({ name: itemMap.get(id)?.name || '?', avgWeekly: total / PARETO_WEEKS }))
-      .filter(r => r.avgWeekly > 0)
-      .sort((a, b) => b.avgWeekly - a.avgWeekly);
-
-    const grandTotal = rowsRaw.reduce((s, r) => s + r.avgWeekly, 0);
-    let cum = 0;
-    let cutoffCount = rowsRaw.length;
-    let cutoffReached = false;
-    const rows = rowsRaw.map((r, idx) => {
-      cum += r.avgWeekly;
-      const cumPct = grandTotal > 0 ? (cum / grandTotal) * 100 : 0;
-      if (!cutoffReached && cumPct >= 80) { cutoffCount = idx + 1; cutoffReached = true; }
-      return { ...r, cumPct };
+    setPareto({
+      entradas: buildParetoResult(entryTotals, itemMap),
+      saidas: buildParetoResult(outputTotals, itemMap),
     });
-
-    setPareto({ cutoffCount, totalWithMovement: rowsRaw.length, rows });
     setParetoLoading(false);
   };
 
@@ -892,7 +898,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                 </div>
               </div>
 
-              {/* Curva de Pareto — movimentação semanal */}
+              {/* Curva de Pareto — movimentação semanal (entradas e saídas separadas) */}
               <div className="border-t border-border pt-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-foreground">Curva de Pareto (80/20) — movimentação semanal</p>
@@ -904,34 +910,49 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Média semanal do valor movimentado (entradas + saídas) de cada item nas últimas {PARETO_WEEKS} semanas.
+                  Média semanal do valor de entradas e de saídas de cada item nas últimas {PARETO_WEEKS} semanas, separadas.
                 </p>
 
                 {pareto && (
                   <>
-                    <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 mb-3">
-                      <p className="text-sm text-foreground">
-                        <span className="font-bold text-primary">{pareto.cutoffCount} produtos</span>
-                        {' '}({fmtNum((pareto.cutoffCount / Math.max(1, pareto.totalWithMovement)) * 100)}% dos {pareto.totalWithMovement} itens com movimentação)
-                        {' '}respondem por <span className="font-bold text-primary">80%</span> do valor movimentado por semana.
-                      </p>
-                    </div>
-                    <div className="h-64 -ml-2">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={pareto.rows.slice(0, 20)} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} angle={-40} textAnchor="end" interval={0} height={60} />
-                          <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `R$${fmtNum(v)}`} width={70} />
-                          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `${v}%`} width={40} />
-                          <RTooltip
-                            formatter={(v: number, n: string) => n === 'avgWeekly' ? [`R$ ${fmtNum(v)}`, 'Média semanal'] : [`${fmtNum(v)}%`, 'Acumulado']}
-                          />
-                          <ReferenceLine yAxisId="right" y={80} stroke="#B8922A" strokeDasharray="4 4" />
-                          <Bar yAxisId="left" dataKey="avgWeekly" name="avgWeekly" fill="#2E4A7A" radius={[3, 3, 0, 0]} />
-                          <Line yAxisId="right" dataKey="cumPct" name="cumPct" stroke="#B8922A" strokeWidth={2} dot={false} />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {([
+                      { key: 'entradas', label: 'Entradas', color: '#3D5C38' },
+                      { key: 'saidas', label: 'Saídas', color: '#7A2C1E' },
+                    ] as const).map(({ key, label, color }) => {
+                      const r = pareto[key];
+                      return (
+                        <div key={key} className="mb-5 last:mb-0">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">{label}</p>
+                          <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 mb-3">
+                            <p className="text-sm text-foreground">
+                              <span className="font-bold text-primary">{r.cutoffCount} produtos</span>
+                              {' '}({fmtNum((r.cutoffCount / Math.max(1, r.totalWithMovement)) * 100)}% dos {r.totalWithMovement} itens com {label.toLowerCase()})
+                              {' '}respondem por <span className="font-bold text-primary">80%</span> do valor de {label.toLowerCase()} por semana.
+                            </p>
+                          </div>
+                          {r.rows.length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-6">Nenhuma {label.toLowerCase() === 'entradas' ? 'entrada' : 'saída'} no período.</p>
+                          ) : (
+                            <div className="h-64 -ml-2">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={r.rows.slice(0, 20)} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} angle={-40} textAnchor="end" interval={0} height={60} />
+                                  <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `R$${fmtNum(v)}`} width={70} />
+                                  <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `${v}%`} width={40} />
+                                  <RTooltip
+                                    formatter={(v: number, n: string) => n === 'avgWeekly' ? [`R$ ${fmtNum(v)}`, 'Média semanal'] : [`${fmtNum(v)}%`, 'Acumulado']}
+                                  />
+                                  <ReferenceLine yAxisId="right" y={80} stroke="#B8922A" strokeDasharray="4 4" />
+                                  <Bar yAxisId="left" dataKey="avgWeekly" name="avgWeekly" fill={color} radius={[3, 3, 0, 0]} />
+                                  <Line yAxisId="right" dataKey="cumPct" name="cumPct" stroke="#B8922A" strokeWidth={2} dot={false} />
+                                </ComposedChart>
+                              </ResponsiveContainer>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </>
                 )}
               </div>
