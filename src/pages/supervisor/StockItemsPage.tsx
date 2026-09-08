@@ -17,7 +17,12 @@ import { MaterialLabelPrint, type LabelItem } from '@/components/MaterialLabelPr
 import * as XLSX from 'xlsx';
 import { ItemImage } from '@/components/ItemImage';
 import { fmtNum } from '@/lib/format';
+import { effectiveUnitCost } from '@/lib/units';
 import ItemFormDialog from '@/components/stock-item/ItemFormDialog';
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
+  ResponsiveContainer, ReferenceLine,
+} from 'recharts';
 
 type Item = {
   id: string; name: string; category: string; unit: string;
@@ -628,6 +633,8 @@ function DuplicateReviewDialog({ open, onClose, items, onDone }: {
 }
 
 // ─── Stock Report Dialog ───
+const PARETO_WEEKS = 12;
+
 function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<{
@@ -639,6 +646,66 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     allWithStock: { name: string; category: string; unit: string; current_stock: number; unit_cost: number; value: number }[];
     suspectDuplicates: { name: string; count: number; totalValue: number; ids: string[] }[];
   } | null>(null);
+
+  const [paretoLoading, setParetoLoading] = useState(false);
+  const [pareto, setPareto] = useState<{
+    cutoffCount: number;
+    totalWithMovement: number;
+    rows: { name: string; avgWeekly: number; cumPct: number }[];
+  } | null>(null);
+
+  const analyzePareto = async () => {
+    setParetoLoading(true);
+    const since = new Date();
+    since.setDate(since.getDate() - PARETO_WEEKS * 7);
+    const sinceIso = since.toISOString();
+
+    const [itemsRes, entriesRes, outputsRes] = await Promise.all([
+      (supabase.from('stock_items') as any).select('id, name, unit_cost, purchase_qty').neq('category', '_sistema_').range(0, 9999),
+      (supabase.from('stock_entries') as any).select('item_id, quantity, unit_cost, created_at').gte('created_at', sinceIso).range(0, 9999),
+      (supabase.from('stock_outputs') as any).select('item_id, quantity, created_at').gte('created_at', sinceIso).range(0, 9999),
+    ]);
+
+    // Custo efetivo (por unidade do item, não da embalagem de compra) usado pra valorizar cada movimentação
+    const itemMap = new Map<string, { name: string; cost: number }>();
+    for (const i of (itemsRes.data || []) as any[]) {
+      itemMap.set(i.id, { name: i.name, cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty) });
+    }
+
+    // Soma o valor movimentado (entradas + saídas) de cada item no período todo
+    const totals = new Map<string, number>();
+    for (const e of (entriesRes.data || []) as any[]) {
+      const meta = itemMap.get(e.item_id);
+      if (!meta) continue;
+      const cost = e.unit_cost && e.unit_cost > 0 ? e.unit_cost : meta.cost;
+      totals.set(e.item_id, (totals.get(e.item_id) || 0) + (e.quantity || 0) * cost);
+    }
+    for (const o of (outputsRes.data || []) as any[]) {
+      const meta = itemMap.get(o.item_id);
+      if (!meta) continue;
+      totals.set(o.item_id, (totals.get(o.item_id) || 0) + (o.quantity || 0) * meta.cost);
+    }
+
+    // Divide pelo nº de semanas do período -> média semanal (não só o total do período)
+    const rowsRaw = [...totals.entries()]
+      .map(([id, total]) => ({ name: itemMap.get(id)?.name || '?', avgWeekly: total / PARETO_WEEKS }))
+      .filter(r => r.avgWeekly > 0)
+      .sort((a, b) => b.avgWeekly - a.avgWeekly);
+
+    const grandTotal = rowsRaw.reduce((s, r) => s + r.avgWeekly, 0);
+    let cum = 0;
+    let cutoffCount = rowsRaw.length;
+    let cutoffReached = false;
+    const rows = rowsRaw.map((r, idx) => {
+      cum += r.avgWeekly;
+      const cumPct = grandTotal > 0 ? (cum / grandTotal) * 100 : 0;
+      if (!cutoffReached && cumPct >= 80) { cutoffCount = idx + 1; cutoffReached = true; }
+      return { ...r, cumPct };
+    });
+
+    setPareto({ cutoffCount, totalWithMovement: rowsRaw.length, rows });
+    setParetoLoading(false);
+  };
 
   const analyze = async () => {
     setLoading(true);
@@ -730,11 +797,11 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     toast.success('Relatório exportado!');
   };
 
-  const reset = () => { setData(null); onClose(); };
+  const reset = () => { setData(null); setPareto(null); onClose(); };
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) reset(); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BarChart2 className="w-5 h-5 text-primary" />
@@ -820,6 +887,50 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Curva de Pareto — movimentação semanal */}
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-foreground">Curva de Pareto (80/20) — movimentação semanal</p>
+                  {!pareto && (
+                    <Button size="sm" variant="outline" onClick={analyzePareto} disabled={paretoLoading}>
+                      {paretoLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+                      {paretoLoading ? 'Calculando...' : 'Gerar curva'}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Média semanal do valor movimentado (entradas + saídas) de cada item nas últimas {PARETO_WEEKS} semanas.
+                </p>
+
+                {pareto && (
+                  <>
+                    <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 mb-3">
+                      <p className="text-sm text-foreground">
+                        <span className="font-bold text-primary">{pareto.cutoffCount} produtos</span>
+                        {' '}({fmtNum((pareto.cutoffCount / Math.max(1, pareto.totalWithMovement)) * 100)}% dos {pareto.totalWithMovement} itens com movimentação)
+                        {' '}respondem por <span className="font-bold text-primary">80%</span> do valor movimentado por semana.
+                      </p>
+                    </div>
+                    <div className="h-64 -ml-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={pareto.rows.slice(0, 20)} margin={{ top: 5, right: 10, left: 0, bottom: 45 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#888' }} angle={-40} textAnchor="end" interval={0} height={60} />
+                          <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `R$${fmtNum(v)}`} width={70} />
+                          <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fill: '#888' }} tickFormatter={v => `${v}%`} width={40} />
+                          <RTooltip
+                            formatter={(v: number, n: string) => n === 'avgWeekly' ? [`R$ ${fmtNum(v)}`, 'Média semanal'] : [`${fmtNum(v)}%`, 'Acumulado']}
+                          />
+                          <ReferenceLine yAxisId="right" y={80} stroke="#B8922A" strokeDasharray="4 4" />
+                          <Bar yAxisId="left" dataKey="avgWeekly" name="avgWeekly" fill="#2E4A7A" radius={[3, 3, 0, 0]} />
+                          <Line yAxisId="right" dataKey="cumPct" name="cumPct" stroke="#B8922A" strokeWidth={2} dot={false} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Todos os itens com estoque */}
