@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Building2, Package, Loader2, Search, ArrowRightLeft } from 'lucide-react';
 import { fmtNum, fmtCur } from '@/lib/format';
+import { effectiveUnitCost } from '@/lib/units';
 
 type Kitchen = { id: string; name: string; is_default: boolean };
 type LocationItem = {
@@ -31,7 +32,7 @@ export default function KitchenDetailPage() {
     const [kRes, locRes] = await Promise.all([
       supabase.from('kitchens').select('id, name, is_default').eq('id', id!).single(),
       supabase.from('stock_item_locations')
-        .select('id, item_id, stock_items(id, name, category, unit, unit_cost, current_stock)')
+        .select('id, item_id, stock_items(id, name, category, unit, unit_cost, purchase_qty, current_stock)')
         .eq('kitchen_id', id!),
     ]);
     if (!kRes.data) { navigate('/kitchens'); return; }
@@ -45,7 +46,8 @@ export default function KitchenDetailPage() {
         name: loc.stock_items?.name || '—',
         category: loc.stock_items?.category || '—',
         unit: loc.stock_items?.unit || '',
-        unit_cost: loc.stock_items?.unit_cost || 0,
+        // unit_cost é o preço da embalagem de compra — converte pro custo por unidade do item
+        unit_cost: effectiveUnitCost(loc.stock_items?.unit_cost || 0, loc.stock_items?.purchase_qty),
         current_stock: loc.stock_items?.current_stock || 0,
       }))
       .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));

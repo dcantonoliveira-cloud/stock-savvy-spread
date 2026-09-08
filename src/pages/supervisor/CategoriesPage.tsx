@@ -89,7 +89,7 @@ export default function CategoriesPage() {
       emoji: cat.emoji,
       itemCount: catItems.length,
       totalStock: catItems.reduce((s, i) => s + i.current_stock, 0),
-      totalValue: catItems.reduce((s, i) => s + (i.valor_total ?? i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0),
+      totalValue: catItems.reduce((s, i) => s + (i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0),
     };
   }).filter(c => c.name !== '_sistema_').sort((a, b) => b.totalValue - a.totalValue);
 
@@ -132,12 +132,16 @@ export default function CategoriesPage() {
   };
 
   const exportExcel = () => {
-    const rows = items.map(i => ({
-      'Nome': i.name, 'Categoria': i.category, 'Unidade': i.unit,
-      'Estoque Atual': i.current_stock, 'Estoque Mínimo': i.min_stock,
-      'Custo Unitário': i.unit_cost,
-      'Valor em Estoque': Math.round(i.current_stock * i.unit_cost * 100) / 100,
-    }));
+    const rows = items.map(i => {
+      // unit_cost é o preço da embalagem de compra — converte pro custo por unidade do item
+      const effCost = i.unit_cost / Math.max(1, i.purchase_qty || 1);
+      return {
+        'Nome': i.name, 'Categoria': i.category, 'Unidade': i.unit,
+        'Estoque Atual': i.current_stock, 'Estoque Mínimo': i.min_stock,
+        'Custo Unitário': Math.round(effCost * 100) / 100,
+        'Valor em Estoque': Math.round(i.current_stock * effCost * 100) / 100,
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 18 }];
     const wb = XLSX.utils.book_new();
@@ -356,7 +360,7 @@ export default function CategoriesPage() {
                         <>
                           {catSubs.map((sub, subIdx) => {
                             const subItems = items.filter(i => i.subcategory_id === sub.id);
-const subValue = subItems.reduce((s, i) => s + (i.valor_total ?? i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0);
+const subValue = subItems.reduce((s, i) => s + (i.current_stock * (i.unit_cost / Math.max(1, i.purchase_qty || 1))), 0);
                             const isLastSub = subIdx === catSubs.length - 1;
                             return (
                               <tr

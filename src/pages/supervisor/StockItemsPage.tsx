@@ -686,9 +686,9 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     ]);
 
     // Custo efetivo (por unidade do item, não da embalagem de compra) usado pra valorizar cada movimentação
-    const itemMap = new Map<string, { name: string; cost: number }>();
+    const itemMap = new Map<string, { name: string; cost: number; purchaseQty: number | null }>();
     for (const i of (itemsRes.data || []) as any[]) {
-      itemMap.set(i.id, { name: i.name, cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty) });
+      itemMap.set(i.id, { name: i.name, cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty), purchaseQty: i.purchase_qty });
     }
 
     // Soma o valor de entradas e saídas separadamente
@@ -696,7 +696,8 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     for (const e of (entriesRes.data || []) as any[]) {
       const meta = itemMap.get(e.item_id);
       if (!meta) continue;
-      const cost = e.unit_cost && e.unit_cost > 0 ? e.unit_cost : meta.cost;
+      // e.unit_cost também está no preço da embalagem de compra — converte antes de valorizar
+      const cost = e.unit_cost && e.unit_cost > 0 ? effectiveUnitCost(e.unit_cost, meta.purchaseQty) : meta.cost;
       entryTotals.set(e.item_id, (entryTotals.get(e.item_id) || 0) + (e.quantity || 0) * cost);
     }
     const outputTotals = new Map<string, number>();

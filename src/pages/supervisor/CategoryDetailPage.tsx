@@ -8,6 +8,7 @@ import {
   AlertTriangle, ChevronLeft, ChevronRight, BarChart3
 } from 'lucide-react';
 import { fmtNum, fmtDate } from '@/lib/format';
+import { effectiveUnitCost } from '@/lib/units';
 
 type Item = {
   id: string; name: string; unit: string;
@@ -38,11 +39,12 @@ export default function CategoryDetailPage() {
     setLoading(true);
     const { data: itemsData } = await supabase
       .from('stock_items')
-      .select('id, name, unit, current_stock, min_stock, unit_cost')
+      .select('id, name, unit, current_stock, min_stock, unit_cost, purchase_qty')
       .eq('category', categoryName)
       .order('name');
 
-    const itemList = (itemsData || []) as Item[];
+    // unit_cost é o preço da embalagem de compra — converte pro custo por unidade do item
+    const itemList = ((itemsData || []) as any[]).map(i => ({ ...i, unit_cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty) })) as Item[];
     setItems(itemList);
 
     if (itemList.length > 0) {

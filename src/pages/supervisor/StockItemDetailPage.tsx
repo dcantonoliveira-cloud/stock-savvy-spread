@@ -130,7 +130,10 @@ export default function StockItemDetailPage() {
     }
 
     setItem({ ...itemData });
-    setEntries(entriesData);
+    // Converte pra exibição: e.unit_cost vem do banco no preço da embalagem de compra
+    // (mesma convenção de stock_items.unit_cost) — aqui vira custo por unidade do item,
+    // pra todo cálculo/exibição derivado de entries (preço médio, histórico, movimentações).
+    setEntries(entriesData.map(e => ({ ...e, unit_cost: effectiveUnitCost(e.unit_cost, itemData.purchase_qty) })));
     setOutputs((outputsRes.data || []) as unknown as Output[]);
     setSuppliers(suppliersData);
 
@@ -295,10 +298,11 @@ export default function StockItemDetailPage() {
   const isLow = item.current_stock > 0 && item.current_stock < item.min_stock && item.min_stock > 0;
   const totalEntries = entries.reduce((s, e) => s + e.quantity, 0);
   const totalOutputs = outputs.reduce((s, o) => s + o.quantity, 0);
+  // entries.unit_cost já vem convertido pro custo por unidade do item (ver load())
   const pricedEntries = entries.filter(e => e.unit_cost > 0);
   const avgCost = pricedEntries.length > 0
     ? pricedEntries.reduce((s, e) => s + e.unit_cost * e.quantity, 0) / pricedEntries.reduce((s, e) => s + e.quantity, 0)
-    : item.unit_cost;
+    : effectiveUnitCost(item.unit_cost, item.purchase_qty);
 
   // All movements merged
   const isCorrectionNote = (notes: string | null) =>

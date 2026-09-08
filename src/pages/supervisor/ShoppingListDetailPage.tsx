@@ -8,7 +8,7 @@ import {
   Save, TrendingDown, CheckCircle2, Truck,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { convertToItemUnit } from '@/lib/units';
+import { convertToItemUnit, effectiveUnitCost } from '@/lib/units';
 import { getSavedShoppingLists, SavedShoppingList } from '@/components/ConsolidatedShoppingListDialog';
 import { fmtNum, fmtCur } from '@/lib/format';
 
@@ -86,7 +86,7 @@ export default function ShoppingListDetailPage() {
 
       const referencedItemIds = [...new Set(sheetItemsData.map((si: any) => si.item_id).filter(Boolean))];
       const { data: stockData } = await supabase
-        .from('stock_items').select('id, name, unit, unit_cost, current_stock, category').in('id', referencedItemIds);
+        .from('stock_items').select('id, name, unit, unit_cost, purchase_qty, current_stock, category').in('id', referencedItemIds);
       const stock = (stockData || []) as any[];
 
       const sheetsMap: Record<string, any> = {};
@@ -118,7 +118,8 @@ export default function ShoppingListDetailPage() {
           const qtyInItemUnit = convertToItemUnit(si.quantity, itemUnit, itemUnit);
           const needed = qtyInItemUnit * scale;
           if (!map[si.item_id]) {
-            map[si.item_id] = { id: si.item_id, name: s?.name || si.item_id, unit: itemUnit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: s?.unit_cost || 0 };
+            // unit_cost é o preço da embalagem de compra — converte pro custo por unidade do item
+            map[si.item_id] = { id: si.item_id, name: s?.name || si.item_id, unit: itemUnit, category: s?.category || 'Outros', needed: 0, inStock: s?.current_stock || 0, toBuy: 0, unitCost: effectiveUnitCost(s?.unit_cost || 0, s?.purchase_qty) };
           }
           map[si.item_id].needed += needed;
           // Tag breakdown

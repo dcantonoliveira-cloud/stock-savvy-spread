@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building2, Plus, Pencil, Trash2, Lock, Loader2, ChevronRight, Package } from 'lucide-react';
 import { fmtNum } from '@/lib/format';
+import { effectiveUnitCost } from '@/lib/units';
 import { toast } from 'sonner';
 
 type Kitchen = { id: string; name: string; is_default: boolean };
 type Location = { id: string; item_id: string; kitchen_id: string };
-type StockRef = { id: string; current_stock: number; unit_cost: number };
+type StockRef = { id: string; current_stock: number; unit_cost: number; purchase_qty: number | null };
 
 export default function KitchensPage() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function KitchensPage() {
     const [k, l, si] = await Promise.all([
       supabase.from('kitchens').select('id, name, is_default').order('name'),
       supabase.from('stock_item_locations').select('id, item_id, kitchen_id'),
-      (supabase.from('stock_items') as any).select('id, current_stock, unit_cost').range(0, 9999),
+      (supabase.from('stock_items') as any).select('id, current_stock, unit_cost, purchase_qty').range(0, 9999),
     ]);
     if (k.data) setKitchens(k.data as Kitchen[]);
     if (l.data) setLocations(l.data as Location[]);
@@ -79,7 +80,7 @@ export default function KitchensPage() {
       const si = stockMap[loc.item_id];
       if (si && si.current_stock > 0) {
         itemCount++;
-        totalValue += si.current_stock * si.unit_cost;
+        totalValue += si.current_stock * effectiveUnitCost(si.unit_cost, si.purchase_qty);
       }
     }
     return { itemCount, totalValue };
