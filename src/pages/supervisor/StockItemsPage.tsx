@@ -710,11 +710,14 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const analyze = async () => {
     setLoading(true);
     const { data: items } = await (supabase.from('stock_items') as any)
-      .select('id, name, category, unit, current_stock, unit_cost')
+      .select('id, name, category, unit, current_stock, unit_cost, purchase_qty')
       .neq('category', '_sistema_')
       .range(0, 9999);
 
-    const all = (items || []) as any[];
+    // unit_cost é o preço da embalagem de compra, não da unidade do item — usa o custo
+    // efetivo (unit_cost / purchase_qty) em todo cálculo de valor, senão itens comprados
+    // em caixa/pacote aparecem com valor de estoque muito inflado.
+    const all = ((items || []) as any[]).map(i => ({ ...i, unit_cost: effectiveUnitCost(i.unit_cost || 0, i.purchase_qty) }));
 
     // Total
     const totalValue = all.reduce((s: number, i: any) => s + (i.current_stock || 0) * (i.unit_cost || 0), 0);
