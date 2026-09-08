@@ -827,9 +827,9 @@ export default function StockItemDetailPage() {
               {correctionQty !== '' && !isNaN(parseFloat(correctionQty)) && (
                 <p className={`text-xs mt-1 ${parseFloat(correctionQty) > item.current_stock ? 'text-green-600' : parseFloat(correctionQty) < item.current_stock ? 'text-red-600' : 'text-muted-foreground'}`}>
                   {parseFloat(correctionQty) > item.current_stock
-                    ? `Entrada de ${fmt(parseFloat(correctionQty) - item.current_stock)} ${item.unit}`
+                    ? `Entrada de ${fmtNum(parseFloat(correctionQty) - item.current_stock)} ${item.unit}`
                     : parseFloat(correctionQty) < item.current_stock
-                      ? `Saída de ${fmt(item.current_stock - parseFloat(correctionQty))} ${item.unit}`
+                      ? `Saída de ${fmtNum(item.current_stock - parseFloat(correctionQty))} ${item.unit}`
                       : 'Sem alteração'}
                 </p>
               )}
