@@ -27,10 +27,12 @@ type Subcategory = { id: string; name: string; category_id: string };
  * responsáveis, apelidos e tags). Reutilizável em qualquer tela que precise cadastrar
  * ou editar um insumo sem levar o usuário até o Estoque Geral.
  */
-export default function ItemFormDialog({ open, onClose, item, onSaved }: {
+export default function ItemFormDialog({ open, onClose, item, initialName, onSaved }: {
   open: boolean;
   onClose: () => void;
   item?: StockItemFull;
+  /** Pré-preenche o nome ao criar um item novo (ex: texto já digitado numa busca). Ignorado em modo edição. */
+  initialName?: string;
   onSaved: (item: StockItemFull) => void;
 }) {
   const [loadingMeta, setLoadingMeta] = useState(true);
@@ -53,7 +55,7 @@ export default function ItemFormDialog({ open, onClose, item, onSaved }: {
 
   useEffect(() => {
     if (!open) return;
-    setName(item?.name || '');
+    setName(item?.name || initialName || '');
     setCategory(item?.category || '');
     setSubcategoryId(item?.subcategory_id || '');
     setUnit(item?.unit || UNITS[0]);
@@ -79,7 +81,7 @@ export default function ItemFormDialog({ open, onClose, item, onSaved }: {
       setAllGroups((grpsRes.data || []) as { id: string; name: string }[]);
       setLoadingMeta(false);
     });
-  }, [open, item]);
+  }, [open, item, initialName]);
 
   const catRec = allCategoryRecords.find(c => c.name === category);
   const availableSubcats = catRec ? allSubcategories.filter(s => s.category_id === catRec.id) : allSubcategories;

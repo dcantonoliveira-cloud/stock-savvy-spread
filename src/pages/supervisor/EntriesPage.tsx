@@ -15,6 +15,7 @@ import { Plus, Trash2, Upload, FileText, Camera, FileCode, Loader2, Check, X, Al
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { fmtNum, fmtCur } from '@/lib/format';
+import ItemFormDialog, { StockItemFull } from '@/components/stock-item/ItemFormDialog';
 
 type Item = { id: string; name: string; unit: string; current_stock: number; barcode: string | null };
 type Kitchen = { id: string; name: string; is_default: boolean };
@@ -133,9 +134,6 @@ export default function EntriesPage() {
   const [itemSearch, setItemSearch] = useState('');
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateName, setQuickCreateName] = useState('');
-  const [quickCreateUnit, setQuickCreateUnit] = useState('kg');
-  const [quickCreateCategory, setQuickCreateCategory] = useState('Outros');
-  const [quickCreateSaving, setQuickCreateSaving] = useState(false);
   // allocation
   const [itemLocations, setItemLocations] = useState<ItemLocation[]>([]);
   const [allocationKitchenId, setAllocationKitchenId] = useState('');
@@ -251,24 +249,10 @@ export default function EntriesPage() {
 
   const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setItemLocations([]); setAllocationKitchenId(''); };
 
-  const handleQuickCreate = async () => {
-    if (!quickCreateName.trim()) { toast.error('Nome é obrigatório'); return; }
-    setQuickCreateSaving(true);
-    const { data, error } = await supabase.from('stock_items').insert({
-      name: quickCreateName.trim(), unit: quickCreateUnit,
-      category: quickCreateCategory, current_stock: 0, min_stock: 0, unit_cost: 0,
-    } as any).select('id, name, unit, current_stock, barcode').single();
-    if (error || !data) { toast.error('Erro ao criar insumo'); setQuickCreateSaving(false); return; }
-    const newItem = data as Item;
-    const updatedItems = [...items, newItem].sort((a, b) => a.name.localeCompare(b.name));
-    setItems(updatedItems);
+  const handleQuickCreateSaved = (item: StockItemFull) => {
+    const newItem: Item = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, barcode: item.barcode };
+    setItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
     handleItemSelect(newItem.id);
-    setQuickCreateOpen(false);
-    setQuickCreateName('');
-    setQuickCreateUnit('kg');
-    setQuickCreateCategory('Outros');
-    setQuickCreateSaving(false);
-    toast.success(`"${newItem.name}" criado e selecionado!`);
   };
 
   const handleSave = async () => {
@@ -1091,42 +1075,13 @@ export default function EntriesPage() {
             </DialogContent>
           </Dialog>
 
-          {/* Quick create item dialog */}
-          <Dialog open={quickCreateOpen} onOpenChange={o => { setQuickCreateOpen(o); if (!o) { setQuickCreateName(''); setQuickCreateUnit('kg'); setQuickCreateCategory('Outros'); } }}>
-            <DialogContent className="max-w-sm">
-              <DialogHeader><DialogTitle>Criar Novo Insumo</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Nome *</label>
-                  <Input value={quickCreateName} onChange={e => setQuickCreateName(e.target.value)} autoFocus placeholder="Nome do insumo" onKeyDown={e => { if (e.key === 'Enter') handleQuickCreate(); }} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm text-muted-foreground mb-1 block">Unidade</label>
-                    <Select value={quickCreateUnit} onValueChange={setQuickCreateUnit}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {['kg', 'g', 'L', 'ml', 'un', 'pct', 'cx', 'lata', 'dz'].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
-                    <Select value={quickCreateCategory} onValueChange={setQuickCreateCategory}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {['Hortifruti', 'Carnes', 'Frios', 'Bebidas', 'Panificação', 'Limpeza', 'Descartáveis', 'Outros'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button className="w-full" onClick={handleQuickCreate} disabled={quickCreateSaving}>
-                  {quickCreateSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PackagePlus className="w-4 h-4 mr-2" />}
-                  Criar e Selecionar
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          {/* Quick create item dialog — mesmo formulário completo do Estoque Geral */}
+          <ItemFormDialog
+            open={quickCreateOpen}
+            initialName={quickCreateName}
+            onClose={() => { setQuickCreateOpen(false); setQuickCreateName(''); }}
+            onSaved={handleQuickCreateSaved}
+          />
         </div>
       </div>
 
