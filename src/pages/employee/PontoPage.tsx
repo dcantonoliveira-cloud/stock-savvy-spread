@@ -54,7 +54,12 @@ export default function PontoPage() {
   useEffect(() => { load(); }, [load]);
 
   const lastEntry = entries[0] ?? null;
-  const nextType: 'entry' | 'exit' = lastEntry?.type === 'entry' ? 'exit' : 'entry';
+  const lastEntryIsToday = !!lastEntry && isToday(parseISO(lastEntry.recorded_at));
+  // O botão só alterna entrada/saída dentro do dia de hoje. Se o último registro for de um dia
+  // anterior (ex: o funcionário esqueceu de bater a saída), ele não pode travar o dia de hoje —
+  // senão o funcionário fica sem conseguir bater nada no dia seguinte.
+  const nextType: 'entry' | 'exit' = lastEntryIsToday && lastEntry?.type === 'entry' ? 'exit' : 'entry';
+  const pendingExit = lastEntry && !lastEntryIsToday && lastEntry.type === 'entry' ? lastEntry : null;
 
   const getCoords = (): Promise<{ latitude: number; longitude: number } | null> =>
     new Promise(resolve => {
@@ -107,6 +112,15 @@ export default function PontoPage() {
           Olá, {profile?.display_name?.split(' ')[0]}
         </p>
       </div>
+
+      {/* Aviso de saída pendente em dia anterior */}
+      {pendingExit && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800">
+          Você não registrou a <span className="font-semibold">saída</span> do dia{' '}
+          <span className="font-semibold">{format(parseISO(pendingExit.recorded_at), "dd/MM 'às' HH:mm")}</span>.
+          Isso não impede você de bater ponto hoje, mas avise seu supervisor para corrigir esse dia.
+        </div>
+      )}
 
       {/* Relógio + botão */}
       <div className="bg-white border border-border rounded-2xl p-6 flex flex-col items-center gap-5">
