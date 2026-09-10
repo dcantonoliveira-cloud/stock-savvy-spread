@@ -77,7 +77,13 @@ export function ProducaoOrcamentosTab() {
       const { error } = await (supabase.from as any)('production_quotes')
         .insert({ company_id: COMPANY_ID, ...payload, created_by: user.id });
       if (error) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
-      toast.success('Orçamento criado!');
+      toast.success('Orçamento criado! Gerando o PDF...');
+      try {
+        const company = await getCompany();
+        await printProductionQuote(payload, company);
+      } catch {
+        toast.error('Orçamento salvo, mas houve erro ao gerar o PDF. Use o botão de download na lista.');
+      }
     }
     setSaving(false);
     setModalOpen(false);
