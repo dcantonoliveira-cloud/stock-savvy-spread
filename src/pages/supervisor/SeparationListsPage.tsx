@@ -4,11 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Plus, Search, Upload, X, Trash2, ArrowLeft, Loader2, AlertTriangle,
-  CheckCircle2, ListChecks, Send,
+  CheckCircle2, ListChecks, Send, Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum } from '@/lib/format';
 import { convertToItemUnit, getUnitFamily } from '@/lib/units';
+import ItemFormDialog, { StockItemFull } from '@/components/stock-item/ItemFormDialog';
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
 
@@ -115,13 +116,15 @@ function parseSeparationSheet(rows: any[][]): { raw_name: string; raw_unit: stri
     .filter(r => r.raw_name);
 }
 
-// ── Busca inline de item (pra corrigir não-casados ou adicionar manualmente) ──
-function ItemPickerInline({ items, onPick, placeholder = 'Buscar insumo...' }: {
-  items: StockItemLite[]; onPick: (item: StockItemLite) => void; placeholder?: string;
+// ── Busca inline de item (pra corrigir não-casados, editar um já casado, ou adicionar manualmente) ──
+function ItemPickerInline({ items, onPick, onCreateNew, placeholder = 'Buscar insumo...', initialQuery = '' }: {
+  items: StockItemLite[]; onPick: (item: StockItemLite) => void;
+  onCreateNew?: (searchText: string) => void; placeholder?: string; initialQuery?: string;
 }) {
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(initialQuery);
   const [open, setOpen] = useState(false);
   const filtered = q.trim().length < 1 ? [] : items.filter(i => i.name.toLowerCase().includes(q.toLowerCase())).slice(0, 10);
+  const showDropdown = open && (filtered.length > 0 || (!!onCreateNew && q.trim().length > 0));
   return (
     <div className="relative">
       <input
@@ -132,7 +135,7 @@ function ItemPickerInline({ items, onPick, placeholder = 'Buscar insumo...' }: {
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
-      {open && filtered.length > 0 && (
+      {showDropdown && (
         <div className="absolute z-50 mt-1 w-64 bg-white border border-border rounded-xl shadow-lg max-h-52 overflow-y-auto">
           {filtered.map(i => (
             <button key={i.id} type="button" onMouseDown={() => { onPick(i); setQ(''); setOpen(false); }}
@@ -141,6 +144,12 @@ function ItemPickerInline({ items, onPick, placeholder = 'Buscar insumo...' }: {
               <span className="text-muted-foreground">{fmtNum(i.current_stock)} {i.unit}</span>
             </button>
           ))}
+          {onCreateNew && q.trim().length > 0 && (
+            <button type="button" onMouseDown={() => { onCreateNew(q.trim()); setOpen(false); }}
+              className={`w-full flex items-center gap-1.5 px-3 py-2 hover:bg-primary/5 text-left text-xs text-primary ${filtered.length > 0 ? 'border-t border-border/50' : ''}`}>
+              <Plus className="w-3 h-3 shrink-0" /> Criar novo insumo "{q.trim()}"
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -158,6 +167,8 @@ export default function SeparationListsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [items, setItems] = useState<SepItemRow[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [createItemFor, setCreateItemFor] = useState<{ row: SepItemRow | null; initialName: string } | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -302,6 +313,19 @@ export default function SeparationListsPage() {
     setItems(prev => [...prev, data as SepItemRow]);
   };
 
+  /** Insumo criado na hora (não existia no cadastro) — vincula na linha que pediu e some no picker global. */
+  const handleItemCreated = (item: StockItemFull) => {
+    const lite: StockItemLite = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock };
+    setStockItems(prev => [...prev, lite].sort((a, b) => a.name.localeCompare(b.name)));
+    if (createItemFor?.row) {
+      resolveItemMatch(createItemFor.row, lite);
+      setEditingRowId(null);
+    } else {
+      addManualItem(lite);
+    }
+    setCreateItemFor(null);
+  };
+
   const selectedList = lists.find(l => l.id === selectedId) ?? null;
   const unmatchedCount = items.filter(i => !i.item_id).length;
   const noQtyCount = items.filter(i => i.item_id && i.requested_qty == null).length;
@@ -360,7 +384,9 @@ export default function SeparationListsPage() {
         )}
 
         <div>
-          <ItemPickerInline items={stockItems} onPick={addManualItem} placeholder="Adicionar item que faltou na planilha..." />
+          <ItemPickerInline items={stockItems} onPick={addManualItem}
+            onCreateNew={text => setCreateItemFor({ row: null, initialName: text })}
+            placeholder="Adicionar item que faltou na planilha..." />
         </div>
 
         {itemsLoading ? (
@@ -390,22 +416,38 @@ export default function SeparationListsPage() {
                         {row.raw_unit && <p className="text-[11px] text-muted-foreground">un. planilha: {row.raw_unit}</p>}
                       </td>
                       <td className="px-4 py-2.5">
-                        {matched ? (
+                        {matched && editingRowId !== row.id ? (
                           <div>
-                            <span className="flex items-center gap-1 text-emerald-600 font-medium text-xs">
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />{matched.name}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-1 text-emerald-600 font-medium text-xs">
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />{matched.name}
+                              </span>
+                              <button onClick={() => setEditingRowId(row.id)} title="Trocar insumo"
+                                className="text-muted-foreground/50 hover:text-primary transition-colors">
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            </div>
                             <p className={`text-[10px] mt-0.5 ${unitDiverges(matched.unit) ? 'text-amber-600 font-semibold' : 'text-muted-foreground'}`}>
                               un. sistema: {matched.unit}{unitDiverges(matched.unit) ? ' — confira a conversão' : ''}
                             </p>
                           </div>
                         ) : (
                           <div>
-                            <ItemPickerInline items={stockItems} onPick={i => resolveItemMatch(row, i)} />
+                            <ItemPickerInline
+                              items={stockItems}
+                              initialQuery={editingRowId === row.id ? '' : row.raw_name}
+                              onPick={i => { resolveItemMatch(row, i); setEditingRowId(null); }}
+                              onCreateNew={text => setCreateItemFor({ row, initialName: text })}
+                            />
                             {suggestion && (
                               <button onClick={() => resolveItemMatch(row, suggestion)}
                                 className="mt-1 text-[11px] text-primary hover:underline block">
                                 Você quis dizer: {suggestion.name} ({suggestion.unit})?
+                              </button>
+                            )}
+                            {matched && (
+                              <button onClick={() => setEditingRowId(null)} className="mt-1 text-[11px] text-muted-foreground hover:underline block">
+                                Cancelar
                               </button>
                             )}
                           </div>
@@ -458,6 +500,15 @@ export default function SeparationListsPage() {
             </button>
           )}
         </div>
+
+        {createItemFor && (
+          <ItemFormDialog
+            open={!!createItemFor}
+            initialName={createItemFor.initialName}
+            onClose={() => setCreateItemFor(null)}
+            onSaved={handleItemCreated}
+          />
+        )}
       </div>
     );
   }
