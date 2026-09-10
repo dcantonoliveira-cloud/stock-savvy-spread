@@ -1190,6 +1190,32 @@ export default function EventDetailPage() {
           </div>
         )}
       </div>
+
+      {waTrigger && (
+        <WhatsAppConfirmModal trigger={waTrigger} onClose={() => setWaTrigger(null)} />
+      )}
+
+      {lostModal && (
+        <LostReasonModal
+          onConfirm={reason => { applyStatus('lost', reason); setLostModal(false); }}
+          onCancel={() => setLostModal(false)}
+        />
+      )}
+      {cancelModal && (
+        <CancelEventModal
+          totalValue={event?.total_value ?? null}
+          onConfirm={confirmCancel}
+          onCancel={() => setCancelModal(false)}
+        />
+      )}
+
+      {allocTastingOpen && event && (
+        <AllocTastingModal
+          eventId={event.id}
+          eventName={event.event_name ?? ''}
+          onClose={() => setAllocTastingOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1260,32 +1286,6 @@ function EventHistorySection({ eventId }: { eventId: string }) {
             </div>
           ))}
         </div>
-      )}
-
-      {waTrigger && (
-        <WhatsAppConfirmModal trigger={waTrigger} onClose={() => setWaTrigger(null)} />
-      )}
-
-      {lostModal && (
-        <LostReasonModal
-          onConfirm={reason => { applyStatus('lost', reason); setLostModal(false); }}
-          onCancel={() => setLostModal(false)}
-        />
-      )}
-      {cancelModal && (
-        <CancelEventModal
-          totalValue={event?.total_value ?? null}
-          onConfirm={confirmCancel}
-          onCancel={() => setCancelModal(false)}
-        />
-      )}
-
-      {allocTastingOpen && event && (
-        <AllocTastingModal
-          eventId={event.id}
-          eventName={event.event_name ?? ''}
-          onClose={() => setAllocTastingOpen(false)}
-        />
       )}
     </div>
   );
