@@ -389,7 +389,6 @@ function ActionsSection({ eventId, clientWhatsapp, clientName, eventName, onCanc
   onDelete: () => void;
 }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
   const [waTrigger, setWaTrigger]             = useState<WhatsAppTrigger | null>(null);
 
   const openReviewModal = async () => {
@@ -411,17 +410,6 @@ function ActionsSection({ eventId, clientWhatsapp, clientName, eventName, onCanc
           onClose={() => setShowDeleteModal(false)}
         />
       )}
-      {showCancelModal && (
-        <ConfirmModal
-          title="Cancelar evento"
-          description="O status do evento será alterado para CANCELADO. O evento continuará na base e pode ser revertido depois."
-          confirmLabel="Sim, cancelar evento"
-          confirmCls="bg-amber-600 hover:bg-amber-700 text-white"
-          onConfirm={() => { setShowCancelModal(false); onCancel(); }}
-          onClose={() => setShowCancelModal(false)}
-        />
-      )}
-
       {/* Avaliação */}
       <div className="bg-white border border-border rounded-2xl p-5 flex items-center justify-between gap-4">
         <div>
@@ -450,7 +438,7 @@ function ActionsSection({ eventId, clientWhatsapp, clientName, eventName, onCanc
             Mantém o evento na base com status <strong>CANCELADO</strong>. Pode ser revertido.
           </p>
         </div>
-        <Button onClick={() => setShowCancelModal(true)} variant="outline" className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-50">
+        <Button onClick={onCancel} variant="outline" className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-50">
           <XCircle className="w-3.5 h-3.5 mr-1.5" />
           Cancelar evento
         </Button>
