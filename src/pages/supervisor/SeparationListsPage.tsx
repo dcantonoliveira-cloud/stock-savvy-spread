@@ -326,7 +326,7 @@ export default function SeparationListsPage() {
   // ─── Detail / review screen ────────────────────────────────────────────────
   if (selectedId) {
     return (
-      <div className="p-6 space-y-5 max-w-4xl mx-auto">
+      <div className="p-6 space-y-5">
         <button onClick={() => setSelectedId(null)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="w-4 h-4" /> Voltar
         </button>
