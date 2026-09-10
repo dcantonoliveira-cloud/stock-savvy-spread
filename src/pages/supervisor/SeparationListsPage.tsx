@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum } from '@/lib/format';
+import { convertToItemUnit, getUnitFamily } from '@/lib/units';
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
 
@@ -65,6 +66,19 @@ function suggestItem(raw: string, items: StockItemLite[]): StockItemLite | null 
   const firstWord = norm.split(' ')[0];
   if (firstWord.length < 3) return null;
   return items.find(i => normalize(i.name).startsWith(firstWord)) ?? null;
+}
+
+/** Só converte quando as duas unidades são da mesma família (peso ou volume) — pra unidade de
+ * embalagem (PCT, GARR, FCO...) não existe conversão automática confiável, então não inventa número. */
+function tryConvertQty(rawUnit: string | null, rawQty: number | null, itemUnit: string): number | null {
+  if (!rawUnit || rawQty == null) return null;
+  const from = rawUnit.trim().toLowerCase();
+  const to = itemUnit.trim().toLowerCase();
+  if (from === to) return null;
+  const famFrom = getUnitFamily(from);
+  const famTo = getUnitFamily(to);
+  if (famFrom === 'other' || famTo === 'other' || famFrom !== famTo) return null;
+  return convertToItemUnit(rawQty, from, to);
 }
 
 function readSheetRows(file: File): Promise<any[][]> {
@@ -266,6 +280,19 @@ export default function SeparationListsPage() {
     await (supabase.from as any)('separation_list_items').delete().eq('id', id);
   };
 
+  /** Resolve um item não-casado e memoriza o texto da planilha como apelido do insumo —
+   * da próxima vez que essa mesma planilha (ou outra parecida) for subida, casa sozinho. */
+  const resolveItemMatch = async (row: SepItemRow, item: StockItemLite) => {
+    updateItem(row.id, { item_id: item.id });
+    const rawNorm = normalize(row.raw_name);
+    if (!row.raw_name.trim() || rawNorm === normalize(item.name)) return;
+    const alreadyKnown = aliases.some(a => a.item_id === item.id && normalize(a.alias) === rawNorm);
+    if (alreadyKnown) return;
+    const { error } = await (supabase.from as any)('stock_item_aliases')
+      .upsert({ item_id: item.id, alias: row.raw_name.trim() }, { onConflict: 'item_id,alias' });
+    if (!error) setAliases(prev => [...prev, { item_id: item.id, alias: row.raw_name.trim() }]);
+  };
+
   const addManualItem = async (item: StockItemLite) => {
     if (!selectedId) return;
     const { data, error } = await (supabase.from as any)('separation_list_items')
@@ -354,24 +381,31 @@ export default function SeparationListsPage() {
                 {items.map(row => {
                   const matched = stockItems.find(i => i.id === row.item_id);
                   const suggestion = !matched ? suggestItem(row.raw_name, stockItems) : null;
+                  const unitDiverges = (u: string) => row.raw_unit && normalize(row.raw_unit) !== normalize(u);
+                  const converted = matched ? tryConvertQty(row.raw_unit, row.requested_qty, matched.unit) : null;
                   return (
                     <tr key={row.id} className="hover:bg-muted/10">
                       <td className="px-4 py-2.5">
                         <p className="text-foreground">{row.raw_name}</p>
-                        {row.raw_unit && <p className="text-[11px] text-muted-foreground">{row.raw_unit}</p>}
+                        {row.raw_unit && <p className="text-[11px] text-muted-foreground">un. planilha: {row.raw_unit}</p>}
                       </td>
                       <td className="px-4 py-2.5">
                         {matched ? (
-                          <span className="flex items-center gap-1 text-emerald-600 font-medium text-xs">
-                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />{matched.name}
-                          </span>
+                          <div>
+                            <span className="flex items-center gap-1 text-emerald-600 font-medium text-xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />{matched.name}
+                            </span>
+                            <p className={`text-[10px] mt-0.5 ${unitDiverges(matched.unit) ? 'text-amber-600 font-semibold' : 'text-muted-foreground'}`}>
+                              un. sistema: {matched.unit}{unitDiverges(matched.unit) ? ' — confira a conversão' : ''}
+                            </p>
+                          </div>
                         ) : (
                           <div>
-                            <ItemPickerInline items={stockItems} onPick={i => updateItem(row.id, { item_id: i.id })} />
+                            <ItemPickerInline items={stockItems} onPick={i => resolveItemMatch(row, i)} />
                             {suggestion && (
-                              <button onClick={() => updateItem(row.id, { item_id: suggestion.id })}
-                                className="mt-1 text-[11px] text-primary hover:underline">
-                                Você quis dizer: {suggestion.name}?
+                              <button onClick={() => resolveItemMatch(row, suggestion)}
+                                className="mt-1 text-[11px] text-primary hover:underline block">
+                                Você quis dizer: {suggestion.name} ({suggestion.unit})?
                               </button>
                             )}
                           </div>
@@ -384,6 +418,12 @@ export default function SeparationListsPage() {
                           placeholder="definir"
                           onChange={e => updateItem(row.id, { requested_qty: e.target.value === '' ? null : parseFloat(e.target.value) })}
                         />
+                        {converted != null && matched && (
+                          <button type="button" onClick={() => updateItem(row.id, { requested_qty: Math.round(converted * 100) / 100 })}
+                            className="block mt-1 text-[10px] text-primary hover:underline">
+                            ≈ {fmtNum(converted)} {matched.unit} — usar
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs font-semibold">
                         {row.separated_qty != null
