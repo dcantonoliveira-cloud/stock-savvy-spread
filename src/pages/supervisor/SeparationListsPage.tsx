@@ -178,7 +178,7 @@ function SortableTh({ children, col, sortCol, sortAsc, onSort, className = '' }:
 }
 
 export default function SeparationListsPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [lists, setLists] = useState<SepList[]>([]);
   const [listCounts, setListCounts] = useState<Record<string, { total: number; done: number }>>({});
   const [loading, setLoading] = useState(true);
@@ -192,6 +192,7 @@ export default function SeparationListsPage() {
   const [createItemFor, setCreateItemFor] = useState<{ row: SepItemRow | null; initialName: string } | null>(null);
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
+  const [directFinalizing, setDirectFinalizing] = useState(false);
   const handleSort = (col: string) => {
     if (sortCol === col) setSortAsc(a => !a);
     else { setSortCol(col); setSortAsc(true); }
@@ -365,6 +366,39 @@ export default function SeparationListsPage() {
     toast.success('Lista enviada para separação! Já aparece no app do funcionário.');
   };
 
+  /** Pula o app do funcionário: dá baixa no estoque direto daqui, usando a quantidade
+   * pedida (já que ninguém vai confirmar a quantidade real separada). */
+  const directFinalize = async () => {
+    if (!selectedId || !user) return;
+    if (unmatchedCount > 0) { toast.error(`Resolva os ${unmatchedCount} item(ns) não reconhecido(s) antes de descontar.`); return; }
+    const toRegister = items.filter(i => i.item_id && i.requested_qty != null && i.requested_qty > 0);
+    if (toRegister.length === 0) { toast.error('Nenhum item com quantidade pedida definida.'); return; }
+    if (!confirm(`Isso vai dar baixa no estoque de ${toRegister.length} item(ns) agora, usando a quantidade pedida (sem passar pelo app do funcionário). Confirma?`)) return;
+
+    setDirectFinalizing(true);
+    let hasError = false;
+    const today = new Date().toISOString().split('T')[0];
+    for (const line of toRegister) {
+      const { error } = await (supabase.from as any)('stock_outputs').insert({
+        item_id: line.item_id, quantity: line.requested_qty,
+        notes: `Separação: ${selectedList?.name ?? ''}`,
+        employee_name: profile?.display_name || user.email || 'Supervisor',
+        date: today, registered_by: user.id,
+      });
+      if (error) { console.error(error); hasError = true; continue; }
+      await (supabase.from as any)('separation_list_items')
+        .update({ separated_qty: line.requested_qty, separated_at: new Date().toISOString(), separated_by: user.id })
+        .eq('id', line.id);
+    }
+    await (supabase.from as any)('separation_lists').update({ status: 'done', finalized_at: new Date().toISOString() }).eq('id', selectedId);
+
+    setDirectFinalizing(false);
+    if (hasError) toast.error('Alguns itens tiveram erro ao dar baixa. Verifique o console.');
+    else toast.success('Baixa feita direto no estoque!');
+    setLists(prev => prev.map(l => l.id === selectedId ? { ...l, status: 'done' } : l));
+    openDetail(selectedId);
+  };
+
   const deleteList = async (id: string) => {
     if (!confirm('Excluir esta lista de separação?')) return;
     await (supabase.from as any)('separation_lists').delete().eq('id', id);
@@ -527,16 +561,25 @@ export default function SeparationListsPage() {
           );
         })()}
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <button onClick={() => deleteList(selectedId)}
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors">
             <Trash2 className="w-3.5 h-3.5" /> Excluir lista
           </button>
-          {selectedList?.status === 'draft' && (
-            <button onClick={sendToSeparation}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
-              <Send className="w-4 h-4" /> Enviar para separação
-            </button>
+          {selectedList?.status !== 'done' && (
+            <div className="flex items-center gap-2">
+              <button onClick={directFinalize} disabled={directFinalizing}
+                title="Dá baixa no estoque agora, usando a quantidade pedida — sem passar pelo app do funcionário"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted/60 transition-colors disabled:opacity-60">
+                <CheckCircle2 className="w-4 h-4" /> {directFinalizing ? 'Descontando...' : 'Descontar direto (sem separação)'}
+              </button>
+              {selectedList?.status === 'draft' && (
+                <button onClick={sendToSeparation}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
+                  <Send className="w-4 h-4" /> Enviar para separação
+                </button>
+              )}
+            </div>
           )}
         </div>
 
