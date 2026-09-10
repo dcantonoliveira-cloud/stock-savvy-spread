@@ -71,12 +71,12 @@ export function ProducaoOrcamentosTab() {
     };
     if (editingId) {
       const { error } = await (supabase.from as any)('production_quotes').update(payload).eq('id', editingId);
-      if (error) { toast.error('Erro ao salvar orçamento'); setSaving(false); return; }
+      if (error) { toast.error('Erro ao salvar orçamento: ' + error.message); setSaving(false); return; }
       toast.success('Orçamento atualizado!');
     } else {
       const { error } = await (supabase.from as any)('production_quotes')
         .insert({ company_id: COMPANY_ID, ...payload, created_by: user.id });
-      if (error) { toast.error('Erro ao criar orçamento'); setSaving(false); return; }
+      if (error) { toast.error('Erro ao criar orçamento: ' + error.message); setSaving(false); return; }
       toast.success('Orçamento criado! Gerando o PDF...');
       try {
         const company = await getCompany();
