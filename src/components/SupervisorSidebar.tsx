@@ -55,6 +55,7 @@ const navStructure: NavGroup[] = [
     { path: '/entries',        label: 'Entradas',         icon: ArrowUpCircle },
     { path: '/outputs',        label: 'Saídas',           icon: ArrowDownCircle },
     { path: '/batch-movement', label: 'Em Lote',          icon: ArrowRightLeft },
+    { path: '/separacao',      label: 'Separação',        icon: ListChecks },
     { path: '/transfers',      label: 'Transferências',   icon: ArrowRightLeft },
     { path: '/fornecedores',        label: 'Fornecedores',      icon: Truck },
     { path: '/compras/precos',      label: 'Comparar Preços',  icon: TrendingUp },

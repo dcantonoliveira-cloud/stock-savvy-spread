@@ -27,6 +27,7 @@ const ROUTE_PERMS: [string, keyof Permissions][] = [
   ['/entries',        'access_estoque'],
   ['/outputs',        'access_estoque'],
   ['/batch-movement', 'access_estoque'],
+  ['/separacao',      'access_estoque'],
   ['/transfers',      'access_estoque'],
   ['/fornecedores',   'access_estoque'],
   ['/categories',     'access_estoque'],

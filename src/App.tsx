@@ -24,6 +24,7 @@ const StockItemsPage           = lazy(() => import("./pages/supervisor/StockItem
 const EntriesPage              = lazy(() => import("./pages/supervisor/EntriesPage"));
 const SupervisorOutputsPage    = lazy(() => import("./pages/supervisor/OutputsPage"));
 const BatchMovementPage        = lazy(() => import("./pages/supervisor/BatchMovementPage"));
+const SeparationListsPage      = lazy(() => import("./pages/supervisor/SeparationListsPage"));
 const SupervisorSheetsPage     = lazy(() => import("./pages/supervisor/SheetsPage"));
 const SheetDetailPage          = lazy(() => import("./pages/supervisor/SheetDetailPage"));
 const SupervisorComparisonPage = lazy(() => import("./pages/supervisor/ComparisonPage"));
@@ -90,6 +91,7 @@ const EmployeeDashboard       = lazy(() => import("./pages/employee/EmployeeDash
 const EmployeeInventoryPage   = lazy(() => import("./pages/employee/EmployeeInventoryPage"));
 const EmployeeEventsPage      = lazy(() => import("./pages/employee/EmployeeEventsPage"));
 const EmployeeMateriaisPage   = lazy(() => import("./pages/employee/EmployeeMateriaisPage"));
+const EmployeeSeparationPage  = lazy(() => import("./pages/employee/EmployeeSeparationPage"));
 const MyPayslipsPage          = lazy(() => import("./pages/employee/MyPayslipsPage"));
 const PayslipSignPage         = lazy(() => import("./pages/employee/PayslipSignPage"));
 const ProducaoPage            = lazy(() => import("./pages/employee/ProducaoPage"));
@@ -324,6 +326,7 @@ function AppRoutes() {
             <Route path="/entries" element={<EntriesPage />} />
             <Route path="/outputs" element={<SupervisorOutputsPage />} />
             <Route path="/batch-movement" element={<BatchMovementPage />} />
+            <Route path="/separacao" element={<SeparationListsPage />} />
             <Route path="/sheets" element={<SupervisorSheetsPage />} />
             <Route path="/sheets/:id" element={<SheetDetailPage />} />
             <Route path="/event-menus" element={<EventMenusPage />} />
@@ -378,6 +381,7 @@ function AppRoutes() {
           <Route path="/inventario" element={permissions.access_inventory || permissions.access_stock ? <EmployeeInventoryPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/eventos" element={permissions.access_stock ? <EmployeeEventsPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/materiais" element={permissions.access_materials ? <EmployeeMateriaisPage /> : <Navigate to="/" replace />} />
+          <Route path="/separacao" element={permissions.access_stock ? <EmployeeSeparationPage /> : <Navigate to="/materiais" replace />} />
           <Route path="/producao" element={<ProducaoPage />} />
           <Route path="/meus-holerites" element={<MyPayslipsPage />} />
           <Route path="/meus-holerites/:id" element={<PayslipSignPage />} />
