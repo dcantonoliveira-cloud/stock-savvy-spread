@@ -80,9 +80,9 @@ function buildHtml(quote: ProductionQuote, company: QuoteCompany | null): string
       <h1 style="font-family:'Cormorant Garamond',serif;font-weight:600;font-size:38px;line-height:1.15;color:#0E2A45;margin-top:8px;hyphens:none;">${quote.name || '—'}</h1>
       <div style="${FONT}font-size:11px;color:#6B6B6B;margin-top:8px;">${fmtDate(quote.quote_date)}</div>
     </div>
-    <div style="text-align:right;flex-shrink:0;background:#F8F6F1;border:1px solid #E7E3DB;border-radius:10px;padding:14px 20px;">
+    <div style="text-align:right;flex-shrink:0;background:#F8F6F1;border:1px solid #E7E3DB;border-radius:10px;padding:11px 18px;">
       <div style="${FONT}font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#A29D92;font-weight:600;">Valor</div>
-      <div style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:#0E2A45;margin-top:4px;white-space:nowrap;">${fmtBRL(quote.value)}</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:600;color:#0E2A45;margin-top:4px;white-space:nowrap;">${fmtBRL(quote.value)}</div>
     </div>
   </div>
 
