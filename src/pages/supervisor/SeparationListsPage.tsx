@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,8 +7,8 @@ import {
   CheckCircle2, ListChecks, Send, Pencil, ChevronUp, ChevronsUpDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { fmtNum } from '@/lib/format';
-import { convertToItemUnit, getUnitFamily } from '@/lib/units';
+import { fmtNum, fmtCur } from '@/lib/format';
+import { convertToItemUnit, getUnitFamily, effectiveUnitCost } from '@/lib/units';
 import ItemFormDialog, { StockItemFull } from '@/components/stock-item/ItemFormDialog';
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
@@ -36,7 +36,7 @@ interface SepItemRow {
   sort_order: number;
 }
 
-interface StockItemLite { id: string; name: string; unit: string; current_stock: number }
+interface StockItemLite { id: string; name: string; unit: string; current_stock: number; unit_cost: number; purchase_qty: number | null }
 interface EventOption { id: string; event_name: string; event_date: string }
 
 const STATUS_CFG: Record<SepStatus, { label: string; cls: string }> = {
@@ -180,7 +180,7 @@ function SortableTh({ children, col, sortCol, sortAsc, onSort, className = '' }:
 export default function SeparationListsPage() {
   const { user, profile } = useAuth();
   const [lists, setLists] = useState<SepList[]>([]);
-  const [listCounts, setListCounts] = useState<Record<string, { total: number; done: number }>>({});
+  const [allListItemRows, setAllListItemRows] = useState<{ list_id: string; item_id: string | null; requested_qty: number | null; separated_qty: number | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockItems, setStockItems] = useState<StockItemLite[]>([]);
   const [aliases, setAliases] = useState<{ item_id: string; alias: string }[]>([]);
@@ -218,22 +218,40 @@ export default function SeparationListsPage() {
     setLists(listRows);
     if (listRows.length > 0) {
       const { data: rows } = await (supabase.from as any)('separation_list_items')
-        .select('list_id, separated_qty').in('list_id', listRows.map(l => l.id));
-      const counts: Record<string, { total: number; done: number }> = {};
-      for (const r of (rows ?? []) as any[]) {
-        counts[r.list_id] ??= { total: 0, done: 0 };
-        counts[r.list_id].total++;
-        if (r.separated_qty != null) counts[r.list_id].done++;
-      }
-      setListCounts(counts);
+        .select('list_id, item_id, requested_qty, separated_qty').in('list_id', listRows.map(l => l.id));
+      setAllListItemRows(rows ?? []);
+    } else {
+      setAllListItemRows([]);
     }
     setLoading(false);
   };
 
+  const listCounts = useMemo(() => {
+    const counts: Record<string, { total: number; done: number }> = {};
+    for (const r of allListItemRows) {
+      counts[r.list_id] ??= { total: 0, done: 0 };
+      counts[r.list_id].total++;
+      if (r.separated_qty != null) counts[r.list_id].done++;
+    }
+    return counts;
+  }, [allListItemRows]);
+
+  const listValues = useMemo(() => {
+    const values: Record<string, number> = {};
+    for (const r of allListItemRows) {
+      if (!r.item_id || r.requested_qty == null) continue;
+      const item = stockItems.find(i => i.id === r.item_id);
+      if (!item) continue;
+      const eff = effectiveUnitCost(item.unit_cost || 0, item.purchase_qty);
+      values[r.list_id] = (values[r.list_id] ?? 0) + eff * r.requested_qty;
+    }
+    return values;
+  }, [allListItemRows, stockItems]);
+
   useEffect(() => {
     loadLists();
     Promise.all([
-      supabase.from('stock_items').select('id, name, unit, current_stock').neq('category', '_sistema_').order('name').range(0, 9999),
+      supabase.from('stock_items').select('id, name, unit, current_stock, unit_cost, purchase_qty').neq('category', '_sistema_').order('name').range(0, 9999),
       (supabase.from('stock_item_aliases') as any).select('item_id, alias'),
     ]).then(([itemsRes, aliasesRes]) => {
       if (itemsRes.data) setStockItems(itemsRes.data as StockItemLite[]);
@@ -343,7 +361,7 @@ export default function SeparationListsPage() {
 
   /** Insumo criado na hora (não existia no cadastro) — vincula na linha que pediu e some no picker global. */
   const handleItemCreated = (item: StockItemFull) => {
-    const lite: StockItemLite = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock };
+    const lite: StockItemLite = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, unit_cost: item.unit_cost, purchase_qty: item.purchase_qty };
     setStockItems(prev => [...prev, lite].sort((a, b) => a.name.localeCompare(b.name)));
     if (createItemFor?.row) {
       resolveItemMatch(createItemFor.row, lite);
@@ -621,6 +639,7 @@ export default function SeparationListsPage() {
                 <th className="text-left px-5 py-3">Lista</th>
                 <th className="text-left px-4 py-3">Evento</th>
                 <th className="text-center px-4 py-3">Progresso</th>
+                <th className="text-right px-4 py-3">Valor</th>
                 <th className="text-center px-4 py-3">Status</th>
                 <th className="text-left px-4 py-3">Criada em</th>
               </tr>
@@ -628,6 +647,7 @@ export default function SeparationListsPage() {
             <tbody className="divide-y divide-border/50">
               {lists.map(l => {
                 const c = listCounts[l.id];
+                const value = listValues[l.id];
                 return (
                   <tr key={l.id} onClick={() => openDetail(l.id)} className="hover:bg-muted/20 transition-colors cursor-pointer">
                     <td className="px-5 py-3 font-medium text-foreground flex items-center gap-2">
@@ -636,6 +656,9 @@ export default function SeparationListsPage() {
                     <td className="px-4 py-3 text-muted-foreground text-xs">{l.event_name ?? '—'}</td>
                     <td className="px-4 py-3 text-center text-xs text-muted-foreground">
                       {c ? `${c.done}/${c.total}` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs font-semibold text-foreground">
+                      {value ? fmtCur(value) : '—'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CFG[l.status].cls}`}>{STATUS_CFG[l.status].label}</span>
