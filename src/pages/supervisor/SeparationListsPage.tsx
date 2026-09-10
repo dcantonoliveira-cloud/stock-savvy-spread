@@ -191,10 +191,16 @@ export default function SeparationListsPage() {
   useEffect(() => {
     if (eventSearch.length < 2) { setEventOptions([]); return; }
     const t = setTimeout(async () => {
+      // Só eventos confirmados e com data a partir do 1º dia do mês anterior ao de hoje
+      // (evita listar eventos já muito antigos no autocomplete)
+      const now = new Date();
+      const threshold = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
       const { data } = await (supabase.from as any)('events')
         .select('id, event_name, event_date')
         .ilike('event_name', `%${eventSearch}%`)
         .eq('company_id', COMPANY_ID)
+        .eq('status', 'confirmed')
+        .gt('event_date', threshold)
         .order('event_date').limit(8);
       setEventOptions(data ?? []);
       setShowEventDrop(true);
