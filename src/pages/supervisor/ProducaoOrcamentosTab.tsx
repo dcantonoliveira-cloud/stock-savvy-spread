@@ -4,10 +4,22 @@ import { useAuth } from '@/hooks/useAuth';
 import { getCompany } from '@/lib/companyCache';
 import { printProductionQuote } from '@/utils/printProductionQuote';
 import RichTextEditor from '@/components/RichTextEditor';
-import { Plus, Search, FileDown, Pencil, Trash2, X, Loader2 } from 'lucide-react';
+import { Plus, Search, FileDown, Pencil, Trash2, X, Loader2, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import ProductionOrderFormModal, { ProductionOrderFormValues } from './ProductionOrderFormModal';
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
+
+/** Converte o HTML do editor rico numa versão em texto simples, pra pré-preencher a
+ * descrição (texto puro) do pedido de produção — <br>/<p>/<li> viram quebra de linha. */
+function stripHtmlToText(html: string): string {
+  const div = document.createElement('div');
+  div.innerHTML = html
+    .replace(/<\/(p|div|li|h1|h2|h3)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n');
+  const text = (div.textContent || div.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+  return text;
+}
 
 interface Quote {
   id: string;
@@ -34,6 +46,8 @@ export function ProducaoOrcamentosTab() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(BLANK);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [orderInitialValues, setOrderInitialValues] = useState<Partial<ProductionOrderFormValues> | undefined>(undefined);
 
   const load = async () => {
     setLoading(true);
@@ -100,6 +114,16 @@ export function ProducaoOrcamentosTab() {
     toast.success('Orçamento excluído');
   };
 
+  const transformToOrder = (q: Quote) => {
+    setOrderInitialValues({
+      title: q.name,
+      description: q.content ? stripHtmlToText(q.content) : '',
+      delivery_date: q.quote_date,
+      extra_value: q.value != null ? String(q.value) : '',
+    });
+    setOrderModalOpen(true);
+  };
+
   const handleGeneratePdf = async (q: Quote) => {
     setGeneratingId(q.id);
     try {
@@ -150,6 +174,11 @@ export function ProducaoOrcamentosTab() {
                   <td className="px-4 py-3 text-right font-semibold text-emerald-600">{fmtBRL(q.value)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
+                      <button onClick={() => transformToOrder(q)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                        title="Transformar em pedido">
+                        <ClipboardCheck className="w-3.5 h-3.5" />
+                      </button>
                       <button onClick={() => handleGeneratePdf(q)} disabled={generatingId === q.id}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
                         title="Gerar PDF">
@@ -212,6 +241,13 @@ export function ProducaoOrcamentosTab() {
           </div>
         </div>
       )}
+
+      <ProductionOrderFormModal
+        open={orderModalOpen}
+        initialValues={orderInitialValues}
+        onClose={() => setOrderModalOpen(false)}
+        onSaved={() => toast.success('Agora é só acompanhar esse pedido na aba Pendentes.')}
+      />
     </div>
   );
 }
