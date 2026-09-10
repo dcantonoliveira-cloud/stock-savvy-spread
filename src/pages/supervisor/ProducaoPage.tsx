@@ -2,14 +2,15 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil, List, ChevronLeft, ChevronRight, Package } from 'lucide-react';
+import { Plus, Search, ChefHat, CalendarDays, DollarSign, Loader2, X, CheckCircle2, Trash2, TrendingUp, CreditCard, Banknote, Smartphone, UtensilsCrossed, Pencil, List, ChevronLeft, ChevronRight, Package, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProducaoMateriaisTab } from './ProducaoMateriaisTab';
+import { ProducaoOrcamentosTab } from './ProducaoOrcamentosTab';
 
 const COMPANY_ID = 'c56c2ccd-2c35-4ebb-b868-e153727e5d89';
 
 type Status = 'pending' | 'in_progress' | 'done';
-type FilterType = Status | 'financeiro' | 'materiais';
+type FilterType = Status | 'financeiro' | 'materiais' | 'orcamentos';
 
 interface Order {
   id: string;
@@ -536,29 +537,31 @@ export default function SupervisorProducaoPage() {
             {pending === 0 && inProgress === 0 && 'Tudo em dia'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-            <button onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              title="Vista em lista">
-              <List className="w-4 h-4" />
-            </button>
-            <button onClick={() => setViewMode('calendar')}
-              className={`p-1.5 rounded-lg transition-colors ${viewMode === 'calendar' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              title="Vista em calendário">
-              <CalendarDays className="w-4 h-4" />
+        {filter !== 'financeiro' && filter !== 'materiais' && filter !== 'orcamentos' && (
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
+              <button onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                title="Vista em lista">
+                <List className="w-4 h-4" />
+              </button>
+              <button onClick={() => setViewMode('calendar')}
+                className={`p-1.5 rounded-lg transition-colors ${viewMode === 'calendar' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                title="Vista em calendário">
+                <CalendarDays className="w-4 h-4" />
+              </button>
+            </div>
+            <button onClick={() => { setForm(BLANK); setEventSearch(''); setEditingId(null); setModalOpen(true); }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
+              <Plus className="w-4 h-4" /> Novo pedido
             </button>
           </div>
-          <button onClick={() => { setForm(BLANK); setEventSearch(''); setEditingId(null); setModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
-            <Plus className="w-4 h-4" /> Novo pedido
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
-        {filter !== 'financeiro' && (
+        {filter !== 'financeiro' && filter !== 'materiais' && filter !== 'orcamentos' && (
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <input className="w-full pl-8 pr-3 py-2 rounded-xl border border-border text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -566,13 +569,14 @@ export default function SupervisorProducaoPage() {
           </div>
         )}
         <div className="flex gap-1 bg-muted/40 rounded-xl p-1">
-          {(['pending', 'in_progress', 'done', ...(canFinanceiro ? ['financeiro' as const] : []), 'materiais' as const] as const).map(f => (
+          {(['pending', 'in_progress', 'done', ...(canFinanceiro ? ['financeiro' as const] : []), 'materiais' as const, 'orcamentos' as const] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                 filter === f ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}>
               {f === 'financeiro' ? <><TrendingUp className="w-3 h-3" />Financeiro</>
                : f === 'materiais' ? <><Package className="w-3 h-3" />Materiais</>
+               : f === 'orcamentos' ? <><FileText className="w-3 h-3" />Orçamentos</>
                : STATUS_CFG[f as Status].label}
             </button>
           ))}
@@ -591,8 +595,11 @@ export default function SupervisorProducaoPage() {
         <ProducaoMateriaisTab orders={orders.map(o => ({ id: o.id, title: o.title }))} />
       )}
 
+      {/* Orçamentos view */}
+      {filter === 'orcamentos' && <ProducaoOrcamentosTab />}
+
       {/* Calendar view */}
-      {filter !== 'financeiro' && filter !== 'materiais' && viewMode === 'calendar' && (
+      {filter !== 'financeiro' && filter !== 'materiais' && filter !== 'orcamentos' && viewMode === 'calendar' && (
         loading
           ? <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
           : <CalendarView
@@ -605,7 +612,7 @@ export default function SupervisorProducaoPage() {
       )}
 
       {/* Orders table */}
-      {filter !== 'financeiro' && filter !== 'materiais' && viewMode === 'list' && (
+      {filter !== 'financeiro' && filter !== 'materiais' && filter !== 'orcamentos' && viewMode === 'list' && (
         loading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
         ) : filtered.length === 0 ? (

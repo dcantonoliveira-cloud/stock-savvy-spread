@@ -9,7 +9,7 @@ import { ArrowUpCircle, ArrowDownCircle, Search, Trash2, Loader2, CheckCircle2, 
 import { toast } from 'sonner';
 import { fmtNum } from '@/lib/format';
 
-type Item = { id: string; name: string; category: string; unit: string; current_stock: number };
+type Item = { id: string; name: string; category: string; unit: string; current_stock: number; subcategory_id: string | null };
 type LineType = 'entrada' | 'saida';
 type BatchLine = { item: Item; qty: string; type: LineType };
 type UnmatchedRow = { name: string; entrada: number; saida: number };
@@ -31,17 +31,28 @@ export default function BatchMovementPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [unmatched, setUnmatched] = useState<UnmatchedRow[]>([]);
+  const [subcategories, setSubcategories] = useState<{ id: string; name: string }[]>([]);
+  const [tagsByItem, setTagsByItem] = useState<Record<string, string[]>>({});
   const searchRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadItems = () =>
     Promise.all([
-      supabase.from('stock_items').select('id, name, category, unit, current_stock')
+      supabase.from('stock_items').select('id, name, category, unit, current_stock, subcategory_id')
         .neq('category', '_sistema_').order('name').range(0, 9999),
       (supabase.from('stock_item_aliases') as any).select('item_id, alias'),
-    ]).then(([itemsRes, aliasesRes]) => {
+      supabase.from('subcategories').select('id, name'),
+      (supabase.from('stock_item_tags') as any).select('item_id, tags:tag_id(name)'),
+    ]).then(([itemsRes, aliasesRes, subcatsRes, tagsRes]) => {
       if (itemsRes.data) setItems(itemsRes.data as Item[]);
       if (aliasesRes.data) setAliases(aliasesRes.data as { item_id: string; alias: string }[]);
+      if (subcatsRes.data) setSubcategories(subcatsRes.data as { id: string; name: string }[]);
+      const tMap: Record<string, string[]> = {};
+      for (const l of (tagsRes.data ?? []) as any[]) {
+        if (!l.tags?.name) continue;
+        (tMap[l.item_id] ??= []).push(l.tags.name);
+      }
+      setTagsByItem(tMap);
     });
 
   useEffect(() => { loadItems(); }, []);
@@ -81,9 +92,12 @@ export default function BatchMovementPage() {
 
   // ── Planilha: baixar modelo com nomes já preenchidos ──
   const handleDownloadTemplate = () => {
+    const subcatName = (id: string | null) => subcategories.find(s => s.id === id)?.name ?? '';
     const rows = [...items].sort((a, b) => a.name.localeCompare(b.name)).map(i => ({
       'Nome': i.name,
       'Categoria': i.category,
+      'Subcategoria': subcatName(i.subcategory_id),
+      'Tags': (tagsByItem[i.id] ?? []).join(', '),
       'Unidade': i.unit,
       'Estoque Atual': i.current_stock,
       'Entrada': '',
