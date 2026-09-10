@@ -360,7 +360,7 @@ export default function StockItemDetailPage() {
   const pagedMovements = allMovements.slice(movPage * PAGE_SIZE, (movPage + 1) * PAGE_SIZE);
 
   // Price history — only entries with actual purchase price
-  const priceHistory = [...pricedEntries].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const priceHistory = [...pricedEntries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Lowest price supplier
   const lowestPrice = suppliers.length > 1
@@ -555,6 +555,7 @@ export default function StockItemDetailPage() {
                 <th className="text-right px-3 py-2">QUANTIDADE</th>
                 <th className="text-right px-3 py-2">QTD. ATUAL</th>
                 <th className="text-right px-3 py-2">CUSTO UNIT.</th>
+                <th className="text-right px-3 py-2">CUSTO TOTAL</th>
                 <th className="text-left px-3 py-2">REFERÊNCIA</th>
                 <th className="text-left px-3 py-2">OBSERVAÇÕES</th>
                 <th className="w-10" />
@@ -580,6 +581,11 @@ export default function StockItemDetailPage() {
                   <td className="px-3 py-2.5 text-right text-muted-foreground text-xs">
                     {m.cost != null ? fmtCur(m.cost) : '—'}
                   </td>
+                  <td className="px-3 py-2.5 text-right text-xs" title={m.cost == null ? 'Estimado pelo custo médio (essa movimentação não tem custo unitário próprio)' : undefined}>
+                    {m.cost != null
+                      ? <span className="font-semibold text-foreground">{fmtCur(m.cost * m.qty)}</span>
+                      : <span className="text-muted-foreground">~{fmtCur(avgCost * m.qty)}</span>}
+                  </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.who || m.ref || '—'}</td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground">{m.notes || '—'}</td>
                   <td className="px-2 py-2.5 text-center">
@@ -594,7 +600,7 @@ export default function StockItemDetailPage() {
                 </tr>
               ))}
               {pagedMovements.length === 0 && (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted-foreground text-sm">Nenhuma movimentação registrada</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted-foreground text-sm">Nenhuma movimentação registrada</td></tr>
               )}
             </tbody>
           </table>
