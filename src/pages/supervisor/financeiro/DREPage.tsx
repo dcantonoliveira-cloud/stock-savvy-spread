@@ -46,13 +46,13 @@ export default function DREPage() {
       const first = `${year}-01-01`;
       const last  = `${year}-12-31`;
 
-      const [eventsRes, paymentsRes, cashRes, billsRes] = await Promise.all([
+      const [eventsRes, paymentsRes, cashRes, billsRes, cancelledFeesRes] = await Promise.all([
         // competência: valor total do evento no mês da festa
         supabase.from('events')
           .select('event_date, total_value')
           .gte('event_date', first).lte('event_date', last)
           .in('status', ['confirmed', 'completed']),
-        // caixa: pagamentos confirmados pelo mês em que entraram
+        // caixa: pagamentos confirmados pelo mês em que entraram (já inclui a multa lançada como event_payment)
         supabase.from('event_payments' as any)
           .select('payment_date, value')
           .gte('payment_date', first).lte('payment_date', last)
@@ -66,6 +66,11 @@ export default function DREPage() {
           .select('paid_date, amount, category')
           .eq('status', 'paid')
           .gte('paid_date', first).lte('paid_date', last),
+        // competência: multa de cancelamento no mês do CANCELAMENTO (não do evento)
+        supabase.from('events')
+          .select('cancelled_at, cancellation_fee')
+          .eq('status', 'cancelled').gt('cancellation_fee', 0)
+          .gte('cancelled_at', first).lte('cancelled_at', `${last}T23:59:59`),
       ]);
 
       const monthly: PeriodData[] = Array.from({length:12}, emptyPeriod);
@@ -75,6 +80,10 @@ export default function DREPage() {
         ((eventsRes.data ?? []) as any[]).forEach((e: any) => {
           const m = parseInt(e.event_date?.slice(5, 7)) - 1;
           if (m >= 0 && m < 12) monthly[m].receita_eventos += e.total_value ?? 0;
+        });
+        ((cancelledFeesRes.data ?? []) as any[]).forEach((e: any) => {
+          const m = parseInt(e.cancelled_at?.slice(5, 7)) - 1;
+          if (m >= 0 && m < 12) monthly[m].receita_eventos += e.cancellation_fee ?? 0;
         });
       } else {
         ((paymentsRes.data ?? []) as any[]).forEach((p: any) => {

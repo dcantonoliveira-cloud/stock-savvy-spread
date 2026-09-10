@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, ChevronDown, Info, Trash2, ChevronsUpDown, ChevronUp, FileDown } from 'lucide-react';
 import { LostReasonModal } from '@/components/LostReasonModal';
+import { CancelEventModal } from '@/components/CancelEventModal';
 import { ExportEventosModal } from '@/components/ExportEventosModal';
 import { getLostReasonLabel } from '@/lib/lostReasons';
 
@@ -18,6 +19,7 @@ interface Orcamento {
   status: string;
   date_reserved: boolean | null;
   lost_reason: string | null;
+  total_value: number | null;
   clients: { name: string | null } | null;
   tasting_date?: string | null;
 }
@@ -61,6 +63,7 @@ export default function OrcamentosPage() {
   const [exportOpen, setExportOpen]   = useState(false);
   const [sortAsc, setSortAsc] = useState(true);
   const [lostModal, setLostModal] = useState<{ id: string } | null>(null);
+  const [cancelModal, setCancelModal] = useState<{ id: string; totalValue: number | null } | null>(null);
 
   const handleSort = (col: string) => {
     if (sortCol === col) setSortAsc(a => !a);
@@ -72,7 +75,7 @@ export default function OrcamentosPage() {
     const [evRes, tseRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, lost_reason, clients(name)')
+        .select('id, event_name, location_text, organizer, event_date, created_at, status, date_reserved, lost_reason, total_value, clients(name)')
         .in('status', [...PIPELINE_STATUSES, 'cancelled', 'lost'])
         .not('event_name', 'is', null)
         .neq('event_name', '')
@@ -135,7 +138,32 @@ export default function OrcamentosPage() {
 
   const updateStatus = (id: string, status: string) => {
     if (status === 'lost') { setLostModal({ id }); return; }
+    if (status === 'cancelled') {
+      const row = rows.find(r => r.id === id);
+      setCancelModal({ id, totalValue: row?.total_value ?? null });
+      return;
+    }
     applyStatus(id, status);
+  };
+
+  /** Cancela e, se houver multa, lança um pagamento na data de hoje — mesma lógica
+   * da página de detalhe do evento (o valor original já sai sozinho do faturamento
+   * por competência assim que o status vira 'cancelled'). */
+  const confirmCancel = async (fee: number) => {
+    if (!cancelModal) return;
+    const { id } = cancelModal;
+    const now = new Date().toISOString();
+    setRows(prev => prev.map(r => r.id === id ? { ...r, status: 'cancelled', date_reserved: null } : r));
+    await supabase.from('events').update({ status: 'cancelled', date_reserved: false, cancellation_fee: fee, cancelled_at: now } as any).eq('id', id);
+    if (fee > 0) {
+      await supabase.from('event_payments' as any).insert({
+        event_id: id, payment_date: now.slice(0, 10), value: fee,
+        type: 'cancellation_fee', is_confirmed: true, notes: 'Multa por cancelamento',
+      });
+      const { data: freshEvent } = await supabase.from('events').select('paid_value').eq('id', id).single();
+      await supabase.from('events').update({ paid_value: ((freshEvent as any)?.paid_value ?? 0) + fee }).eq('id', id);
+    }
+    setCancelModal(null);
   };
 
   const deleteRow = async (id: string) => {
@@ -424,6 +452,13 @@ export default function OrcamentosPage() {
         <LostReasonModal
           onConfirm={reason => { applyStatus(lostModal.id, 'lost', reason); setLostModal(null); }}
           onCancel={() => setLostModal(null)}
+        />
+      )}
+      {cancelModal && (
+        <CancelEventModal
+          totalValue={cancelModal.totalValue}
+          onConfirm={confirmCancel}
+          onCancel={() => setCancelModal(null)}
         />
       )}
       {exportOpen && (

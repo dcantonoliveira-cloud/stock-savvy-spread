@@ -83,6 +83,7 @@ export default function EstatisticasPage() {
   const [tab, setTab] = useState<'originais' | 'bi'>('originais');
   const [events, setEvents] = useState<EventRow[]>([]);
   const [contratos, setContratos] = useState<ContratoRow[]>([]);
+  const [cancelledFees, setCancelledFees] = useState<{ cancelled_at: string; cancellation_fee: number }[]>([]);
   const [fatProducao, setFatProducao] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tastings, setTastings] = useState<any[]>([]);
@@ -215,7 +216,7 @@ export default function EstatisticasPage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [evtRes, contratosRes, tastRes, prodRes, sessStatsRes] = await Promise.all([
+      const [evtRes, contratosRes, tastRes, prodRes, sessStatsRes, cancelledFeesRes] = await Promise.all([
         // Eventos do ano: para orçamentos, gráficos e KPIs (por event_date)
         supabase
           .from('events')
@@ -241,9 +242,19 @@ export default function EstatisticasPage() {
           .lte('delivery_date', `${year}-12-31`)
           .gt('extra_value', 0),
         supabase.from('tasting_session_stats' as any).select('session_id, novos, fechados'),
+        // Multas de cancelamento no ano: filtrado por cancelled_at (independente do event_date —
+        // um evento de jan/27 cancelado em set/26 tem que contar em set/26, não em jan/27)
+        supabase
+          .from('events')
+          .select('cancelled_at, cancellation_fee')
+          .eq('status', 'cancelled')
+          .gt('cancellation_fee', 0)
+          .gte('cancelled_at', `${year}-01-01`)
+          .lte('cancelled_at', `${year}-12-31T23:59:59`),
       ]);
       setEvents((evtRes.data ?? []) as EventRow[]);
       setContratos((contratosRes.data ?? []) as ContratoRow[]);
+      setCancelledFees((cancelledFeesRes.data ?? []) as { cancelled_at: string; cancellation_fee: number }[]);
       setTastings((tastRes.data ?? []) as any[]);
       const prod = (prodRes.data ?? []) as { extra_value: number }[];
       setFatProducao(prod.reduce((s: number, o: { extra_value: number }) => s + (o.extra_value ?? 0), 0));
@@ -258,6 +269,18 @@ export default function EstatisticasPage() {
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const completed = useMemo(() => events.filter(e => e.status === 'completed' || e.status === 'confirmed'), [events]);
+
+  // Multas de cancelamento, por mês do CANCELAMENTO (não do evento) — entram no faturamento
+  // total, mas nunca em ticket médio/média de convidados (não são um evento de verdade).
+  const cancellationFeesByMonth = useMemo(() => {
+    const arr = Array(12).fill(0);
+    for (const f of cancelledFees) {
+      if (!f.cancelled_at) continue;
+      arr[monthOf(f.cancelled_at)] += f.cancellation_fee ?? 0;
+    }
+    return arr;
+  }, [cancelledFees]);
+  const totalCancellationFees = cancellationFeesByMonth.reduce((s, v) => s + v, 0);
 
   // Eventos por mês
   const byMonth = useMemo(() => MONTHS.map((m, i) => ({
@@ -279,7 +302,7 @@ export default function EstatisticasPage() {
   const totalEvents = completed.length;
   const totalGuests = completed.reduce((s, e) => s + (e.guest_count ?? 0), 0);
   const totalStaff  = completed.reduce((s, e) => s + (e.professional_count ?? 0), 0);
-  const totalRev    = completed.reduce((s, e) => s + (e.total_value ?? 0), 0);
+  const totalRev    = completed.reduce((s, e) => s + (e.total_value ?? 0), 0) + totalCancellationFees;
   // Média de convidados — exclui eventos com "JABS" no nome
   const completedSemJabs = year === 2027
     ? completed.filter(e => !e.event_name?.toUpperCase().includes('JABS'))
@@ -342,7 +365,7 @@ export default function EstatisticasPage() {
       });
 
       // Faturamento: soma dos contratos fechados no mês
-      const faturamento = contratosList.reduce((s, e) => s + (e.total_value ?? 0), 0);
+      const faturamento = contratosList.reduce((s, e) => s + (e.total_value ?? 0), 0) + cancellationFeesByMonth[i];
 
       // Conversão de degustações: só sessões que já aconteceram (data < hoje)
       const todayStr = new Date().toISOString().split('T')[0];
@@ -366,7 +389,7 @@ export default function EstatisticasPage() {
         _tastingEventsList: tastingEventsList,
       };
     });
-  }, [events, contratos, year, sessionMap, tastings, sessionStats]);
+  }, [events, contratos, year, sessionMap, tastings, sessionStats, cancellationFeesByMonth]);
 
   const totals = useMemo(() => {
     // Soma novos/fechados de sessões passadas do ano via tasting_session_stats
@@ -414,8 +437,8 @@ export default function EstatisticasPage() {
       e.event_date && monthOf(e.event_date) === i &&
       (e.status === 'confirmed' || e.status === 'completed')
     );
-    return Math.round(mes.reduce((s, e) => s + (e.total_value ?? 0), 0));
-  }), [events]);
+    return Math.round(mes.reduce((s, e) => s + (e.total_value ?? 0), 0) + cancellationFeesByMonth[i]);
+  }), [events, cancellationFeesByMonth]);
 
   // Degustações section
   const now = new Date();

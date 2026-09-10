@@ -36,6 +36,8 @@ interface EventDetail {
   non_paying_guests: number | null;
   price_per_person: number | null;
   total_value: number | null;
+  cancellation_fee: number | null;
+  cancelled_at: string | null;
   is_paid_in_full: boolean;
   contract_signed: boolean;
   contract_signed_date: string | null;
@@ -153,6 +155,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 import { EVENT_STATUS } from '@/lib/eventStatus';
 import { LostReasonModal } from '@/components/LostReasonModal';
+import { CancelEventModal } from '@/components/CancelEventModal';
 const DROPDOWN_STATUS_KEYS = ALL_STATUS_KEYS.filter(k => k !== 'completed' && k !== 'tasting_scheduled');
 const ALL_STATUS_OPTIONS = DROPDOWN_STATUS_KEYS.map(k => ({ key: k, label: EVENT_STATUS[k].label, cls: EVENT_STATUS[k].cls }));
 
@@ -219,6 +222,7 @@ export default function EventDetailPage() {
   const [allocTastingOpen, setAllocTastingOpen] = useState(false);
   const [obsModal, setObsModal] = useState<{ open: boolean; text: string; customFields: any[]; company: any } | null>(null);
   const [lostModal, setLostModal] = useState(false);
+  const [cancelModal, setCancelModal] = useState(false);
   const [form, setForm] = useState<Partial<EventDetail>>({});
   const [clientForm, setClientForm] = useState<Record<string, string>>({});
   const [linkedMenuId, setLinkedMenuId] = useState<string | null>(null);
@@ -422,16 +426,40 @@ export default function EventDetailPage() {
       return;
     }
     if (newStatus === 'lost') { setLostModal(true); return; }
+    if (newStatus === 'cancelled') { setCancelModal(true); return; }
     applyStatus(newStatus);
   };
 
-  const cancelEvent = async () => {
+  const cancelEvent = () => setCancelModal(true);
+
+  /** Cancela o evento e, se houver multa, lança um pagamento na data de hoje —
+   * o valor do evento já sai sozinho do faturamento por competência (mês do evento,
+   * já que evento cancelado não entra nesses relatórios); a multa entra como
+   * faturamento no mês do cancelamento por conta desse pagamento. */
+  const confirmCancel = async (fee: number) => {
     if (!id) return;
-    if (!confirm('Cancelar este evento? O status será alterado para CANCELADO.')) return;
-    const { error } = await supabase.from('events').update({ status: 'cancelled', date_reserved: false }).eq('id', id);
-    if (error) { toast.error('Erro ao cancelar'); return; }
-    setEvent(prev => prev ? { ...prev, status: 'cancelled', date_reserved: false } : prev);
-    toast.success('Evento cancelado');
+    const now = new Date().toISOString();
+    const updates = { status: 'cancelled', date_reserved: false, cancellation_fee: fee, cancelled_at: now };
+    const { error } = await supabase.from('events').update(updates).eq('id', id);
+    if (error) { toast.error('Erro ao cancelar: ' + error.message); return; }
+
+    if (fee > 0) {
+      const { error: payError } = await supabase.from('event_payments' as any).insert({
+        event_id: id, payment_date: now.slice(0, 10), value: fee,
+        type: 'cancellation_fee', is_confirmed: true, notes: 'Multa por cancelamento',
+      });
+      if (payError) {
+        toast.error('Evento cancelado, mas houve erro ao lançar a multa: ' + payError.message);
+      } else {
+        // paid_value é um cache — soma a multa nele agora pra não ficar desatualizado até a aba Financeiro recalcular sozinha
+        const { data: freshEvent } = await supabase.from('events').select('paid_value').eq('id', id).single();
+        await supabase.from('events').update({ paid_value: ((freshEvent as any)?.paid_value ?? 0) + fee }).eq('id', id);
+      }
+    }
+
+    setEvent(prev => prev ? { ...prev, ...updates } : prev);
+    setCancelModal(false);
+    toast.success(fee > 0 ? 'Evento cancelado e multa lançada!' : 'Evento cancelado');
   };
 
   const deleteEvent = async () => {
@@ -1242,6 +1270,13 @@ function EventHistorySection({ eventId }: { eventId: string }) {
         <LostReasonModal
           onConfirm={reason => { applyStatus('lost', reason); setLostModal(false); }}
           onCancel={() => setLostModal(false)}
+        />
+      )}
+      {cancelModal && (
+        <CancelEventModal
+          totalValue={event?.total_value ?? null}
+          onConfirm={confirmCancel}
+          onCancel={() => setCancelModal(false)}
         />
       )}
 

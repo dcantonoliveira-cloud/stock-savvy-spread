@@ -149,6 +149,8 @@ interface EventBI {
   organizer_id: string | null;
   lost_reason: string | null;
   price_per_person: number | null;
+  cancellation_fee: number | null;
+  cancelled_at: string | null;
 }
 
 type TabKey = 'geral' | 'fechados' | 'aberto' | 'nfechou' | 'clientes' | 'parceiros' | 'kpis';
@@ -207,7 +209,7 @@ export default function BIDashboard() {
     const [evRes, clRes, locRes] = await Promise.all([
       supabase
         .from('events' as any)
-        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, price_per_person, contract_signed_date, created_at, client_id, organizer, organizer_id, lost_reason')
+        .select('id, event_name, status, event_date, event_type, location_text, location_id, guest_count, duration_hours, additional_hours, total_value, price_per_person, contract_signed_date, created_at, client_id, organizer, organizer_id, lost_reason, cancellation_fee, cancelled_at')
         .gte('event_date', windowStart)
         .order('event_date', { ascending: false }),
       supabase.from('clients' as any).select('id, name, zip_code, source'),
@@ -259,6 +261,28 @@ export default function BIDashboard() {
   const ab  = useMemo(() => ev.filter(e => isAberto(e.status)), [ev]);
   const nf  = useMemo(() => ev.filter(e => isNFechou(e.status)), [ev]);
   const ticketMedio = fc.length ? avg(fc.map(e => e.total_value ?? 0)) : 0;
+
+  // Multas de cancelamento, filtradas pelo mês/ano do CANCELAMENTO (não do evento) — mesmos
+  // filtros de tipo/local do topo, mas a data usada é cancelled_at. Contam no faturamento
+  // total, nunca no ticket médio (não é um evento de verdade).
+  const cancelledWithFee = useMemo(() => all.filter(e => {
+    if (e.status !== 'cancelled' || !e.cancelled_at || !((e.cancellation_fee ?? 0) > 0)) return false;
+    if (filterYear && yearOf(e.cancelled_at) !== Number(filterYear)) return false;
+    if (filterMonth && monthOf(e.cancelled_at) !== Number(filterMonth) - 1) return false;
+    if (filterType && e.event_type !== filterType) return false;
+    if (filterLocal && locName(e) !== filterLocal) return false;
+    return true;
+  }), [all, filterYear, filterMonth, filterType, filterLocal]);
+  const totalCancellationFees = sum(cancelledWithFee.map(e => e.cancellation_fee ?? 0));
+  const cancellationFeesByMonth = useMemo(() => {
+    const arr = Array(12).fill(0);
+    all.forEach(e => {
+      if (e.status !== 'cancelled' || !e.cancelled_at || !((e.cancellation_fee ?? 0) > 0)) return;
+      if (filterYear && yearOf(e.cancelled_at) !== Number(filterYear)) return;
+      arr[monthOf(e.cancelled_at)] += e.cancellation_fee ?? 0;
+    });
+    return arr;
+  }, [all, filterYear]);
 
   const clearFilters = () => { setFilterYear(''); setFilterMonth(''); setFilterType(''); setFilterLocal(''); setFilterRange(0); };
   const hasFilter = filterYear || filterMonth || filterType || filterLocal || filterRange > 0;
@@ -321,7 +345,7 @@ export default function BIDashboard() {
         </div>
       </div>
 
-      {tab === 'geral'    && <TabGeral    ev={ev} fc={fc} ab={ab} all={all} locName={locName} ticketMedio={ticketMedio} />}
+      {tab === 'geral'    && <TabGeral    ev={ev} fc={fc} ab={ab} all={all} locName={locName} ticketMedio={ticketMedio} totalCancellationFees={totalCancellationFees} cancellationFeesByMonth={cancellationFeesByMonth} />}
       {tab === 'fechados' && <TabFechados ev={ev} fc={fc} locName={locName} />}
       {tab === 'aberto'   && <TabAberto  ab={ab} ev={ev} fc={fc} ticketMedio={ticketMedio} />}
       {tab === 'nfechou'  && <TabNFechou nf={nf} ev={ev} />}
@@ -335,13 +359,14 @@ export default function BIDashboard() {
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB: VISÃO GERAL
 // ══════════════════════════════════════════════════════════════════════════════
-function TabGeral({ ev, fc, ab, all, locName, ticketMedio }: {
+function TabGeral({ ev, fc, ab, all, locName, ticketMedio, totalCancellationFees, cancellationFeesByMonth }: {
   ev: EventBI[]; fc: EventBI[]; ab: EventBI[]; all: EventBI[];
   locName: (e: EventBI) => string | null; ticketMedio: number;
+  totalCancellationFees: number; cancellationFeesByMonth: number[];
 }) {
   const hoje = new Date();
   const Y = hoje.getFullYear();
-  const rT = sum(fc.map(e => e.total_value ?? 0));
+  const rT = sum(fc.map(e => e.total_value ?? 0)) + totalCancellationFees;
   const txConv = ev.length ? (fc.length / ev.length * 100).toFixed(1) : '0';
   const futFC = fc.filter(e => e.event_date && yearOf(e.event_date) >= Y);
   const carteira = sum(futFC.map(e => e.total_value ?? 0));
@@ -376,10 +401,10 @@ function TabGeral({ ev, fc, ab, all, locName, ticketMedio }: {
     { name: 'Fechado', value: totalFech, fill: '#3D5C38' },
   ];
 
-  // Receita por mês (eventos fechados por mês do evento)
+  // Receita por mês (eventos fechados por mês do evento + multas por mês do cancelamento)
   const recMes = MONTHS.map((m, i) => ({
     name: m,
-    receita: sum(fc.filter(e => e.event_date && monthOf(e.event_date) === i).map(e => e.total_value ?? 0)) / 1000,
+    receita: (sum(fc.filter(e => e.event_date && monthOf(e.event_date) === i).map(e => e.total_value ?? 0)) + cancellationFeesByMonth[i]) / 1000,
     qtd: fc.filter(e => e.event_date && monthOf(e.event_date) === i).length,
   }));
 
