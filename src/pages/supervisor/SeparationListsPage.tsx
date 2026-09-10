@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Plus, Search, Upload, X, Trash2, ArrowLeft, Loader2, AlertTriangle,
-  CheckCircle2, ListChecks, Send, Pencil,
+  CheckCircle2, ListChecks, Send, Pencil, ChevronUp, ChevronsUpDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum } from '@/lib/format';
@@ -156,6 +156,27 @@ function ItemPickerInline({ items, onPick, onCreateNew, placeholder = 'Buscar in
   );
 }
 
+// ── Cabeçalho de coluna clicável pra ordenar a tabela de revisão ──
+function SortableTh({ children, col, sortCol, sortAsc, onSort, className = '' }: {
+  children?: React.ReactNode; col: string;
+  sortCol: string | null; sortAsc: boolean; onSort: (col: string) => void; className?: string;
+}) {
+  const active = sortCol === col;
+  return (
+    <th
+      className={`px-4 py-2.5 cursor-pointer select-none whitespace-nowrap ${active ? 'text-foreground' : ''} ${className}`}
+      onClick={() => onSort(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        {active
+          ? <ChevronUp className={`w-3 h-3 transition-transform ${sortAsc ? '' : 'rotate-180'}`} />
+          : <ChevronsUpDown className="w-3 h-3 opacity-30" />}
+      </span>
+    </th>
+  );
+}
+
 export default function SeparationListsPage() {
   const { user } = useAuth();
   const [lists, setLists] = useState<SepList[]>([]);
@@ -169,6 +190,12 @@ export default function SeparationListsPage() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [createItemFor, setCreateItemFor] = useState<{ row: SepItemRow | null; initialName: string } | null>(null);
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(true);
+  const handleSort = (col: string) => {
+    if (sortCol === col) setSortAsc(a => !a);
+    else { setSortCol(col); setSortAsc(true); }
+  };
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -389,22 +416,33 @@ export default function SeparationListsPage() {
             placeholder="Adicionar item que faltou na planilha..." />
         </div>
 
-        {itemsLoading ? (
+        {(() => {
+          const matchedNameOf = (row: SepItemRow) => stockItems.find(i => i.id === row.item_id)?.name ?? '';
+          const sortedItems = sortCol ? [...items].sort((a, b) => {
+            let va: string | number = '', vb: string | number = '';
+            if (sortCol === 'raw_name') { va = a.raw_name; vb = b.raw_name; }
+            if (sortCol === 'matched') { va = matchedNameOf(a); vb = matchedNameOf(b); }
+            if (sortCol === 'requested_qty') { va = a.requested_qty ?? -Infinity; vb = b.requested_qty ?? -Infinity; }
+            if (sortCol === 'separated_qty') { va = a.separated_qty ?? -Infinity; vb = b.separated_qty ?? -Infinity; }
+            const cmp = typeof va === 'string' ? va.localeCompare(vb as string, 'pt-BR') : (va as number) - (vb as number);
+            return sortAsc ? cmp : -cmp;
+          }) : items;
+          return itemsLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
         ) : (
           <div className="bg-white border border-border rounded-2xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/30 border-b border-border text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                  <th className="text-left px-4 py-2.5">Item (da planilha)</th>
-                  <th className="text-left px-4 py-2.5 w-56">Insumo cadastrado</th>
-                  <th className="text-right px-4 py-2.5 w-28">Qtd. pedida</th>
-                  <th className="text-right px-4 py-2.5 w-28">Separado</th>
+                  <SortableTh col="raw_name" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} className="text-left">Item (da planilha)</SortableTh>
+                  <SortableTh col="matched" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} className="text-left w-56">Insumo cadastrado</SortableTh>
+                  <SortableTh col="requested_qty" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} className="text-right w-28">Qtd. pedida</SortableTh>
+                  <SortableTh col="separated_qty" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} className="text-right w-28">Separado</SortableTh>
                   <th className="w-10" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {items.map(row => {
+                {sortedItems.map(row => {
                   const matched = stockItems.find(i => i.id === row.item_id);
                   const suggestion = !matched ? suggestItem(row.raw_name, stockItems) : null;
                   const unitDiverges = (u: string) => row.raw_unit && normalize(row.raw_unit) !== normalize(u);
@@ -486,7 +524,8 @@ export default function SeparationListsPage() {
               </tbody>
             </table>
           </div>
-        )}
+          );
+        })()}
 
         <div className="flex items-center justify-between gap-3">
           <button onClick={() => deleteList(selectedId)}
