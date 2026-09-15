@@ -30,14 +30,16 @@
         var msg = e.message || (e.error && e.error.message) || '';
         if (msg.indexOf('Failed to fetch dynamically imported module') !== -1 ||
             msg.indexOf('Importing a module script failed') !== -1 ||
-            msg.indexOf('Unable to preload CSS') !== -1) {
+            msg.indexOf('Unable to preload CSS') !== -1 ||
+            msg.indexOf('is not a valid JavaScript MIME type') !== -1) {
           tryChunkReload();
         }
       }, true);
       window.addEventListener('unhandledrejection', function(e) {
         var msg = (e.reason && e.reason.message) || String(e.reason || '');
         if (msg.indexOf('Failed to fetch dynamically imported module') !== -1 ||
-            msg.indexOf('Importing a module script failed') !== -1) {
+            msg.indexOf('Importing a module script failed') !== -1 ||
+            msg.indexOf('is not a valid JavaScript MIME type') !== -1) {
           tryChunkReload();
         }
       });
