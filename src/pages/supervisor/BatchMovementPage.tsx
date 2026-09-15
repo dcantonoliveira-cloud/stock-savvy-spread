@@ -28,6 +28,7 @@ export default function BatchMovementPage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [batch, setBatch] = useState<BatchLine[]>([]);
   const [notes, setNotes] = useState('');
+  const [batchDate, setBatchDate] = useState(''); // vazio = hoje (padrão); preenchido = lançamento retroativo
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [unmatched, setUnmatched] = useState<UnmatchedRow[]>([]);
@@ -179,6 +180,7 @@ export default function BatchMovementPage() {
           item_id: line.item.id, quantity: qty,
           notes: notes.trim() || null,
           registered_by: user.id,
+          ...(batchDate ? { date: batchDate } : {}),
         });
         if (error) { console.error(error); hasError = true; continue; }
       } else {
@@ -186,7 +188,7 @@ export default function BatchMovementPage() {
           item_id: line.item.id, quantity: qty,
           notes: notes.trim() || null,
           employee_name: user.email || 'Supervisor',
-          date: now.split('T')[0],
+          date: batchDate || now.split('T')[0],
           registered_by: user.id,
         });
         if (error) { console.error(error); hasError = true; continue; }
@@ -209,6 +211,7 @@ export default function BatchMovementPage() {
       await loadItems();
       setBatch([]);
       setNotes('');
+      setBatchDate('');
       setTimeout(() => setSaved(false), 2000);
     }
   };
@@ -396,13 +399,20 @@ export default function BatchMovementPage() {
         </div>
       )}
 
-      {/* Notes */}
+      {/* Notes + Date */}
       {batch.length > 0 && (
-        <div>
+        <div className="grid grid-cols-[1fr_auto] gap-3 items-start">
           <Input
             value={notes}
             onChange={e => setNotes(e.target.value)}
             placeholder="Observação (opcional) — vale para todos os itens"
+          />
+          <Input
+            type="date"
+            value={batchDate}
+            onChange={e => setBatchDate(e.target.value)}
+            title="Data (opcional — em branco usa hoje) — vale para todos os itens"
+            className="w-40"
           />
         </div>
       )}

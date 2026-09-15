@@ -143,6 +143,7 @@ export default function EntriesPage() {
   const [supplier, setSupplier] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [entryDate, setEntryDate] = useState(''); // vazio = hoje (comportamento padrão); preenchido = lançamento retroativo
 
   // NF import state
   const [nfDialogOpen, setNfDialogOpen] = useState(false);
@@ -247,7 +248,7 @@ export default function EntriesPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setItemLocations([]); setAllocationKitchenId(''); };
+  const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setEntryDate(''); setItemLocations([]); setAllocationKitchenId(''); };
 
   const handleQuickCreateSaved = (item: StockItemFull) => {
     const newItem: Item = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, barcode: item.barcode };
@@ -271,6 +272,7 @@ export default function EntriesPage() {
       invoice_number: invoiceNumber.trim() || null,
       notes: notes.trim() || null,
       registered_by: user.id,
+      ...(entryDate ? { date: entryDate } : {}),
     });
     if (error) { toast.error('Erro ao registrar entrada'); return; }
 
@@ -1065,6 +1067,10 @@ export default function EntriesPage() {
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Nota Fiscal (opcional)</label>
                   <Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} placeholder="Nº da NF" />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Data (opcional — em branco usa hoje)</label>
+                  <Input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} placeholder="Hoje" />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Observações (opcional)</label>

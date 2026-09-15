@@ -41,6 +41,7 @@ export default function SupervisorOutputsPage() {
   const [employeeName, setEmployeeName] = useState('');
   const [eventName, setEventName] = useState('');
   const [notes, setNotes] = useState('');
+  const [outputDate, setOutputDate] = useState(''); // vazio = hoje (padrão); preenchido = lançamento retroativo
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [itemLocations, setItemLocations] = useState<ItemLocation[]>([]);
   const [allocationKitchenId, setAllocationKitchenId] = useState('');
@@ -109,7 +110,7 @@ export default function SupervisorOutputsPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const resetForm = () => { setItemId(''); setQuantity(''); setEmployeeName(''); setEventName(''); setNotes(''); setItemLocations([]); setAllocationKitchenId(''); };
+  const resetForm = () => { setItemId(''); setQuantity(''); setEmployeeName(''); setEventName(''); setNotes(''); setOutputDate(''); setItemLocations([]); setAllocationKitchenId(''); };
 
   const handleSave = async () => {
     if (!itemId) { toast.error('Selecione um item'); return; }
@@ -127,6 +128,7 @@ export default function SupervisorOutputsPage() {
       event_name: eventName.trim() || null,
       notes: notes.trim() || null,
       registered_by: user.id,
+      ...(outputDate ? { date: outputDate } : {}),
     });
     if (error) { toast.error('Erro ao registrar'); return; }
 
@@ -252,6 +254,10 @@ export default function SupervisorOutputsPage() {
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Evento (opcional)</label>
                 <Input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="Ex: Casamento Silva" />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Data (opcional — em branco usa hoje)</label>
+                <Input type="date" value={outputDate} onChange={e => setOutputDate(e.target.value)} placeholder="Hoje" />
               </div>
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Observações (opcional)</label>
