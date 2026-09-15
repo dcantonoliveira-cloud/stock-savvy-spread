@@ -255,7 +255,7 @@ function AppRoutes() {
     );
   }
 
-  if (role === 'supervisor' && window.location.pathname.startsWith('/assessora')) {
+  if (role === 'supervisor' && window.location.pathname.startsWith('/assessora') && new URLSearchParams(window.location.search).has('preview')) {
     return (
       <ErrorBoundary>
       <Suspense fallback={<PageLoader />}>

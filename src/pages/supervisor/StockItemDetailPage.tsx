@@ -21,6 +21,7 @@ type StockItem = {
   id: string; name: string; category: string; unit: string;
   current_stock: number; min_stock: number; unit_cost: number;
   subcategory_id: string | null; barcode: string | null; purchase_qty: number | null; image_url: string | null;
+  cost_source_item_id: string | null;
 };
 
 type Entry = {
@@ -56,6 +57,7 @@ export default function StockItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'movimentos' | 'precos' | 'fornecedores' | 'pratos' | 'config'>('movimentos');
   const [subcategoryName, setSubcategoryName] = useState<string | null>(null);
+  const [costSourceName, setCostSourceName] = useState<string | null>(null);
   const [allProfiles, setAllProfiles] = useState<{ user_id: string; display_name: string }[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([]);
 
@@ -107,7 +109,10 @@ export default function StockItemDetailPage() {
     // a menos que uma edição manual de preço (stock_price_history) seja mais recente que ela.
     const latestPricedEntry = entriesData.find(e => e.unit_cost && e.unit_cost > 0);
     const latestManualEdit = ((priceHistRes.data || []) as any[])[0];
-    if (latestPricedEntry) {
+    // Item com preço vinculado a outro insumo: o preço dele já é mantido em sincronia
+    // pelo banco (trigger) sempre que o do "insumo mãe" muda — não deixa uma entrada
+    // avulsa com preço "vencer" e desalinhar o vínculo.
+    if (latestPricedEntry && !itemData.cost_source_item_id) {
       const entryIsNewer = !latestManualEdit || new Date(latestPricedEntry.created_at).getTime() >= new Date(latestManualEdit.created_at).getTime();
       if (entryIsNewer && Math.abs((itemData.unit_cost || 0) - latestPricedEntry.unit_cost) > 0.001) {
         await supabase.from('stock_items').update({ unit_cost: latestPricedEntry.unit_cost } as any).eq('id', id!);
@@ -146,6 +151,13 @@ export default function StockItemDetailPage() {
       setSubcategoryName((subcat as any)?.name ?? null);
     } else {
       setSubcategoryName(null);
+    }
+
+    if (itemData.cost_source_item_id) {
+      const { data: src } = await supabase.from('stock_items').select('name').eq('id', itemData.cost_source_item_id).single();
+      setCostSourceName((src as any)?.name ?? null);
+    } else {
+      setCostSourceName(null);
     }
 
     const usages: SheetUsage[] = (sheetItemsRes.data || []).map((row: any) => ({
@@ -433,32 +445,40 @@ export default function StockItemDetailPage() {
 
           return (
             <React.Fragment>
-              {/* Card: Preço Atual — clicável para editar */}
+              {/* Card: Preço Atual — clicável para editar, exceto quando o preço é vinculado a outro insumo */}
               <div
-                className="bg-white rounded-xl border border-border shadow-sm p-4 cursor-pointer group hover:border-primary/40 hover:shadow-md transition-all"
-                onClick={() => { setPriceEditValue(String(item.unit_cost || '')); setPriceEditOpen(true); }}
-                title="Clique para editar o preço"
+                className={`bg-white rounded-xl border border-border shadow-sm p-4 group transition-all ${item.cost_source_item_id ? '' : 'cursor-pointer hover:border-primary/40 hover:shadow-md'}`}
+                onClick={() => { if (!item.cost_source_item_id) { setPriceEditValue(String(item.unit_cost || '')); setPriceEditOpen(true); } }}
+                title={item.cost_source_item_id ? `Preço vinculado a ${costSourceName ?? 'outro insumo'}` : 'Clique para editar o preço'}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-amber-600" />
                     <span className="text-xs text-muted-foreground">Preço Atual</span>
                   </div>
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                  {!item.cost_source_item_id && (
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                  )}
                 </div>
                 <p className="text-xl font-bold text-amber-600">
                   {currentPrice > 0 ? fmtCur(currentPrice) : '—'}
                 </p>
-                {priceDiff != null && (
-                  <p className={`text-[11px] mt-1 ${priceDiff > 0 ? 'text-destructive' : 'text-success'}`}>
-                    {priceDiff > 0 ? `+${priceDiff.toFixed(1)}% vs ${otherSuppliers[0]?.supplier_name ?? '2º fornecedor'}` : `${priceDiff.toFixed(1)}% vs ${otherSuppliers[0]?.supplier_name ?? '2º fornecedor'}`}
-                  </p>
-                )}
-                {!priceDiff && preferredSupplier && (
-                  <p className="text-[11px] mt-1 text-muted-foreground/60">{preferredSupplier.supplier_name}</p>
-                )}
-                {!priceDiff && !preferredSupplier && (
-                  <p className="text-[10px] text-muted-foreground/50 mt-0.5 group-hover:text-primary/60 transition-colors">clique para editar</p>
+                {item.cost_source_item_id ? (
+                  <p className="text-[11px] mt-1 text-primary">Vinculado a {costSourceName ?? '...'}</p>
+                ) : (
+                  <>
+                    {priceDiff != null && (
+                      <p className={`text-[11px] mt-1 ${priceDiff > 0 ? 'text-destructive' : 'text-success'}`}>
+                        {priceDiff > 0 ? `+${priceDiff.toFixed(1)}% vs ${otherSuppliers[0]?.supplier_name ?? '2º fornecedor'}` : `${priceDiff.toFixed(1)}% vs ${otherSuppliers[0]?.supplier_name ?? '2º fornecedor'}`}
+                      </p>
+                    )}
+                    {!priceDiff && preferredSupplier && (
+                      <p className="text-[11px] mt-1 text-muted-foreground/60">{preferredSupplier.supplier_name}</p>
+                    )}
+                    {!priceDiff && !preferredSupplier && (
+                      <p className="text-[10px] text-muted-foreground/50 mt-0.5 group-hover:text-primary/60 transition-colors">clique para editar</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -801,6 +821,20 @@ export default function StockItemDetailPage() {
       {/* Tab: Configurações */}
       {activeTab === 'config' && (
         <div className="bg-white rounded-xl border border-border shadow-sm p-5 space-y-5">
+          <div>
+            <p className="text-sm font-medium text-foreground mb-1">Vinculação de custo</p>
+            {item.cost_source_item_id ? (
+              <p className="text-sm text-muted-foreground">
+                O preço deste item segue automaticamente o de <strong>{costSourceName ?? '...'}</strong>.
+                Pra mudar ou remover o vínculo, edite o item em Estoque Geral.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Este item tem preço próprio. Pra fazer o preço dele seguir o de outro insumo (ex: um corte derivado),
+                edite o item em Estoque Geral.
+              </p>
+            )}
+          </div>
           <ResponsibleEditor itemId={item.id} allProfiles={allProfiles} allGroups={allGroups} />
           <AliasEditor itemId={item.id} />
           <TagEditor itemId={item.id} />

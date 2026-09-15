@@ -16,7 +16,7 @@ export type StockItemFull = {
   id: string; name: string; category: string; unit: string;
   current_stock: number; min_stock: number; unit_cost: number;
   purchase_qty: number | null; barcode: string | null; image_url: string | null;
-  subcategory_id: string | null;
+  subcategory_id: string | null; cost_source_item_id: string | null;
 };
 
 type Subcategory = { id: string; name: string; category_id: string };
@@ -40,6 +40,7 @@ export default function ItemFormDialog({ open, onClose, item, initialName, onSav
   const [allCategoryRecords, setAllCategoryRecords] = useState<{ id: string; name: string }[]>([]);
   const [allProfiles, setAllProfiles] = useState<{ user_id: string; display_name: string }[]>([]);
   const [allGroups, setAllGroups] = useState<{ id: string; name: string }[]>([]);
+  const [linkableItems, setLinkableItems] = useState<{ id: string; name: string; unit_cost: number; purchase_qty: number | null }[]>([]);
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
@@ -51,6 +52,7 @@ export default function ItemFormDialog({ open, onClose, item, initialName, onSav
   const [purchaseQty, setPurchaseQty] = useState('1');
   const [barcode, setBarcode] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [costSourceItemId, setCostSourceItemId] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -65,6 +67,7 @@ export default function ItemFormDialog({ open, onClose, item, initialName, onSav
     setPurchaseQty(item?.purchase_qty?.toString() || '1');
     setBarcode(item?.barcode || '');
     setImageUrl(item?.image_url || null);
+    setCostSourceItemId(item?.cost_source_item_id || '');
 
     setLoadingMeta(true);
     Promise.all([
@@ -73,12 +76,17 @@ export default function ItemFormDialog({ open, onClose, item, initialName, onSav
       supabase.from('profiles').select('user_id, display_name').order('display_name'),
       (supabase.from('inventory_groups') as any).select('id, name').order('name'),
       supabase.from('user_roles').select('user_id, role').eq('role', 'employee'),
-    ]).then(([subsRes, catsRes, profsRes, grpsRes, rolesRes]) => {
+      (supabase.from('stock_items') as any).select('id, name, unit_cost, purchase_qty, cost_source_item_id').neq('category', '_sistema_').order('name'),
+    ]).then(([subsRes, catsRes, profsRes, grpsRes, rolesRes, itemsRes]) => {
       setAllSubcategories((subsRes.data || []) as Subcategory[]);
       setAllCategoryRecords((catsRes.data || []) as { id: string; name: string }[]);
       const employeeIds = new Set(((rolesRes.data || []) as { user_id: string }[]).map(r => r.user_id));
       setAllProfiles(((profsRes.data || []) as { user_id: string; display_name: string }[]).filter(p => employeeIds.has(p.user_id)));
       setAllGroups((grpsRes.data || []) as { id: string; name: string }[]);
+      // Só itens "base" (sem vínculo de custo próprio) podem ser escolhidos como insumo mãe —
+      // evita encadear vínculos (A depende de B que depende de C).
+      const all = (itemsRes.data || []) as { id: string; name: string; unit_cost: number; purchase_qty: number | null; cost_source_item_id: string | null }[];
+      setLinkableItems(all.filter(i => !i.cost_source_item_id && i.id !== item?.id));
       setLoadingMeta(false);
     });
   }, [open, item, initialName]);
@@ -108,6 +116,7 @@ export default function ItemFormDialog({ open, onClose, item, initialName, onSav
       barcode: barcode.trim() || null,
       image_url: imageUrl,
       subcategory_id: subcategoryId || null,
+      cost_source_item_id: costSourceItemId || null,
     };
 
     if (item?.id) {
@@ -123,7 +132,7 @@ export default function ItemFormDialog({ open, onClose, item, initialName, onSav
     const { data: created, error } = await supabase.from('stock_items').insert(payload as any).select().single();
     if (error || !created) {
       // Fallback: tenta só com campos essenciais, caso alguma coluna opcional não exista
-      const { purchase_qty: _pq, subcategory_id: _sc, barcode: _bc, image_url: _iu, ...coreData } = payload;
+      const { purchase_qty: _pq, subcategory_id: _sc, barcode: _bc, image_url: _iu, cost_source_item_id: _cs, ...coreData } = payload;
       const { data: created2, error: e2 } = await supabase.from('stock_items').insert(coreData as any).select().single();
       setSaving(false);
       if (e2 || !created2) { toast.error('Erro ao cadastrar: ' + (e2?.message || error?.message || 'Item não foi salvo')); return; }
@@ -204,7 +213,11 @@ export default function ItemFormDialog({ open, onClose, item, initialName, onSav
               </div>
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Preço da embalagem (R$)</label>
-                <Input type="number" step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} />
+                <Input
+                  type="number" step="0.01" value={unitCost}
+                  onChange={e => setUnitCost(e.target.value)}
+                  disabled={!!costSourceItemId}
+                />
               </div>
             </div>
             <div>
@@ -218,14 +231,37 @@ export default function ItemFormDialog({ open, onClose, item, initialName, onSav
                   onChange={e => setPurchaseQty(e.target.value)}
                   className="w-32"
                   min="0.001"
+                  disabled={!!costSourceItemId}
                 />
                 <span className="text-sm text-muted-foreground">{unit} / embalagem</span>
               </div>
-              {parseFloat(purchaseQty) > 1 && parseFloat(unitCost) > 0 && (
+              {!costSourceItemId && parseFloat(purchaseQty) > 1 && parseFloat(unitCost) > 0 && (
                 <p className="text-xs text-primary mt-1">
                   Custo por {unit} ≈ R$ {fmtNum(parseFloat(unitCost) / parseFloat(purchaseQty))}
                 </p>
               )}
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">
+                Preço segue outro insumo (opcional)
+                <span className="ml-1 text-xs text-muted-foreground/70">— ex: item cortado/porcionado a partir de outro já cadastrado</span>
+              </label>
+              <Select value={costSourceItemId || '__none__'} onValueChange={v => setCostSourceItemId(v === '__none__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Nenhum — preço próprio" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum — preço próprio</SelectItem>
+                  {linkableItems.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {costSourceItemId && (() => {
+                const src = linkableItems.find(i => i.id === costSourceItemId);
+                const eff = src ? (src.unit_cost || 0) / Math.max(0.0001, src.purchase_qty || 1) : 0;
+                return (
+                  <p className="text-xs text-primary mt-1">
+                    Preço e embalagem ficam travados — esse item sempre custa o mesmo por {unit} que <strong>{src?.name}</strong>{eff > 0 ? ` (hoje R$ ${fmtNum(eff)})` : ''}.
+                  </p>
+                );
+              })()}
             </div>
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Código de Barras</label>

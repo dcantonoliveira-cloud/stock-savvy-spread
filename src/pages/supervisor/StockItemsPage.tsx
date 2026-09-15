@@ -33,6 +33,7 @@ type Item = {
   subcategory_name?: string;
   counter_user_id: string | null;
   counter_group_id: string | null;
+  cost_source_item_id: string | null;
 };
 
 type Subcategory = {
@@ -663,6 +664,54 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     allWithStock: { name: string; category: string; unit: string; current_stock: number; unit_cost: number; value: number }[];
     suspectDuplicates: { name: string; count: number; totalValue: number; ids: string[] }[];
   } | null>(null);
+  const [timeline, setTimeline] = useState<{ date: string; value: number }[] | null>(null);
+
+  const TIMELINE_DAYS = 90;
+
+  // Reconstrói o valor total de estoque dia a dia dos últimos TIMELINE_DAYS: parte do
+  // estoque atual de cada item e "desfaz" as movimentações (entradas/saídas) voltando no
+  // tempo. Simulação — valoriza tudo pelo custo efetivo ATUAL de cada item (não tenta
+  // reconstruir o preço histórico), então mostra a tendência de quantidade em estoque.
+  const loadTimeline = async (itemsWithCost: { id: string; current_stock: number; unit_cost: number }[]) => {
+    const since = new Date();
+    since.setDate(since.getDate() - TIMELINE_DAYS);
+    const sinceStr = since.toISOString().split('T')[0];
+
+    const [entriesRes, outputsRes] = await Promise.all([
+      (supabase.from('stock_entries') as any).select('item_id, quantity, date').gte('date', sinceStr).range(0, 19999),
+      (supabase.from('stock_outputs') as any).select('item_id, quantity, date').gte('date', sinceStr).range(0, 19999),
+    ]);
+
+    const costMap = new Map(itemsWithCost.map(i => [i.id, i.unit_cost || 0]));
+    const runningStock = new Map(itemsWithCost.map(i => [i.id, i.current_stock || 0]));
+
+    const movsByDate = new Map<string, { item_id: string; delta: number }[]>();
+    const addMov = (date: string, item_id: string, delta: number) => {
+      if (!date) return;
+      if (!movsByDate.has(date)) movsByDate.set(date, []);
+      movsByDate.get(date)!.push({ item_id, delta });
+    };
+    for (const e of (entriesRes.data || []) as any[]) addMov(e.date, e.item_id, e.quantity || 0);
+    for (const o of (outputsRes.data || []) as any[]) addMov(o.date, o.item_id, -(o.quantity || 0));
+
+    const days: string[] = [];
+    const cursor = new Date();
+    for (let i = 0; i < TIMELINE_DAYS; i++) {
+      days.push(cursor.toISOString().split('T')[0]);
+      cursor.setDate(cursor.getDate() - 1);
+    }
+
+    const series: { date: string; value: number }[] = [];
+    for (const day of days) {
+      let total = 0;
+      for (const [id, qty] of runningStock) total += qty * (costMap.get(id) || 0);
+      series.push({ date: day, value: total });
+      const dayMovs = movsByDate.get(day);
+      if (dayMovs) for (const m of dayMovs) runningStock.set(m.item_id, (runningStock.get(m.item_id) || 0) - m.delta);
+    }
+    series.reverse();
+    setTimeline(series);
+  };
 
   type ParetoResult = { cutoffCount: number; totalWithMovement: number; rows: { name: string; avgWeekly: number; cumPct: number; qty: number; unit: string; count: number }[] };
 
@@ -834,6 +883,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
     setData({ totalValue, totalItems: all.length, itemsWithStock, byCategory, topItems, allWithStock, suspectDuplicates });
     setLoading(false);
+    loadTimeline(all.map((i: any) => ({ id: i.id, current_stock: i.current_stock, unit_cost: i.unit_cost })));
   };
 
   const exportReport = () => {
@@ -870,7 +920,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     toast.success('Relatório exportado!');
   };
 
-  const reset = () => { setData(null); setPareto(null); onClose(); };
+  const reset = () => { setData(null); setPareto(null); setTimeline(null); onClose(); };
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) reset(); }}>
@@ -915,6 +965,37 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                     <p className={`text-lg font-bold mt-1 ${k.highlight ? 'text-primary' : 'text-foreground'}`}>{k.value}</p>
                   </div>
                 ))}
+              </div>
+
+              {/* Linha do tempo do valor de estoque */}
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="text-sm font-medium text-foreground mb-1">Valor de Estoque — últimos {TIMELINE_DAYS} dias</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Simulação a partir das movimentações registradas, valorizada pelo custo atual de cada item.
+                </p>
+                {!timeline ? (
+                  <div className="h-56 flex items-center justify-center text-xs text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Calculando linha do tempo...
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart data={timeline} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={d => { const [, m, dd] = d.split('-'); return `${dd}/${m}`; }}
+                        tick={{ fontSize: 10 }}
+                        interval={Math.floor(TIMELINE_DAYS / 6)}
+                      />
+                      <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={40} />
+                      <RTooltip
+                        formatter={(v: number) => [`R$ ${fmtNum(v)}`, 'Valor em estoque']}
+                        labelFormatter={d => { const [y, m, dd] = String(d).split('-'); return `${dd}/${m}/${y}`; }}
+                      />
+                      <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
               </div>
 
               {/* Duplicatas suspeitas */}
