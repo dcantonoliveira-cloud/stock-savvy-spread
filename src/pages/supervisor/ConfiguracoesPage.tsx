@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { invalidateCompanyCache } from '@/lib/companyCache';
+import { useAuth } from '@/hooks/useAuth';
+import { getPushSubscriptionStatus, subscribeToPush, unsubscribeFromPush } from '@/lib/pushNotifications';
 import {
   Upload, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle,
   User, Building2, Plug, Camera, Lock, MessageCircle, Save, ChevronDown, ChevronUp,
@@ -187,6 +189,94 @@ function Section({ title }: { title: string }) {
     <div className="flex items-center gap-3 mb-5">
       <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 whitespace-nowrap">{title}</span>
       <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
+// ─── Push Notifications Card (só supervisor) ──────────────────────────────────
+function PushNotificationsCard({ userId }: { userId: string }) {
+  const [status, setStatus] = useState<'granted' | 'denied' | 'default' | 'unsupported' | 'loading'>('loading');
+  const [hasSubscription, setHasSubscription] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    getPushSubscriptionStatus().then(setStatus);
+    supabase.from('push_subscriptions' as any).select('id').eq('user_id', userId).then(({ data }) => {
+      setHasSubscription(!!data && (data as any[]).length > 0);
+    });
+  }, [userId]);
+
+  if (status === 'unsupported') return null;
+
+  const handleToggle = async () => {
+    setWorking(true);
+    if (hasSubscription) {
+      const res = await unsubscribeFromPush(userId);
+      if (res.ok) { setHasSubscription(false); toast.success('Notificações desativadas'); }
+      else toast.error(res.error ?? 'Erro ao desativar');
+    } else {
+      const res = await subscribeToPush(userId);
+      if (res.ok) { setHasSubscription(true); setStatus('granted'); toast.success('Notificações ativadas!'); }
+      else toast.error(res.error ?? 'Erro ao ativar notificações');
+    }
+    setWorking(false);
+  };
+
+  const handleTestSend = async () => {
+    setTesting(true);
+    const { data: subs } = await supabase.from('push_subscriptions' as any)
+      .select('endpoint, p256dh, auth').eq('user_id', userId).limit(1);
+    const sub = (subs as any[])?.[0];
+    if (!sub) { toast.error('Nenhuma inscrição salva — ative a notificação primeiro'); setTesting(false); return; }
+    const { error } = await supabase.functions.invoke('test-push', {
+      body: {
+        subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        title: 'Teste de notificação',
+        message: 'Se você está vendo isso, o push está funcionando!',
+      },
+    });
+    if (error) toast.error('Erro ao enviar teste: ' + error.message);
+    else toast.success('Teste enviado — deve aparecer em alguns segundos');
+    setTesting(false);
+  };
+
+  return (
+    <div className="bg-white border border-border rounded-2xl p-6 space-y-1">
+      <Section title="Notificações push" />
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-foreground">Alertas no navegador</p>
+          <p className="text-xs text-muted-foreground mt-0.5 max-w-md">
+            Recebe os mesmos alertas que já chegam por WhatsApp (pagamento pendente, cardápio alterado perto do evento, holerite não assinado) direto no navegador, mesmo com o sistema fechado.
+          </p>
+          {status === 'denied' && (
+            <p className="text-xs text-amber-600 mt-1.5">
+              Notificação bloqueada nas permissões do navegador — libere manualmente pra ativar.
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleToggle}
+          disabled={working || status === 'denied'}
+          className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none shrink-0 disabled:opacity-40 ${
+            hasSubscription ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+          }`}
+        >
+          <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${
+            hasSubscription ? 'left-5' : 'left-0.5'
+          }`} />
+        </button>
+      </div>
+      {hasSubscription && (
+        <button
+          onClick={handleTestSend}
+          disabled={testing}
+          className="text-xs text-primary hover:underline disabled:opacity-50 pt-1"
+        >
+          {testing ? 'Enviando teste...' : 'Mandar notificação de teste'}
+        </button>
+      )}
     </div>
   );
 }
@@ -939,6 +1029,7 @@ function DriveBackupCard({ integration, onSave }: {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ConfiguracoesPage() {
+  const { user, role } = useAuth();
   const [tab, setTab] = useState<Tab>('empresa');
   const [company,         setCompany]       = useState<Company | null>(null);
   const [profile,         setProfile]       = useState<Profile | null>(null);
@@ -1249,6 +1340,8 @@ export default function ConfiguracoesPage() {
             <p className="text-xs text-muted-foreground px-1">
               Modelos de contrato e anexo em <strong>Cadastros → Contratos</strong>.
             </p>
+
+            {role === 'supervisor' && user && <PushNotificationsCard userId={user.id} />}
           </>
         )}
 
