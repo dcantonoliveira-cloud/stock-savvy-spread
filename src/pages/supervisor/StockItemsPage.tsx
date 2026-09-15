@@ -677,13 +677,21 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     since.setDate(since.getDate() - TIMELINE_DAYS);
     const sinceStr = since.toISOString().split('T')[0];
 
+    const sinceIso = since.toISOString();
     const [entriesRes, outputsRes] = await Promise.all([
-      (supabase.from('stock_entries') as any).select('item_id, quantity, date').gte('date', sinceStr).range(0, 19999),
-      (supabase.from('stock_outputs') as any).select('item_id, quantity, date').gte('date', sinceStr).range(0, 19999),
+      // Filtra por created_at (sempre preenchido) — a coluna `date` só existe pra permitir
+      // lançamento retroativo e fica NULL em registros antigos de antes dela existir, então
+      // filtrar só por `date` perde todo o histórico anterior a isso.
+      (supabase.from('stock_entries') as any).select('item_id, quantity, date, created_at').gte('created_at', sinceIso).range(0, 19999),
+      (supabase.from('stock_outputs') as any).select('item_id, quantity, date, created_at').gte('created_at', sinceIso).range(0, 19999),
     ]);
 
     const costMap = new Map(itemsWithCost.map(i => [i.id, i.unit_cost || 0]));
     const runningStock = new Map(itemsWithCost.map(i => [i.id, i.current_stock || 0]));
+
+    // Data efetiva do movimento: usa `date` quando preenchida (lançamento com data escolhida
+    // pelo usuário), senão cai pra data de criação — o mesmo padrão usado no resto do sistema.
+    const effectiveDate = (row: { date: string | null; created_at: string }) => row.date || row.created_at.split('T')[0];
 
     const movsByDate = new Map<string, { item_id: string; delta: number }[]>();
     const addMov = (date: string, item_id: string, delta: number) => {
@@ -691,8 +699,8 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       if (!movsByDate.has(date)) movsByDate.set(date, []);
       movsByDate.get(date)!.push({ item_id, delta });
     };
-    for (const e of (entriesRes.data || []) as any[]) addMov(e.date, e.item_id, e.quantity || 0);
-    for (const o of (outputsRes.data || []) as any[]) addMov(o.date, o.item_id, -(o.quantity || 0));
+    for (const e of (entriesRes.data || []) as any[]) addMov(effectiveDate(e), e.item_id, e.quantity || 0);
+    for (const o of (outputsRes.data || []) as any[]) addMov(effectiveDate(o), o.item_id, -(o.quantity || 0));
 
     const days: string[] = [];
     const cursor = new Date();
