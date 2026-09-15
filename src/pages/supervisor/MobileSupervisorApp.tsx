@@ -142,11 +142,8 @@ function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const items: { id: Tab; label: string; Icon: React.FC<{ className?: string }> }[] = [
     { id: 'home',     label: 'Início',   Icon: Home },
     { id: 'events',   label: 'Eventos',  Icon: List },
-    { id: 'quotes',   label: 'Orçam.',   Icon: FileText },
     { id: 'agenda',   label: 'Agenda',   Icon: CalendarDays },
     { id: 'tastings', label: 'Degust.',  Icon: Utensils },
-    { id: 'sheets',   label: 'Fichas',   Icon: BookOpen },
-    { id: 'stock',    label: 'Estoque',  Icon: PackagePlus },
   ];
 
   return (
@@ -291,42 +288,51 @@ function SettingsScreen() {
     <div className="flex-1 overflow-y-auto scrollbar-none pb-32">
       <Hero title="Configurações" />
       <div className="px-4 pt-4 space-y-4">
-        {status !== 'unsupported' && (
-          <div className="bg-white rounded-3xl shadow-sm p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Bell className="w-4 h-4" style={{ color: GOLD_400 }} />
-              <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: RON_800 }}>Notificações push</p>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-900">Alertas no navegador</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Pagamento pendente, cardápio alterado perto do evento, holerite não assinado — mesmo com o app fechado.
-                </p>
-                {status === 'denied' && (
-                  <p className="text-xs text-amber-600 mt-1.5">Bloqueado nas permissões do navegador.</p>
-                )}
-              </div>
-              <button
-                onClick={handleToggle}
-                disabled={working || status === 'denied'}
-                className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 disabled:opacity-40 ${
-                  hasSubscription ? 'bg-emerald-500' : 'bg-gray-300'
-                }`}
-              >
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${
-                  hasSubscription ? 'left-5' : 'left-0.5'
-                }`} />
-              </button>
-            </div>
-            {hasSubscription && (
-              <button onClick={handleTestSend} disabled={testing}
-                className="mt-3 text-xs font-medium disabled:opacity-50" style={{ color: RON_800 }}>
-                {testing ? 'Enviando teste...' : 'Mandar notificação de teste'}
-              </button>
-            )}
+        <div className="bg-white rounded-3xl shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Bell className="w-4 h-4" style={{ color: GOLD_400 }} />
+            <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: RON_800 }}>Notificações push</p>
           </div>
-        )}
+
+          {status === 'unsupported' || status === 'loading' ? (
+            <p className="text-xs text-gray-400 leading-relaxed">
+              {status === 'loading'
+                ? 'Verificando suporte...'
+                : 'Esse navegador não suporta notificações aqui. No iPhone, primeiro instale o app: Compartilhar → Adicionar à Tela de Início, e abra por esse ícone (não pelo Safari direto) — só então essa opção aparece.'}
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-900">Alertas no navegador</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Pagamento pendente, cardápio alterado perto do evento, holerite não assinado — mesmo com o app fechado.
+                  </p>
+                  {status === 'denied' && (
+                    <p className="text-xs text-amber-600 mt-1.5">Bloqueado nas permissões do navegador.</p>
+                  )}
+                </div>
+                <button
+                  onClick={handleToggle}
+                  disabled={working || status === 'denied'}
+                  className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 disabled:opacity-40 ${
+                    hasSubscription ? 'bg-emerald-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${
+                    hasSubscription ? 'left-5' : 'left-0.5'
+                  }`} />
+                </button>
+              </div>
+              {hasSubscription && (
+                <button onClick={handleTestSend} disabled={testing}
+                  className="mt-3 text-xs font-medium disabled:opacity-50" style={{ color: RON_800 }}>
+                  {testing ? 'Enviando teste...' : 'Mandar notificação de teste'}
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -337,7 +343,6 @@ function HomeScreen({ events, sessions, loading, setTab, onSelect }: {
   events: Event[]; sessions: SessionExtra[]; loading: boolean;
   setTab: (t: Tab) => void; onSelect: (id: string) => void;
 }) {
-  const { signOut } = useAuth();
   const now = new Date();
   const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
@@ -361,10 +366,6 @@ function HomeScreen({ events, sessions, loading, setTab, onSelect }: {
         <div className="relative overflow-hidden px-5 pt-8 pb-6">
           <div className="absolute top-4 right-6 w-24 h-24 rounded-full opacity-[0.06]"
                style={{ background: 'radial-gradient(circle, white, transparent)' }} />
-          <button onClick={signOut}
-            className="absolute top-3 right-4 p-2 text-white/30 hover:text-white/60 transition-colors">
-            <LogOut className="w-4 h-4" />
-          </button>
           <h1 className="text-3xl font-bold text-white tracking-tight">Rondello</h1>
           <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mt-0.5">Buffet</p>
         </div>
@@ -1282,7 +1283,7 @@ export default function MobileSupervisorApp() {
       ) : (
         <>
           <button onClick={() => setMenuOpen(true)}
-            className="fixed z-40 left-4 w-10 h-10 rounded-full bg-white/95 backdrop-blur-xl shadow-lg flex items-center justify-center"
+            className="fixed z-40 right-4 w-10 h-10 rounded-full bg-white/95 backdrop-blur-xl shadow-lg flex items-center justify-center"
             style={{ top: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}>
             <Menu className="w-5 h-5" style={{ color: RON_950 }} />
           </button>
