@@ -5,9 +5,11 @@ import { QRCodeSVG } from 'qrcode.react';
 import {
   Home, List, FileText, CalendarDays, Utensils, BookOpen,
   ChevronRight, ChevronLeft, LogOut, ArrowRight,
-  MapPin, Users, Search, X, QrCode, PackagePlus,
+  MapPin, Users, Search, X, QrCode, PackagePlus, Menu, Settings, Bell,
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { getPushSubscriptionStatus, subscribeToPush, unsubscribeFromPush } from '@/lib/pushNotifications';
 import MobileEventDetailScreen from './MobileEventDetailScreen';
 import MobileSheetsScreen from './MobileSheetsScreen';
 import MobileStockScreen from './MobileStockScreen';
@@ -47,7 +49,7 @@ type LinkedEvent = {
   guest_count: number | null;
 };
 
-type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings' | 'sheets' | 'stock';
+type Tab = 'home' | 'events' | 'quotes' | 'agenda' | 'tastings' | 'sheets' | 'stock' | 'settings';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const RON_950 = '#0e1f4a';
@@ -182,6 +184,149 @@ function Hero({ title, sub, actions }: { title: string; sub?: string; actions?: 
         {actions && <div className="absolute top-2 right-4">{actions}</div>}
         <h1 className="text-3xl font-bold text-white tracking-tight">{title}</h1>
         {sub && <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Side Menu ────────────────────────────────────────────────────────────────
+function SideMenu({ open, onClose, setTab }: { open: boolean; onClose: () => void; setTab: (t: Tab) => void }) {
+  const { signOut } = useAuth();
+  if (!open) return null;
+
+  const items: { id: Tab; label: string; Icon: React.FC<{ className?: string }> }[] = [
+    { id: 'quotes',   label: 'Orçamentos',    Icon: FileText },
+    { id: 'sheets',   label: 'Ficha Técnica', Icon: BookOpen },
+    { id: 'stock',    label: 'Estoque',       Icon: PackagePlus },
+    { id: 'settings', label: 'Configurações', Icon: Settings },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[70]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="absolute top-0 left-0 bottom-0 w-72 max-w-[80vw] bg-white shadow-2xl flex flex-col"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <p className="text-lg font-bold" style={{ color: RON_950 }}>Rondello</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Buffet</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-gray-400"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto py-2">
+          {items.map(({ id, label, Icon }) => (
+            <button key={id} onClick={() => { setTab(id); onClose(); }}
+              className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-gray-50 transition-colors">
+              <Icon className="w-5 h-5 text-gray-500" />
+              <span className="text-sm font-medium text-gray-800">{label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="p-3 border-t border-gray-100">
+          <button onClick={signOut}
+            className="w-full flex items-center gap-3 px-2 py-2.5 text-left text-gray-400 hover:text-gray-600 transition-colors">
+            <LogOut className="w-4 h-4" />
+            <span className="text-xs font-medium">Sair</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Settings Screen ──────────────────────────────────────────────────────────
+function SettingsScreen() {
+  const { user } = useAuth();
+  const [status, setStatus] = useState<'granted' | 'denied' | 'default' | 'unsupported' | 'loading'>('loading');
+  const [hasSubscription, setHasSubscription] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    getPushSubscriptionStatus().then(setStatus);
+    supabase.from('push_subscriptions' as any).select('id').eq('user_id', user.id).then(({ data }) => {
+      setHasSubscription(!!data && (data as any[]).length > 0);
+    });
+  }, [user]);
+
+  const handleToggle = async () => {
+    if (!user) return;
+    setWorking(true);
+    if (hasSubscription) {
+      const res = await unsubscribeFromPush(user.id);
+      if (res.ok) { setHasSubscription(false); toast.success('Notificações desativadas'); }
+      else toast.error(res.error ?? 'Erro ao desativar');
+    } else {
+      const res = await subscribeToPush(user.id);
+      if (res.ok) { setHasSubscription(true); setStatus('granted'); toast.success('Notificações ativadas!'); }
+      else toast.error(res.error ?? 'Erro ao ativar notificações');
+    }
+    setWorking(false);
+  };
+
+  const handleTestSend = async () => {
+    if (!user) return;
+    setTesting(true);
+    const { data: subs } = await supabase.from('push_subscriptions' as any)
+      .select('endpoint, p256dh, auth').eq('user_id', user.id).limit(1);
+    const sub = (subs as any[])?.[0];
+    if (!sub) { toast.error('Nenhuma inscrição salva — ative a notificação primeiro'); setTesting(false); return; }
+    const { error } = await supabase.functions.invoke('test-push', {
+      body: {
+        subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        title: 'Teste de notificação',
+        message: 'Se você está vendo isso, o push está funcionando!',
+      },
+    });
+    if (error) toast.error('Erro ao enviar teste: ' + error.message);
+    else toast.success('Teste enviado — deve aparecer em alguns segundos');
+    setTesting(false);
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto scrollbar-none pb-32">
+      <Hero title="Configurações" />
+      <div className="px-4 pt-4 space-y-4">
+        {status !== 'unsupported' && (
+          <div className="bg-white rounded-3xl shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Bell className="w-4 h-4" style={{ color: GOLD_400 }} />
+              <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: RON_800 }}>Notificações push</p>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">Alertas no navegador</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Pagamento pendente, cardápio alterado perto do evento, holerite não assinado — mesmo com o app fechado.
+                </p>
+                {status === 'denied' && (
+                  <p className="text-xs text-amber-600 mt-1.5">Bloqueado nas permissões do navegador.</p>
+                )}
+              </div>
+              <button
+                onClick={handleToggle}
+                disabled={working || status === 'denied'}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 disabled:opacity-40 ${
+                  hasSubscription ? 'bg-emerald-500' : 'bg-gray-300'
+                }`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${
+                  hasSubscription ? 'left-5' : 'left-0.5'
+                }`} />
+              </button>
+            </div>
+            {hasSubscription && (
+              <button onClick={handleTestSend} disabled={testing}
+                className="mt-3 text-xs font-medium disabled:opacity-50" style={{ color: RON_800 }}>
+                {testing ? 'Enviando teste...' : 'Mandar notificação de teste'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1057,6 +1202,7 @@ export default function MobileSupervisorApp() {
   const [loading, setLoading]               = useState(true);
   const [selectedEventId, setSelectedEventId]     = useState<string | null>(null);
   const [selectedTastingId, setSelectedTastingId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1135,6 +1281,11 @@ export default function MobileSupervisorApp() {
         />
       ) : (
         <>
+          <button onClick={() => setMenuOpen(true)}
+            className="fixed z-40 left-4 w-10 h-10 rounded-full bg-white/95 backdrop-blur-xl shadow-lg flex items-center justify-center"
+            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}>
+            <Menu className="w-5 h-5" style={{ color: RON_950 }} />
+          </button>
           {tab === 'home'     && <HomeScreen     events={events} sessions={sessions} loading={loading} setTab={setTab} onSelect={setSelectedEventId} />}
           {tab === 'events'   && <EventsScreen   events={events} loading={loading} onSelect={setSelectedEventId} />}
           {tab === 'quotes'   && <QuotesScreen   events={events} loading={loading} onSelect={setSelectedEventId} />}
@@ -1142,9 +1293,11 @@ export default function MobileSupervisorApp() {
           {tab === 'tastings' && <TastingsScreen sessions={sessions} loading={loading} onTasting={setSelectedTastingId} />}
           {tab === 'sheets'   && <MobileSheetsScreen />}
           {tab === 'stock'    && <MobileStockScreen />}
+          {tab === 'settings' && <SettingsScreen />}
           <BottomNav tab={tab} setTab={setTab} />
         </>
       )}
+      <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} setTab={setTab} />
     </div>
   );
 }
