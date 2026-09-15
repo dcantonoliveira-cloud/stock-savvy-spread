@@ -11,15 +11,16 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Rondello', message: 'Você tem uma notificação nova.' };
+  let data = { message: 'Você tem uma notificação nova.' };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
     // payload não veio em JSON — usa os valores padrão
   }
 
+  // Título sempre fixo — a marca é o app, não o tipo de alerta. O que muda é o corpo.
   event.waitUntil(
-    self.registration.showNotification(data.title, {
+    self.registration.showNotification('Rondello Buffet', {
       body: data.message,
       icon: '/app-icon-192.png',
       badge: '/app-icon-192.png',

@@ -1,9 +1,53 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { ConnectionHealthBanner } from './ConnectionHealthBanner';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, ChefHat, Home, ClipboardList, CalendarDays, Warehouse, FileText, UtensilsCrossed, Timer, ListChecks } from 'lucide-react';
+import { LogOut, ChefHat, Home, ClipboardList, CalendarDays, Warehouse, FileText, UtensilsCrossed, Timer, ListChecks, Bell, BellOff, Loader2 } from 'lucide-react';
+import { isPushSupported, hasLocalPushSubscription, subscribeToPush, unsubscribeFromPush } from '@/lib/pushNotifications';
+import { toast } from 'sonner';
+
+function PushBell() {
+  const { user } = useAuth();
+  const [supported, setSupported] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
+  const [working, setWorking] = useState(false);
+
+  useEffect(() => {
+    if (!isPushSupported()) return;
+    setSupported(true);
+    hasLocalPushSubscription().then(setSubscribed);
+  }, []);
+
+  if (!supported || !user) return null;
+
+  const handleClick = async () => {
+    setWorking(true);
+    if (subscribed) {
+      const res = await unsubscribeFromPush(user.id);
+      if (res.ok) { setSubscribed(false); toast.success('Notificações desativadas'); }
+      else toast.error(res.error ?? 'Erro ao desativar');
+    } else {
+      const res = await subscribeToPush(user.id);
+      if (res.ok) { setSubscribed(true); toast.success('Notificações ativadas!'); }
+      else toast.error(res.error ?? 'Erro ao ativar notificações');
+    }
+    setWorking(false);
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={handleClick}
+      disabled={working}
+      title={subscribed ? 'Notificações ativadas — clique pra desativar' : 'Ativar notificações'}
+      className={`rounded-xl w-8 h-8 ${subscribed ? 'text-primary hover:bg-primary/10' : 'hover:bg-muted'}`}
+    >
+      {working ? <Loader2 className="w-4 h-4 animate-spin" /> : subscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+    </Button>
+  );
+}
 
 export default function EmployeeLayout({ children }: { children: ReactNode }) {
   const { signOut, profile, permissions } = useAuth();
@@ -58,6 +102,7 @@ export default function EmployeeLayout({ children }: { children: ReactNode }) {
               {profile?.display_name}
             </span>
           </div>
+          <PushBell />
           <Button
             variant="ghost"
             size="icon"

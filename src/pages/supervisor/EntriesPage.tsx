@@ -17,7 +17,7 @@ import { cn, formatDateOnlyBR, todayLocalISO } from '@/lib/utils';
 import { fmtNum, fmtCur } from '@/lib/format';
 import ItemFormDialog, { StockItemFull } from '@/components/stock-item/ItemFormDialog';
 
-type Item = { id: string; name: string; unit: string; current_stock: number; barcode: string | null };
+type Item = { id: string; name: string; unit: string; current_stock: number; barcode: string | null; cost_source_item_id: string | null };
 type Kitchen = { id: string; name: string; is_default: boolean };
 type ItemLocation = { id: string; kitchen_id: string; current_stock: number };
 type Entry = { id: string; item_id: string; quantity: number; unit_cost: number | null; supplier: string | null; invoice_number: string | null; notes: string | null; date: string; created_at: string };
@@ -194,7 +194,7 @@ export default function EntriesPage() {
     }
 
     const [itemsRes, entriesRes, kitchensRes, aliasesRes] = await Promise.all([
-      supabase.from('stock_items').select('id, name, unit, current_stock, barcode').order('name').range(0, 9999),
+      (supabase.from('stock_items') as any).select('id, name, unit, current_stock, barcode, cost_source_item_id').order('name').range(0, 9999),
       entriesQuery,
       supabase.from('kitchens').select('id, name, is_default').order('name'),
       (supabase.from('stock_item_aliases') as any).select('item_id, alias'),
@@ -220,6 +220,9 @@ export default function EntriesPage() {
     setItemComboOpen(false);
     setAllocationKitchenId('');
     setItemLocations([]);
+    // Item com preço vinculado a outro insumo: não deixa um custo digitado antes (pra outro
+    // item) sobrar aqui parado e ser enviado por engano.
+    if (items.find(i => i.id === id)?.cost_source_item_id) setUnitCost('');
     if (!id) return;
     setLoadingLocations(true);
     const { data } = await supabase.from('stock_item_locations').select('id, kitchen_id, current_stock').eq('item_id', id);
@@ -251,7 +254,7 @@ export default function EntriesPage() {
   const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setEntryDate(todayLocalISO()); setItemLocations([]); setAllocationKitchenId(''); };
 
   const handleQuickCreateSaved = (item: StockItemFull) => {
-    const newItem: Item = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, barcode: item.barcode };
+    const newItem: Item = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, barcode: item.barcode, cost_source_item_id: item.cost_source_item_id };
     setItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
     handleItemSelect(newItem.id);
   };
@@ -616,7 +619,7 @@ export default function EntriesPage() {
       } as any);
     }
 
-    setItems(prev => [...prev, { id: (data as any).id, name: (data as any).name, unit: pi.unit, current_stock: 0, barcode: pi.barcode }].sort((a, b) => a.name.localeCompare(b.name)));
+    setItems(prev => [...prev, { id: (data as any).id, name: (data as any).name, unit: pi.unit, current_stock: 0, barcode: pi.barcode, cost_source_item_id: null }].sort((a, b) => a.name.localeCompare(b.name)));
     updateParsedItem(idx, 'matched_item_id', (data as any).id);
     updateParsedItem(idx, 'matched_item_name', (data as any).name);
     toast.success(`"${pi.name}" criado no estoque!`);
@@ -1029,37 +1032,47 @@ export default function EntriesPage() {
                       type="number" step="0.01" value={unitCost}
                       onChange={e => setUnitCost(e.target.value)}
                       placeholder="0.00"
+                      disabled={!!selectedItem?.cost_source_item_id}
                     />
                   </div>
                 </div>
-                {/* Total price helper */}
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <label className="text-sm font-medium text-amber-800 mb-1 block">
-                    💡 Calcular pelo preço total da nota
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs text-muted-foreground mb-0.5 block">Preço total pago (R$)</label>
-                      <Input
-                        type="number" step="0.01" placeholder="Ex: 50,00"
-                        className="h-8 text-sm bg-white"
-                        onChange={e => {
-                          const total = parseFloat(e.target.value);
-                          const qty = parseFloat(quantity);
-                          if (total > 0 && qty > 0) {
-                            setUnitCost((total / qty).toFixed(4));
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-4">÷ qtde = custo/un</div>
-                  </div>
-                  {unitCost && quantity && (
-                    <p className="text-xs text-amber-700 mt-1">
-                      = {fmtCur(parseFloat(unitCost))} por {selectedItem?.unit || 'un'}
+                {/* Total price helper — não faz sentido pra item com preço vinculado a outro insumo */}
+                {selectedItem?.cost_source_item_id ? (
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                    <p className="text-xs text-primary">
+                      💲 O preço desse item segue automaticamente o de{' '}
+                      <strong>{items.find(i => i.id === selectedItem.cost_source_item_id)?.name ?? 'outro insumo'}</strong> — não precisa informar custo aqui.
                     </p>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <label className="text-sm font-medium text-amber-800 mb-1 block">
+                      💡 Calcular pelo preço total da nota
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="text-xs text-muted-foreground mb-0.5 block">Preço total pago (R$)</label>
+                        <Input
+                          type="number" step="0.01" placeholder="Ex: 50,00"
+                          className="h-8 text-sm bg-white"
+                          onChange={e => {
+                            const total = parseFloat(e.target.value);
+                            const qty = parseFloat(quantity);
+                            if (total > 0 && qty > 0) {
+                              setUnitCost((total / qty).toFixed(4));
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-4">÷ qtde = custo/un</div>
+                    </div>
+                    {unitCost && quantity && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        = {fmtCur(parseFloat(unitCost))} por {selectedItem?.unit || 'un'}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Fornecedor (opcional)</label>
                   <Input value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Nome do fornecedor" />

@@ -1,3 +1,5 @@
+import webpush from 'npm:web-push@3.6.7'
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -41,6 +43,32 @@ async function sendWhatsApp(phone: string, message: string, zapiConfig: { instan
     },
     body: JSON.stringify({ phone: phone.replace(/\D/g, ''), message }),
   }).catch(() => {})
+}
+
+let vapidReady = false
+async function sendPush(userIds: string[], message: string, url?: string) {
+  const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY')
+  const vapidPrivate = Deno.env.get('VAPID_PRIVATE_KEY')
+  if (!vapidPublic || !vapidPrivate || userIds.length === 0) return
+  if (!vapidReady) {
+    webpush.setVapidDetails('mailto:douglas@rondellobuffet.com.br', vapidPublic, vapidPrivate)
+    vapidReady = true
+  }
+  const idList = userIds.map(id => `'${esc(id)}'`).join(',')
+  const subs = await sql(`SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id IN (${idList})`)
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } } as any,
+        JSON.stringify({ message, url }),
+      )
+    } catch (err) {
+      const status = (err as any)?.statusCode
+      if (status === 404 || status === 410) {
+        await sqlInsert(`DELETE FROM push_subscriptions WHERE endpoint = '${esc(sub.endpoint)}'`)
+      }
+    }
+  }
 }
 
 function esc(s: string) { return s.replace(/'/g, "''") }
@@ -215,17 +243,24 @@ Deno.serve(async (req) => {
     }
 
     const groupRows = await sql(`
-      SELECT ng.type, pr.phone
+      SELECT ng.type, ngm.user_id, pr.phone
       FROM notification_groups ng
       JOIN notification_group_members ngm ON ngm.group_id = ng.id
-      JOIN profiles pr ON pr.user_id = ngm.user_id
-      WHERE ng.company_id = '${companyId}' AND pr.phone IS NOT NULL
+      LEFT JOIN profiles pr ON pr.user_id = ngm.user_id
+      WHERE ng.company_id = '${companyId}'
     `)
 
-    const groupMap: Record<string, string[]> = {}
+    const groupPhones: Record<string, string[]> = {}
+    const groupUserIds: Record<string, string[]> = {}
     for (const row of groupRows) {
-      if (!groupMap[row.type]) groupMap[row.type] = []
-      groupMap[row.type].push(row.phone)
+      if (row.phone) {
+        if (!groupPhones[row.type]) groupPhones[row.type] = []
+        groupPhones[row.type].push(row.phone)
+      }
+      if (row.user_id) {
+        if (!groupUserIds[row.type]) groupUserIds[row.type] = []
+        groupUserIds[row.type].push(row.user_id)
+      }
     }
 
     for (const alert of alertsToSend) {
@@ -240,9 +275,10 @@ Deno.serve(async (req) => {
         alert.type === 'menu_change'      ? '🍽️' :
         alert.type === 'payslip_unsigned' ? '📄' : '🚨'
       const msg = `${emoji} *${alert.title}*\n${alert.description}`
-      for (const phone of groupMap[groupType] ?? []) {
+      for (const phone of groupPhones[groupType] ?? []) {
         await sendWhatsApp(phone, msg, zapiConfig)
       }
+      await sendPush(groupUserIds[groupType] ?? [], `${emoji} ${alert.title} — ${alert.description}`)
     }
 
     // Atualiza notified_at nos holerites que acabaram de ser notificados

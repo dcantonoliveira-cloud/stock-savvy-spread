@@ -417,6 +417,19 @@ export default function EventDetailPage() {
     if (error) { toast.error('Erro ao alterar status: ' + error.message); return; }
     setEvent(prev => prev ? { ...prev, ...updates } : prev);
     toast.success('Status atualizado');
+
+    // Evento fechado — avisa os supervisores na hora, não precisa esperar o check periódico.
+    if (newStatus === 'confirmed' && event) {
+      const dateLabel = event.event_date ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('pt-BR') : 'data a definir';
+      const local = event.location_text?.trim() || 'local a definir';
+      supabase.functions.invoke('send-push', {
+        body: {
+          roles: ['supervisor'],
+          message: `Evento fechado — ${event.event_name ?? 'Evento'} · ${dateLabel} · ${local}`,
+          url: `/events/${id}`,
+        },
+      }).catch(() => {});
+    }
   };
 
   const changeStatus = (newStatus: string) => {
