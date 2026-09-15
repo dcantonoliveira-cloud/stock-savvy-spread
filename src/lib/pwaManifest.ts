@@ -35,5 +35,5 @@ export function setupPwaManifest() {
     touchIcon.rel = 'apple-touch-icon';
     document.head.appendChild(touchIcon);
   }
-  touchIcon.href = '/pwa-192.png';
+  touchIcon.href = '/app-icon-192.png';
 }
