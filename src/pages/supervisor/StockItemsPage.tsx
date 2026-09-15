@@ -18,6 +18,7 @@ import * as XLSX from 'xlsx';
 import { ItemImage } from '@/components/ItemImage';
 import { fmtNum } from '@/lib/format';
 import { effectiveUnitCost } from '@/lib/units';
+import { formatDateOnlyBR } from '@/lib/utils';
 import ItemFormDialog from '@/components/stock-item/ItemFormDialog';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -665,6 +666,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     suspectDuplicates: { name: string; count: number; totalValue: number; ids: string[] }[];
   } | null>(null);
   const [timeline, setTimeline] = useState<{ date: string; value: number }[] | null>(null);
+  const [timelineAnchor, setTimelineAnchor] = useState<string | null>(null);
 
   const TIMELINE_DAYS = 90;
 
@@ -672,19 +674,28 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
   // estoque atual de cada item e "desfaz" as movimentações (entradas/saídas) voltando no
   // tempo. Simulação — valoriza tudo pelo custo efetivo ATUAL de cada item (não tenta
   // reconstruir o preço histórico), então mostra a tendência de quantidade em estoque.
+  // Não faz sentido "simular" antes da última conferência de estoque concluída: o estoque
+  // registrado até lá pode estar bem longe da realidade (é justamente o que a conferência
+  // corrige), então o gráfico começa nessa data em vez de nos TIMELINE_DAYS inteiros.
   const loadTimeline = async (itemsWithCost: { id: string; current_stock: number; unit_cost: number }[]) => {
     const since = new Date();
     since.setDate(since.getDate() - TIMELINE_DAYS);
     const sinceStr = since.toISOString().split('T')[0];
 
     const sinceIso = since.toISOString();
-    const [entriesRes, outputsRes] = await Promise.all([
+    const [entriesRes, outputsRes, lastCountRes] = await Promise.all([
       // Filtra por created_at (sempre preenchido) — a coluna `date` só existe pra permitir
       // lançamento retroativo e fica NULL em registros antigos de antes dela existir, então
       // filtrar só por `date` perde todo o histórico anterior a isso.
       (supabase.from('stock_entries') as any).select('item_id, quantity, date, created_at').gte('created_at', sinceIso).range(0, 19999),
       (supabase.from('stock_outputs') as any).select('item_id, quantity, date, created_at').gte('created_at', sinceIso).range(0, 19999),
+      (supabase.from('inventory_counts') as any).select('completed_at').eq('status', 'completed').not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false }).limit(1),
     ]);
+
+    const lastCountDate: string | null = (lastCountRes.data?.[0] as any)?.completed_at?.split('T')[0] || null;
+    const effectiveStart = lastCountDate && lastCountDate > sinceStr ? lastCountDate : sinceStr;
+    setTimelineAnchor(lastCountDate && lastCountDate > sinceStr ? lastCountDate : null);
 
     const costMap = new Map(itemsWithCost.map(i => [i.id, i.unit_cost || 0]));
     const runningStock = new Map(itemsWithCost.map(i => [i.id, i.current_stock || 0]));
@@ -705,7 +716,9 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     const days: string[] = [];
     const cursor = new Date();
     for (let i = 0; i < TIMELINE_DAYS; i++) {
-      days.push(cursor.toISOString().split('T')[0]);
+      const dayStr = cursor.toISOString().split('T')[0];
+      if (dayStr < effectiveStart) break;
+      days.push(dayStr);
       cursor.setDate(cursor.getDate() - 1);
     }
 
@@ -928,7 +941,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     toast.success('Relatório exportado!');
   };
 
-  const reset = () => { setData(null); setPareto(null); setTimeline(null); onClose(); };
+  const reset = () => { setData(null); setPareto(null); setTimeline(null); setTimelineAnchor(null); onClose(); };
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) reset(); }}>
@@ -977,9 +990,13 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
               {/* Linha do tempo do valor de estoque */}
               <div className="rounded-xl border border-border bg-card p-4">
-                <p className="text-sm font-medium text-foreground mb-1">Valor de Estoque — últimos {TIMELINE_DAYS} dias</p>
+                <p className="text-sm font-medium text-foreground mb-1">
+                  Valor de Estoque {timelineAnchor ? `— desde a última conferência` : `— últimos ${TIMELINE_DAYS} dias`}
+                </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Simulação a partir das movimentações registradas, valorizada pelo custo atual de cada item.
+                  {timelineAnchor
+                    ? `Simulação desde a última conferência de estoque concluída (${formatDateOnlyBR(timelineAnchor)}) — antes disso o estoque registrado pode não refletir a realidade, já que é isso que a conferência corrige.`
+                    : 'Simulação a partir das movimentações registradas, valorizada pelo custo atual de cada item.'}
                 </p>
                 {!timeline ? (
                   <div className="h-56 flex items-center justify-center text-xs text-muted-foreground">
