@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPushSubscriptionStatus, subscribeToPush, unsubscribeFromPush } from '@/lib/pushNotifications';
+import { getPushSubscriptionStatus, subscribeToPush, unsubscribeFromPush, hasLocalPushSubscription, getLocalPushSubscription } from '@/lib/pushNotifications';
 import MobileEventDetailScreen from './MobileEventDetailScreen';
 import MobileSheetsScreen from './MobileSheetsScreen';
 import MobileStockScreen from './MobileStockScreen';
@@ -245,9 +245,7 @@ function SettingsScreen() {
   useEffect(() => {
     if (!user) return;
     getPushSubscriptionStatus().then(setStatus);
-    supabase.from('push_subscriptions' as any).select('id').eq('user_id', user.id).then(({ data }) => {
-      setHasSubscription(!!data && (data as any[]).length > 0);
-    });
+    hasLocalPushSubscription().then(setHasSubscription);
   }, [user]);
 
   const handleToggle = async () => {
@@ -268,10 +266,8 @@ function SettingsScreen() {
   const handleTestSend = async () => {
     if (!user) return;
     setTesting(true);
-    const { data: subs } = await supabase.from('push_subscriptions' as any)
-      .select('endpoint, p256dh, auth').eq('user_id', user.id).limit(1);
-    const sub = (subs as any[])?.[0];
-    if (!sub) { toast.error('Nenhuma inscrição salva — ative a notificação primeiro'); setTesting(false); return; }
+    const sub = await getLocalPushSubscription();
+    if (!sub) { toast.error('Nenhuma inscrição salva nesse aparelho — ative a notificação primeiro'); setTesting(false); return; }
     const { error } = await supabase.functions.invoke('test-push', {
       body: {
         subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },

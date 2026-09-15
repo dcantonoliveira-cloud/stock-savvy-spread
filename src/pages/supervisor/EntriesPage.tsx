@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { CommandSeparator } from '@/components/ui/command';
 import { Plus, Trash2, Upload, FileText, Camera, FileCode, Loader2, Check, X, AlertTriangle, PackagePlus, Download, Receipt, ShoppingCart, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatDateOnlyBR, todayLocalISO } from '@/lib/utils';
 import { fmtNum, fmtCur } from '@/lib/format';
 import ItemFormDialog, { StockItemFull } from '@/components/stock-item/ItemFormDialog';
 
@@ -143,7 +143,7 @@ export default function EntriesPage() {
   const [supplier, setSupplier] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [notes, setNotes] = useState('');
-  const [entryDate, setEntryDate] = useState(''); // vazio = hoje (comportamento padrão); preenchido = lançamento retroativo
+  const [entryDate, setEntryDate] = useState(todayLocalISO()); // já vem preenchido com hoje; editável pra lançamento retroativo
 
   // NF import state
   const [nfDialogOpen, setNfDialogOpen] = useState(false);
@@ -248,7 +248,7 @@ export default function EntriesPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setEntryDate(''); setItemLocations([]); setAllocationKitchenId(''); };
+  const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setEntryDate(todayLocalISO()); setItemLocations([]); setAllocationKitchenId(''); };
 
   const handleQuickCreateSaved = (item: StockItemFull) => {
     const newItem: Item = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, barcode: item.barcode };
@@ -381,7 +381,7 @@ export default function EntriesPage() {
     const rows = filtered.map(e => {
       const item = items.find(i => i.id === e.item_id);
       return [
-        new Date(e.date).toLocaleDateString('pt-BR'),
+        formatDateOnlyBR(e.date),
         item?.name || '',
         String(e.quantity),
         item?.unit || '',
@@ -1069,8 +1069,8 @@ export default function EntriesPage() {
                   <Input value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} placeholder="Nº da NF" />
                 </div>
                 <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Data (opcional — em branco usa hoje)</label>
-                  <Input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} placeholder="Hoje" />
+                  <label className="text-sm text-muted-foreground mb-1 block">Data</label>
+                  <Input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Observações (opcional)</label>
@@ -1136,7 +1136,7 @@ export default function EntriesPage() {
                 return (
                   <TableRow key={entry.id}>
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {new Date(entry.date).toLocaleDateString('pt-BR')}
+                      {formatDateOnlyBR(entry.date)}
                     </TableCell>
                     <TableCell className="font-medium">
                       {item?.name || (

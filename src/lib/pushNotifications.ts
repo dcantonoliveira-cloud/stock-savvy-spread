@@ -19,6 +19,36 @@ export async function getPushSubscriptionStatus(): Promise<'granted' | 'denied' 
   return Notification.permission;
 }
 
+/** Se ESSE aparelho/navegador está inscrito — nunca olha o banco (que é por conta, não por
+ * aparelho), sempre pergunta direto pro Push API do navegador qual é a inscrição real local. */
+export async function hasLocalPushSubscription(): Promise<boolean> {
+  if (!isPushSupported()) return false;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration('/push-sw.js');
+    if (!registration) return false;
+    const subscription = await registration.pushManager.getSubscription();
+    return !!subscription;
+  } catch {
+    return false;
+  }
+}
+
+/** Endpoint/keys da inscrição local desse aparelho, pra mandar um teste sem depender
+ * de qual inscrição está salva no banco (pode ser de outro aparelho da mesma conta). */
+export async function getLocalPushSubscription(): Promise<{ endpoint: string; p256dh: string; auth: string } | null> {
+  if (!isPushSupported()) return null;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration('/push-sw.js');
+    const subscription = await registration?.pushManager.getSubscription();
+    if (!subscription) return null;
+    const json = subscription.toJSON();
+    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return null;
+    return { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth };
+  } catch {
+    return null;
+  }
+}
+
 export async function subscribeToPush(userId: string): Promise<{ ok: boolean; error?: string }> {
   if (!isPushSupported()) return { ok: false, error: 'Esse navegador não suporta notificações push.' };
 

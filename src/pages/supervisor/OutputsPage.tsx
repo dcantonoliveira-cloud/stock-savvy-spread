@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Trash2, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum } from '@/lib/format';
+import { formatDateOnlyBR, todayLocalISO } from '@/lib/utils';
 
 type Item = { id: string; name: string; unit: string; current_stock: number };
 type Output = { id: string; item_id: string; quantity: number; employee_name: string; event_name: string | null; notes: string | null; date: string; created_at: string };
@@ -41,7 +42,7 @@ export default function SupervisorOutputsPage() {
   const [employeeName, setEmployeeName] = useState('');
   const [eventName, setEventName] = useState('');
   const [notes, setNotes] = useState('');
-  const [outputDate, setOutputDate] = useState(''); // vazio = hoje (padrão); preenchido = lançamento retroativo
+  const [outputDate, setOutputDate] = useState(todayLocalISO()); // já vem preenchido com hoje; editável pra lançamento retroativo
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [itemLocations, setItemLocations] = useState<ItemLocation[]>([]);
   const [allocationKitchenId, setAllocationKitchenId] = useState('');
@@ -110,7 +111,7 @@ export default function SupervisorOutputsPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const resetForm = () => { setItemId(''); setQuantity(''); setEmployeeName(''); setEventName(''); setNotes(''); setOutputDate(''); setItemLocations([]); setAllocationKitchenId(''); };
+  const resetForm = () => { setItemId(''); setQuantity(''); setEmployeeName(''); setEventName(''); setNotes(''); setOutputDate(todayLocalISO()); setItemLocations([]); setAllocationKitchenId(''); };
 
   const handleSave = async () => {
     if (!itemId) { toast.error('Selecione um item'); return; }
@@ -172,7 +173,7 @@ export default function SupervisorOutputsPage() {
     const rows = filtered.map(o => {
       const item = items.find(i => i.id === o.item_id);
       return [
-        new Date(o.date).toLocaleDateString('pt-BR'),
+        formatDateOnlyBR(o.date),
         item?.name || '',
         String(o.quantity),
         item?.unit || '',
@@ -256,8 +257,8 @@ export default function SupervisorOutputsPage() {
                 <Input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="Ex: Casamento Silva" />
               </div>
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Data (opcional — em branco usa hoje)</label>
-                <Input type="date" value={outputDate} onChange={e => setOutputDate(e.target.value)} placeholder="Hoje" />
+                <label className="text-sm text-muted-foreground mb-1 block">Data</label>
+                <Input type="date" value={outputDate} onChange={e => setOutputDate(e.target.value)} />
               </div>
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Observações (opcional)</label>
@@ -313,7 +314,7 @@ export default function SupervisorOutputsPage() {
                 return (
                   <TableRow key={output.id}>
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {new Date(output.date).toLocaleDateString('pt-BR')}
+                      {formatDateOnlyBR(output.date)}
                     </TableCell>
                     <TableCell className="font-medium">{item?.name || '?'}</TableCell>
                     <TableCell className="text-right text-destructive font-semibold">-{fmtNum(output.quantity)}</TableCell>

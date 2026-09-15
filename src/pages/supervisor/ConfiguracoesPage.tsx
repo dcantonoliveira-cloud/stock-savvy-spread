@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { invalidateCompanyCache } from '@/lib/companyCache';
 import { useAuth } from '@/hooks/useAuth';
-import { getPushSubscriptionStatus, subscribeToPush, unsubscribeFromPush } from '@/lib/pushNotifications';
+import { getPushSubscriptionStatus, subscribeToPush, unsubscribeFromPush, hasLocalPushSubscription, getLocalPushSubscription } from '@/lib/pushNotifications';
 import {
   Upload, Loader2, Eye, EyeOff, CheckCircle2, AlertCircle,
   User, Building2, Plug, Camera, Lock, MessageCircle, Save, ChevronDown, ChevronUp,
@@ -202,9 +202,7 @@ function PushNotificationsCard({ userId }: { userId: string }) {
 
   useEffect(() => {
     getPushSubscriptionStatus().then(setStatus);
-    supabase.from('push_subscriptions' as any).select('id').eq('user_id', userId).then(({ data }) => {
-      setHasSubscription(!!data && (data as any[]).length > 0);
-    });
+    hasLocalPushSubscription().then(setHasSubscription);
   }, [userId]);
 
   if (status === 'unsupported') return null;
@@ -225,10 +223,8 @@ function PushNotificationsCard({ userId }: { userId: string }) {
 
   const handleTestSend = async () => {
     setTesting(true);
-    const { data: subs } = await supabase.from('push_subscriptions' as any)
-      .select('endpoint, p256dh, auth').eq('user_id', userId).limit(1);
-    const sub = (subs as any[])?.[0];
-    if (!sub) { toast.error('Nenhuma inscrição salva — ative a notificação primeiro'); setTesting(false); return; }
+    const sub = await getLocalPushSubscription();
+    if (!sub) { toast.error('Nenhuma inscrição salva nesse aparelho — ative a notificação primeiro'); setTesting(false); return; }
     const { error } = await supabase.functions.invoke('test-push', {
       body: {
         subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },

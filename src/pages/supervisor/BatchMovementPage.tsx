@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowUpCircle, ArrowDownCircle, Search, Trash2, Loader2, CheckCircle2, X, Download, Upload, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { fmtNum } from '@/lib/format';
+import { todayLocalISO } from '@/lib/utils';
 
 type Item = { id: string; name: string; category: string; unit: string; current_stock: number; subcategory_id: string | null };
 type LineType = 'entrada' | 'saida';
@@ -28,7 +29,7 @@ export default function BatchMovementPage() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [batch, setBatch] = useState<BatchLine[]>([]);
   const [notes, setNotes] = useState('');
-  const [batchDate, setBatchDate] = useState(''); // vazio = hoje (padrão); preenchido = lançamento retroativo
+  const [batchDate, setBatchDate] = useState(todayLocalISO()); // já vem preenchido com hoje; editável pra lançamento retroativo
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [unmatched, setUnmatched] = useState<UnmatchedRow[]>([]);
@@ -211,7 +212,7 @@ export default function BatchMovementPage() {
       await loadItems();
       setBatch([]);
       setNotes('');
-      setBatchDate('');
+      setBatchDate(todayLocalISO());
       setTimeout(() => setSaved(false), 2000);
     }
   };
@@ -411,7 +412,7 @@ export default function BatchMovementPage() {
             type="date"
             value={batchDate}
             onChange={e => setBatchDate(e.target.value)}
-            title="Data (opcional — em branco usa hoje) — vale para todos os itens"
+            title="Data — vale para todos os itens"
             className="w-40"
           />
         </div>
