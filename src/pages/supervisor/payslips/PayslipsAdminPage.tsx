@@ -267,7 +267,7 @@ export default function PayslipsAdminPage() {
           employee_id: form.employee_id,
           payslip_title: title,
           sign_url: signUrl,
-          channels: ['email', 'whatsapp'],
+          channels: ['email', 'whatsapp', 'push'],
         },
       }).then(({ data: notifData, error: notifErr }) => {
         if (notifErr) return;
@@ -277,6 +277,7 @@ export default function PayslipsAdminPage() {
         if (r.whatsapp?.ok)   toast.success('WhatsApp enviado ao funcionário');
         if (r.whatsapp?.error && r.whatsapp.error !== 'Z-API não configurado')
           toast.error(`WhatsApp: ${r.whatsapp.error}`);
+        if (r.push?.ok)       toast.success('Notificação push enviada ao funcionário');
       });
     } catch (e: any) {
       toast.error(e.message ?? 'Erro ao publicar holerite');

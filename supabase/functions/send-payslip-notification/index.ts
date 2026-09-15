@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import webpush from 'npm:web-push@3.6.7'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -10,7 +11,7 @@ interface NotifyRequest {
   employee_id: string
   payslip_title: string
   sign_url: string            // URL para o funcionário acessar e assinar
-  channels: ('email' | 'whatsapp')[]
+  channels: ('email' | 'whatsapp' | 'push')[]
 }
 
 Deno.serve(async (req) => {
@@ -108,6 +109,42 @@ Deno.serve(async (req) => {
           : { ok: false, error: `Z-API HTTP ${res.status}` }
       } catch (e: any) {
         results.whatsapp = { ok: false, error: e.message }
+      }
+    }
+  }
+
+  // ── Push ──────────────────────────────────────────────────────
+  if (channels.includes('push')) {
+    const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY')
+    const vapidPrivate = Deno.env.get('VAPID_PRIVATE_KEY')
+    if (!vapidPublic || !vapidPrivate) {
+      results.push = { ok: false, error: 'VAPID keys não configuradas' }
+    } else {
+      const { data: subs } = await supabase
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth')
+        .eq('user_id', employee_id)
+
+      if (!subs?.length) {
+        results.push = { ok: false, error: 'Funcionário sem notificação ativada' }
+      } else {
+        webpush.setVapidDetails('mailto:douglas@rondellobuffet.com.br', vapidPublic, vapidPrivate)
+        const relativeUrl = new URL(sign_url).pathname
+        let sent = 0
+        for (const sub of subs) {
+          try {
+            await webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } } as any,
+              JSON.stringify({ message: `📄 Holerite disponível — ${payslip_title}`, url: relativeUrl }),
+            )
+            sent++
+          } catch (err: any) {
+            if (err?.statusCode === 404 || err?.statusCode === 410) {
+              await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
+            }
+          }
+        }
+        results.push = sent > 0 ? { ok: true } : { ok: false, error: 'Falha ao entregar' }
       }
     }
   }

@@ -255,6 +255,27 @@ export default function InventoryPage() {
         await supabase.from('inventory_count_item_assignees' as any).insert(assigneeRowsToInsert);
       }
 
+      // Avisa por push quem ficou responsável por algum item (direto ou via grupo).
+      const notifyUserIds = new Set<string>();
+      for (const resp of finalRespByIdx) {
+        for (const r of resp) {
+          if (r.user_id) notifyUserIds.add(r.user_id);
+          if (r.group_id) {
+            const grp = groups.find(g => g.id === r.group_id);
+            grp?.members.forEach(m => notifyUserIds.add(m.user_id));
+          }
+        }
+      }
+      if (notifyUserIds.size > 0) {
+        supabase.functions.invoke('send-push', {
+          body: {
+            user_ids: [...notifyUserIds],
+            message: '📋 Inventário disponível — já dá pra contar seus itens.',
+            url: '/inventario',
+          },
+        }).catch(() => {});
+      }
+
       toast.success('Contagem criada! Os funcionários já podem contar no app deles.');
       setNewCountOpen(false);
       setOverrides({});
