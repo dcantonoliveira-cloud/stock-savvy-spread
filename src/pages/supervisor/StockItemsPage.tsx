@@ -688,8 +688,8 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
       // Filtra por created_at (sempre preenchido) — a coluna `date` só existe pra permitir
       // lançamento retroativo e fica NULL em registros antigos de antes dela existir, então
       // filtrar só por `date` perde todo o histórico anterior a isso.
-      (supabase.from('stock_entries') as any).select('item_id, quantity, date, created_at').gte('created_at', sinceIso).range(0, 19999),
-      (supabase.from('stock_outputs') as any).select('item_id, quantity, date, created_at').gte('created_at', sinceIso).range(0, 19999),
+      (supabase.from('stock_entries') as any).select('item_id, quantity, date, created_at, notes').gte('created_at', sinceIso).range(0, 19999),
+      (supabase.from('stock_outputs') as any).select('item_id, quantity, date, created_at, notes').gte('created_at', sinceIso).range(0, 19999),
       (supabase.from('inventory_counts') as any).select('completed_at').eq('status', 'completed').not('completed_at', 'is', null)
         .order('completed_at', { ascending: false }).limit(1),
     ]);
@@ -706,14 +706,22 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     // pelo usuário), senão cai pra data de criação — o mesmo padrão usado no resto do sistema.
     const effectiveDate = (row: { date: string | null; created_at: string }) => row.date || row.created_at.split('T')[0];
 
+    // Ajuste manual/correção de estoque não é movimentação real — é o sistema corrigindo um
+    // valor que já estava errado (mesmo critério usado no Pareto). "Desfazer" uma correção ao
+    // voltar no tempo inflaria o passado pelo valor inteiro do erro que acabou de ser corrigido,
+    // então esses movimentos ficam de fora da reconstrução (o item fica "congelado" no valor
+    // atual nos dias antes da correção, já que não temos como saber o real).
+    const isCorrection = (notes: string | null) =>
+      !!notes && (notes.startsWith('Ajuste manual') || notes.startsWith('Correção de estoque'));
+
     const movsByDate = new Map<string, { item_id: string; delta: number }[]>();
     const addMov = (date: string, item_id: string, delta: number) => {
       if (!date) return;
       if (!movsByDate.has(date)) movsByDate.set(date, []);
       movsByDate.get(date)!.push({ item_id, delta });
     };
-    for (const e of (entriesRes.data || []) as any[]) addMov(effectiveDate(e), e.item_id, e.quantity || 0);
-    for (const o of (outputsRes.data || []) as any[]) addMov(effectiveDate(o), o.item_id, -(o.quantity || 0));
+    for (const e of (entriesRes.data || []) as any[]) if (!isCorrection(e.notes)) addMov(effectiveDate(e), e.item_id, e.quantity || 0);
+    for (const o of (outputsRes.data || []) as any[]) if (!isCorrection(o.notes)) addMov(effectiveDate(o), o.item_id, -(o.quantity || 0));
 
     const days: string[] = [];
     const cursor = new Date();
@@ -1031,6 +1039,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                   {timelineAnchor
                     ? `Simulação desde a última conferência de estoque concluída (${formatDateOnlyBR(timelineAnchor)}) — antes disso o estoque registrado pode não refletir a realidade, já que é isso que a conferência corrige.`
                     : 'Simulação a partir das movimentações registradas, valorizada pelo custo atual de cada item.'}
+                  {' '}Ajustes manuais de correção não entram na simulação (não são movimentação real).
                 </p>
                 {!timeline ? (
                   <div className="h-56 flex items-center justify-center text-xs text-muted-foreground">
