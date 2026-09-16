@@ -667,6 +667,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
   } | null>(null);
   const [timeline, setTimeline] = useState<{ date: string; value: number }[] | null>(null);
   const [timelineAnchor, setTimelineAnchor] = useState<string | null>(null);
+  const [weeklyOpening, setWeeklyOpening] = useState<{ monday: string; total: number; byCategory: { category: string; value: number }[] }[] | null>(null);
 
   const TIMELINE_DAYS = 90;
 
@@ -677,7 +678,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
   // Não faz sentido "simular" antes da última conferência de estoque concluída: o estoque
   // registrado até lá pode estar bem longe da realidade (é justamente o que a conferência
   // corrige), então o gráfico começa nessa data em vez de nos TIMELINE_DAYS inteiros.
-  const loadTimeline = async (itemsWithCost: { id: string; current_stock: number; unit_cost: number }[]) => {
+  const loadTimeline = async (itemsWithCost: { id: string; current_stock: number; unit_cost: number; category: string }[]) => {
     const since = new Date();
     since.setDate(since.getDate() - TIMELINE_DAYS);
     const sinceStr = since.toISOString().split('T')[0];
@@ -698,6 +699,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     setTimelineAnchor(lastCountDate && lastCountDate > sinceStr ? lastCountDate : null);
 
     const costMap = new Map(itemsWithCost.map(i => [i.id, i.unit_cost || 0]));
+    const categoryMap = new Map(itemsWithCost.map(i => [i.id, i.category || 'Outros']));
     const runningStock = new Map(itemsWithCost.map(i => [i.id, i.current_stock || 0]));
 
     // Data efetiva do movimento: usa `date` quando preenchida (lançamento com data escolhida
@@ -723,15 +725,47 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     }
 
     const series: { date: string; value: number }[] = [];
+    // Guarda o valor por categoria de cada dia também — usado pra montar o "estoque inicial
+    // da semana" abaixo, sem precisar refazer a reconstrução do zero.
+    const categoryByDay = new Map<string, Map<string, number>>();
     for (const day of days) {
       let total = 0;
-      for (const [id, qty] of runningStock) total += qty * (costMap.get(id) || 0);
+      const catTotals = new Map<string, number>();
+      for (const [id, qty] of runningStock) {
+        const v = qty * (costMap.get(id) || 0);
+        total += v;
+        const cat = categoryMap.get(id) || 'Outros';
+        catTotals.set(cat, (catTotals.get(cat) || 0) + v);
+      }
       series.push({ date: day, value: total });
+      categoryByDay.set(day, catTotals);
       const dayMovs = movsByDate.get(day);
       if (dayMovs) for (const m of dayMovs) runningStock.set(m.item_id, (runningStock.get(m.item_id) || 0) - m.delta);
     }
     series.reverse();
     setTimeline(series);
+
+    // Estoque inicial de cada semana = o estoque no fechamento de domingo (véspera da segunda),
+    // ou seja, ANTES de qualquer movimentação lançada na própria segunda-feira — o que for
+    // movimentado na segunda já conta pra semana que começa nela, não pra anterior.
+    const weeks: { monday: string; total: number; byCategory: { category: string; value: number }[] }[] = [];
+    for (const day of days) {
+      const d = new Date(day + 'T00:00:00');
+      if (d.getDay() !== 1) continue; // 1 = segunda-feira
+      const sunday = new Date(d);
+      sunday.setDate(sunday.getDate() - 1);
+      const sundayStr = sunday.toISOString().split('T')[0];
+      const catTotals = categoryByDay.get(sundayStr);
+      if (!catTotals) continue; // domingo anterior fora da janela reconstruída — semana incompleta
+      const total = [...catTotals.values()].reduce((s, v) => s + v, 0);
+      weeks.push({
+        monday: day,
+        total,
+        byCategory: [...catTotals.entries()].map(([category, value]) => ({ category, value })).sort((a, b) => b.value - a.value),
+      });
+    }
+    weeks.reverse();
+    setWeeklyOpening(weeks);
   };
 
   type ParetoResult = { cutoffCount: number; totalWithMovement: number; rows: { name: string; avgWeekly: number; cumPct: number; qty: number; unit: string; count: number }[] };
@@ -904,7 +938,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
     setData({ totalValue, totalItems: all.length, itemsWithStock, byCategory, topItems, allWithStock, suspectDuplicates });
     setLoading(false);
-    loadTimeline(all.map((i: any) => ({ id: i.id, current_stock: i.current_stock, unit_cost: i.unit_cost })));
+    loadTimeline(all.map((i: any) => ({ id: i.id, current_stock: i.current_stock, unit_cost: i.unit_cost, category: i.category })));
   };
 
   const exportReport = () => {
@@ -941,7 +975,7 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
     toast.success('Relatório exportado!');
   };
 
-  const reset = () => { setData(null); setPareto(null); setTimeline(null); setTimelineAnchor(null); onClose(); };
+  const reset = () => { setData(null); setPareto(null); setTimeline(null); setTimelineAnchor(null); setWeeklyOpening(null); onClose(); };
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) reset(); }}>
@@ -1020,6 +1054,50 @@ function StockReportDialog({ open, onClose }: { open: boolean; onClose: () => vo
                       <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
                     </ComposedChart>
                   </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Estoque inicial da semana (toda segunda-feira, antes das movimentações do dia) */}
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="text-sm font-medium text-foreground mb-1">Estoque Inicial da Semana</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Valor no fechamento de domingo, antes de qualquer movimentação lançada na segunda — o que entra ou sai na
+                  segunda já conta pra semana que começa nela.
+                </p>
+                {!weeklyOpening ? (
+                  <div className="h-24 flex items-center justify-center text-xs text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Calculando...
+                  </div>
+                ) : weeklyOpening.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">
+                    Nenhuma segunda-feira completa dentro do período reconstruído ainda.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border text-muted-foreground">
+                          <th className="text-left py-1.5 pr-3 font-medium">Semana de</th>
+                          <th className="text-right py-1.5 px-3 font-medium">Total</th>
+                          {(weeklyOpening[0]?.byCategory ?? []).map(c => (
+                            <th key={c.category} className="text-right py-1.5 pl-3 font-medium whitespace-nowrap">{c.category}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weeklyOpening.map(w => (
+                          <tr key={w.monday} className="border-b border-border/50 last:border-0">
+                            <td className="py-1.5 pr-3 font-medium text-foreground whitespace-nowrap">{formatDateOnlyBR(w.monday)}</td>
+                            <td className="py-1.5 px-3 text-right font-semibold text-primary whitespace-nowrap">R$ {fmtNum(w.total)}</td>
+                            {(weeklyOpening[0]?.byCategory ?? []).map(c0 => {
+                              const v = w.byCategory.find(c => c.category === c0.category)?.value ?? 0;
+                              return <td key={c0.category} className="py-1.5 pl-3 text-right text-muted-foreground whitespace-nowrap">R$ {fmtNum(v)}</td>;
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
 
