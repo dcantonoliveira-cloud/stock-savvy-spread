@@ -54,12 +54,15 @@ export default function NotificationsPanel({ fullHeight }: { fullHeight?: boolea
   const [notifs, setNotifs] = useState<Notif[]>([]);
 
   const load = useCallback(async () => {
+    // O filtro dos tipos excluídos precisa ir NO BANCO, antes do limite: eles são a
+    // maioria dos registros recentes e, filtrados só depois, ocupavam as 50 vagas e
+    // deixavam o painel vazio mesmo havendo notificação de verdade pra mostrar.
     const { data, error } = await supabase
       .from('app_notifications')
       .select('*')
+      .not('type', 'in', `(${[...EXCLUDED_TYPES].join(',')})`)
       .order('created_at', { ascending: false })
       .limit(50);
-    console.log('[NotificationsPanel] data:', data?.length, 'error:', error?.message);
     if (!error) setNotifs((data ?? []).filter((n: any) => !EXCLUDED_TYPES.has(n.type)) as Notif[]);
   }, []);
 
