@@ -128,6 +128,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let currentUserId: string | null = null;
+    // Momento da última busca de permissões — usado pra não refazer as 4 queries
+    // toda vez que a aba volta ao foco (alternar de janela o dia todo gerava
+    // centenas de consultas por dia sem nada ter mudado).
+    let lastFetchAt = 0;
+    const REFETCH_COOLDOWN_MS = 5 * 60 * 1000;
 
     // onAuthStateChange é a fonte de verdade — cobre inicial + login/logout
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -137,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // setTimeout evita deadlock interno do Supabase client
         setTimeout(async () => {
           await fetchUserData(session.user.id, session.user);
+          lastFetchAt = Date.now();
           setLoading(false);
         }, 0);
       } else {
@@ -152,7 +158,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // canal Realtime (postgres_changes) sempre aberto pra cada sessão logada,
     // que sobrecarregava o banco (WAL polling contínuo do Supabase Realtime).
     const onFocus = () => {
-      if (currentUserId) fetchUserData(currentUserId);
+      if (!currentUserId) return;
+      if (Date.now() - lastFetchAt < REFETCH_COOLDOWN_MS) return;
+      lastFetchAt = Date.now();
+      fetchUserData(currentUserId);
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') onFocus();

@@ -49,7 +49,11 @@ export default defineConfig(({ mode }) => ({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/, /^\/functions/],
         globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
-        globIgnores: ['orcamento.html'],
+        // Os bundles "-legacy-" só são executados por iOS 12/Safari 12 — navegador
+        // moderno baixa e nunca usa. Deixá-los fora do precache corta ~5,5MB da
+        // instalação do PWA; os arquivos continuam no servidor pra quem precisar
+        // (esses aparelhos só perdem o funcionamento offline).
+        globIgnores: ['orcamento.html', '**/*-legacy-*.js', '**/polyfills-legacy-*.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,

@@ -407,12 +407,39 @@ export default function EventArquivosTab({ eventId, event, clientPhone }: Props)
     setAddendumSigners(signers.length > 0 ? signers : [{ name: '', email: '' }]);
   }, [showAddendumZapForm]);
 
-  const autoSave = (field: string, value: string) => {
-    clearTimeout(timers.current[field]);
-    timers.current[field] = setTimeout(async () => {
-      await supabase.from('events').update({ [field]: value || null }).eq('id', eventId);
-    }, 600);
+  // Última versão já gravada de cada campo — evita reescrever a linha inteira do evento
+  // quando o texto não mudou de fato. Cada UPDATE cria uma nova versão da linha no
+  // Postgres (as antigas viram lixo até o vacuum), e o contrato chega a 40KB, então
+  // salvar a cada respiro durante a digitação inchava o banco à toa.
+  const savedValues = useRef<Record<string, string>>({});
+  const pendingValues = useRef<Record<string, string>>({});
+
+  const flushField = async (field: string) => {
+    const value = pendingValues.current[field];
+    if (value === undefined || savedValues.current[field] === value) return;
+    const { error } = await supabase.from('events').update({ [field]: value || null }).eq('id', eventId);
+    if (!error) savedValues.current[field] = value;
   };
+
+  const autoSave = (field: string, value: string) => {
+    pendingValues.current[field] = value;
+    clearTimeout(timers.current[field]);
+    timers.current[field] = setTimeout(() => flushField(field), 2500);
+  };
+
+  // Se a aba for escondida/fechada antes do tempo do auto-save, grava na hora —
+  // com isso o atraso maior não abre janela pra perder texto digitado.
+  useEffect(() => {
+    const flushAll = () => {
+      if (document.visibilityState !== 'hidden') return;
+      for (const field of Object.keys(pendingValues.current)) {
+        clearTimeout(timers.current[field]);
+        flushField(field);
+      }
+    };
+    document.addEventListener('visibilitychange', flushAll);
+    return () => document.removeEventListener('visibilitychange', flushAll);
+  }, [eventId]);
 
   const generateContract = async () => {
     if (!contractTemplate) { toast.error('Nenhum modelo configurado. Vá em Cadastros → Contratos.'); return; }

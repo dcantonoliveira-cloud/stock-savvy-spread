@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -238,16 +238,21 @@ export default function EntriesPage() {
     setLoadingLocations(false);
   };
 
-  const filtered = entries.filter(e => {
-    const item = items.find(i => i.id === e.item_id);
-    const matchDate = filterDate ? e.date === filterDate : true;
+  // Índice por id em vez de items.find() dentro do filtro: sem isso o custo era
+  // (nº de lançamentos × nº de itens) recalculado a cada tecla digitada.
+  const itemsById = useMemo(() => new Map(items.map(i => [i.id, i])), [items]);
+
+  const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    const matchSearch = q
-      ? (item?.name || '').toLowerCase().includes(q) ||
-        (e.supplier || '').toLowerCase().includes(q)
-      : true;
-    return matchDate && matchSearch;
-  });
+    return entries.filter(e => {
+      const matchDate = filterDate ? e.date === filterDate : true;
+      if (!matchDate) return false;
+      if (!q) return true;
+      const item = itemsById.get(e.item_id);
+      return (item?.name || '').toLowerCase().includes(q) ||
+             (e.supplier || '').toLowerCase().includes(q);
+    });
+  }, [entries, itemsById, filterDate, search]);
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
