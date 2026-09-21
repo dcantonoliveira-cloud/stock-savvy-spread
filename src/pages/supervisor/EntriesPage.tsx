@@ -17,7 +17,7 @@ import { cn, formatDateOnlyBR, todayLocalISO } from '@/lib/utils';
 import { fmtNum, fmtCur } from '@/lib/format';
 import ItemFormDialog, { StockItemFull } from '@/components/stock-item/ItemFormDialog';
 
-type Item = { id: string; name: string; unit: string; current_stock: number; barcode: string | null; cost_source_item_id: string | null };
+type Item = { id: string; name: string; unit: string; current_stock: number; barcode: string | null; cost_source_item_id: string | null; unit_cost: number | null };
 type Kitchen = { id: string; name: string; is_default: boolean };
 type ItemLocation = { id: string; kitchen_id: string; current_stock: number };
 type Entry = { id: string; item_id: string; quantity: number; unit_cost: number | null; supplier: string | null; invoice_number: string | null; notes: string | null; date: string; created_at: string };
@@ -194,7 +194,7 @@ export default function EntriesPage() {
     }
 
     const [itemsRes, entriesRes, kitchensRes, aliasesRes] = await Promise.all([
-      (supabase.from('stock_items') as any).select('id, name, unit, current_stock, barcode, cost_source_item_id').order('name').range(0, 9999),
+      (supabase.from('stock_items') as any).select('id, name, unit, current_stock, barcode, cost_source_item_id, unit_cost').order('name').range(0, 9999),
       entriesQuery,
       supabase.from('kitchens').select('id, name, is_default').order('name'),
       (supabase.from('stock_item_aliases') as any).select('item_id, alias'),
@@ -220,12 +220,31 @@ export default function EntriesPage() {
     setItemComboOpen(false);
     setAllocationKitchenId('');
     setItemLocations([]);
-    // Item com preço vinculado a outro insumo: não deixa um custo digitado antes (pra outro
-    // item) sobrar aqui parado e ser enviado por engano.
-    if (items.find(i => i.id === id)?.cost_source_item_id) setUnitCost('');
     if (!id) return;
+
+    const picked = items.find(i => i.id === id);
+    // Item com preço vinculado a outro insumo: o custo não é editável aqui, então limpa
+    // o campo em vez de sugerir qualquer valor.
+    if (picked?.cost_source_item_id) {
+      setUnitCost('');
+    } else {
+      // Sugere o último custo gravado no item. É o valor cru de stock_items.unit_cost
+      // de propósito: é exatamente ele que o salvamento grava de volta, então salvar sem
+      // mexer no campo mantém o preço como está, em vez de alterá-lo sem querer.
+      setUnitCost(picked?.unit_cost ? String(picked.unit_cost) : '');
+    }
+
     setLoadingLocations(true);
-    const { data } = await supabase.from('stock_item_locations').select('id, kitchen_id, current_stock').eq('item_id', id);
+    const [{ data }, { data: sup }] = await Promise.all([
+      supabase.from('stock_item_locations').select('id, kitchen_id, current_stock').eq('item_id', id),
+      (supabase as any).from('item_suppliers').select('supplier_name, unit_price, is_preferred')
+        .eq('item_id', id).order('is_preferred', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+
+    // Fornecedor preferido do item (ou o único cadastrado) já entra preenchido
+    const supplierRow = sup as { supplier_name?: string; unit_price?: number } | null;
+    if (supplierRow?.supplier_name) setSupplier(supplierRow.supplier_name);
+
     const locs = (data || []) as ItemLocation[];
     setItemLocations(locs);
     // Default: if item has non-default kitchen with stock > 0, let user choose; else Estoque Geral
@@ -259,7 +278,7 @@ export default function EntriesPage() {
   const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setEntryDate(todayLocalISO()); setItemLocations([]); setAllocationKitchenId(''); };
 
   const handleQuickCreateSaved = (item: StockItemFull) => {
-    const newItem: Item = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, barcode: item.barcode, cost_source_item_id: item.cost_source_item_id };
+    const newItem: Item = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, barcode: item.barcode, cost_source_item_id: item.cost_source_item_id, unit_cost: item.unit_cost ?? null };
     setItems(prev => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
     handleItemSelect(newItem.id);
   };
@@ -624,7 +643,7 @@ export default function EntriesPage() {
       } as any);
     }
 
-    setItems(prev => [...prev, { id: (data as any).id, name: (data as any).name, unit: pi.unit, current_stock: 0, barcode: pi.barcode, cost_source_item_id: null }].sort((a, b) => a.name.localeCompare(b.name)));
+    setItems(prev => [...prev, { id: (data as any).id, name: (data as any).name, unit: pi.unit, current_stock: 0, barcode: pi.barcode, cost_source_item_id: null, unit_cost: pi.unit_cost ?? null }].sort((a, b) => a.name.localeCompare(b.name)));
     updateParsedItem(idx, 'matched_item_id', (data as any).id);
     updateParsedItem(idx, 'matched_item_name', (data as any).name);
     toast.success(`"${pi.name}" criado no estoque!`);
