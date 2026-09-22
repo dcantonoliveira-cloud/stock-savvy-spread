@@ -18,6 +18,18 @@ import { fmtNum, fmtCur } from '@/lib/format';
 import ItemFormDialog, { StockItemFull } from '@/components/stock-item/ItemFormDialog';
 
 type Item = { id: string; name: string; unit: string; current_stock: number; barcode: string | null; cost_source_item_id: string | null; unit_cost: number | null };
+
+/** Produto já adicionado à nota que está sendo lançada. O destino (centro de custo) e as
+ *  localizações ficam guardados por linha porque variam de item pra item. */
+type EntryLine = {
+  itemId: string;
+  itemName: string;
+  unit: string;
+  quantity: number;
+  unitCost: number | null;
+  kitchenId: string;
+  locations: ItemLocation[];
+};
 type Kitchen = { id: string; name: string; is_default: boolean };
 type ItemLocation = { id: string; kitchen_id: string; current_stock: number };
 type Entry = { id: string; item_id: string; quantity: number; unit_cost: number | null; supplier: string | null; invoice_number: string | null; notes: string | null; date: string; created_at: string };
@@ -137,6 +149,10 @@ export default function EntriesPage() {
   // allocation
   const [itemLocations, setItemLocations] = useState<ItemLocation[]>([]);
   const [allocationKitchenId, setAllocationKitchenId] = useState('');
+  // Produtos já adicionados à nota atual — fornecedor, NF, data e observação são do
+  // lançamento inteiro; cada linha daqui vira uma entrada de estoque separada.
+  const [entryLines, setEntryLines] = useState<EntryLine[]>([]);
+  const [saving, setSaving] = useState(false);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [unitCost, setUnitCost] = useState('');
@@ -275,7 +291,7 @@ export default function EntriesPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setEntryDate(todayLocalISO()); setItemLocations([]); setAllocationKitchenId(''); };
+  const resetForm = () => { setItemId(''); setQuantity(''); setUnitCost(''); setSupplier(''); setInvoiceNumber(''); setNotes(''); setEntryDate(todayLocalISO()); setItemLocations([]); setAllocationKitchenId(''); setEntryLines([]); };
 
   const handleQuickCreateSaved = (item: StockItemFull) => {
     const newItem: Item = { id: item.id, name: item.name, unit: item.unit, current_stock: item.current_stock, barcode: item.barcode, cost_source_item_id: item.cost_source_item_id, unit_cost: item.unit_cost ?? null };
@@ -283,64 +299,107 @@ export default function EntriesPage() {
     handleItemSelect(newItem.id);
   };
 
-  const handleSave = async () => {
-    if (!itemId) { toast.error('Selecione um item'); return; }
-    if (!quantity || parseFloat(quantity) <= 0) { toast.error('Quantidade inválida'); return; }
-    if (!allocationKitchenId) { toast.error('Selecione o destino (centro de custo)'); return; }
-    if (!user) return;
+  /** Valida os campos do produto que está sendo digitado e devolve a linha pronta. */
+  const buildCurrentLine = (silent = false): EntryLine | null => {
+    if (!itemId) { if (!silent) toast.error('Selecione um item'); return null; }
+    if (!quantity || parseFloat(quantity) <= 0) { if (!silent) toast.error('Quantidade inválida'); return null; }
+    if (!allocationKitchenId) { if (!silent) toast.error('Selecione o destino (centro de custo)'); return null; }
+    const picked = items.find(i => i.id === itemId);
+    return {
+      itemId,
+      itemName: picked?.name ?? '?',
+      unit: picked?.unit ?? '',
+      quantity: parseFloat(quantity),
+      unitCost: unitCost ? parseFloat(unitCost) : null,
+      kitchenId: allocationKitchenId,
+      locations: itemLocations,
+    };
+  };
 
-    const qty = parseFloat(quantity);
+  /** Limpa só os campos do produto, preservando fornecedor/NF/data/observação da nota. */
+  const clearItemFields = () => {
+    setItemId(''); setQuantity(''); setUnitCost('');
+    setItemLocations([]); setAllocationKitchenId('');
+  };
 
+  const addLine = () => {
+    const line = buildCurrentLine();
+    if (!line) return;
+    setEntryLines(prev => [...prev, line]);
+    clearItemFields();
+  };
+
+  /** Grava uma linha: entrada + custo do item + fornecedor + saldo no centro de custo.
+   *  Mesma sequência que já era feita para o lançamento de um produto só. */
+  const saveLine = async (line: EntryLine) => {
     const { error } = await supabase.from('stock_entries').insert({
-      item_id: itemId,
-      quantity: qty,
-      unit_cost: unitCost ? parseFloat(unitCost) : null,
+      item_id: line.itemId,
+      quantity: line.quantity,
+      unit_cost: line.unitCost,
       supplier: supplier.trim() || null,
       invoice_number: invoiceNumber.trim() || null,
       notes: notes.trim() || null,
-      registered_by: user.id,
+      registered_by: user!.id,
       ...(entryDate ? { date: entryDate } : {}),
     });
-    if (error) { toast.error('Erro ao registrar entrada'); return; }
+    if (error) throw new Error(`${line.itemName}: ${error.message}`);
 
     // Atualiza o custo do item (dispara automaticamente o histórico de preço via trigger)
     // e vincula o fornecedor ao item, se informado.
-    const parsedCost = unitCost ? parseFloat(unitCost) : null;
-    if (parsedCost && parsedCost > 0) {
-      await supabase.from('stock_items').update({ unit_cost: parsedCost } as any).eq('id', itemId);
+    if (line.unitCost && line.unitCost > 0) {
+      await supabase.from('stock_items').update({ unit_cost: line.unitCost } as any).eq('id', line.itemId);
     }
     if (supplier.trim()) {
-      await linkSupplierToItem(itemId, supplier.trim(), parsedCost);
+      await linkSupplierToItem(line.itemId, supplier.trim(), line.unitCost);
     }
 
     // Update stock_item_locations for the chosen kitchen
-    const existingLoc = itemLocations.find(l => l.kitchen_id === allocationKitchenId);
+    const existingLoc = line.locations.find(l => l.kitchen_id === line.kitchenId);
     if (existingLoc) {
       await supabase.from('stock_item_locations')
-        .update({ current_stock: existingLoc.current_stock + qty } as any)
+        .update({ current_stock: existingLoc.current_stock + line.quantity } as any)
         .eq('id', existingLoc.id);
     } else {
       await supabase.from('stock_item_locations').insert({
-        item_id: itemId,
-        kitchen_id: allocationKitchenId,
-        current_stock: qty,
+        item_id: line.itemId,
+        kitchen_id: line.kitchenId,
+        current_stock: line.quantity,
       } as any);
     }
 
     // Also ensure Estoque Geral has a row for this item (0 if not already)
-    if (defaultKitchen && allocationKitchenId !== defaultKitchen.id) {
-      const hasDefault = itemLocations.some(l => l.kitchen_id === defaultKitchen.id);
+    if (defaultKitchen && line.kitchenId !== defaultKitchen.id) {
+      const hasDefault = line.locations.some(l => l.kitchen_id === defaultKitchen.id);
       if (!hasDefault) {
         await supabase.from('stock_item_locations').insert({
-          item_id: itemId, kitchen_id: defaultKitchen.id, current_stock: 0,
+          item_id: line.itemId, kitchen_id: defaultKitchen.id, current_stock: 0,
         } as any);
       }
     }
+  };
 
-    toast.success('Entrada registrada!');
-    resetForm();
-    setDialogOpen(false);
-    load(filterDate || undefined);
+  const handleSave = async () => {
+    if (!user) return;
+
+    // O produto que estiver preenchido na hora de salvar entra junto, sem precisar
+    // clicar em "adicionar" antes — quem lança um item só segue fazendo como antes.
+    const current = itemId ? buildCurrentLine() : null;
+    if (itemId && !current) return;
+    const allLines = current ? [...entryLines, current] : entryLines;
+    if (allLines.length === 0) { toast.error('Adicione ao menos um produto'); return; }
+
+    setSaving(true);
+    try {
+      for (const line of allLines) await saveLine(line);
+      toast.success(allLines.length === 1 ? 'Entrada registrada!' : `${allLines.length} entradas registradas!`);
+      resetForm();
+      setDialogOpen(false);
+      load(filterDate || undefined);
+    } catch (e: any) {
+      toast.error('Erro ao registrar: ' + (e?.message ?? 'tente de novo'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -1097,6 +1156,42 @@ export default function EntriesPage() {
                     )}
                   </div>
                 )}
+
+                <Button variant="outline" onClick={addLine} disabled={!itemId} className="w-full">
+                  <Plus className="w-4 h-4 mr-2" />Adicionar outro produto a esta nota
+                </Button>
+
+                {entryLines.length > 0 && (
+                  <div className="border border-border rounded-lg divide-y divide-border">
+                    <div className="px-3 py-2 bg-muted/40 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Produtos desta nota ({entryLines.length})
+                      </span>
+                      <span className="text-xs font-semibold text-foreground">
+                        {fmtCur(entryLines.reduce((s, l) => s + l.quantity * (l.unitCost ?? 0), 0))}
+                      </span>
+                    </div>
+                    {entryLines.map((l, idx) => (
+                      <div key={`${l.itemId}-${idx}`} className="px-3 py-2 flex items-center gap-2 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate text-foreground">{l.itemName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {fmtNum(l.quantity)} {l.unit}
+                            {l.unitCost ? ` · ${fmtCur(l.unitCost)}/${l.unit || 'un'}` : ' · sem custo'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setEntryLines(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-muted-foreground hover:text-destructive p-1 shrink-0"
+                          title="Remover produto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div>
                   <label className="text-sm text-muted-foreground mb-1 block">Fornecedor (opcional)</label>
                   <Input value={supplier} onChange={e => setSupplier(e.target.value)} placeholder="Nome do fornecedor" />
@@ -1113,7 +1208,13 @@ export default function EntriesPage() {
                   <label className="text-sm text-muted-foreground mb-1 block">Observações (opcional)</label>
                   <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Observações" />
                 </div>
-                <Button onClick={handleSave} className="w-full">Registrar Entrada</Button>
+                <Button onClick={handleSave} disabled={saving} className="w-full">
+                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {(() => {
+                    const total = entryLines.length + (itemId ? 1 : 0);
+                    return total > 1 ? `Registrar ${total} entradas` : 'Registrar Entrada';
+                  })()}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
