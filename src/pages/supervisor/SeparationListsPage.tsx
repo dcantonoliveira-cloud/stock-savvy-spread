@@ -470,12 +470,23 @@ export default function SeparationListsPage() {
 
         {(() => {
           const matchedNameOf = (row: SepItemRow) => stockItems.find(i => i.id === row.item_id)?.name ?? '';
+          // Valor da linha = custo por unidade do insumo × quantidade pedida. Mesma conta do
+          // total que já aparece na listagem de listas, pra os dois baterem.
+          const rowValue = (r: SepItemRow): number | null => {
+            if (!r.item_id || r.requested_qty == null) return null;
+            const it = stockItems.find(i => i.id === r.item_id);
+            if (!it) return null;
+            return effectiveUnitCost(it.unit_cost || 0, it.purchase_qty) * r.requested_qty;
+          };
+          const totalValue = items.reduce((s, r) => s + (rowValue(r) ?? 0), 0);
+
           const sortedItems = sortCol ? [...items].sort((a, b) => {
             let va: string | number = '', vb: string | number = '';
             if (sortCol === 'raw_name') { va = a.raw_name; vb = b.raw_name; }
             if (sortCol === 'matched') { va = matchedNameOf(a); vb = matchedNameOf(b); }
             if (sortCol === 'requested_qty') { va = a.requested_qty ?? -Infinity; vb = b.requested_qty ?? -Infinity; }
             if (sortCol === 'separated_qty') { va = a.separated_qty ?? -Infinity; vb = b.separated_qty ?? -Infinity; }
+            if (sortCol === 'valor') { va = rowValue(a) ?? -Infinity; vb = rowValue(b) ?? -Infinity; }
             const cmp = typeof va === 'string' ? va.localeCompare(vb as string, 'pt-BR') : (va as number) - (vb as number);
             return sortAsc ? cmp : -cmp;
           }) : items;
@@ -490,6 +501,7 @@ export default function SeparationListsPage() {
                   <SortableTh col="matched" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} className="text-left w-56">Insumo cadastrado</SortableTh>
                   <SortableTh col="requested_qty" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} className="text-right w-28">Qtd. pedida</SortableTh>
                   <SortableTh col="separated_qty" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} className="text-right w-28">Separado</SortableTh>
+                  <SortableTh col="valor" sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} className="text-right w-28">Valor</SortableTh>
                   <th className="w-10" />
                 </tr>
               </thead>
@@ -562,6 +574,13 @@ export default function SeparationListsPage() {
                           ? <span className={row.requested_qty != null && row.separated_qty < row.requested_qty ? 'text-amber-600' : 'text-emerald-600'}>{fmtNum(row.separated_qty)}</span>
                           : <span className="text-muted-foreground/40">—</span>}
                       </td>
+                      <td className="px-4 py-2.5 text-right text-xs">
+                        {(() => {
+                          const v = rowValue(row);
+                          if (v == null) return <span className="text-muted-foreground/40">—</span>;
+                          return <span className="font-semibold text-foreground">{fmtCur(v)}</span>;
+                        })()}
+                      </td>
                       <td className="px-2 py-2.5">
                         <button onClick={() => deleteItemRow(row.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                           <X className="w-3.5 h-3.5" />
@@ -571,9 +590,20 @@ export default function SeparationListsPage() {
                   );
                 })}
                 {items.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-10 text-muted-foreground text-sm">Nenhum item nessa lista.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-10 text-muted-foreground text-sm">Nenhum item nessa lista.</td></tr>
                 )}
               </tbody>
+              {items.length > 0 && (
+                <tfoot>
+                  <tr className="bg-muted/30 border-t border-border">
+                    <td colSpan={4} className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Total da lista
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold text-primary">{fmtCur(totalValue)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
           );
