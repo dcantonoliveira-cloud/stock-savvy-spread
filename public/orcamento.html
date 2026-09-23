@@ -1252,7 +1252,7 @@
       var cancelado = false;
       setBuscando(true);
       var t = setTimeout(function () {
-        var cols = 'id, event_name, event_date, location_text, event_type, guest_count, duration_hours, status, clients(name)';
+        var cols = 'id, event_name, event_date, location_text, event_type, guest_count, duration_hours, status, clients(name), tasting_session_events(session_id, tasting_sessions(scheduled_date, type))';
         var like = '%' + termo + '%';
         /* Duas buscas: pelo nome do evento e pelo nome do cliente — o usuário pode
            lembrar de qualquer um dos dois. Os resultados são unidos sem repetir. */
@@ -1299,6 +1299,23 @@
       return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : d;
     }
 
+    /* Degustação em que o evento está alocado. Pode haver mais de uma; mostra a
+       mais próxima e sinaliza se existirem outras. */
+    function degustacaoDe(ev) {
+      var alocacoes = (ev.tasting_session_events || []).filter(function (a) {
+        return a && a.tasting_sessions && a.tasting_sessions.scheduled_date;
+      });
+      if (!alocacoes.length) return null;
+      alocacoes.sort(function (a, b) {
+        return String(a.tasting_sessions.scheduled_date).localeCompare(String(b.tasting_sessions.scheduled_date));
+      });
+      var s0 = alocacoes[0].tasting_sessions;
+      var txt = 'Degustação ' + dataBr(s0.scheduled_date);
+      if (s0.type) txt += ' (' + (s0.type === 'almoco' ? 'Almoço' : 'Jantar') + ')';
+      if (alocacoes.length > 1) txt += ' +' + (alocacoes.length - 1);
+      return txt;
+    }
+
     return (
       <div style={{ position:'relative', marginBottom:16 }}>
         <Label>Buscar evento em negociação</Label>
@@ -1332,6 +1349,9 @@
                     {ev.location_text ? ' · ' + ev.location_text : ''}
                     {' · '}
                     <span style={{ color:GOLD, fontWeight:600 }}>{STATUS_LABEL[ev.status] || ev.status}</span>
+                    {degustacaoDe(ev) && (
+                      <span style={{ color:'#7C3AED', fontWeight:600 }}>{' · ' + degustacaoDe(ev)}</span>
+                    )}
                   </div>
                 </div>
               );
