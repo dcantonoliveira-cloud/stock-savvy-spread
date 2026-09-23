@@ -1235,6 +1235,113 @@
   }
 
   /* ── ModeloSelector ────────────────────────────────────────────────────── */
+  /* ── Busca de evento (só 1º contato e negociando) ───────────────────────── */
+  var STATUS_BUSCA = ['lead', 'negotiating'];
+  var STATUS_LABEL = { lead: '1º Contato', negotiating: 'Negociando' };
+
+  function BuscaEvento({ onPick }) {
+    const [q, setQ] = React.useState('');
+    const [rows, setRows] = React.useState([]);
+    const [aberto, setAberto] = React.useState(false);
+    const [buscando, setBuscando] = React.useState(false);
+
+    React.useEffect(function () {
+      var termo = q.trim();
+      if (termo.length < 2) { setRows([]); setAberto(false); return; }
+      if (!_supa) return;
+      var cancelado = false;
+      setBuscando(true);
+      var t = setTimeout(function () {
+        var cols = 'id, event_name, event_date, location_text, event_type, guest_count, duration_hours, status, clients(name)';
+        var like = '%' + termo + '%';
+        /* Duas buscas: pelo nome do evento e pelo nome do cliente — o usuário pode
+           lembrar de qualquer um dos dois. Os resultados são unidos sem repetir. */
+        Promise.all([
+          _supa.from('events').select(cols).in('status', STATUS_BUSCA)
+            .ilike('event_name', like).order('event_date', { ascending: false }).limit(15),
+          _supa.from('events').select(cols.replace('clients(name)', 'clients!inner(name)')).in('status', STATUS_BUSCA)
+            .ilike('clients.name', like).order('event_date', { ascending: false }).limit(15)
+        ]).then(function (res) {
+          if (cancelado) return;
+          var vistos = {};
+          var todos = [];
+          (res || []).forEach(function (r) {
+            ((r && r.data) || []).forEach(function (ev) {
+              if (vistos[ev.id]) return;
+              vistos[ev.id] = true;
+              todos.push(ev);
+            });
+          });
+          setRows(todos);
+          setAberto(true);
+          setBuscando(false);
+        }).catch(function () { if (!cancelado) { setBuscando(false); } });
+      }, 300);
+      return function () { cancelado = true; clearTimeout(t); };
+    }, [q]);
+
+    function escolher(ev) {
+      onPick(ev);
+      setQ('');
+      setRows([]);
+      setAberto(false);
+    }
+
+    function rotulo(ev) {
+      var cli = ev.clients && ev.clients.name;
+      if (cli && ev.event_name && cli !== ev.event_name) return ev.event_name + ' · ' + cli;
+      return ev.event_name || cli || 'Sem nome';
+    }
+
+    function dataBr(d) {
+      if (!d) return 'sem data';
+      var p = String(d).slice(0, 10).split('-');
+      return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : d;
+    }
+
+    return (
+      <div style={{ position:'relative', marginBottom:16 }}>
+        <Label>Buscar evento em negociação</Label>
+        <input
+          value={q}
+          onChange={function (e) { setQ(e.target.value); }}
+          onFocus={function () { if (rows.length) setAberto(true); }}
+          placeholder="Digite o nome do evento ou do cliente..."
+          style={{ width:'100%', padding:'9px 11px', fontSize:13, border:'1px solid #E5E7EB',
+                   borderRadius:6, outline:'none', boxSizing:'border-box', fontFamily:'inherit' }}
+        />
+        {buscando && <div style={{ fontSize:11, color:GRAY, marginTop:4 }}>Buscando...</div>}
+        {aberto && !buscando && (
+          <div style={{ position:'absolute', zIndex:30, left:0, right:0, top:'100%', marginTop:4,
+                        background:'#fff', border:'1px solid #E5E7EB', borderRadius:6,
+                        boxShadow:'0 6px 20px rgba(0,0,0,.10)', maxHeight:260, overflowY:'auto' }}>
+            {rows.length === 0 && (
+              <div style={{ padding:'10px 12px', fontSize:12, color:GRAY }}>
+                Nenhum evento em 1º contato ou negociando com esse nome.
+              </div>
+            )}
+            {rows.map(function (ev) {
+              return (
+                <div key={ev.id} onClick={function () { escolher(ev); }}
+                     style={{ padding:'9px 12px', cursor:'pointer', borderBottom:'1px solid #F3F4F6' }}
+                     onMouseEnter={function (e) { e.currentTarget.style.background = '#FAFAFA'; }}
+                     onMouseLeave={function (e) { e.currentTarget.style.background = '#fff'; }}>
+                  <div style={{ fontSize:13, color:NAVY, fontWeight:600 }}>{rotulo(ev)}</div>
+                  <div style={{ fontSize:11, color:GRAY, marginTop:2 }}>
+                    {dataBr(ev.event_date)}
+                    {ev.location_text ? ' · ' + ev.location_text : ''}
+                    {' · '}
+                    <span style={{ color:GOLD, fontWeight:600 }}>{STATUS_LABEL[ev.status] || ev.status}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function ModeloSelector({ modelos, onLoad, onSave, onDelete }) {
     const [showSave, setShowSave] = React.useState(false);
     const [nome, setNome] = React.useState('');
@@ -2447,6 +2554,28 @@
   /* ── App ───────────────────────────────────────────────────────────────── */
   function App() {
     const [cliente, setCliente] = React.useState({ nome:'', data:'', local:'', convidados:'', tipo:'', horas:'' });
+
+    /* Preenche os dados do cliente a partir de um evento escolhido na busca.
+       Campo vazio no evento não apaga o que já estiver digitado aqui. */
+    const preencherDoEvento = React.useCallback(function (ev) {
+      if (!ev) return;
+      var dataBr = '';
+      if (ev.event_date) {
+        var p = String(ev.event_date).slice(0, 10).split('-');
+        if (p.length === 3) dataBr = p[2] + '/' + p[1] + '/' + p[0];
+      }
+      var nomeCli = (ev.clients && ev.clients.name) || ev.event_name || '';
+      setCliente(function (prev) {
+        return {
+          nome:       nomeCli || prev.nome,
+          data:       dataBr || prev.data,
+          local:      ev.location_text || prev.local,
+          tipo:       ev.event_type || prev.tipo,
+          convidados: ev.guest_count != null ? String(ev.guest_count) : prev.convidados,
+          horas:      ev.duration_hours != null ? String(ev.duration_hours) : prev.horas
+        };
+      });
+    }, []);
     const [fraseCapa, setFraseCapa] = React.useState('');
     const [sobreTexto, setSobreTexto] = React.useState('');
     const [pacotes, setPacotes] = React.useState([makePacote(1)]);
@@ -2942,6 +3071,7 @@
           {/* Cliente */}
           <Card>
             <SecHead>Dados do Cliente / Evento</SecHead>
+            <BuscaEvento onPick={preencherDoEvento} />
             <Grid>
               <Field label="Nome do cliente ou casal"><Input value={cliente.nome} onChange={v => setC('nome',v)} placeholder="Ex: Juliana e Pedro" /></Field>
               <Field label="Data do evento"><Input value={cliente.data} onChange={v => setC('data',v)} placeholder="Ex: 15/06/2026" /></Field>
