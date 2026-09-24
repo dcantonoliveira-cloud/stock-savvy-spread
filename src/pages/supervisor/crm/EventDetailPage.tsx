@@ -292,6 +292,7 @@ export default function EventDetailPage() {
           address:  ev.contratante_address  || c?.address  || '',
           zip_code: ev.contratante_zip_code || c?.zip_code || '',
           source:   ev.contratante_source   || c?.source   || '',
+          instagram: ev.contratante_instagram || (c as any)?.instagram || '',
         };
         setClientForm(cf);
         clientFormRef.current = cf;
@@ -490,6 +491,7 @@ export default function EventDetailPage() {
       name: data.name || null, phone: data.phone || null, email: data.email || null,
       cpf: data.cpf || null, rg: data.rg || null, address: data.address || null,
       zip_code: data.zip_code || null, source: data.source || null,
+      instagram: data.instagram || null,
     }).eq('id', clientId);
     if (error) { setSaveStatus('idle'); toast.error('Erro ao salvar: ' + error.message); return; }
     setSaveStatus('saved');
@@ -998,6 +1000,10 @@ export default function EventDetailPage() {
                       <option key={o} value={o}>{o}</option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Instagram dos noivos</label>
+                  <input className={inputCls} value={clientForm.instagram ?? ''} onChange={e => setC('instagram', e.target.value)} placeholder="@perfil (opcional)" />
                 </div>
               </div>
             </div>

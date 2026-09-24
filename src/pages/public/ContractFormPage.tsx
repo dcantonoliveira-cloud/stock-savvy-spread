@@ -19,6 +19,7 @@ interface FormData {
   witness_2_name: string;
   witness_2_email: string;
   source: string;
+  instagram: string;
 }
 
 const inputCls =
@@ -51,7 +52,14 @@ const maskRg = (v: string) => {
 const BLANK: FormData = {
   name: '', cpf: '', rg: '', address: '', zip_code: '',
   phone: '', email: '', witness_name: '', witness_cpf: '', witness_email: '',
-  witness_2_name: '', witness_2_email: '', source: '',
+  witness_2_name: '', witness_2_email: '', source: '', instagram: '',
+};
+
+/** Aceita colagem do perfil inteiro (instagram.com/fulano) ou com @ — guarda só o usuário. */
+const normalizeInstagram = (v: string) => {
+  const semUrl = v.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/+$/, '');
+  const semArroba = semUrl.replace(/^@+/, '');
+  return semArroba ? '@' + semArroba.replace(/\s+/g, '') : '';
 };
 
 function CompanyHeader({ company }: { company: Company | null }) {
@@ -123,6 +131,7 @@ export default function ContractFormPage() {
       contratante_phone:       form.phone       || null,
       contratante_email:       form.email       || null,
       contratante_source:      form.source      || null,
+      contratante_instagram:   form.instagram   || null,
       witness_name:            form.witness_name    || null,
       witness_cpf:             form.witness_cpf     || null,
       witness_email:           form.witness_email   || null,
@@ -149,6 +158,7 @@ export default function ContractFormPage() {
         address:  form.address  || null,
         zip_code: form.zip_code || null,
         source:   form.source   || null,
+        instagram: form.instagram || null,
       }).select('id').single();
       if (newClient) {
         resolvedClientId = newClient.id;
@@ -164,6 +174,7 @@ export default function ContractFormPage() {
         address:  form.address  || undefined,
         zip_code: form.zip_code || undefined,
         source:   form.source   || undefined,
+        instagram: form.instagram || undefined,
       }).eq('id', resolvedClientId);
     }
 
@@ -267,6 +278,21 @@ export default function ContractFormPage() {
                     <option key={o} value={o}>{o}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Instagram dos noivos <span className="text-gray-400 normal-case font-normal">(opcional)</span>
+                </label>
+                <input
+                  className={inputCls}
+                  value={form.instagram}
+                  onChange={set('instagram')}
+                  onBlur={() => setForm(prev => ({ ...prev, instagram: normalizeInstagram(prev.instagram) }))}
+                  placeholder="@seuperfil"
+                />
+                <p className="text-xs text-gray-400 mt-1.5">
+                  É só para marcarmos vocês nas postagens sobre o evento. Pode deixar em branco se preferir.
+                </p>
               </div>
             </div>
           </div>
